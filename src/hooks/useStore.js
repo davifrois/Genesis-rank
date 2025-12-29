@@ -257,6 +257,7 @@ const useStoreState = () => {
             throw new Error('Evento invalido.');
         }
         const selected = new Set(athleteIds);
+        const eventName = data.events.find((event) => event.id === eventId)?.name || eventId;
 
         setData(prev => {
             const previousRanks = buildRankMap(prev.athletes);
@@ -282,7 +283,7 @@ const useStoreState = () => {
         addLog({
             type: 'INFO',
             action: 'ASSIGN_EVENT',
-            details: `Atletas vinculados ao evento ${eventId}.`
+            details: `Atletas vinculados ao evento ${eventName}.`
         });
     };
 

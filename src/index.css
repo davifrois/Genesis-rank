@@ -854,6 +854,105 @@ select {
   justify-content: space-between;
 }
 
+.event-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.event-card {
+  background: var(--surface-muted);
+  border-radius: 16px;
+  padding: 1.2rem;
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.event-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.event-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.event-card__stats {
+  display: flex;
+  gap: 1.6rem;
+}
+
+.event-stat span {
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.event-stat strong {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.event-card__footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.event-assign-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1rem 0 0.6rem;
+}
+
+.event-assign-toolbar .search-input {
+  flex: 1;
+}
+
+.event-assign-list {
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding-right: 0.4rem;
+}
+
+.event-assign-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8rem;
+  padding: 0.8rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  cursor: pointer;
+}
+
+.event-assign-item input {
+  margin-top: 0.2rem;
+}
+
+.event-assign-name {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.select-compact {
+  width: 200px;
+  min-width: 160px;
+}
+
 .mini-chart {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -2189,7 +2288,8 @@ select {
 
   .stats-grid,
   .action-grid,
-  .card-grid {
+  .card-grid,
+  .event-grid {
     grid-template-columns: 1fr;
   }
 
@@ -2232,6 +2332,15 @@ select {
 
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .event-assign-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .select-compact {
+    width: 100%;
   }
 
   .mobile-only {

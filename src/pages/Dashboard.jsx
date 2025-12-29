@@ -7,8 +7,7 @@ import {
     CheckCircle2,
     ClipboardList,
     Clock,
-    CalendarDays,
-    CalendarPlus,
+    Calendar,
     Download,
     LayoutDashboard,
     LayoutGrid,
@@ -46,7 +45,6 @@ const Dashboard = () => {
         addLog,
         currentUser,
         logout,
-        eventResults,
         clearEventResults,
         logs
     } = useStore();
@@ -145,7 +143,7 @@ const Dashboard = () => {
                 setImportError('');
             }, 4000);
         }
-    }, [importAthletes, importMode, showFeedback]);
+    }, [importAthletes, importMode, importEventId, activeEventId, showFeedback]);
 
     const handleManualInputChange = useCallback((id, value) => {
         setManualInputs((prev) => ({ ...prev, [id]: value }));
@@ -305,8 +303,9 @@ const Dashboard = () => {
 
     const assignCandidates = useMemo(() => {
         const term = assignSearch.trim().toLowerCase();
-        if (!term) return athletes;
-        return athletes.filter((athlete) => (
+        const sorted = [...athletes].sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+        if (!term) return sorted;
+        return sorted.filter((athlete) => (
             athlete.nome.toLowerCase().includes(term)
             || (athlete.academia || '').toLowerCase().includes(term)
         ));
@@ -363,7 +362,7 @@ const Dashboard = () => {
 
     const navItems = [
         { id: 'overview', label: 'Visao geral', icon: LayoutDashboard },
-        { id: 'events', label: 'Eventos', icon: CalendarDays, meta: events.length },
+        { id: 'events', label: 'Eventos', icon: Calendar, meta: events.length },
         { id: 'athletes', label: 'Atletas', icon: Users, meta: athletes.length },
         { id: 'automation', label: 'Automacoes', icon: Zap },
         { id: 'activity', label: 'Atividade', icon: Activity }
@@ -387,10 +386,6 @@ const Dashboard = () => {
         }
         if (!newAthlete.academia) {
             showFeedback('error', 'Informe a academia do atleta.');
-            return;
-        }
-        if (events.length > 0 && !newAthlete.eventId) {
-            showFeedback('error', 'Selecione um evento.');
             return;
         }
 
@@ -453,6 +448,8 @@ const Dashboard = () => {
             showFeedback('error', err?.message || 'Falha ao vincular atletas.');
         }
     };
+
+    const selectedAssignCount = Object.values(assignSelection).filter(Boolean).length;
 
     return (
         <div className="admin-shell">
@@ -518,7 +515,7 @@ const Dashboard = () => {
                         <strong>{totals.totalPoints}</strong>
                     </div>
                     <div className="sidebar-stat">
-                        <span>Eventos ao vivo</span>
+                        <span>Eventos cadastrados</span>
                         <strong>{events.length}</strong>
                     </div>
                 </div>
@@ -629,7 +626,7 @@ const Dashboard = () => {
                         </div>
                         <div className="panel-actions">
                             <button type="button" className="btn btn-primary" onClick={openEventModal}>
-                                <CalendarPlus size={14} />
+                                <Calendar size={14} />
                                 Criar evento
                             </button>
                         </div>
@@ -776,7 +773,7 @@ const Dashboard = () => {
                                         <td>
                                             <div className="table-name">{athlete.nome}</div>
                                             <div className="table-meta">
-                                                {athlete.faixa} / {athlete.peso || 'Peso'} / {athlete.categoria} / {athlete.isNoGi ? 'NO-GI' : 'GI'} / {eventLabel}
+                                                {athlete.faixa || 'Faixa'} / {athlete.peso || 'Peso'} / {athlete.categoria || 'Categoria'} / {athlete.isNoGi ? 'NO-GI' : 'GI'} / {eventLabel}
                                             </div>
                                         </td>
                                         <td>{athlete.academia}</td>
@@ -843,7 +840,7 @@ const Dashboard = () => {
                                         <span className="points-pill">{athlete.pontos} pts</span>
                                     </div>
                                     <div className="table-meta">
-                                        {athlete.faixa} / {athlete.peso || 'Peso'} / {athlete.categoria} / {athlete.isNoGi ? 'NO-GI' : 'GI'} / {eventLabel}
+                                        {athlete.faixa || 'Faixa'} / {athlete.peso || 'Peso'} / {athlete.categoria || 'Categoria'} / {athlete.isNoGi ? 'NO-GI' : 'GI'} / {eventLabel}
                                     </div>
                                     <div className="athlete-card__actions">
                                         <div className="points-editor">
@@ -1252,6 +1249,84 @@ const Dashboard = () => {
                                         </button>
                                     </div>
                                 </form>
+                            </div>
+                        </motion.div>
+                    </>
+                )}
+            </AnimatePresence>
+            <AnimatePresence>
+                {showAssignModal && assignEvent && (
+                    <>
+                        <motion.div
+                            className="modal-backdrop"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={handleCloseAssignModal}
+                        />
+                        <motion.div
+                            className="modal-card"
+                            initial={{ opacity: 0, y: 12 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 12 }}
+                        >
+                            <div className="modal-panel modal-panel--wide">
+                                <div className="modal-header">
+                                    <div className="modal-title">Gerenciar atletas</div>
+                                    <button type="button" className="btn btn-ghost" onClick={handleCloseAssignModal}>
+                                        Fechar
+                                    </button>
+                                </div>
+                                <div className="panel-subtitle">
+                                    Evento: {assignEvent.name}. Selecionar move o atleta para este evento.
+                                </div>
+                                <div className="event-assign-toolbar">
+                                    <div className="search-input">
+                                        <Search size={16} />
+                                        <input
+                                            type="text"
+                                            placeholder="Pesquisar atleta"
+                                            value={assignSearch}
+                                            onChange={(event) => setAssignSearch(event.target.value)}
+                                            aria-label="Pesquisar atleta"
+                                        />
+                                    </div>
+                                    <span className="tag">{selectedAssignCount} selecionados</span>
+                                </div>
+                                <div className="event-assign-list">
+                                    {assignCandidates.map((athlete) => {
+                                        const currentEvent = eventMap[athlete.eventId]?.name;
+                                        const metaBase = `${athlete.academia || 'Sem academia'} - ${athlete.faixa || 'Faixa'} / ${athlete.peso || 'Peso'} / ${athlete.categoria || 'Categoria'}`;
+                                        const eventNote = athlete.eventId && athlete.eventId !== assignEvent.id
+                                            ? ` - Atual: ${currentEvent || 'Outro evento'}`
+                                            : '';
+
+                                        return (
+                                            <label key={athlete.id} className="event-assign-item">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={!!assignSelection[athlete.id]}
+                                                    onChange={() => handleToggleAssign(athlete.id)}
+                                                />
+                                                <div>
+                                                    <div className="event-assign-name">{athlete.nome}</div>
+                                                    <div className="table-meta">{metaBase}{eventNote}</div>
+                                                </div>
+                                            </label>
+                                        );
+                                    })}
+                                    {assignCandidates.length === 0 && (
+                                        <div className="panel-subtitle">Nenhum atleta encontrado.</div>
+                                    )}
+                                </div>
+                                <div className="form-actions">
+                                    <button type="button" className="btn btn-ghost" onClick={handleCloseAssignModal}>
+                                        Cancelar
+                                    </button>
+                                    <button type="button" className="btn btn-primary" onClick={handleSaveAssign}>
+                                        Salvar vinculo
+                                    </button>
+                                </div>
                             </div>
                         </motion.div>
                     </>
