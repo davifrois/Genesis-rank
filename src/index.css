@@ -627,6 +627,17 @@ select {
   border: 1px solid var(--border);
 }
 
+.tag-button {
+  cursor: pointer;
+  background: var(--brand-soft);
+  color: var(--brand-strong);
+  border-color: rgba(15, 58, 95, 0.25);
+}
+
+.tag-button:hover {
+  transform: translateY(-1px);
+}
+
 .data-table {
   width: 100%;
   border-collapse: separate;

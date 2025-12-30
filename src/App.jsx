@@ -38,7 +38,7 @@ const AppLayout = () => {
   const [eventError, setEventError] = useState('');
   const [showLogin, setShowLogin] = useState(false);
   const isAdmin = currentUser?.role === 'admin';
-  const canAccessAdmin = !currentUser || isAdmin;
+  const canAccessAdmin = isAdmin;
 
   const handleOpenEventModal = () => {
     setEventError('');

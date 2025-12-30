@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { rankAthletes } from './scoringService';
+import { nextPowerOfTwo } from './bracketService';
 
 const BRAND_PRIMARY = [15, 58, 95];
 const BRAND_ACCENT = [26, 95, 161];
@@ -32,6 +33,299 @@ const runAutoTable = (doc, config) => {
         return;
     }
     throw new Error('Modulo de tabela do PDF nao esta disponivel.');
+};
+
+const loadImage = (src) => new Promise((resolve, reject) => {
+    if (typeof Image === 'undefined') {
+        reject(new Error('Ambiente sem suporte a imagens.'));
+        return;
+    }
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Falha ao carregar imagem.'));
+    img.src = src;
+});
+
+const fitText = (doc, text, maxWidth) => {
+    if (!text) return '';
+    if (doc.getTextWidth(text) <= maxWidth) return text;
+    let trimmed = text;
+    while (trimmed.length > 0 && doc.getTextWidth(`${trimmed}...`) > maxWidth) {
+        trimmed = trimmed.slice(0, -1);
+    }
+    return trimmed.length ? `${trimmed}...` : text;
+};
+
+const computeRoundCenters = (slotCount, seedY, rounds) => {
+    const centers = [];
+    for (let r = 0; r < rounds; r += 1) {
+        const groupSize = 2 ** (r + 1);
+        const matchCount = slotCount / groupSize;
+        const roundCenters = [];
+        for (let m = 0; m < matchCount; m += 1) {
+            const start = m * groupSize;
+            const end = start + groupSize - 1;
+            roundCenters.push((seedY[start] + seedY[end]) / 2);
+        }
+        centers.push(roundCenters);
+    }
+    return centers;
+};
+
+const drawBracketSide = ({
+    doc,
+    seeds,
+    seedY,
+    slotHeight,
+    roundCenters,
+    roundX,
+    nameX,
+    nameWidth,
+    lineStartX,
+    finalX,
+    alignRight
+}) => {
+    const sideRounds = roundCenters.length;
+    const nameFontSize = slotHeight >= 8 ? 7.2 : 6.2;
+    const academyFontSize = Math.max(5, nameFontSize - 1.4);
+    const lineOffset = Math.min(1.6, slotHeight * 0.3);
+    doc.setFont('helvetica', 'normal');
+
+    seeds.forEach((seed, index) => {
+        const y = seedY[index];
+        const name = seed?.name || 'BYE';
+        const academy = seed?.academy || '';
+
+        doc.setTextColor(20);
+        doc.setFontSize(nameFontSize);
+        const nameText = fitText(doc, name, nameWidth - 4);
+        doc.text(nameText, alignRight ? nameX : nameX, y - lineOffset, {
+            align: alignRight ? 'right' : 'left',
+            baseline: 'middle'
+        });
+
+        if (academy) {
+            doc.setTextColor(90);
+            doc.setFontSize(academyFontSize);
+            const academyText = fitText(doc, academy, nameWidth - 4);
+            doc.text(academyText, alignRight ? nameX : nameX, y + lineOffset, {
+                align: alignRight ? 'right' : 'left',
+                baseline: 'middle'
+            });
+        }
+        if (sideRounds === 0) {
+            doc.line(lineStartX, y, finalX, y);
+        } else {
+            doc.line(lineStartX, y, roundX[0], y);
+        }
+    });
+
+    if (sideRounds === 0) return;
+
+    for (let r = 0; r < sideRounds; r += 1) {
+        const currentCenters = roundCenters[r];
+        const x = roundX[r];
+        const nextX = r < sideRounds - 1 ? roundX[r + 1] : finalX;
+        currentCenters.forEach((centerY, matchIndex) => {
+            const child1 = r === 0
+                ? seedY[matchIndex * 2]
+                : roundCenters[r - 1][matchIndex * 2];
+            const child2 = r === 0
+                ? seedY[matchIndex * 2 + 1]
+                : roundCenters[r - 1][matchIndex * 2 + 1];
+            doc.line(x, child1, x, child2);
+            doc.line(x, centerY, nextX, centerY);
+        });
+    }
+};
+
+export const generateBracketsPDF = async (brackets, athletes, options = {}) => {
+    const {
+        eventName = '',
+        eventDate = '',
+        eventLocation = '',
+        logoUrl = '/genesis-logo.png',
+        modeLabel = ''
+    } = options;
+
+    if (!Array.isArray(brackets) || brackets.length === 0) {
+        throw new Error('Nenhuma chave encontrada para exportar.');
+    }
+
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const logo = await loadImage(logoUrl).catch(() => null);
+    const athletesMap = new Map(athletes.map((athlete) => [athlete.id, athlete]));
+
+    brackets.forEach((bracket, index) => {
+        if (index > 0) {
+            doc.addPage('a4', 'landscape');
+        }
+
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+
+        doc.setFillColor(...BRAND_PRIMARY);
+        doc.rect(0, 0, pageWidth, 18, 'F');
+
+        if (logo) {
+            doc.addImage(logo, 'PNG', 10, 3, 26, 12);
+        }
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.setTextColor(255, 255, 255);
+        doc.text('GENESIS ESPORTES - CHAVEAMENTO', 40, 12);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(40);
+
+        const metaParts = [
+            eventName ? `Evento: ${eventName}` : '',
+            eventDate ? `Data: ${formatDate(eventDate)}` : '',
+            eventLocation ? `Local: ${eventLocation}` : '',
+            modeLabel ? `Modalidade: ${modeLabel}` : ''
+        ].filter(Boolean);
+
+        doc.text(metaParts.join(' | '), 10, 26);
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(20);
+        doc.text(`Chave ${bracket.number || '-'}`, 10, 34);
+        doc.text(bracket.label || 'Categoria', pageWidth / 2, 34, { align: 'center' });
+
+        const size = nextPowerOfTwo(bracket.seedIds?.length || 0, 2);
+        const seeds = Array.from({ length: size }, (_, idx) => {
+            const id = bracket.seedIds?.[idx];
+            const athlete = id ? athletesMap.get(id) : null;
+            if (!athlete) {
+                return { name: 'BYE', academy: '' };
+            }
+            return {
+                name: athlete?.nome || 'Atleta',
+                academy: athlete?.academia || 'Sem academia'
+            };
+        });
+
+        const topMargin = 42;
+        const footerPadding = 6;
+        const footerHeight = 38;
+        const bottomMargin = footerHeight + footerPadding;
+        const leftMargin = 10;
+        const rightMargin = 10;
+        const centerGap = 22;
+        const nameWidth = 60;
+        const totalHeight = pageHeight - topMargin - bottomMargin;
+        const sideSlots = size / 2;
+        const slotHeight = totalHeight / sideSlots;
+        const seedY = Array.from({ length: sideSlots }, (_, idx) => (
+            topMargin + slotHeight / 2 + idx * slotHeight
+        ));
+
+        const rounds = Math.max(1, Math.log2(size));
+        const sideRounds = Math.max(0, rounds - 1);
+        const bracketWidth = (pageWidth - leftMargin - rightMargin - 2 * nameWidth - centerGap) / 2;
+        const roundStep = sideRounds > 0 ? bracketWidth / sideRounds : 0;
+        const leftRoundX = Array.from({ length: sideRounds }, (_, r) => (
+            leftMargin + nameWidth + 4 + roundStep * r
+        ));
+        const rightRoundX = Array.from({ length: sideRounds }, (_, r) => (
+            pageWidth - rightMargin - nameWidth - 4 - roundStep * r
+        ));
+        const centerLeftX = pageWidth / 2 - centerGap / 2;
+        const centerRightX = pageWidth / 2 + centerGap / 2;
+
+        const leftSeeds = seeds.slice(0, sideSlots);
+        const rightSeeds = seeds.slice(sideSlots);
+
+        const leftCenters = computeRoundCenters(sideSlots, seedY, sideRounds);
+        const rightCenters = computeRoundCenters(sideSlots, seedY, sideRounds);
+
+        doc.setDrawColor(40);
+        drawBracketSide({
+            doc,
+            seeds: leftSeeds,
+            seedY,
+            slotHeight,
+            roundCenters: leftCenters,
+            roundX: leftRoundX,
+            nameX: leftMargin,
+            nameWidth,
+            lineStartX: leftMargin + nameWidth,
+            finalX: centerLeftX,
+            alignRight: false
+        });
+
+        drawBracketSide({
+            doc,
+            seeds: rightSeeds,
+            seedY,
+            slotHeight,
+            roundCenters: rightCenters,
+            roundX: rightRoundX,
+            nameX: pageWidth - rightMargin,
+            nameWidth,
+            lineStartX: pageWidth - rightMargin - nameWidth,
+            finalX: centerRightX,
+            alignRight: true
+        });
+
+        const finalY = topMargin + totalHeight / 2;
+        doc.setDrawColor(80);
+        doc.circle(pageWidth / 2, finalY, 4, 'S');
+
+        const footerTop = pageHeight - footerHeight;
+        const podiumStartY = footerTop + 4;
+        const podiumGap = 6;
+        const podiumLineStartX = pageWidth / 2 - 4;
+        const podiumLineEndX = pageWidth / 2 + 18;
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(30);
+        doc.text('1º', pageWidth / 2 - 10, podiumStartY, { align: 'center', baseline: 'middle' });
+        doc.text('2º', pageWidth / 2 - 10, podiumStartY + podiumGap, { align: 'center', baseline: 'middle' });
+        doc.text('3º', pageWidth / 2 - 10, podiumStartY + podiumGap * 2, { align: 'center', baseline: 'middle' });
+        doc.setDrawColor(120);
+        doc.line(podiumLineStartX, podiumStartY, podiumLineEndX, podiumStartY);
+        doc.line(podiumLineStartX, podiumStartY + podiumGap, podiumLineEndX, podiumStartY + podiumGap);
+        doc.line(podiumLineStartX, podiumStartY + podiumGap * 2, podiumLineEndX, podiumStartY + podiumGap * 2);
+
+        const baiaCount = 10;
+        const baiaBoxWidth = 10;
+        const baiaBoxHeight = 6;
+        const baiaGap = 2;
+        const baiaTotalWidth = baiaCount * baiaBoxWidth + (baiaCount - 1) * baiaGap;
+        const baiaStartX = (pageWidth - baiaTotalWidth) / 2;
+        const baiaY = footerTop + 18;
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7);
+        doc.setTextColor(40);
+        for (let i = 0; i < baiaCount; i += 1) {
+            const x = baiaStartX + i * (baiaBoxWidth + baiaGap);
+            doc.roundedRect(x, baiaY, baiaBoxWidth, baiaBoxHeight, 1, 1);
+            doc.text(String(i + 1), x + baiaBoxWidth / 2, baiaY + baiaBoxHeight / 2 + 1.5, {
+                align: 'center',
+                baseline: 'middle'
+            });
+        }
+
+        const signLineY = footerTop + 28;
+        const signWidth = 42;
+        doc.setDrawColor(80);
+        doc.line(leftMargin, signLineY, leftMargin + signWidth, signLineY);
+        doc.line(pageWidth - rightMargin - signWidth, signLineY, pageWidth - rightMargin, signLineY);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7);
+        doc.setTextColor(50);
+        doc.text('Chamador', leftMargin + signWidth / 2, signLineY + 4, { align: 'center' });
+        doc.text('Mesario', pageWidth - rightMargin - signWidth / 2, signLineY + 4, { align: 'center' });
+    });
+
+    const fileName = `Chaves_${buildFileSafeName(eventName)}_${buildFileSafeName(modeLabel || 'geral')}.pdf`;
+    doc.save(fileName);
 };
 
 export const generateRankingPDF = (athletes, options = {}) => {

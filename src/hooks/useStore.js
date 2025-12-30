@@ -348,6 +348,80 @@ const useStoreState = () => {
         return newEvent;
     };
 
+    const updateEvent = (eventId, updates = {}) => {
+        if (!eventId) {
+            addLog({ type: 'ERROR', action: 'UPDATE_EVENT', details: 'Evento invalido para edicao.' });
+            throw new Error('Evento invalido.');
+        }
+
+        const current = data.events.find((event) => event.id === eventId);
+        if (!current) {
+            addLog({ type: 'ERROR', action: 'UPDATE_EVENT', details: `Evento nao encontrado: ${eventId}` });
+            throw new Error('Evento nao encontrado.');
+        }
+
+        const name = (updates?.name ?? current.name).toString().trim();
+        if (!name) {
+            addLog({ type: 'ERROR', action: 'UPDATE_EVENT', details: 'Nome do evento nao informado.' });
+            throw new Error('Informe o nome do evento.');
+        }
+
+        const duplicate = data.events.find((item) => (
+            item.id !== eventId
+            && normalizeKeyPart(item.name) === normalizeKeyPart(name)
+        ));
+        if (duplicate) {
+            addLog({ type: 'ERROR', action: 'UPDATE_EVENT', details: `Evento duplicado: ${name}` });
+            throw new Error('Ja existe um evento com este nome.');
+        }
+
+        const updatedEvent = {
+            ...current,
+            name,
+            date: updates?.date ?? current.date ?? '',
+            location: (updates?.location ?? current.location ?? '').toString().trim()
+        };
+
+        setData(prev => ({
+            ...prev,
+            events: prev.events.map((event) => (event.id === eventId ? updatedEvent : event))
+        }));
+
+        addLog({ type: 'INFO', action: 'UPDATE_EVENT', details: `Evento atualizado: ${name}` });
+        return updatedEvent;
+    };
+
+    const deleteEvent = (eventId) => {
+        if (!eventId) {
+            addLog({ type: 'ERROR', action: 'DELETE_EVENT', details: 'Evento invalido para exclusao.' });
+            throw new Error('Evento invalido.');
+        }
+
+        const eventName = data.events.find((event) => event.id === eventId)?.name || eventId;
+
+        setData(prev => {
+            const previousRanks = buildRankMap(prev.athletes);
+            const updatedAthletes = prev.athletes.map((athlete) => (
+                athlete.eventId === eventId
+                    ? { ...athlete, eventId: '' }
+                    : athlete
+            ));
+            const nextRanks = buildRankMap(updatedAthletes);
+
+            return {
+                ...prev,
+                events: prev.events.filter((event) => event.id !== eventId),
+                activeEventId: prev.activeEventId === eventId ? null : prev.activeEventId,
+                athletes: updatedAthletes,
+                brackets: prev.brackets.filter((bracket) => bracket.eventId !== eventId),
+                rankHistory: ensureRankHistory(updatedAthletes, prev.rankHistory || {}),
+                notifications: buildRankNotifications(previousRanks, nextRanks, updatedAthletes, prev.notifications || [])
+            };
+        });
+
+        addLog({ type: 'WARN', action: 'DELETE_EVENT', details: `Evento removido: ${eventName}` });
+    };
+
     const setActiveEvent = (eventId) => {
         setData(prev => ({ ...prev, activeEventId: eventId || null }));
         const eventName = data.events.find((event) => event.id === eventId)?.name || 'Evento';
@@ -514,14 +588,14 @@ const useStoreState = () => {
             throw new Error('Selecione um evento para gerar as chaves.');
         }
 
-        const { brackets, nextNumber } = buildBracketPayloads(
+        const payload = buildBracketPayloads(
             data.athletes,
             eventId,
             mode,
             data.nextBracketNumber || 1
         );
 
-        if (brackets.length === 0) {
+        if (payload.brackets.length === 0) {
             return { created: 0 };
         }
 
@@ -533,12 +607,6 @@ const useStoreState = () => {
             const remaining = replaceExisting
                 ? prev.brackets.filter((bracket) => !replaceMode(bracket))
                 : prev.brackets;
-            const payload = buildBracketPayloads(
-                prev.athletes,
-                eventId,
-                mode,
-                prev.nextBracketNumber || 1
-            );
 
             return {
                 ...prev,
@@ -550,10 +618,10 @@ const useStoreState = () => {
         addLog({
             type: 'INFO',
             action: 'GENERATE_BRACKETS',
-            details: `Chaves geradas: ${brackets.length} para evento ${eventId}.`
+            details: `Chaves geradas: ${payload.brackets.length} para evento ${eventId}.`
         });
 
-        return { created: brackets.length };
+        return { created: payload.brackets.length, brackets: payload.brackets };
     };
 
     const setBracketPodium = (bracketId, podium) => {
@@ -749,6 +817,8 @@ const useStoreState = () => {
         openEventModal,
         closeEventModal,
         addEvent,
+        updateEvent,
+        deleteEvent,
         setActiveEvent,
         assignAthletesToEvent,
         addAthlete,

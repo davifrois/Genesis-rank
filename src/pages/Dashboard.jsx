@@ -14,17 +14,19 @@ import {
     List,
     LogOut,
     Menu,
+    Pencil,
     RotateCcw,
     Search,
     ShieldCheck,
     Sparkles,
     Trophy,
+    Trash2,
     Upload,
     UserPlus,
     Users,
     Zap
 } from 'lucide-react';
-import { generateRankingPDF } from '../services/pdfService';
+import { generateBracketsPDF, generateRankingPDF } from '../services/pdfService';
 import { extractTextFromPdfFile, parseAthletesFromText } from '../services/pdfImportService';
 import { buildBracketMatches } from '../services/bracketService';
 import { authService } from '../services/authService';
@@ -55,6 +57,8 @@ const Dashboard = () => {
         events,
         activeEventId,
         openEventModal,
+        updateEvent,
+        deleteEvent,
         setActiveEvent,
         assignAthletesToEvent,
         addLog,
@@ -82,6 +86,9 @@ const Dashboard = () => {
     const [bracketEventId, setBracketEventId] = useState(activeEventId || '');
     const [bracketMode, setBracketMode] = useState('ALL');
     const [bracketSearch, setBracketSearch] = useState('');
+    const [showEventEditModal, setShowEventEditModal] = useState(false);
+    const [eventEditForm, setEventEditForm] = useState({ id: '', name: '', date: '', location: '' });
+    const [eventEditError, setEventEditError] = useState('');
     const [newAthlete, setNewAthlete] = useState({
         nome: '',
         faixa: 'Branca',
@@ -138,6 +145,58 @@ const Dashboard = () => {
             showFeedback('error', message);
         }
     }, [activeEventId, athletes, clearEventResults, events, showFeedback]);
+
+    const handleOpenEditEvent = useCallback((eventItem) => {
+        if (!eventItem) return;
+        setEventEditError('');
+        setEventEditForm({
+            id: eventItem.id,
+            name: eventItem.name || '',
+            date: eventItem.date || '',
+            location: eventItem.location || ''
+        });
+        setShowEventEditModal(true);
+    }, []);
+
+    const handleCloseEditEvent = useCallback(() => {
+        setShowEventEditModal(false);
+        setEventEditError('');
+        setEventEditForm({ id: '', name: '', date: '', location: '' });
+    }, []);
+
+    const handleUpdateEvent = useCallback((event) => {
+        event.preventDefault();
+        setEventEditError('');
+        try {
+            const updated = updateEvent(eventEditForm.id, {
+                name: eventEditForm.name,
+                date: eventEditForm.date,
+                location: eventEditForm.location
+            });
+            showFeedback('success', `Evento atualizado: ${updated?.name || 'evento'}.`);
+            handleCloseEditEvent();
+        } catch (err) {
+            const message = err?.message || 'Falha ao atualizar evento.';
+            setEventEditError(message);
+            showFeedback('error', message);
+        }
+    }, [eventEditForm, updateEvent, showFeedback, handleCloseEditEvent]);
+
+    const handleDeleteEvent = useCallback(() => {
+        if (!eventEditForm.id) return;
+        const name = eventEditForm.name || 'evento selecionado';
+        const confirmed = window.confirm(`Deseja apagar o ${name}? Esta acao nao pode ser desfeita.`);
+        if (!confirmed) return;
+        try {
+            deleteEvent(eventEditForm.id);
+            showFeedback('success', 'Evento removido com sucesso.');
+            handleCloseEditEvent();
+        } catch (err) {
+            const message = err?.message || 'Falha ao remover evento.';
+            setEventEditError(message);
+            showFeedback('error', message);
+        }
+    }, [eventEditForm.id, eventEditForm.name, deleteEvent, showFeedback, handleCloseEditEvent]);
 
     const handleImportRanking = useCallback(() => {
         importInputRef.current?.click();
@@ -219,7 +278,12 @@ const Dashboard = () => {
         }
     }, [manualInputs, setManualPoints, showFeedback]);
 
-    const handleGenerateBrackets = useCallback(() => {
+    const handleRefreshBeltSummary = useCallback(() => {
+        setNow(new Date());
+        showFeedback('success', 'Resumo por faixa atualizado.');
+    }, [showFeedback]);
+
+    const handleGenerateBrackets = useCallback(async () => {
         if (!bracketEventId) {
             showFeedback('error', 'Selecione um evento para gerar as chaves.');
             return;
@@ -243,13 +307,27 @@ const Dashboard = () => {
             });
             if (result.created > 0) {
                 showFeedback('success', `${result.created} chaves geradas.`);
+                const eventMeta = events.find((event) => event.id === bracketEventId);
+                const modeLabelMap = {
+                    ALL: 'Geral',
+                    GI: 'GI (peso)',
+                    'NO-GI': 'NO-GI (peso)',
+                    'ABS-GI': 'ABS GI',
+                    'ABS-NO-GI': 'ABS NO-GI'
+                };
+                await generateBracketsPDF(result.brackets || [], athletes, {
+                    eventName: eventMeta?.name || 'Evento',
+                    eventDate: eventMeta?.date || '',
+                    eventLocation: eventMeta?.location || '',
+                    modeLabel: modeLabelMap[bracketMode] || bracketMode
+                });
             } else {
                 showFeedback('error', 'Nenhuma categoria encontrada para gerar chaves.');
             }
         } catch (err) {
             showFeedback('error', err?.message || 'Falha ao gerar chaves.');
         }
-    }, [bracketEventId, bracketMode, brackets, generateBrackets, showFeedback]);
+    }, [bracketEventId, bracketMode, brackets, events, generateBrackets, athletes, showFeedback]);
 
     const handleApplyBracketPodium = useCallback((bracketId) => {
         const result = applyBracketPodium(bracketId);
@@ -366,6 +444,19 @@ const Dashboard = () => {
             setBracketEventId(activeEventId);
         }
     }, [activeEventId, newAthlete.eventId, importEventId, bracketEventId]);
+
+    useEffect(() => {
+        const eventIds = new Set(events.map((event) => event.id));
+        if (eventFilter !== 'all' && eventFilter !== 'none' && !eventIds.has(eventFilter)) {
+            setEventFilter('all');
+        }
+        if (importEventId && !eventIds.has(importEventId)) {
+            setImportEventId('');
+        }
+        if (bracketEventId && !eventIds.has(bracketEventId)) {
+            setBracketEventId('');
+        }
+    }, [events, eventFilter, importEventId, bracketEventId]);
 
     const eventMap = useMemo(() => (
         events.reduce((acc, event) => {
@@ -798,6 +889,14 @@ const Dashboard = () => {
                                             >
                                                 Gerenciar atletas
                                             </button>
+                                            <button
+                                                type="button"
+                                                className="btn btn-ghost"
+                                                onClick={() => handleOpenEditEvent(event)}
+                                            >
+                                                <Pencil size={14} />
+                                                Editar
+                                            </button>
                                         </div>
                                     </div>
                                 );
@@ -974,7 +1073,14 @@ const Dashboard = () => {
                             <div className="panel-title">Resumo por faixa</div>
                             <div className="panel-subtitle">Distribuicao de pontos por graduacao</div>
                         </div>
-                        <span className="tag">Atualizado</span>
+                        <button
+                            type="button"
+                            className="tag tag-button"
+                            onClick={handleRefreshBeltSummary}
+                            title={`Atualizado as ${now.toLocaleTimeString('pt-BR')}`}
+                        >
+                            Atualizar
+                        </button>
                     </div>
                     <div className="mini-chart">
                         {beltStats.map((belt) => (
@@ -1445,6 +1551,89 @@ const Dashboard = () => {
                                         </div>
                                     ))}
                                 </div>
+                            </div>
+                        </motion.div>
+                    </>
+                )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+                {showEventEditModal && (
+                    <>
+                        <motion.div
+                            className="modal-backdrop"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={handleCloseEditEvent}
+                        />
+                        <motion.div
+                            className="modal-card"
+                            initial={{ opacity: 0, y: 12 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 12 }}
+                        >
+                            <div className="modal-panel">
+                                <div className="modal-header">
+                                    <div className="modal-title">Editar evento</div>
+                                    <button type="button" className="btn btn-ghost" onClick={handleCloseEditEvent}>
+                                        Fechar
+                                    </button>
+                                </div>
+                                {eventEditError && (
+                                    <div className="login-error" role="alert">
+                                        <AlertCircle size={18} />
+                                        <p>{eventEditError}</p>
+                                    </div>
+                                )}
+                                <form onSubmit={handleUpdateEvent}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                        <div>
+                                            <label className="table-meta">Nome do evento</label>
+                                            <input
+                                                className="input"
+                                                type="text"
+                                                value={eventEditForm.name}
+                                                onChange={(event) => setEventEditForm({ ...eventEditForm, name: event.target.value })}
+                                                placeholder="Ex: Etapa 1 - Regional"
+                                                required
+                                            />
+                                        </div>
+                                        <div className="form-grid">
+                                            <div>
+                                                <label className="table-meta">Data</label>
+                                                <input
+                                                    className="input"
+                                                    type="date"
+                                                    value={eventEditForm.date}
+                                                    onChange={(event) => setEventEditForm({ ...eventEditForm, date: event.target.value })}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="table-meta">Local</label>
+                                                <input
+                                                    className="input"
+                                                    type="text"
+                                                    value={eventEditForm.location}
+                                                    onChange={(event) => setEventEditForm({ ...eventEditForm, location: event.target.value })}
+                                                    placeholder="Ex: Arena Central"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="form-actions">
+                                        <button type="button" className="btn btn-ghost" onClick={handleCloseEditEvent}>
+                                            Cancelar
+                                        </button>
+                                        <button type="button" className="btn btn-danger" onClick={handleDeleteEvent}>
+                                            <Trash2 size={14} />
+                                            Apagar evento
+                                        </button>
+                                        <button type="submit" className="btn btn-primary">
+                                            Salvar alteracoes
+                                        </button>
+                                    </div>
+                                </form>
                             </div>
                         </motion.div>
                     </>
