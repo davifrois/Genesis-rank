@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Medal, Search } from 'lucide-react';
 import { useStore } from '../hooks/useStore';
 import { rankAthletes } from '../services/scoringService';
@@ -27,8 +27,20 @@ const buildGroupDescriptor = (athlete) => {
 };
 
 const Ranking = () => {
-    const { athletes } = useStore();
+    const { athletes, events, activeEventId } = useStore();
     const [activeTab, setActiveTab] = useState('GI');
+    const [selectedEventId, setSelectedEventId] = useState(activeEventId || 'all');
+
+    useEffect(() => {
+        const hasSelectedEvent = events.some((event) => event.id === selectedEventId);
+        if (selectedEventId !== 'all' && selectedEventId !== 'none' && !hasSelectedEvent) {
+            setSelectedEventId(activeEventId || 'all');
+        }
+    }, [activeEventId, events, selectedEventId]);
+
+    const selectedEvent = useMemo(() => (
+        events.find((event) => event.id === selectedEventId)
+    ), [events, selectedEventId]);
 
     const tabs = [
         { id: 'GI', label: 'Categoria de Peso GI (COM Pano)' },
@@ -38,15 +50,24 @@ const Ranking = () => {
         { id: 'GERAL', label: 'GERAL' }
     ];
 
-    const filteredAthletes = useMemo(() => {
+    const eventFilteredAthletes = useMemo(() => {
         return athletes.filter((athlete) => {
+            if (selectedEventId === 'none') return !athlete.eventId;
+            if (selectedEventId === 'all') return true;
+            return athlete.eventId === selectedEventId;
+        });
+    }, [athletes, selectedEventId]);
+
+    const filteredAthletes = useMemo(() => {
+        return eventFilteredAthletes.filter((athlete) => {
             if (activeTab === 'GI') return !athlete.isNoGi && !athlete.isAbsolute;
             if (activeTab === 'NO-GI') return athlete.isNoGi && !athlete.isAbsolute;
             if (activeTab === 'ABS-GI') return !athlete.isNoGi && athlete.isAbsolute;
             if (activeTab === 'ABS-NO-GI') return athlete.isNoGi && athlete.isAbsolute;
             return true;
         });
-    }, [athletes, activeTab]);
+    }, [activeTab, eventFilteredAthletes]);
+
 
     const { groupedAthletes, overallWinners } = useMemo(() => {
         const groups = {};
@@ -92,6 +113,27 @@ const Ranking = () => {
         <div className="ranking-minimal">
             <div className="correction-banner">
                 <button type="button" className="correction-link">Solicitar Correcao</button>
+            </div>
+
+            <div className="rank-controls">
+                <div>
+                    <div className="rank-controls__label">Evento</div>
+                    <div className="rank-controls__value">
+                        {selectedEvent?.name || (selectedEventId === 'none' ? 'Sem evento' : 'Todos os eventos')}
+                    </div>
+                </div>
+                <select
+                    className="input select-compact"
+                    value={selectedEventId}
+                    onChange={(event) => setSelectedEventId(event.target.value)}
+                    aria-label="Selecionar evento"
+                >
+                    <option value="all">Todos os eventos</option>
+                    <option value="none">Sem evento</option>
+                    {events.map((eventItem) => (
+                        <option key={eventItem.id} value={eventItem.id}>{eventItem.name}</option>
+                    ))}
+                </select>
             </div>
 
             <div className="tab-container minimal-tabs">

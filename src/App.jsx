@@ -4,6 +4,7 @@ import { Trophy, User, Activity, Settings, AlertCircle } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Dashboard from './pages/Dashboard';
 import Ranking from './pages/Ranking';
+import TeamRanking from './pages/TeamRanking';
 import { useStore } from './hooks/useStore';
 import './index.css';
 
@@ -82,6 +83,13 @@ const AppLayout = () => {
             >
               Ranking Oficial
             </Link>
+            <Link
+              to="/ranking-equipes"
+              className={`nav-link ${location.pathname === '/ranking-equipes' ? 'is-active' : ''}`}
+              aria-current={location.pathname === '/ranking-equipes' ? 'page' : undefined}
+            >
+              Ranking Equipes
+            </Link>
           </nav>
 
           <div className="topbar-actions">
@@ -114,6 +122,7 @@ const AppLayout = () => {
               <Routes location={location}>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/ranking" element={<Ranking />} />
+                <Route path="/ranking-equipes" element={<TeamRanking />} />
               </Routes>
             </motion.div>
           </AnimatePresence>

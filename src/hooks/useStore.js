@@ -379,6 +379,28 @@ const useStoreState = () => {
         return true;
     };
 
+    const resetAthletePoints = (id) => {
+        setData(prev => {
+            const previousRanks = buildRankMap(prev.athletes);
+            const updatedAthletes = prev.athletes.map(a => {
+                if (a.id === id) {
+                    return { ...a, historico: [], pontos: 0 };
+                }
+                return a;
+            });
+            const nextRanks = buildRankMap(updatedAthletes);
+
+            return {
+                ...prev,
+                athletes: updatedAthletes,
+                rankHistory: ensureRankHistory(updatedAthletes, prev.rankHistory || {}),
+                notifications: buildRankNotifications(previousRanks, nextRanks, updatedAthletes, prev.notifications || [])
+            };
+        });
+
+        addLog({ type: 'INFO', action: 'RESET_POINTS', details: `Pontos limpos para ID ${id}` });
+    };
+
     const clearAthletes = () => {
         setData(prev => ({
             ...prev,
@@ -465,6 +487,7 @@ const useStoreState = () => {
         addAthlete,
         updateAthletePoints,
         setManualPoints,
+        resetAthletePoints,
         clearAthletes,
         importAthletes,
         addLog,

@@ -1,29 +1,29 @@
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
 
 :root {
-  --bg: #f7f7f3;
-  --bg-alt: #efefea;
+  --bg: #f3f7fb;
+  --bg-alt: #e9f0f7;
   --surface: #ffffff;
-  --surface-muted: rgba(17, 24, 39, 0.02);
-  --surface-strong: #111827;
-  --ink: #111827;
-  --ink-strong: #0f172a;
-  --muted: rgba(17, 24, 39, 0.62);
-  --muted-strong: rgba(17, 24, 39, 0.82);
-  --border: rgba(17, 24, 39, 0.12);
-  --brand: #d14b4b;
-  --brand-strong: #b53e3e;
-  --brand-soft: rgba(209, 75, 75, 0.12);
-  --accent: #d14b4b;
-  --accent-strong: #b53e3e;
-  --accent-soft: rgba(209, 75, 75, 0.12);
-  --success: #d14b4b;
-  --warning: #d14b4b;
-  --danger: #d14b4b;
-  --info: #d14b4b;
-  --shadow-sm: 0 8px 20px rgba(17, 24, 39, 0.06);
-  --shadow-md: 0 16px 34px rgba(17, 24, 39, 0.08);
-  --shadow-lg: 0 28px 50px rgba(17, 24, 39, 0.12);
+  --surface-muted: rgba(15, 42, 71, 0.04);
+  --surface-strong: #0b2238;
+  --ink: #0b2238;
+  --ink-strong: #071525;
+  --muted: rgba(11, 34, 56, 0.62);
+  --muted-strong: rgba(11, 34, 56, 0.82);
+  --border: rgba(11, 34, 56, 0.14);
+  --brand: #0f3a5f;
+  --brand-strong: #0a2b46;
+  --brand-soft: rgba(15, 58, 95, 0.12);
+  --accent: #1a5fa1;
+  --accent-strong: #124574;
+  --accent-soft: rgba(26, 95, 161, 0.14);
+  --success: #1a5fa1;
+  --warning: #1a5fa1;
+  --danger: #1a5fa1;
+  --info: #1a5fa1;
+  --shadow-sm: 0 8px 20px rgba(11, 34, 56, 0.08);
+  --shadow-md: 0 16px 34px rgba(11, 34, 56, 0.12);
+  --shadow-lg: 0 28px 50px rgba(11, 34, 56, 0.16);
   --radius-lg: 18px;
   --radius-md: 14px;
   --radius-sm: 10px;
@@ -44,8 +44,8 @@ html {
 }
 
 body {
-  background: radial-gradient(circle at top left, rgba(17, 24, 39, 0.05) 0%, transparent 55%),
-    radial-gradient(circle at 20% 20%, rgba(209, 75, 75, 0.08) 0%, transparent 60%),
+  background: radial-gradient(circle at top left, rgba(15, 58, 95, 0.08) 0%, transparent 55%),
+    radial-gradient(circle at 20% 20%, rgba(26, 95, 161, 0.1) 0%, transparent 60%),
     linear-gradient(180deg, var(--bg) 0%, var(--bg-alt) 100%);
   color: var(--ink);
   min-height: 100vh;
@@ -641,6 +641,11 @@ select {
   padding: 0 0.8rem;
 }
 
+.data-table th.points-col,
+.data-table td.points-col {
+  text-align: center;
+}
+
 .data-table td {
   padding: 1rem 0.8rem;
   background: var(--surface-muted);
@@ -678,12 +683,16 @@ select {
 }
 
 .points-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: var(--brand-soft);
   color: var(--brand-strong);
   padding: 0.25rem 0.6rem;
   border-radius: 999px;
   font-weight: 700;
   font-size: 0.75rem;
+  min-width: 56px;
 }
 
 .row-actions {
@@ -719,6 +728,28 @@ select {
   color: var(--brand-strong);
   background: var(--brand-soft);
   border-color: rgba(209, 75, 75, 0.25);
+}
+
+.action-btn--reset {
+  color: var(--brand-strong);
+  background: var(--surface-muted);
+  border-color: var(--border);
+}
+
+.action-btn--podium-silver {
+  color: var(--ink);
+  background: var(--surface-muted);
+  border-color: var(--border);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.action-btn--podium-bronze {
+  color: var(--brand-strong);
+  background: rgba(15, 58, 95, 0.12);
+  border-color: rgba(15, 58, 95, 0.25);
+  font-size: 0.75rem;
+  font-weight: 700;
 }
 
 .action-btn--set {
@@ -1353,6 +1384,29 @@ select {
   gap: 1.4rem;
 }
 
+.rank-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.rank-controls__label {
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.rank-controls__value {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin-top: 0.25rem;
+}
+
 .tab-container {
   display: flex;
   flex-wrap: wrap;
@@ -1431,6 +1485,32 @@ select {
 
 .import-status.is-error {
   color: var(--brand-strong);
+}
+
+.import-debug {
+  flex-basis: 100%;
+  margin-top: 0.6rem;
+  border: 1px dashed var(--border);
+  background: #fff;
+  border-radius: 12px;
+  padding: 0.6rem 0.7rem;
+  font-size: 0.7rem;
+  color: var(--ink);
+}
+
+.import-debug__title {
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted-strong);
+  margin-bottom: 0.4rem;
+}
+
+.import-debug pre {
+  white-space: pre-wrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.7rem;
+  line-height: 1.4;
 }
 
 .correction-banner {
@@ -1730,8 +1810,8 @@ select {
 }
 
 .podium-card--ouro {
-  background: var(--brand-soft);
-  border-color: rgba(209, 75, 75, 0.3);
+  background: var(--accent-soft);
+  border-color: rgba(26, 95, 161, 0.3);
 }
 
 .podium-card--prata {
@@ -1740,8 +1820,8 @@ select {
 }
 
 .podium-card--bronze {
-  background: rgba(209, 75, 75, 0.08);
-  border-color: rgba(209, 75, 75, 0.2);
+  background: rgba(15, 58, 95, 0.08);
+  border-color: rgba(15, 58, 95, 0.2);
 }
 
 .podium-card__icon {
@@ -1783,6 +1863,52 @@ select {
   font-size: 0.65rem;
   text-transform: uppercase;
   letter-spacing: 0.12em;
+}
+
+.rank-team {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+.rank-team__header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.rank-team__title {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.rank-team__subtitle {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-top: 0.3rem;
+}
+
+.team-table th {
+  text-align: center;
+}
+
+.team-table td {
+  text-align: center;
+}
+
+.team-table th:first-child,
+.team-table td:first-child {
+  text-align: left;
+}
+
+.team-table td:last-child {
+  text-align: right;
+  font-weight: 600;
+}
+
+.team-row.is-top td {
+  border-color: rgba(26, 95, 161, 0.3);
 }
 
 .rank-list {

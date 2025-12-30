@@ -1,0 +1,17 @@
+{
+  "totalRecords": 2,
+  "validRecords": 1,
+  "invalidRecords": 1,
+  "errors": [
+    {
+      "record": 2,
+      "field": "idade",
+      "message": "Campo idade obrigatorio ou invalido."
+    },
+    {
+      "record": 2,
+      "field": "sexo",
+      "message": "Campo sexo obrigatorio ou invalido."
+    }
+  ]
+}

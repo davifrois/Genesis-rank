@@ -14,6 +14,7 @@ import {
     List,
     LogOut,
     Menu,
+    RotateCcw,
     Search,
     ShieldCheck,
     Sparkles,
@@ -29,12 +30,21 @@ import { authService } from '../services/authService';
 import { motion, AnimatePresence } from 'framer-motion';
 import LoginOverlay from '../components/LoginOverlay';
 
+const buildImportDebug = (rawText) => {
+    const lines = (rawText || '')
+        .split(/\r?\n/)
+        .map((line) => line.trimEnd())
+        .filter((line) => line.trim().length > 0);
+    return lines.slice(0, 60).join('\n');
+};
+
 const Dashboard = () => {
     const {
         athletes,
         addAthlete,
         updateAthletePoints,
         setManualPoints,
+        resetAthletePoints,
         clearAthletes,
         importAthletes,
         events,
@@ -60,6 +70,7 @@ const Dashboard = () => {
     const [importMode, setImportMode] = useState('GI');
     const [importStatus, setImportStatus] = useState('');
     const [importError, setImportError] = useState('');
+    const [importDebug, setImportDebug] = useState('');
     const [manualInputs, setManualInputs] = useState({});
     const [eventFilter, setEventFilter] = useState(activeEventId || 'all');
     const [importEventId, setImportEventId] = useState(activeEventId || '');
@@ -92,10 +103,33 @@ const Dashboard = () => {
     }, []);
 
     const handleFinalizeEvent = useCallback(() => {
-        generateRankingPDF(athletes);
-        showFeedback('success', 'Relatorio gerado com sucesso!');
-        clearEventResults();
-    }, [athletes, clearEventResults, showFeedback]);
+        if (!activeEventId) {
+            showFeedback('error', 'Ative um evento para gerar o relatorio.');
+            return;
+        }
+
+        const eventMeta = events.find((event) => event.id === activeEventId);
+        const eventAthletes = athletes.filter((athlete) => athlete.eventId === activeEventId);
+
+        if (!eventAthletes.length) {
+            showFeedback('error', 'Nenhum atleta vinculado ao evento ativo.');
+            return;
+        }
+
+        try {
+            generateRankingPDF(eventAthletes, {
+                eventName: eventMeta?.name || 'Evento',
+                eventDate: eventMeta?.date || '',
+                eventLocation: eventMeta?.location || ''
+            });
+            showFeedback('success', `Relatorio gerado para ${eventMeta?.name || 'evento ativo'}.`);
+            clearEventResults();
+        } catch (err) {
+            const message = err?.message || 'Falha ao gerar o relatorio.';
+            console.error('PDF export error:', err);
+            showFeedback('error', message);
+        }
+    }, [activeEventId, athletes, clearEventResults, events, showFeedback]);
 
     const handleImportRanking = useCallback(() => {
         importInputRef.current?.click();
@@ -115,14 +149,26 @@ const Dashboard = () => {
 
         setImportError('');
         setImportStatus('Lendo arquivo...');
+        setImportDebug('');
 
         try {
             const isText = file.type === 'text/plain' || file.name.toLowerCase().endsWith('.txt');
             const text = isText ? await file.text() : await extractTextFromPdfFile(file);
+            const cleanedText = text.replace(/\s+/g, '').trim();
+
+            if (!cleanedText) {
+                setImportError('PDF sem texto. Gere um PDF pesquisavel (OCR) e tente novamente.');
+                setImportStatus('');
+                showFeedback('error', 'PDF sem texto para importar.');
+                return;
+            }
+
             const parsed = parseAthletesFromText(text, importMode);
 
             if (!parsed.length) {
                 setImportError('Nenhum atleta encontrado. Verifique se o PDF tem texto.');
+                setImportDebug(buildImportDebug(text));
+                console.log('PDF import debug preview:\n', buildImportDebug(text));
                 setImportStatus('');
                 showFeedback('error', 'Nenhum atleta valido para importar.');
                 return;
@@ -761,7 +807,7 @@ const Dashboard = () => {
                                 <tr>
                                     <th>Atleta</th>
                                     <th>Academia</th>
-                                    <th>Pontos</th>
+                                    <th className="points-col">Pontos</th>
                                     <th style={{ textAlign: 'right' }}>Acoes</th>
                                 </tr>
                             </thead>
@@ -777,7 +823,7 @@ const Dashboard = () => {
                                             </div>
                                         </td>
                                         <td>{athlete.academia}</td>
-                                        <td>
+                                        <td className="points-col">
                                             <span className="points-pill">{athlete.pontos} pts</span>
                                         </td>
                                         <td>
@@ -800,13 +846,15 @@ const Dashboard = () => {
                                                 </div>
                                                 <button
                                                     type="button"
-                                                    className="action-btn action-btn--win"
+                                                    className="action-btn action-btn--reset"
                                                     onClick={() => {
-                                                        updateAthletePoints(athlete.id, { type: 'win' });
-                                                        showFeedback('success', `+5 pontos para ${athlete.nome}`);
+                                                        resetAthletePoints(athlete.id);
+                                                        setManualInputs((prev) => ({ ...prev, [athlete.id]: '' }));
+                                                        showFeedback('success', `Pontos limpos para ${athlete.nome}`);
                                                     }}
+                                                    aria-label="Limpar pontos"
                                                 >
-                                                    +5
+                                                    <RotateCcw size={14} />
                                                 </button>
                                                 <button
                                                     type="button"
@@ -818,6 +866,28 @@ const Dashboard = () => {
                                                     aria-label="Registrar ouro"
                                                 >
                                                     <Trophy size={14} />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="action-btn action-btn--podium-silver"
+                                                    onClick={() => {
+                                                        updateAthletePoints(athlete.id, { type: 'podium', position: 2 });
+                                                        showFeedback('success', `Prata para ${athlete.nome}`);
+                                                    }}
+                                                    aria-label="Registrar prata"
+                                                >
+                                                    2
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="action-btn action-btn--podium-bronze"
+                                                    onClick={() => {
+                                                        updateAthletePoints(athlete.id, { type: 'podium', position: 3 });
+                                                        showFeedback('success', `Bronze para ${athlete.nome}`);
+                                                    }}
+                                                    aria-label="Registrar bronze"
+                                                >
+                                                    3
                                                 </button>
                                             </div>
                                         </td>
@@ -861,13 +931,15 @@ const Dashboard = () => {
                                         </div>
                                         <button
                                             type="button"
-                                            className="action-btn action-btn--win"
+                                            className="action-btn action-btn--reset"
                                             onClick={() => {
-                                                updateAthletePoints(athlete.id, { type: 'win' });
-                                                showFeedback('success', `+5 pontos para ${athlete.nome}`);
+                                                resetAthletePoints(athlete.id);
+                                                setManualInputs((prev) => ({ ...prev, [athlete.id]: '' }));
+                                                showFeedback('success', `Pontos limpos para ${athlete.nome}`);
                                             }}
+                                            aria-label="Limpar pontos"
                                         >
-                                            +5
+                                            <RotateCcw size={14} />
                                         </button>
                                         <button
                                             type="button"
@@ -879,6 +951,28 @@ const Dashboard = () => {
                                             aria-label="Registrar ouro"
                                         >
                                             <Trophy size={14} />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="action-btn action-btn--podium-silver"
+                                            onClick={() => {
+                                                updateAthletePoints(athlete.id, { type: 'podium', position: 2 });
+                                                showFeedback('success', `Prata para ${athlete.nome}`);
+                                            }}
+                                            aria-label="Registrar prata"
+                                        >
+                                            2
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="action-btn action-btn--podium-bronze"
+                                            onClick={() => {
+                                                updateAthletePoints(athlete.id, { type: 'podium', position: 3 });
+                                                showFeedback('success', `Bronze para ${athlete.nome}`);
+                                            }}
+                                            aria-label="Registrar bronze"
+                                        >
+                                            3
                                         </button>
                                     </div>
                                 </div>
@@ -932,6 +1026,12 @@ const Dashboard = () => {
                                 {importError || importStatus}
                             </div>
                         )}
+                        {importDebug && (
+                            <div className="import-debug">
+                                <div className="import-debug__title">Debug preview (primeiras linhas)</div>
+                                <pre>{importDebug}</pre>
+                            </div>
+                        )}
                     </div>
                     <div className="action-grid">
                         <div className="action-card">
@@ -947,7 +1047,7 @@ const Dashboard = () => {
                         </div>
                         <div className="action-card">
                             <strong>Exportar relatorio</strong>
-                            <span>Gere o PDF oficial com pontuacao consolidada.</span>
+                            <span>Gere o PDF oficial do evento ativo.</span>
                             <div className="action-card__footer">
                                 <button type="button" className="btn btn-ghost" onClick={handleFinalizeEvent}>
                                     <Download size={14} />

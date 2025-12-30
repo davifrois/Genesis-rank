@@ -9,19 +9,19 @@ describe('scoringService', () => {
 
     it('should calculate points correctly for podiums', () => {
         const history = [
-            { type: 'podium', position: 1 }, // 20
-            { type: 'podium', position: 2 }, // 10
-            { type: 'podium', position: 3 }  // 5
+            { type: 'podium', position: 1 }, // 9
+            { type: 'podium', position: 2 }, // 3
+            { type: 'podium', position: 3 }  // 1
         ];
-        expect(calculateTotalPoints(history)).toBe(35);
+        expect(calculateTotalPoints(history)).toBe(13);
     });
 
     it('should handle mixed history', () => {
         const history = [
             { type: 'win' }, // 5
-            { type: 'podium', position: 1 } // 20
+            { type: 'podium', position: 1 } // 9
         ];
-        expect(calculateTotalPoints(history)).toBe(25);
+        expect(calculateTotalPoints(history)).toBe(14);
     });
 
     it('should break ties by first-place podiums', () => {

@@ -1,12 +1,49 @@
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { rankAthletes } from './scoringService';
 
-export const generateRankingPDF = (athletes) => {
+const BRAND_PRIMARY = [15, 58, 95];
+const BRAND_ACCENT = [26, 95, 161];
+
+const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const parsed = new Date(dateString);
+    if (Number.isNaN(parsed.getTime())) return dateString;
+    return parsed.toLocaleDateString('pt-BR');
+};
+
+const buildFileSafeName = (value) => (
+    (value || 'Geral')
+        .toString()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^A-Za-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 60)
+);
+
+const runAutoTable = (doc, config) => {
+    if (doc && typeof doc.autoTable === 'function') {
+        doc.autoTable(config);
+        return;
+    }
+    if (typeof autoTable === 'function') {
+        autoTable(doc, config);
+        return;
+    }
+    throw new Error('Modulo de tabela do PDF nao esta disponivel.');
+};
+
+export const generateRankingPDF = (athletes, options = {}) => {
+    const {
+        eventName = '',
+        eventDate = '',
+        eventLocation = ''
+    } = options;
     const doc = new jsPDF();
 
     // Header with Genesis branding
-    doc.setFillColor(211, 47, 47); // Genesis Red
+    doc.setFillColor(...BRAND_PRIMARY);
     doc.rect(0, 0, 210, 40, 'F');
 
     doc.setFont("helvetica", "bold");
@@ -15,11 +52,33 @@ export const generateRankingPDF = (athletes) => {
     doc.text('GENESIS ESPORTES', 14, 25);
 
     doc.setFontSize(10);
-    doc.text('RELATÓRIO OFICIAL DE RANKING 2025', 14, 32);
+    doc.text('RELATORIO OFICIAL DE RANKING 2025', 14, 32);
 
     doc.setFont("helvetica", "normal");
-    doc.setTextColor(100);
-    doc.text(`Documento gerado em: ${new Date().toLocaleString()}`, 14, 50);
+    doc.setTextColor(90);
+
+    let cursorY = 50;
+    doc.text(`Documento gerado em: ${new Date().toLocaleString()}`, 14, cursorY);
+    cursorY += 6;
+
+    if (eventName) {
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(20);
+        doc.text(`Evento: ${eventName}`, 14, cursorY);
+        cursorY += 6;
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(90);
+    }
+
+    const metaParts = [
+        eventDate ? `Data: ${formatDate(eventDate)}` : '',
+        eventLocation ? `Local: ${eventLocation}` : ''
+    ].filter(Boolean);
+
+    if (metaParts.length) {
+        doc.text(metaParts.join(' | '), 14, cursorY);
+        cursorY += 6;
+    }
 
     const tableColumn = ["POS", "ATLETA", "FAIXA", "CATEGORIA", "ACADEMIA", "PTS"];
     const tableRows = rankAthletes(athletes)
@@ -32,13 +91,13 @@ export const generateRankingPDF = (athletes) => {
             a.pontos
         ]);
 
-    doc.autoTable({
+    runAutoTable(doc, {
         head: [tableColumn],
         body: tableRows,
-        startY: 55,
+        startY: cursorY + 2,
         theme: 'grid',
         headStyles: {
-            fillColor: [31, 41, 55],
+            fillColor: BRAND_PRIMARY,
             textColor: [255, 255, 255],
             fontSize: 8,
             halign: 'center'
@@ -46,17 +105,18 @@ export const generateRankingPDF = (athletes) => {
         styles: { fontSize: 8 },
         columnStyles: {
             0: { halign: 'center', fontStyle: 'bold' },
-            5: { halign: 'center', fontStyle: 'bold', textColor: [211, 47, 47] }
+            5: { halign: 'center', fontStyle: 'bold', textColor: BRAND_ACCENT }
         }
     });
 
-    doc.save(`Ranking_Genesis_Oficial.pdf`);
+    const fileName = `Ranking_Genesis_${buildFileSafeName(eventName)}.pdf`;
+    doc.save(fileName);
 };
 
 export const generateEventResultsPDF = (eventName, podiums) => {
     const doc = new jsPDF();
 
-    doc.setFillColor(31, 41, 55);
+    doc.setFillColor(...BRAND_PRIMARY);
     doc.rect(0, 0, 210, 30, 'F');
 
     doc.setFontSize(18);
@@ -67,7 +127,7 @@ export const generateEventResultsPDF = (eventName, podiums) => {
 
     podiums.forEach(p => {
         doc.setFontSize(12);
-        doc.setTextColor(211, 47, 47);
+        doc.setTextColor(...BRAND_ACCENT);
         doc.text(`${p.category} - ${p.belt}`, 14, currentY);
 
         currentY += 5;
@@ -78,7 +138,7 @@ export const generateEventResultsPDF = (eventName, podiums) => {
             ["3º LUGAR", p.third?.nome || '-', p.third?.academia || '-'],
         ];
 
-        doc.autoTable({
+        runAutoTable(doc, {
             body: rows,
             startY: currentY,
             theme: 'striped',
