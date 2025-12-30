@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { generateRankingPDF } from '../services/pdfService';
 import { extractTextFromPdfFile, parseAthletesFromText } from '../services/pdfImportService';
+import { buildBracketMatches } from '../services/bracketService';
 import { authService } from '../services/authService';
 import { motion, AnimatePresence } from 'framer-motion';
 import LoginOverlay from '../components/LoginOverlay';
@@ -47,6 +48,10 @@ const Dashboard = () => {
         resetAthletePoints,
         clearAthletes,
         importAthletes,
+        brackets,
+        generateBrackets,
+        setBracketPodium,
+        applyBracketPodium,
         events,
         activeEventId,
         openEventModal,
@@ -74,6 +79,9 @@ const Dashboard = () => {
     const [manualInputs, setManualInputs] = useState({});
     const [eventFilter, setEventFilter] = useState(activeEventId || 'all');
     const [importEventId, setImportEventId] = useState(activeEventId || '');
+    const [bracketEventId, setBracketEventId] = useState(activeEventId || '');
+    const [bracketMode, setBracketMode] = useState('ALL');
+    const [bracketSearch, setBracketSearch] = useState('');
     const [newAthlete, setNewAthlete] = useState({
         nome: '',
         faixa: 'Branca',
@@ -211,6 +219,47 @@ const Dashboard = () => {
         }
     }, [manualInputs, setManualPoints, showFeedback]);
 
+    const handleGenerateBrackets = useCallback(() => {
+        if (!bracketEventId) {
+            showFeedback('error', 'Selecione um evento para gerar as chaves.');
+            return;
+        }
+
+        const hasExisting = brackets.some((bracket) => (
+            bracket.eventId === bracketEventId
+            && (bracketMode === 'ALL' || bracket.mode === bracketMode)
+        ));
+
+        if (hasExisting) {
+            const confirmed = window.confirm('Ja existem chaves para este evento. Deseja gerar novamente?');
+            if (!confirmed) return;
+        }
+
+        try {
+            const result = generateBrackets({
+                eventId: bracketEventId,
+                mode: bracketMode,
+                replaceExisting: hasExisting
+            });
+            if (result.created > 0) {
+                showFeedback('success', `${result.created} chaves geradas.`);
+            } else {
+                showFeedback('error', 'Nenhuma categoria encontrada para gerar chaves.');
+            }
+        } catch (err) {
+            showFeedback('error', err?.message || 'Falha ao gerar chaves.');
+        }
+    }, [bracketEventId, bracketMode, brackets, generateBrackets, showFeedback]);
+
+    const handleApplyBracketPodium = useCallback((bracketId) => {
+        const result = applyBracketPodium(bracketId);
+        if (result.ok) {
+            showFeedback('success', 'Podio aplicado com sucesso.');
+        } else {
+            showFeedback('error', result.message || 'Nao foi possivel aplicar o podio.');
+        }
+    }, [applyBracketPodium, showFeedback]);
+
     const openUserResetModal = useCallback(() => {
         if (authService.isLocalAuth && !authService.isLocalAuth()) {
             showFeedback('error', 'Redefinicao de senha disponivel apenas no modo local.');
@@ -313,7 +362,10 @@ const Dashboard = () => {
         if (activeEventId && !importEventId) {
             setImportEventId(activeEventId);
         }
-    }, [activeEventId, newAthlete.eventId, importEventId]);
+        if (activeEventId && !bracketEventId) {
+            setBracketEventId(activeEventId);
+        }
+    }, [activeEventId, newAthlete.eventId, importEventId, bracketEventId]);
 
     const eventMap = useMemo(() => (
         events.reduce((acc, event) => {
@@ -326,9 +378,30 @@ const Dashboard = () => {
         events.find((event) => event.id === activeEventId)
     ), [events, activeEventId]);
 
-    if (!currentUser) {
-        return <LoginOverlay />;
-    }
+    const athleteMap = useMemo(() => (
+        new Map(athletes.map((athlete) => [athlete.id, athlete]))
+    ), [athletes]);
+
+    const filteredBrackets = useMemo(() => {
+        const term = bracketSearch.trim().toLowerCase();
+        const numberTerm = Number(term);
+        const hasNumber = term.length > 0 && Number.isFinite(numberTerm);
+        return brackets
+            .filter((bracket) => (
+                !bracketEventId
+                || bracket.eventId === bracketEventId
+            ))
+            .filter((bracket) => (
+                bracketMode === 'ALL' || bracket.mode === bracketMode
+            ))
+            .filter((bracket) => {
+                if (!term) return true;
+                const labelMatch = (bracket.label || '').toLowerCase().includes(term);
+                const numberMatch = hasNumber ? bracket.number === numberTerm : false;
+                return labelMatch || numberMatch;
+            })
+            .sort((a, b) => (a.number || 0) - (b.number || 0));
+    }, [brackets, bracketEventId, bracketMode, bracketSearch]);
 
     const isLocalAuth = authService.isLocalAuth ? authService.isLocalAuth() : true;
     const localUsers = isLocalAuth && authService.listUsers ? authService.listUsers() : [];
@@ -409,6 +482,7 @@ const Dashboard = () => {
     const navItems = [
         { id: 'overview', label: 'Visao geral', icon: LayoutDashboard },
         { id: 'events', label: 'Eventos', icon: Calendar, meta: events.length },
+        { id: 'brackets', label: 'Chaveamento', icon: ClipboardList },
         { id: 'athletes', label: 'Atletas', icon: Users, meta: athletes.length },
         { id: 'automation', label: 'Automacoes', icon: Zap },
         { id: 'activity', label: 'Atividade', icon: Activity }
@@ -496,6 +570,10 @@ const Dashboard = () => {
     };
 
     const selectedAssignCount = Object.values(assignSelection).filter(Boolean).length;
+
+    if (!currentUser) {
+        return <LoginOverlay />;
+    }
 
     return (
         <div className="admin-shell">
@@ -726,6 +804,169 @@ const Dashboard = () => {
                             })}
                         </div>
                     )}
+                </section>
+                <section className="panel" id="brackets">
+                    <div className="panel-header">
+                        <div>
+                            <div className="panel-title">Chaveamento</div>
+                            <div className="panel-subtitle">Gere chaves por categoria e aplique o podio automaticamente.</div>
+                        </div>
+                        <div className="panel-actions">
+                            {events.length > 0 && (
+                                <select
+                                    className="input select-compact"
+                                    value={bracketEventId}
+                                    onChange={(event) => setBracketEventId(event.target.value)}
+                                    aria-label="Selecionar evento para chaveamento"
+                                >
+                                    <option value="">Selecionar evento</option>
+                                    {events.map((event) => (
+                                        <option key={event.id} value={event.id}>{event.name}</option>
+                                    ))}
+                                </select>
+                            )}
+                            <select
+                                className="input select-compact"
+                                value={bracketMode}
+                                onChange={(event) => setBracketMode(event.target.value)}
+                                aria-label="Selecionar categoria de chaveamento"
+                            >
+                                <option value="ALL">Todas as categorias</option>
+                                <option value="GI">GI (peso)</option>
+                                <option value="NO-GI">NO-GI (peso)</option>
+                                <option value="ABS-GI">ABS GI</option>
+                                <option value="ABS-NO-GI">ABS NO-GI</option>
+                            </select>
+                            <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={handleGenerateBrackets}
+                                disabled={!events.length}
+                            >
+                                <ClipboardList size={14} />
+                                Gerar chaves
+                            </button>
+                        </div>
+                    </div>
+                    <div className="bracket-toolbar">
+                        <div className="search-input">
+                            <Search size={16} />
+                            <input
+                                type="text"
+                                placeholder="Buscar chave por numero ou categoria"
+                                value={bracketSearch}
+                                onChange={(event) => setBracketSearch(event.target.value)}
+                                aria-label="Buscar chave"
+                            />
+                        </div>
+                        <span className="tag">{filteredBrackets.length} chaves</span>
+                    </div>
+                    <div className="bracket-list">
+                        {filteredBrackets.map((bracket) => {
+                            const bracketAthletes = (bracket.seedIds || [])
+                                .map((id) => athleteMap.get(id))
+                                .filter(Boolean);
+                            const matches = bracketAthletes.length
+                                ? buildBracketMatches(bracket.seedIds || [], bracket.size || 0)
+                                : [];
+                            const eventLabel = eventMap[bracket.eventId]?.name || 'Sem evento';
+                            const applied = Boolean(bracket.appliedAt);
+
+                            return (
+                                <div key={bracket.id} className="bracket-card">
+                                    <div className="bracket-card__header">
+                                        <div>
+                                            <div className="bracket-number">Chave {bracket.number || '-'}</div>
+                                            <div className="table-meta">{bracket.label}</div>
+                                        </div>
+                                        <div className="bracket-tags">
+                                            <span className="tag">{bracket.mode || 'GI'}</span>
+                                            {applied && <span className="tag bracket-tag--applied">Aplicado</span>}
+                                        </div>
+                                    </div>
+                                    <div className="bracket-card__meta">
+                                        Evento: {eventLabel} · Atletas: {bracketAthletes.length}
+                                    </div>
+                                    <div className="bracket-grid">
+                                        <div className="bracket-matches">
+                                            <div className="bracket-section-title">Rodada 1</div>
+                                            {matches.map((match, index) => {
+                                                const nameA = match.slotA ? athleteMap.get(match.slotA)?.nome : 'BYE';
+                                                const nameB = match.slotB ? athleteMap.get(match.slotB)?.nome : 'BYE';
+                                                return (
+                                                    <div key={match.id} className="bracket-match">
+                                                        <span className="bracket-seed">{nameA || 'Atleta'}</span>
+                                                        <span className="bracket-vs">vs</span>
+                                                        <span className="bracket-seed">{nameB || 'Atleta'}</span>
+                                                        <span className="bracket-match__index">#{index + 1}</span>
+                                                    </div>
+                                                );
+                                            })}
+                                            {matches.length === 0 && (
+                                                <div className="panel-subtitle">Sem atletas nesta chave.</div>
+                                            )}
+                                        </div>
+                                        <div className="bracket-podium">
+                                            <div className="bracket-section-title">Podio</div>
+                                            <label className="bracket-field">
+                                                <span>1º lugar</span>
+                                                <select
+                                                    className="input bracket-select"
+                                                    value={bracket.podium?.goldId || ''}
+                                                    onChange={(event) => setBracketPodium(bracket.id, { goldId: event.target.value })}
+                                                    disabled={bracketAthletes.length === 0}
+                                                >
+                                                    <option value="">Selecionar atleta</option>
+                                                    {bracketAthletes.map((athlete) => (
+                                                        <option key={athlete.id} value={athlete.id}>{athlete.nome}</option>
+                                                    ))}
+                                                </select>
+                                            </label>
+                                            <label className="bracket-field">
+                                                <span>2º lugar</span>
+                                                <select
+                                                    className="input bracket-select"
+                                                    value={bracket.podium?.silverId || ''}
+                                                    onChange={(event) => setBracketPodium(bracket.id, { silverId: event.target.value })}
+                                                    disabled={bracketAthletes.length < 2}
+                                                >
+                                                    <option value="">Selecionar atleta</option>
+                                                    {bracketAthletes.map((athlete) => (
+                                                        <option key={athlete.id} value={athlete.id}>{athlete.nome}</option>
+                                                    ))}
+                                                </select>
+                                            </label>
+                                            <label className="bracket-field">
+                                                <span>3º lugar</span>
+                                                <select
+                                                    className="input bracket-select"
+                                                    value={bracket.podium?.bronzeId || ''}
+                                                    onChange={(event) => setBracketPodium(bracket.id, { bronzeId: event.target.value })}
+                                                    disabled={bracketAthletes.length < 3}
+                                                >
+                                                    <option value="">Selecionar atleta</option>
+                                                    {bracketAthletes.map((athlete) => (
+                                                        <option key={athlete.id} value={athlete.id}>{athlete.nome}</option>
+                                                    ))}
+                                                </select>
+                                            </label>
+                                            <button
+                                                type="button"
+                                                className="btn btn-primary bracket-apply"
+                                                onClick={() => handleApplyBracketPodium(bracket.id)}
+                                                disabled={bracketAthletes.length === 0}
+                                            >
+                                                {applied ? 'Reaplicar podio' : 'Aplicar podio'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                        {filteredBrackets.length === 0 && (
+                            <div className="panel-subtitle">Nenhuma chave encontrada.</div>
+                        )}
+                    </div>
                 </section>
                 <section className="panel">
                     <div className="panel-header">

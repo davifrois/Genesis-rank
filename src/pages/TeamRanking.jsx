@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Medal } from 'lucide-react';
 import { useStore } from '../hooks/useStore';
 import { buildScoreBreakdown } from '../services/scoringService';
 
@@ -68,6 +69,21 @@ const TeamRanking = () => {
   }, [eventFilteredAthletes]);
 
   const topTeams = teamRanking.slice(0, 3);
+  const formatPlace = (rank) => `${rank}º lugar`;
+  const renderPodiumLabel = (index) => {
+    if (index === 0) return '1º lugar';
+    if (index === 1) return '2º lugar';
+    return '3º lugar';
+  };
+
+  const renderMedal = (index) => {
+    const medalClass = index === 0
+      ? 'team-medal--gold'
+      : index === 1
+        ? 'team-medal--silver'
+        : 'team-medal--bronze';
+    return <Medal className={`team-medal__icon ${medalClass}`} size={16} />;
+  };
 
   return (
     <div className="ranking-minimal">
@@ -95,7 +111,7 @@ const TeamRanking = () => {
       <div className="rank-team">
         <div className="rank-team__header">
           <div>
-            <div className="rank-team__title">Classificacao por equipe</div>
+            <div className="rank-team__title">Classificação por equipe</div>
             <div className="rank-team__subtitle">Soma de pontos e medalhas por academia.</div>
           </div>
           <span className="tag">Top 3</span>
@@ -109,7 +125,10 @@ const TeamRanking = () => {
                 className={`podium-card podium-card--${index === 0 ? 'ouro' : index === 1 ? 'prata' : 'bronze'}`}
               >
                 <div className="podium-card__info">
-                  <span>{index + 1} lugar</span>
+                  <span className="podium-place">
+                    {renderMedal(index)}
+                    {renderPodiumLabel(index)}
+                  </span>
                   <strong>{team.academy}</strong>
                   <p>
                     {team.campeao} ouro / {team.vice} prata / {team.terceiro} bronze
@@ -131,11 +150,26 @@ const TeamRanking = () => {
             <thead>
               <tr>
                 <th>Equipe</th>
-                <th>Campeao</th>
-                <th>Vice</th>
-                <th>Terceiro</th>
+                <th>
+                  <span className="team-medal team-medal--gold">
+                    <Medal size={14} />
+                    Campeão
+                  </span>
+                </th>
+                <th>
+                  <span className="team-medal team-medal--silver">
+                    <Medal size={14} />
+                    Vice
+                  </span>
+                </th>
+                <th>
+                  <span className="team-medal team-medal--bronze">
+                    <Medal size={14} />
+                    Terceiro
+                  </span>
+                </th>
                 <th>Pontos</th>
-                <th>Colocacao</th>
+                <th>Colocação</th>
               </tr>
             </thead>
             <tbody>
@@ -151,7 +185,7 @@ const TeamRanking = () => {
                   <td>
                     <span className="points-pill">{team.pontos}</span>
                   </td>
-                  <td>{team.rank}o lugar</td>
+                  <td>{formatPlace(team.rank)}</td>
                 </tr>
               ))}
             </tbody>

@@ -1,5 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { calculateTotalPoints, rankAthletes } from '../services/scoringService';
+import { authService } from '../services/authService';
+import { buildCategoryDescriptor, matchesBracketMode } from '../services/categoryService';
+import { nextPowerOfTwo, shuffleList } from '../services/bracketService';
 
 const STORAGE_KEY = 'genesis_ranking_data';
 const MAX_HISTORY_ENTRIES = 12;
@@ -20,6 +23,8 @@ const initialData = {
     logs: [],
     notifications: [],
     rankHistory: {},
+    brackets: [],
+    nextBracketNumber: 1,
     currentUser: null,
 };
 
@@ -30,7 +35,14 @@ const sanitizeHistoryItem = (item) => {
         return { type: 'seed', points: Number(item.points) };
     }
     if (item.type === 'podium' && [1, 2, 3].includes(item.position)) {
-        return { type: 'podium', position: item.position };
+        const record = { type: 'podium', position: item.position };
+        if (typeof item.source === 'string' && item.source.trim()) {
+            record.source = item.source.trim();
+        }
+        if (typeof item.bracketId === 'string' && item.bracketId.trim()) {
+            record.bracketId = item.bracketId.trim();
+        }
+        return record;
     }
     return null;
 };
@@ -67,6 +79,79 @@ const normalizeAthlete = (athlete) => {
         isNoGi,
         eventId
     };
+};
+
+const normalizeBracket = (bracket) => {
+    if (!bracket || typeof bracket !== 'object') return null;
+    const seedIds = Array.isArray(bracket.seedIds) ? bracket.seedIds.filter(Boolean) : [];
+    const size = Number.isFinite(bracket.size) ? bracket.size : nextPowerOfTwo(seedIds.length, 2);
+    const podium = bracket.podium && typeof bracket.podium === 'object' ? bracket.podium : {};
+    return {
+        id: bracket.id || Math.random().toString(36).substr(2, 9),
+        number: Number.isFinite(bracket.number) ? bracket.number : 0,
+        eventId: bracket.eventId || '',
+        categoryKey: bracket.categoryKey || '',
+        label: bracket.label || 'Categoria',
+        mode: bracket.mode || 'GI',
+        seedIds,
+        size,
+        podium: {
+            goldId: podium.goldId || '',
+            silverId: podium.silverId || '',
+            bronzeId: podium.bronzeId || ''
+        },
+        appliedAt: bracket.appliedAt || '',
+        createdAt: bracket.createdAt || new Date().toISOString()
+    };
+};
+
+const resolveBracketMode = (athlete) => {
+    if (athlete.isAbsolute) {
+        return athlete.isNoGi ? 'ABS-NO-GI' : 'ABS-GI';
+    }
+    return athlete.isNoGi ? 'NO-GI' : 'GI';
+};
+
+const buildBracketPayloads = (athletes, eventId, mode, startingNumber) => {
+    const groups = new Map();
+    athletes.forEach((athlete) => {
+        if (athlete.eventId !== eventId) return;
+        if (!matchesBracketMode(athlete, mode)) return;
+        const descriptor = buildCategoryDescriptor(athlete);
+        const current = groups.get(descriptor.key) || {
+            key: descriptor.key,
+            label: descriptor.label,
+            entries: [],
+            mode: resolveBracketMode(athlete)
+        };
+        current.entries.push(athlete);
+        groups.set(descriptor.key, current);
+    });
+
+    const ordered = [...groups.values()].sort((a, b) => a.label.localeCompare(b.label));
+    let nextNumber = startingNumber;
+    const brackets = ordered.map((group) => {
+        const seedIds = shuffleList(group.entries.map((athlete) => athlete.id));
+        return {
+            id: `${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+            number: nextNumber++,
+            eventId,
+            categoryKey: group.key,
+            label: group.label,
+            mode: group.mode,
+            seedIds,
+            size: nextPowerOfTwo(seedIds.length, 2),
+            podium: {
+                goldId: '',
+                silverId: '',
+                bronzeId: ''
+            },
+            appliedAt: '',
+            createdAt: new Date().toISOString()
+        };
+    });
+
+    return { brackets, nextNumber };
 };
 
 const buildAthleteKey = (athlete) => {
@@ -157,8 +242,27 @@ const useStoreState = () => {
         }
         const athletes = (parsed.athletes || initialData.athletes).map(normalizeAthlete);
         const events = Array.isArray(parsed.events) ? parsed.events : [];
+        const brackets = Array.isArray(parsed.brackets)
+            ? parsed.brackets.map(normalizeBracket).filter(Boolean)
+            : [];
+        const maxBracketNumber = brackets.reduce((max, bracket) => (
+            Math.max(max, Number(bracket.number) || 0)
+        ), 0);
+        const nextBracketNumber = Math.max(
+            Number.isFinite(parsed.nextBracketNumber) ? parsed.nextBracketNumber : initialData.nextBracketNumber,
+            maxBracketNumber + 1
+        );
         const eventIds = new Set(events.map((event) => event.id));
         const activeEventId = eventIds.has(parsed.activeEventId) ? parsed.activeEventId : null;
+        const currentUser = parsed.currentUser
+            ? {
+                ...parsed.currentUser,
+                role: parsed.currentUser.role
+                    || (authService.getRoleForUsername
+                        ? authService.getRoleForUsername(parsed.currentUser.username)
+                        : parsed.currentUser.role)
+            }
+            : null;
         const merged = {
             ...initialData,
             ...parsed,
@@ -166,7 +270,10 @@ const useStoreState = () => {
             events,
             activeEventId,
             notifications: parsed.notifications || [],
-            rankHistory: parsed.rankHistory || {}
+            rankHistory: parsed.rankHistory || {},
+            brackets,
+            nextBracketNumber,
+            currentUser
         };
 
         return {
@@ -401,6 +508,165 @@ const useStoreState = () => {
         addLog({ type: 'INFO', action: 'RESET_POINTS', details: `Pontos limpos para ID ${id}` });
     };
 
+    const generateBrackets = ({ eventId, mode = 'ALL', replaceExisting = false } = {}) => {
+        if (!eventId) {
+            addLog({ type: 'ERROR', action: 'GENERATE_BRACKETS', details: 'Evento nao informado.' });
+            throw new Error('Selecione um evento para gerar as chaves.');
+        }
+
+        const { brackets, nextNumber } = buildBracketPayloads(
+            data.athletes,
+            eventId,
+            mode,
+            data.nextBracketNumber || 1
+        );
+
+        if (brackets.length === 0) {
+            return { created: 0 };
+        }
+
+        setData(prev => {
+            const replaceMode = (bracket) => (
+                bracket.eventId === eventId
+                && (mode === 'ALL' || bracket.mode === mode)
+            );
+            const remaining = replaceExisting
+                ? prev.brackets.filter((bracket) => !replaceMode(bracket))
+                : prev.brackets;
+            const payload = buildBracketPayloads(
+                prev.athletes,
+                eventId,
+                mode,
+                prev.nextBracketNumber || 1
+            );
+
+            return {
+                ...prev,
+                brackets: [...remaining, ...payload.brackets],
+                nextBracketNumber: payload.nextNumber
+            };
+        });
+
+        addLog({
+            type: 'INFO',
+            action: 'GENERATE_BRACKETS',
+            details: `Chaves geradas: ${brackets.length} para evento ${eventId}.`
+        });
+
+        return { created: brackets.length };
+    };
+
+    const setBracketPodium = (bracketId, podium) => {
+        setData(prev => ({
+            ...prev,
+            brackets: prev.brackets.map((bracket) => (
+                bracket.id === bracketId
+                    ? {
+                        ...bracket,
+                        podium: {
+                            goldId: podium?.goldId ?? bracket.podium?.goldId ?? '',
+                            silverId: podium?.silverId ?? bracket.podium?.silverId ?? '',
+                            bronzeId: podium?.bronzeId ?? bracket.podium?.bronzeId ?? ''
+                        }
+                    }
+                    : bracket
+            ))
+        }));
+    };
+
+    const applyBracketPodium = (bracketId) => {
+        const bracket = data.brackets.find((item) => item.id === bracketId);
+        if (!bracket) {
+            addLog({ type: 'ERROR', action: 'APPLY_BRACKET', details: `Chave ${bracketId} nao encontrada.` });
+            return { ok: false, message: 'Chave nao encontrada.' };
+        }
+
+        const participantIds = new Set(bracket.seedIds || []);
+        if (participantIds.size === 0) {
+            return { ok: false, message: 'Chave sem atletas cadastrados.' };
+        }
+
+        const podium = bracket.podium || {};
+        const positions = {
+            goldId: podium.goldId || '',
+            silverId: podium.silverId || '',
+            bronzeId: podium.bronzeId || ''
+        };
+
+        const required = participantIds.size >= 3
+            ? ['goldId', 'silverId', 'bronzeId']
+            : participantIds.size === 2
+                ? ['goldId', 'silverId']
+                : ['goldId'];
+
+        const missing = required.filter((key) => !positions[key]);
+        if (missing.length) {
+            return { ok: false, message: 'Selecione o podio completo para aplicar.' };
+        }
+
+        const chosen = Object.values(positions).filter(Boolean);
+        const unique = new Set(chosen);
+        if (unique.size !== chosen.length) {
+            return { ok: false, message: 'Os atletas do podio devem ser diferentes.' };
+        }
+
+        for (const id of chosen) {
+            if (!participantIds.has(id)) {
+                return { ok: false, message: 'Podio precisa ser composto por atletas da chave.' };
+            }
+        }
+
+        setData(prev => {
+            const previousRanks = buildRankMap(prev.athletes);
+            const timestamp = new Date().toISOString();
+            const updatedAthletes = prev.athletes.map((athlete) => {
+                if (!participantIds.has(athlete.id)) return athlete;
+                const trimmedHistory = (athlete.historico || []).filter((item) => !(
+                    item.type === 'podium'
+                    && item.source === 'bracket'
+                    && item.bracketId === bracketId
+                ));
+                const additions = [];
+                if (athlete.id === positions.goldId) {
+                    additions.push({ type: 'podium', position: 1, source: 'bracket', bracketId });
+                }
+                if (athlete.id === positions.silverId) {
+                    additions.push({ type: 'podium', position: 2, source: 'bracket', bracketId });
+                }
+                if (athlete.id === positions.bronzeId) {
+                    additions.push({ type: 'podium', position: 3, source: 'bracket', bracketId });
+                }
+                const nextHistory = additions.length
+                    ? [...trimmedHistory, ...additions.map((item) => ({ ...item, timestamp }))]
+                    : trimmedHistory;
+                const pontos = calculateTotalPoints(nextHistory);
+                return { ...athlete, historico: nextHistory, pontos };
+            });
+            const nextRanks = buildRankMap(updatedAthletes);
+            const updatedBrackets = prev.brackets.map((item) => (
+                item.id === bracketId
+                    ? { ...item, appliedAt: timestamp }
+                    : item
+            ));
+
+            return {
+                ...prev,
+                athletes: updatedAthletes,
+                brackets: updatedBrackets,
+                rankHistory: ensureRankHistory(updatedAthletes, prev.rankHistory || {}),
+                notifications: buildRankNotifications(previousRanks, nextRanks, updatedAthletes, prev.notifications || [])
+            };
+        });
+
+        addLog({
+            type: 'INFO',
+            action: 'APPLY_BRACKET',
+            details: `Podio aplicado para chave ${bracket.number || bracketId}.`
+        });
+
+        return { ok: true };
+    };
+
     const clearAthletes = () => {
         setData(prev => ({
             ...prev,
@@ -474,6 +740,7 @@ const useStoreState = () => {
         logs: data.logs,
         notifications: data.notifications,
         rankHistory: data.rankHistory,
+        brackets: data.brackets,
         currentUser: data.currentUser,
         eventResults,
         eventModalOpen: uiState.eventModalOpen,
@@ -488,6 +755,9 @@ const useStoreState = () => {
         updateAthletePoints,
         setManualPoints,
         resetAthletePoints,
+        generateBrackets,
+        setBracketPodium,
+        applyBracketPodium,
         clearAthletes,
         importAthletes,
         addLog,

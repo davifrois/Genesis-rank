@@ -1,11 +1,26 @@
 import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Trophy, User, Activity, Settings, AlertCircle } from 'lucide-react';
+import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
+import {
+  Activity,
+  AlertCircle,
+  ExternalLink,
+  Facebook,
+  Instagram,
+  LogIn,
+  LogOut,
+  Mail,
+  MapPin,
+  Phone,
+  Trophy,
+  User,
+  Youtube,
+} from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Dashboard from './pages/Dashboard';
 import Ranking from './pages/Ranking';
 import TeamRanking from './pages/TeamRanking';
 import { useStore } from './hooks/useStore';
+import LoginOverlay from './components/LoginOverlay';
 import './index.css';
 
 const AppLayout = () => {
@@ -14,12 +29,16 @@ const AppLayout = () => {
     eventModalOpen,
     openEventModal,
     closeEventModal,
-    addEvent
+    addEvent,
+    logout
   } = useStore();
   const location = useLocation();
   const [logoReady, setLogoReady] = useState(true);
   const [eventForm, setEventForm] = useState({ name: '', date: '', location: '' });
   const [eventError, setEventError] = useState('');
+  const [showLogin, setShowLogin] = useState(false);
+  const isAdmin = currentUser?.role === 'admin';
+  const canAccessAdmin = !currentUser || isAdmin;
 
   const handleOpenEventModal = () => {
     setEventError('');
@@ -69,13 +88,15 @@ const AppLayout = () => {
           </div>
 
           <nav className="topbar-nav">
-            <Link
-              to="/"
-              className={`nav-link ${location.pathname === '/' ? 'is-active' : ''}`}
-              aria-current={location.pathname === '/' ? 'page' : undefined}
-            >
-              Painel Admin
-            </Link>
+            {canAccessAdmin && (
+              <Link
+                to="/"
+                className={`nav-link ${location.pathname === '/' ? 'is-active' : ''}`}
+                aria-current={location.pathname === '/' ? 'page' : undefined}
+              >
+                Painel Admin
+              </Link>
+            )}
             <Link
               to="/ranking"
               className={`nav-link ${location.pathname === '/ranking' ? 'is-active' : ''}`}
@@ -97,13 +118,28 @@ const AppLayout = () => {
               <Activity size={12} />
               Ao vivo
             </span>
-            <button className="btn btn-secondary" type="button" onClick={handleOpenEventModal}>
-              Criar Evento
-            </button>
-            <Link className="btn btn-primary" to="/">
-              Minha Conta
-              <User size={14} />
-            </Link>
+            {isAdmin && (
+              <>
+                <button className="btn btn-secondary" type="button" onClick={handleOpenEventModal}>
+                  Criar Evento
+                </button>
+                <Link className="btn btn-primary" to="/">
+                  Minha Conta
+                  <User size={14} />
+                </Link>
+              </>
+            )}
+            {currentUser ? (
+              <button className="btn btn-ghost" type="button" onClick={logout}>
+                Sair
+                <LogOut size={14} />
+              </button>
+            ) : (
+              <button className="btn btn-secondary" type="button" onClick={() => setShowLogin(true)}>
+                Entrar
+                <LogIn size={14} />
+              </button>
+            )}
             {currentUser && <span className="user-greeting">Ola, {currentUser.name}</span>}
           </div>
         </div>
@@ -120,7 +156,10 @@ const AppLayout = () => {
               transition={{ duration: 0.3, ease: 'easeOut' }}
             >
               <Routes location={location}>
-                <Route path="/" element={<Dashboard />} />
+                <Route
+                  path="/"
+                  element={canAccessAdmin ? <Dashboard /> : <Navigate to="/ranking" replace />}
+                />
                 <Route path="/ranking" element={<Ranking />} />
                 <Route path="/ranking-equipes" element={<TeamRanking />} />
               </Routes>
@@ -130,20 +169,112 @@ const AppLayout = () => {
       </main>
 
       <footer className="app-footer">
-        <div className="container footer-inner">
-          <img
-            src="https://ranking.ilutas.com.br/assets/logos/ilutas_logo_branca.png"
-            alt="iLutas"
-            className="footer-logo"
-            onError={(e) => e.target.style.display = 'none'}
-          />
-          <div className="footer-actions">
-            <Trophy size={20} />
-            <Settings size={20} />
+        <div className="container footer-grid">
+          <div className="footer-column footer-brand">
+            <div className="footer-brand__logo">
+              {logoReady ? (
+                <img
+                  src="/genesis-logo.png"
+                  alt="Genesis Esportes"
+                  className="footer-brand__logo-img"
+                  onError={() => setLogoReady(false)}
+                />
+              ) : (
+                <Trophy size={28} />
+              )}
+            </div>
+            <p className="footer-description">
+              A Genesis Esportes organiza eventos de Jiu-Jitsu e monitora rankings com transparencia e excelencia
+              operacional. Fundada em 2017, com sede em Belo Horizonte.
+            </p>
+            <div className="footer-social">
+              <span className="footer-title footer-title--small">Siga-nos</span>
+              <div className="footer-social__links">
+                <a className="footer-social__link" href="https://instagram.com" target="_blank" rel="noreferrer">
+                  <Instagram size={16} />
+                </a>
+                <a className="footer-social__link" href="https://facebook.com" target="_blank" rel="noreferrer">
+                  <Facebook size={16} />
+                </a>
+                <a className="footer-social__link" href="https://youtube.com" target="_blank" rel="noreferrer">
+                  <Youtube size={16} />
+                </a>
+              </div>
+            </div>
           </div>
-          <span>&copy; 2025 Genesis Esportes & iLutas - Sistema de Ranking Nacional</span>
+
+          <div className="footer-column">
+            <div className="footer-title">Contato</div>
+            <div className="footer-contact">
+              <div className="footer-contact__item">
+                <span className="footer-contact__icon"><Phone size={16} /></span>
+                <div>
+                  <span className="footer-contact__label">Telefone / WhatsApp</span>
+                  <a className="footer-link" href="tel:+5531993383014">(31) 99338-3014</a>
+                </div>
+              </div>
+              <div className="footer-contact__item">
+                <span className="footer-contact__icon"><Mail size={16} /></span>
+                <div>
+                  <span className="footer-contact__label">Email</span>
+                  <a className="footer-link" href="mailto:contato@genesisesportes.com.br">
+                    contato@genesisesportes.com.br
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="footer-column">
+            <div className="footer-title">Localizacao</div>
+            <div className="footer-map">
+              <div className="footer-map__frame">
+                <MapPin size={18} />
+                <div>
+                  <strong>Parque Turista - Contagem / MG</strong>
+                  <span>Rua Pains, 139</span>
+                </div>
+              </div>
+              <a
+                className="footer-link footer-link--map"
+                href="https://www.google.com/maps?q=Rua+Pains+139+Contagem+MG"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Ver no mapa <ExternalLink size={12} />
+              </a>
+            </div>
+          </div>
+
+          <div className="footer-column">
+            <div className="footer-title">Menu do site</div>
+            <nav className="footer-menu">
+              <Link to="/">Painel Admin</Link>
+              <Link to="/ranking">Ranking Oficial</Link>
+              <Link to="/ranking-equipes">Ranking Equipes</Link>
+            </nav>
+          </div>
+        </div>
+
+        <div className="footer-bottom">
+          <div className="container footer-bottom__inner">
+            <span>&copy; 2025 Genesis Esportes. Todos os direitos reservados.</span>
+            <span>CNPJ 27.835.080/0001-51</span>
+          </div>
         </div>
       </footer>
+
+      <AnimatePresence>
+        {showLogin && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <LoginOverlay onClose={() => setShowLogin(false)} onSuccess={() => setShowLogin(false)} />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {eventModalOpen && (

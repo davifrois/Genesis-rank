@@ -2,29 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Medal, Search } from 'lucide-react';
 import { useStore } from '../hooks/useStore';
 import { rankAthletes } from '../services/scoringService';
-
-const normalizeGroupPart = (value) => (
-    (value || '').toString().trim().toLowerCase().replace(/\s+/g, ' ')
-);
-
-const buildGroupDescriptor = (athlete) => {
-    const categoria = athlete.categoria || 'Categoria';
-    const faixa = athlete.faixa || 'Faixa';
-    const peso = athlete.peso || (athlete.isAbsolute ? 'Absoluto' : 'Peso');
-    const genero = athlete.genero || athlete.sexo || 'Masculino';
-    const baseParts = [categoria, faixa, peso, genero];
-    const labelParts = athlete.isAbsolute ? ['ABS', ...baseParts] : baseParts;
-    const keyParts = [
-        ...baseParts,
-        athlete.isAbsolute ? 'ABS' : 'STD',
-        athlete.isNoGi ? 'NO-GI' : 'GI'
-    ];
-
-    return {
-        key: keyParts.map(normalizeGroupPart).join('::'),
-        label: labelParts.join(' - ')
-    };
-};
+import { buildCategoryDescriptor } from '../services/categoryService';
 
 const Ranking = () => {
     const { athletes, events, activeEventId } = useStore();
@@ -72,7 +50,7 @@ const Ranking = () => {
     const { groupedAthletes, overallWinners } = useMemo(() => {
         const groups = {};
         filteredAthletes.forEach((athlete) => {
-            const { key, label } = buildGroupDescriptor(athlete);
+            const { key, label } = buildCategoryDescriptor(athlete);
             if (!groups[key]) groups[key] = { label, entries: [] };
             groups[key].entries.push(athlete);
         });
