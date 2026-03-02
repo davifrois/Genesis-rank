@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
@@ -20,6 +19,7 @@ import br.com.genesis.ranking.dto.RegistrationPaymentStatusRequest;
 import br.com.genesis.ranking.model.Athlete;
 import br.com.genesis.ranking.model.Event;
 import br.com.genesis.ranking.model.EventRegistration;
+import br.com.genesis.ranking.model.enums.RegistrationPaymentStatus;
 import br.com.genesis.ranking.repository.AthleteRepository;
 import br.com.genesis.ranking.repository.EventRegistrationRepository;
 import br.com.genesis.ranking.repository.EventRepository;
@@ -31,14 +31,6 @@ public class PublicRegistrationService {
   private static final double DEFAULT_FEE_OVER_15 = 140.0;
   private static final double DEFAULT_FEE_COMBO = 240.0;
   private static final double DEFAULT_FEE_ABSOLUTE = 30.0;
-  private static final String STATUS_PENDING = "PENDING";
-  private static final String STATUS_PAYMENT_CONFIRMED = "PAYMENT_CONFIRMED";
-  private static final String STATUS_PAYMENT_ERROR = "PAYMENT_ERROR";
-  private static final Set<String> VALID_PAYMENT_STATUSES = Set.of(
-      STATUS_PENDING,
-      STATUS_PAYMENT_CONFIRMED,
-      STATUS_PAYMENT_ERROR
-  );
 
   private final EventRepository eventRepository;
   private final EventRegistrationRepository registrationRepository;
@@ -77,7 +69,7 @@ public class PublicRegistrationService {
     registration.setGenero(clean(request.getGenero()));
     registration.setModalidade(normalizeMode(request.getModalidade()));
     registration.setNotes(clean(request.getNotes()));
-    registration.setStatus(STATUS_PENDING);
+    registration.setStatus(RegistrationPaymentStatus.PENDING.name());
 
     EventRegistration saved = registrationRepository.save(registration);
     return toResponse(saved, null);
@@ -93,9 +85,9 @@ public class PublicRegistrationService {
     Map<String, List<Athlete>> athletesByEvent = new HashMap<>();
     return registrations.stream()
         .map((registration) -> {
-          String status = clean(registration.getStatus()).toUpperCase(Locale.ROOT);
+          RegistrationPaymentStatus status = RegistrationPaymentStatus.fromStored(registration.getStatus());
           String athleteId = null;
-          if (STATUS_PAYMENT_CONFIRMED.equals(status)) {
+          if (RegistrationPaymentStatus.PAYMENT_CONFIRMED.equals(status)) {
             athleteId = resolveAthleteId(registration, athletesByEvent);
           }
           return toResponse(registration, athleteId);
@@ -115,15 +107,15 @@ public class PublicRegistrationService {
     EventRegistration registration = registrationRepository.findById(normalizedRegistrationId)
         .orElseThrow(() -> new IllegalArgumentException("Inscricao nao encontrada."));
 
-    String normalizedStatus = normalizePaymentStatus(request.getStatus());
-    registration.setStatus(normalizedStatus);
+    RegistrationPaymentStatus normalizedStatus = RegistrationPaymentStatus.fromExternal(request.getStatus());
+    registration.setStatus(normalizedStatus.name());
     registration.setPaymentReviewNotes(clean(request.getReviewNotes()));
     registration.setPaymentReviewedBy(clean(request.getReviewedBy()));
     registration.setPaymentReviewedAt(Instant.now());
 
     EventRegistration saved = registrationRepository.save(registration);
     String athleteId = null;
-    if (STATUS_PAYMENT_CONFIRMED.equals(normalizedStatus)) {
+    if (RegistrationPaymentStatus.PAYMENT_CONFIRMED.equals(normalizedStatus)) {
       Athlete athlete = ensureAthlete(saved);
       athleteId = athlete != null ? athlete.getId() : null;
       if (athleteId == null) {
@@ -225,8 +217,8 @@ public class PublicRegistrationService {
     response.setCategoria(registration.getCategoria());
     response.setGenero(registration.getGenero());
     response.setModalidade(registration.getModalidade());
-    String status = clean(registration.getStatus()).toUpperCase(Locale.ROOT);
-    response.setStatus(VALID_PAYMENT_STATUSES.contains(status) ? status : STATUS_PENDING);
+    RegistrationPaymentStatus status = RegistrationPaymentStatus.fromStored(registration.getStatus());
+    response.setStatus(status.name());
     response.setNotes(registration.getNotes());
     response.setCreatedAt(registration.getCreatedAt() != null ? registration.getCreatedAt().toString() : null);
     response.setAthleteId(athleteId);
@@ -276,40 +268,6 @@ public class PublicRegistrationService {
     if ("NOGI".equals(mode)) return "NO-GI";
     if ("NO-GI".equals(mode)) return "NO-GI";
     return "GI";
-  }
-
-  private String normalizePaymentStatus(String value) {
-    String normalized = clean(value)
-        .toUpperCase(Locale.ROOT)
-        .replace('-', '_')
-        .replace(' ', '_');
-    if (normalized.isBlank()) {
-      throw new IllegalArgumentException("Status de pagamento invalido.");
-    }
-    if (
-        "PENDENTE".equals(normalized)
-        || "PENDING_REVIEW".equals(normalized)
-        || "PENDING".equals(normalized)
-    ) {
-      return STATUS_PENDING;
-    }
-    if (
-        "PAGO".equals(normalized)
-        || "CONFIRMADO".equals(normalized)
-        || "PAGAMENTO_CONFIRMADO".equals(normalized)
-        || "PAYMENT_CONFIRMED".equals(normalized)
-    ) {
-      return STATUS_PAYMENT_CONFIRMED;
-    }
-    if (
-        "ERRO".equals(normalized)
-        || "RECUSADO".equals(normalized)
-        || "PAGAMENTO_ERRO".equals(normalized)
-        || "PAYMENT_ERROR".equals(normalized)
-    ) {
-      return STATUS_PAYMENT_ERROR;
-    }
-    throw new IllegalArgumentException("Status de pagamento invalido.");
   }
 
   private LocalDate parseDate(String value) {

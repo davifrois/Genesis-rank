@@ -39,6 +39,7 @@ import { useI18n } from '../hooks/useI18n';
 import { DEFAULT_EVENT_FEES, DEFAULT_EVENT_PIX_KEY } from '../utils/eventPricing';
 import { buildFileSafeName, downloadCsv } from '../services/exportService';
 import { translateBelt, translateCategory, translateCompositeLabel, translateWeight } from '../utils/localeLabels';
+import { REGISTRATION_STATUS, normalizeRegistrationStatus } from '../utils/registrationStatus';
 
 const createEventEditFormState = () => ({
     id: '',
@@ -94,15 +95,6 @@ const parseRegistrationNotes = (value) => {
     }
 };
 
-const normalizeRegistrationStatus = (value) => (
-    (value || 'PENDING')
-        .toString()
-        .trim()
-        .toUpperCase()
-        .replace('-', '_')
-        .replace(/\s+/g, '_')
-);
-
 const parseRegistrationRecord = (item, eventMap, copy) => {
     const source = (item && typeof item === 'object') ? item : {};
     const notes = parseRegistrationNotes(source.notes);
@@ -114,9 +106,9 @@ const parseRegistrationRecord = (item, eventMap, copy) => {
     const notesText = notes?.observacoes || '';
     const athletePhotoUrl = notes?.athletePhotoUrl || '';
     const statusNormalized = normalizeRegistrationStatus(source.status);
-    const isPendingSync = statusNormalized === 'PENDING_SYNC';
-    const isPaymentConfirmed = statusNormalized === 'PAYMENT_CONFIRMED';
-    const isPaymentError = statusNormalized === 'PAYMENT_ERROR';
+    const isPendingSync = statusNormalized === REGISTRATION_STATUS.PENDING_SYNC;
+    const isPaymentConfirmed = statusNormalized === REGISTRATION_STATUS.PAYMENT_CONFIRMED;
+    const isPaymentError = statusNormalized === REGISTRATION_STATUS.PAYMENT_ERROR;
     const isImageProof = /^data:image\//i.test(proofFileUrl) || /^image\//i.test(proofMimeType);
     const isPdfProof = /^data:application\/pdf/i.test(proofFileUrl) || /pdf/i.test(proofMimeType);
     const statusLabel = isPendingSync
@@ -1697,7 +1689,7 @@ const Dashboard = () => {
 
     const handleUpdateRegistrationPaymentStatus = useCallback(async (registration, nextStatus) => {
         if (!registration?.id || !nextStatus) return;
-        const promptMessage = nextStatus === 'PAYMENT_ERROR'
+        const promptMessage = nextStatus === REGISTRATION_STATUS.PAYMENT_ERROR
             ? copy.registrationsPanel.errorReviewPrompt
             : copy.registrationsPanel.confirmReviewPrompt;
         const reviewNotes = window.prompt(promptMessage, registration.paymentReviewNotes || '');
@@ -2986,7 +2978,7 @@ const Dashboard = () => {
                                                     <button
                                                         type="button"
                                                         className="btn btn-ghost registration-status-btn"
-                                                        onClick={() => handleUpdateRegistrationPaymentStatus(item, 'PAYMENT_CONFIRMED')}
+                                                        onClick={() => handleUpdateRegistrationPaymentStatus(item, REGISTRATION_STATUS.PAYMENT_CONFIRMED)}
                                                         disabled={registrationStatusUpdatingId === item.id || item.isPaymentConfirmed}
                                                     >
                                                         <CheckCircle2 size={14} />
@@ -2995,7 +2987,7 @@ const Dashboard = () => {
                                                     <button
                                                         type="button"
                                                         className="btn btn-ghost registration-status-btn"
-                                                        onClick={() => handleUpdateRegistrationPaymentStatus(item, 'PAYMENT_ERROR')}
+                                                        onClick={() => handleUpdateRegistrationPaymentStatus(item, REGISTRATION_STATUS.PAYMENT_ERROR)}
                                                         disabled={registrationStatusUpdatingId === item.id || item.isPaymentError}
                                                     >
                                                         <AlertCircle size={14} />

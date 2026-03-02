@@ -1,3 +1,5 @@
+import { REGISTRATION_STATUS, normalizeRegistrationStatus } from '../utils/registrationStatus';
+
 const ENV_API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').trim();
 const API_BASE_URL = ENV_API_BASE_URL ? ENV_API_BASE_URL.replace(/\/$/, '') : '';
 const LOCAL_PENDING_REGISTRATIONS_KEY = 'genesis_public_registration_pending_v1';
@@ -182,7 +184,7 @@ const toPendingRegistrationRow = (record) => {
     genero: payload.genero || '',
     modalidade: payload.modalidade || '',
     notes: payload.notes || '',
-    status: 'PENDING_SYNC',
+    status: REGISTRATION_STATUS.PENDING_SYNC,
     createdAt: safeRecord.createdAt || new Date().toISOString(),
     athleteId: '',
     lastError: safeRecord.lastError || ''
@@ -334,13 +336,18 @@ export const publicRegistrationService = {
       throw new Error('Inscricao invalida.');
     }
 
+    const normalizedStatus = normalizeRegistrationStatus(status);
+    if (normalizedStatus === REGISTRATION_STATUS.PENDING_SYNC) {
+      throw new Error('Status de pagamento invalido.');
+    }
+
     try {
       const response = await fetch(buildApiUrl(`/api/public/registrations/${encodeURIComponent(normalizedId)}/payment`), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ status, reviewNotes, reviewedBy })
+        body: JSON.stringify({ status: normalizedStatus, reviewNotes, reviewedBy })
       });
 
       if (!response.ok) {
