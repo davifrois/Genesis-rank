@@ -3,13 +3,168 @@ import { calculateTotalPoints, rankAthletes } from '../services/scoringService';
 import { authService } from '../services/authService';
 import { buildCategoryDescriptor, matchesBracketMode } from '../services/categoryService';
 import { nextPowerOfTwo, shuffleList } from '../services/bracketService';
+import { normalizeEventFees, resolveEventPixKey } from '../utils/eventPricing';
 
 const STORAGE_KEY = 'genesis_ranking_data';
+const STORAGE_BACKUP_KEY = 'genesis_ranking_data_backup_v1';
+const LEGACY_STORAGE_KEYS = [
+    'genesis_ranking_data_v2',
+    'genesis_ranking_store',
+    'genesis_ranking_state'
+];
+const PENDING_REGISTRATION_STORAGE_KEY = 'genesis_public_registration_pending_v1';
+const STORAGE_VERSION = 3;
 const MAX_HISTORY_ENTRIES = 12;
 const MAX_NOTIFICATIONS = 20;
 const StoreContext = createContext(null);
+const DEFAULT_NEWS_ITEMS = [
+    {
+        id: 'news-1',
+        title: 'Temporada aberta com novos campeonatos',
+        summary: 'Novas etapas regionais e estaduais foram adicionadas e ja alimentam o ranking oficial.',
+        imageUrl: '',
+        publishedAt: '2026-02-12',
+        createdAt: '2026-02-12T12:00:00.000Z'
+    },
+    {
+        id: 'news-2',
+        title: 'Ranking atualizado em tempo real',
+        summary: 'Agora cada resultado processado atualiza pontos e posicao do atleta automaticamente.',
+        imageUrl: '',
+        publishedAt: '2026-02-05',
+        createdAt: '2026-02-05T12:00:00.000Z'
+    },
+    {
+        id: 'news-3',
+        title: 'Regras de pontuacao revisadas',
+        summary: 'A tabela de eventos por estrelas segue valida para manter transparencia no sistema.',
+        imageUrl: '',
+        publishedAt: '2026-01-25',
+        createdAt: '2026-01-25T12:00:00.000Z'
+    }
+];
+const DEFAULT_ACADEMIES = [
+    {
+        id: 'academy-1',
+        name: 'Templum Fight',
+        country: 'Brasil',
+        city: 'Belo Horizonte',
+        state: 'MG',
+        logoUrl: '',
+        createdAt: '2026-01-10T12:00:00.000Z'
+    },
+    {
+        id: 'academy-2',
+        name: 'Genesis Team',
+        country: 'Brasil',
+        city: 'Contagem',
+        state: 'MG',
+        logoUrl: '',
+        createdAt: '2026-01-15T12:00:00.000Z'
+    }
+];
+
+const hasEncodingArtifacts = (value) => (
+    typeof value === 'string' && /Ã|Â|�/.test(value)
+);
+
+const utf8Decoder = typeof TextDecoder !== 'undefined'
+    ? new TextDecoder('utf-8', { fatal: false })
+    : null;
+
+const fixMojibake = (value) => {
+    if (!hasEncodingArtifacts(value) || !utf8Decoder) return value;
+    try {
+        const bytes = Uint8Array.from([...value].map((char) => char.charCodeAt(0)));
+        const decoded = utf8Decoder.decode(bytes);
+        if (!hasEncodingArtifacts(decoded) && decoded !== value) {
+            return decoded;
+        }
+    } catch {
+        return value;
+    }
+    return value;
+};
+
+const normalizeText = (value) => {
+    if (value === null || value === undefined) return '';
+    const text = typeof value === 'string' ? value : String(value);
+    return fixMojibake(text);
+};
+
+const normalizeTextTrimmed = (value) => normalizeText(value).trim();
+
+const normalizeOptionalUrl = (value) => {
+    const text = normalizeTextTrimmed(value || '');
+    if (!text) return '';
+    if (/^(https?:|data:|blob:|\/|\.\/|\.\.\/)/i.test(text)) return text;
+    return `https://${text}`;
+};
+
+const normalizeBoolean = (value, fallback = false) => {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value !== 0;
+    if (typeof value === 'string') {
+        const parsed = value.trim().toLowerCase();
+        if (['true', '1', 'yes', 'sim', 'open', 'aberto', 'active', 'ativo'].includes(parsed)) return true;
+        if (['false', '0', 'no', 'nao', 'closed', 'fechado', 'inactive', 'inativo'].includes(parsed)) return false;
+    }
+    return fallback;
+};
+
+const normalizeId = (value) => {
+    if (value === null || value === undefined) return '';
+    const text = typeof value === 'string' ? value : String(value);
+    return normalizeTextTrimmed(text);
+};
+
+const normalizeArray = (value) => (Array.isArray(value) ? value : []);
+
+const safeReadStorage = (key) => {
+    if (!key) return null;
+    try {
+        return localStorage.getItem(key);
+    } catch {
+        return null;
+    }
+};
+
+const parseStoredJson = (rawValue) => {
+    if (typeof rawValue !== 'string' || !rawValue.trim()) return null;
+    try {
+        return JSON.parse(rawValue);
+    } catch {
+        return null;
+    }
+};
+
+const parseStoredObject = (rawValue) => {
+    const parsed = parseStoredJson(rawValue);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    return parsed;
+};
+
+const loadStoredPayload = () => {
+    const storageKeys = [STORAGE_KEY, STORAGE_BACKUP_KEY, ...LEGACY_STORAGE_KEYS];
+    for (const key of storageKeys) {
+        const parsed = parseStoredObject(safeReadStorage(key));
+        if (parsed) return parsed;
+    }
+    return null;
+};
+
+const normalizeUser = (user) => {
+    if (!user || typeof user !== 'object') return null;
+    return {
+        ...user,
+        username: normalizeTextTrimmed(user.username || ''),
+        name: normalizeTextTrimmed(user.name || ''),
+        role: user.role
+    };
+};
 
 const initialData = {
+    schemaVersion: STORAGE_VERSION,
     athletes: [
         { id: '1', nome: 'JOÃO MIGUEL SANTOS VIEIRA', faixa: 'Branca/Cinza', peso: 'Pena', categoria: 'Pré-Mirim', academia: 'GRACIE BARRA COIMBRA', pontos: 36, historico: [] },
         { id: '2', nome: 'Samir Daniel Silva Fraga', faixa: 'Branca/Cinza', peso: 'Pena', categoria: 'Pré-Mirim', academia: 'GRACIE BARRA COIMBRA', pontos: 12, historico: [] },
@@ -19,6 +174,9 @@ const initialData = {
         { id: '6', nome: 'OLÍVIA MORAES SANTANA', faixa: 'Branca/Cinza', peso: 'Galo', categoria: 'Mirim A', academia: 'GRACIE BARRA COIMBRA', pontos: 12, historico: [] },
     ],
     events: [],
+    news: DEFAULT_NEWS_ITEMS,
+    academies: DEFAULT_ACADEMIES,
+    memberProfiles: [],
     activeEventId: null,
     logs: [],
     notifications: [],
@@ -30,78 +188,419 @@ const initialData = {
 
 const sanitizeHistoryItem = (item) => {
     if (!item || typeof item.type !== 'string') return null;
-    if (item.type === 'win') return { type: 'win' };
-    if (item.type === 'seed' && Number.isFinite(item.points)) {
-        return { type: 'seed', points: Number(item.points) };
-    }
-    if (item.type === 'podium' && [1, 2, 3].includes(item.position)) {
-        const record = { type: 'podium', position: item.position };
-        if (typeof item.source === 'string' && item.source.trim()) {
-            record.source = item.source.trim();
-        }
-        if (typeof item.bracketId === 'string' && item.bracketId.trim()) {
-            record.bracketId = item.bracketId.trim();
+    const type = item.type.trim().toLowerCase();
+    const appendTimestamp = (record) => {
+        if (typeof item.timestamp === 'string' && item.timestamp.trim()) {
+            record.timestamp = item.timestamp.trim();
         }
         return record;
+    };
+
+    if (type === 'win') return appendTimestamp({ type: 'win' });
+    if (type === 'seed' && Number.isFinite(Number(item.points))) {
+        return appendTimestamp({ type: 'seed', points: Number(item.points) });
+    }
+    if (type === 'podium') {
+        const position = Number(item.position);
+        if (![1, 2, 3].includes(position)) return null;
+        const record = { type: 'podium', position };
+        if (typeof item.source === 'string' && item.source.trim()) {
+            record.source = normalizeTextTrimmed(item.source);
+        }
+        if (typeof item.bracketId === 'string' && item.bracketId.trim()) {
+            record.bracketId = normalizeTextTrimmed(item.bracketId);
+        }
+        return appendTimestamp(record);
     }
     return null;
 };
 
 const resolveIsNoGi = (athlete) => (
     athlete?.isNoGi === true
-    || (typeof athlete?.modalidade === 'string' && athlete.modalidade.toUpperCase() === 'NO-GI')
+    || normalizeTextTrimmed(athlete?.modalidade || '').toUpperCase() === 'NO-GI'
 );
 
 const normalizeKeyPart = (value) => (
-    (value || '').toString().trim().toLowerCase().replace(/\s+/g, ' ')
+    (normalizeText(value) || '').toString().trim().toLowerCase().replace(/\s+/g, ' ')
 );
 
-const resolveGender = (athlete) => athlete?.genero || athlete?.sexo || '';
-const resolveEventId = (athlete) => athlete?.eventId || athlete?.eventoId || '';
+const normalizeNameKey = (value) => (
+    normalizeKeyPart(value)
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9 ]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+);
+
+const compactNameKey = (value) => normalizeNameKey(value).replace(/\s+/g, '');
+
+const namesLikelySame = (left, right) => {
+    const leftName = normalizeNameKey(left);
+    const rightName = normalizeNameKey(right);
+    if (!leftName || !rightName) return false;
+    if (leftName === rightName) return true;
+
+    const leftCompact = compactNameKey(leftName);
+    const rightCompact = compactNameKey(rightName);
+    if (!leftCompact || !rightCompact) return false;
+    if (leftCompact === rightCompact) return true;
+    if (leftCompact.includes(rightCompact) || rightCompact.includes(leftCompact)) return true;
+
+    const leftParts = leftName.split(' ').filter(Boolean);
+    const rightParts = rightName.split(' ').filter(Boolean);
+    const leftLastJoined = leftParts.slice(1).join('');
+    const rightLastJoined = rightParts.slice(1).join('');
+    const leftInitialLast = `${leftParts[0]?.charAt(0) || ''}${leftLastJoined}`;
+    const rightInitialLast = `${rightParts[0]?.charAt(0) || ''}${rightLastJoined}`;
+
+    if (leftInitialLast && rightCompact === leftInitialLast) return true;
+    if (rightInitialLast && leftCompact === rightInitialLast) return true;
+
+    const leftLast = leftParts[leftParts.length - 1] || '';
+    const rightLast = rightParts[rightParts.length - 1] || '';
+    const leftFirstInitial = leftParts[0]?.charAt(0) || '';
+    const rightFirstInitial = rightParts[0]?.charAt(0) || '';
+
+    return Boolean(
+        leftLast
+        && rightLast
+        && leftLast === rightLast
+        && leftFirstInitial
+        && rightFirstInitial
+        && leftFirstInitial === rightFirstInitial
+    );
+};
+
+const academyLikelySame = (left, right) => {
+    const leftValue = normalizeKeyPart(left);
+    const rightValue = normalizeKeyPart(right);
+    if (!leftValue || !rightValue) return false;
+    if (leftValue === rightValue) return true;
+    return leftValue.includes(rightValue) || rightValue.includes(leftValue);
+};
+
+const resolveIsAbsolute = (athlete) => (
+    athlete?.isAbsolute === true
+    || athlete?.absoluto === true
+    || athlete?.isAbsoluto === true
+);
+
+const resolveGender = (athlete) => normalizeTextTrimmed(athlete?.genero || athlete?.sexo || '');
+const resolveEventId = (athlete) => normalizeId(athlete?.eventId || athlete?.eventoId || '');
 
 const normalizeAthlete = (athlete) => {
-    let history = Array.isArray(athlete.historico)
-        ? athlete.historico.map(sanitizeHistoryItem).filter(Boolean)
+    const source = athlete || {};
+    let history = Array.isArray(source.historico)
+        ? source.historico.map(sanitizeHistoryItem).filter(Boolean)
         : [];
-    const basePoints = Number(athlete.pontos || 0);
+    const basePoints = Number(source.pontos || 0);
     if (history.length === 0 && basePoints > 0) {
         history = [{ type: 'seed', points: basePoints }];
     }
     const calculatedPoints = calculateTotalPoints(history);
     const pontos = history.length ? calculatedPoints : basePoints;
-    const isNoGi = resolveIsNoGi(athlete);
-    const eventId = resolveEventId(athlete);
+    const isNoGi = resolveIsNoGi(source);
+    const isAbsolute = resolveIsAbsolute(source);
+    const eventId = resolveEventId(source);
+    const nome = normalizeTextTrimmed(source.nome || '');
+    const faixa = normalizeTextTrimmed(source.faixa || '');
+    const peso = normalizeTextTrimmed(source.peso || '');
+    const categoria = normalizeTextTrimmed(source.categoria || '');
+    const academia = normalizeTextTrimmed(source.academia || '') || 'Sem academia';
+    const genero = resolveGender(source);
+    const id = normalizeId(source.id);
+    const photoUrl = normalizeOptionalUrl(source.photoUrl || source.fotoUrl || source.avatarUrl || source.foto || '');
+    const country = normalizeTextTrimmed(source.country || source.pais || source.nacionalidade || '');
+    const countryCode = normalizeTextTrimmed(source.countryCode || source.paisCode || '');
 
     return {
-        ...athlete,
+        ...source,
+        id,
+        nome,
+        faixa,
+        peso,
+        categoria,
+        academia,
+        genero,
+        photoUrl,
+        country,
+        countryCode,
         historico: history,
         pontos,
         isNoGi,
+        isAbsolute,
         eventId
     };
 };
 
 const normalizeBracket = (bracket) => {
     if (!bracket || typeof bracket !== 'object') return null;
-    const seedIds = Array.isArray(bracket.seedIds) ? bracket.seedIds.filter(Boolean) : [];
+    const seedIds = normalizeArray(bracket.seedIds).map(normalizeId).filter(Boolean);
     const size = Number.isFinite(bracket.size) ? bracket.size : nextPowerOfTwo(seedIds.length, 2);
     const podium = bracket.podium && typeof bracket.podium === 'object' ? bracket.podium : {};
+    const id = normalizeId(bracket.id) || Math.random().toString(36).substr(2, 9);
     return {
-        id: bracket.id || Math.random().toString(36).substr(2, 9),
+        id,
         number: Number.isFinite(bracket.number) ? bracket.number : 0,
-        eventId: bracket.eventId || '',
-        categoryKey: bracket.categoryKey || '',
-        label: bracket.label || 'Categoria',
-        mode: bracket.mode || 'GI',
+        eventId: normalizeId(bracket.eventId),
+        categoryKey: normalizeTextTrimmed(bracket.categoryKey || ''),
+        label: normalizeTextTrimmed(bracket.label || '') || 'Categoria',
+        mode: normalizeTextTrimmed(bracket.mode || '') || 'GI',
         seedIds,
         size,
         podium: {
-            goldId: podium.goldId || '',
-            silverId: podium.silverId || '',
-            bronzeId: podium.bronzeId || ''
+            goldId: normalizeId(podium.goldId),
+            silverId: normalizeId(podium.silverId),
+            bronzeId: normalizeId(podium.bronzeId)
         },
         appliedAt: bracket.appliedAt || '',
         createdAt: bracket.createdAt || new Date().toISOString()
+    };
+};
+
+const normalizeEvent = (event) => {
+    if (!event || typeof event !== 'object') return null;
+    const normalizedName = normalizeTextTrimmed(event.name || event.eventName || '');
+    const normalizedDate = typeof event.date === 'string'
+        ? event.date.trim()
+        : typeof event.eventDate === 'string'
+            ? event.eventDate.trim()
+            : event.date || event.eventDate || '';
+    const normalizedLocation = normalizeTextTrimmed(event.location || event.eventLocation || '');
+    const fallbackIdSource = normalizeNameKey(
+        [normalizedName, normalizedDate, normalizedLocation].filter(Boolean).join(' ')
+    ).replace(/\s+/g, '-');
+    const id = normalizeId(event.id || event.eventId || fallbackIdSource);
+    if (!id && !normalizedName) return null;
+    const registrationUrl = normalizeOptionalUrl(event.registrationUrl || event.registrationLink || '');
+    const fees = normalizeEventFees(event);
+    const pixKey = resolveEventPixKey(event);
+    const registrationOpen = normalizeBoolean(
+        event.registrationOpen,
+        true
+    );
+    const internalRegistration = normalizeBoolean(
+        event.internalRegistration,
+        true
+    );
+    return {
+        ...event,
+        id,
+        name: normalizedName || id,
+        date: normalizedDate,
+        location: normalizedLocation,
+        posterUrl: normalizeOptionalUrl(event.posterUrl || event.imageUrl || ''),
+        registrationUrl,
+        pixKey,
+        feeUnder15: fees.under15,
+        feeOver15: fees.over15,
+        feeCombo: fees.combo,
+        feeAbsolute: fees.absolute,
+        registrationOpen,
+        internalRegistration
+    };
+};
+
+const mergeEvents = (baseEvents = [], extraEvents = []) => {
+    const map = new Map();
+    const pushEvent = (event) => {
+        const normalized = normalizeEvent(event);
+        if (!normalized) return;
+        const idKey = normalizeId(normalized.id);
+        const nameKey = normalizeKeyPart(normalized.name);
+        const key = idKey || nameKey;
+        if (!key) return;
+        if (map.has(key)) {
+            const previous = map.get(key);
+            map.set(key, {
+                ...previous,
+                ...normalized,
+                name: normalized.name || previous.name,
+                date: normalized.date || previous.date,
+                location: normalized.location || previous.location
+            });
+            return;
+        }
+        map.set(key, normalized);
+    };
+
+    normalizeArray(baseEvents).forEach(pushEvent);
+    normalizeArray(extraEvents).forEach(pushEvent);
+    return [...map.values()];
+};
+
+const recoverEventsFromPendingRegistrations = () => {
+    const parsed = parseStoredJson(safeReadStorage(PENDING_REGISTRATION_STORAGE_KEY));
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+        .map((record) => {
+            const payload = record?.payload && typeof record.payload === 'object'
+                ? record.payload
+                : {};
+            return normalizeEvent({
+                id: payload.eventId,
+                name: payload.eventName,
+                date: payload.eventDate,
+                location: payload.eventLocation,
+                registrationOpen: true,
+                internalRegistration: true
+            });
+        })
+        .filter(Boolean);
+};
+
+const recoverEventsFromAthletes = (athletes = []) => {
+    return normalizeArray(athletes)
+        .map((athlete) => {
+            const eventId = normalizeId(athlete?.eventId);
+            if (!eventId) return null;
+            return normalizeEvent({
+                id: eventId,
+                name: normalizeTextTrimmed(athlete?.eventName || '') || `Evento ${eventId}`,
+                registrationOpen: true,
+                internalRegistration: true
+            });
+        })
+        .filter(Boolean);
+};
+
+const recoverEventsFromLogs = (logs = []) => {
+    return normalizeArray(logs)
+        .map((item) => normalizeLog(item))
+        .filter(Boolean)
+        .map((log) => {
+            if (normalizeTextTrimmed(log.action).toUpperCase() !== 'ADD_EVENT') return null;
+            const match = normalizeText(log.details).match(/evento criado:\s*(.+)$/i);
+            const name = normalizeTextTrimmed(match?.[1] || '');
+            if (!name) return null;
+            const fallbackId = normalizeNameKey(name).replace(/\s+/g, '-');
+            return normalizeEvent({
+                id: fallbackId,
+                name,
+                registrationOpen: true,
+                internalRegistration: true
+            });
+        })
+        .filter(Boolean);
+};
+
+const recoverEventsIfMissing = ({ events = [], athletes = [], logs = [] }) => {
+    if (normalizeArray(events).length > 0) return events;
+    const recoveredFromAthletes = recoverEventsFromAthletes(athletes);
+    const recoveredFromPending = recoverEventsFromPendingRegistrations();
+    const recoveredFromLogs = recoverEventsFromLogs(logs);
+    return mergeEvents([], [...recoveredFromAthletes, ...recoveredFromPending, ...recoveredFromLogs]);
+};
+
+const normalizeLog = (log) => {
+    if (!log || typeof log !== 'object') return null;
+    return {
+        ...log,
+        type: normalizeText(log.type),
+        action: normalizeText(log.action),
+        details: normalizeText(log.details)
+    };
+};
+
+const normalizeNotification = (notification) => {
+    if (!notification || typeof notification !== 'object') return null;
+    return {
+        ...notification,
+        name: normalizeText(notification.name)
+    };
+};
+
+const normalizeNews = (item) => {
+    if (!item || typeof item !== 'object') return null;
+    const title = normalizeTextTrimmed(item.title || '');
+    if (!title) return null;
+    const summary = normalizeTextTrimmed(item.summary || '');
+    const createdAtRaw = normalizeTextTrimmed(item.createdAt || '');
+    const publishedAtRaw = normalizeTextTrimmed(item.publishedAt || '');
+    const createdAt = createdAtRaw || new Date().toISOString();
+
+    return {
+        ...item,
+        id: normalizeId(item.id) || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        title,
+        summary,
+        imageUrl: normalizeOptionalUrl(item.imageUrl || item.coverUrl || ''),
+        author: normalizeTextTrimmed(item.author || ''),
+        publishedAt: publishedAtRaw,
+        createdAt
+    };
+};
+
+const normalizeAcademy = (academy) => {
+    if (!academy || typeof academy !== 'object') return null;
+    const name = normalizeTextTrimmed(academy.name || academy.nome || '');
+    if (!name) return null;
+
+    return {
+        ...academy,
+        id: normalizeId(academy.id) || `academy-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        name,
+        country: normalizeTextTrimmed(academy.country || academy.pais || '') || 'Brasil',
+        city: normalizeTextTrimmed(academy.city || academy.cidade || ''),
+        state: normalizeTextTrimmed(academy.state || academy.estado || ''),
+        ownerName: normalizeTextTrimmed(academy.ownerName || academy.responsavel || ''),
+        contactPhone: normalizeTextTrimmed(academy.contactPhone || academy.telefone || ''),
+        contactEmail: normalizeTextTrimmed(academy.contactEmail || academy.email || ''),
+        logoUrl: normalizeOptionalUrl(academy.logoUrl || academy.fotoUrl || academy.imageUrl || ''),
+        createdAt: normalizeTextTrimmed(academy.createdAt || '') || new Date().toISOString()
+    };
+};
+
+const calculateAgeFromBirthDate = (value) => {
+    if (!value) return '';
+    const birth = new Date(value);
+    if (Number.isNaN(birth.getTime())) return '';
+
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const hasBirthdayPassed = (
+        today.getMonth() > birth.getMonth()
+        || (today.getMonth() === birth.getMonth() && today.getDate() >= birth.getDate())
+    );
+    if (!hasBirthdayPassed) age -= 1;
+    return age >= 0 ? age : '';
+};
+
+const normalizeMemberProfile = (profile) => {
+    if (!profile || typeof profile !== 'object') return null;
+    const firstName = normalizeTextTrimmed(profile.firstName || profile.nome || profile.name || '');
+    const lastName = normalizeTextTrimmed(profile.lastName || profile.sobrenome || '');
+    const fallbackFullName = [firstName, lastName].filter(Boolean).join(' ').trim();
+    const fullName = normalizeTextTrimmed(profile.fullName || fallbackFullName);
+    const birthDate = normalizeTextTrimmed(profile.birthDate || profile.dataNascimento || '');
+    const parsedAge = Number(profile.age || profile.idade || '');
+    const calculatedAge = calculateAgeFromBirthDate(birthDate);
+    const age = calculatedAge !== ''
+        ? calculatedAge
+        : (Number.isFinite(parsedAge) && parsedAge >= 0 ? Math.floor(parsedAge) : '');
+    if (!fullName) return null;
+
+    return {
+        ...profile,
+        id: normalizeId(profile.id) || `member-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        firstName,
+        lastName,
+        fullName,
+        birthDate,
+        age,
+        email: normalizeTextTrimmed(profile.email || ''),
+        phone: normalizeTextTrimmed(profile.phone || profile.telefone || ''),
+        createdByUsername: normalizeTextTrimmed(profile.createdByUsername || profile.usuario || ''),
+        createdByName: normalizeTextTrimmed(profile.createdByName || profile.usuarioNome || ''),
+        academyId: normalizeId(profile.academyId || ''),
+        academyName: normalizeTextTrimmed(profile.academyName || profile.academia || profile.academy || ''),
+        country: normalizeTextTrimmed(profile.country || profile.pais || '') || 'Brasil',
+        city: normalizeTextTrimmed(profile.city || profile.cidade || ''),
+        belt: normalizeTextTrimmed(profile.belt || profile.faixa || ''),
+        weight: normalizeTextTrimmed(profile.weight || profile.peso || ''),
+        photoUrl: normalizeOptionalUrl(profile.photoUrl || profile.fotoUrl || profile.avatarUrl || profile.photo || ''),
+        createdAt: normalizeTextTrimmed(profile.createdAt || '') || new Date().toISOString()
     };
 };
 
@@ -229,22 +728,90 @@ const buildRankNotifications = (previousRanks, nextRanks, athletes, existingNoti
     return [...fresh, ...existingNotifications].slice(0, MAX_NOTIFICATIONS);
 };
 
+const migrateStoredData = (payload) => {
+    if (!payload || typeof payload !== 'object') {
+        return { ...initialData };
+    }
+    const version = Number.isFinite(payload.schemaVersion) ? payload.schemaVersion : 1;
+    if (version >= STORAGE_VERSION) {
+        return payload;
+    }
+    return { ...payload, schemaVersion: STORAGE_VERSION };
+};
+
 const useStoreState = () => {
     const [data, setData] = useState(() => {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        let parsed = initialData;
-        if (saved) {
-            try {
-                parsed = JSON.parse(saved);
-            } catch (err) {
-                parsed = initialData;
-            }
-        }
-        const athletes = (parsed.athletes || initialData.athletes).map(normalizeAthlete);
-        const events = Array.isArray(parsed.events) ? parsed.events : [];
-        const brackets = Array.isArray(parsed.brackets)
-            ? parsed.brackets.map(normalizeBracket).filter(Boolean)
-            : [];
+        let parsed = loadStoredPayload() || initialData;
+        parsed = migrateStoredData(parsed);
+
+        const athletes = normalizeArray(parsed.athletes || initialData.athletes).map(normalizeAthlete);
+        const logs = normalizeArray(parsed.logs).map(normalizeLog).filter(Boolean).slice(0, 100);
+        const parsedEvents = normalizeArray(parsed.events).map(normalizeEvent).filter(Boolean);
+        const recoveredEvents = recoverEventsIfMissing({
+            events: parsedEvents,
+            athletes,
+            logs
+        });
+        const events = mergeEvents(parsedEvents, recoveredEvents);
+        const eventIds = new Set(events.map((event) => event.id).filter(Boolean));
+        const eventBoundAthletes = athletes.map((athlete) => (
+            athlete.eventId && eventIds.size > 0 && !eventIds.has(athlete.eventId)
+                ? { ...athlete, eventId: '' }
+                : athlete
+        ));
+        const notifications = normalizeArray(parsed.notifications)
+            .map(normalizeNotification)
+            .filter(Boolean)
+            .slice(0, MAX_NOTIFICATIONS);
+        const news = normalizeArray(parsed.news || initialData.news)
+            .map(normalizeNews)
+            .filter(Boolean)
+            .sort((a, b) => {
+                const aTime = new Date(a.publishedAt || a.createdAt || 0).getTime();
+                const bTime = new Date(b.publishedAt || b.createdAt || 0).getTime();
+                return bTime - aTime;
+            });
+        const academies = normalizeArray(parsed.academies || initialData.academies)
+            .map(normalizeAcademy)
+            .filter(Boolean)
+            .sort((a, b) => a.name.localeCompare(b.name));
+        const academyByName = new Map(academies.map((academy) => [normalizeKeyPart(academy.name), academy]));
+        const memberProfiles = normalizeArray(parsed.memberProfiles)
+            .map(normalizeMemberProfile)
+            .filter(Boolean)
+            .map((profile) => {
+                const linkedAcademy = profile.academyId
+                    ? academies.find((academy) => academy.id === profile.academyId)
+                    : academyByName.get(normalizeKeyPart(profile.academyName || ''));
+                if (!linkedAcademy) return profile;
+                return {
+                    ...profile,
+                    academyId: linkedAcademy.id,
+                    academyName: linkedAcademy.name
+                };
+            })
+            .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        const normalizedAthletes = eventBoundAthletes.map((athlete) => {
+            if (athlete.photoUrl) return athlete;
+            const linkedProfile = memberProfiles.find((profile) => (
+                profile?.photoUrl
+                && namesLikelySame(athlete.nome, profile.fullName)
+                && (
+                    academyLikelySame(athlete.academia || '', profile.academyName || '')
+                    || !normalizeKeyPart(profile.academyName || '')
+                    || !normalizeKeyPart(athlete.academia || '')
+                    || normalizeKeyPart(athlete.academia || '') === normalizeKeyPart('Sem academia')
+                )
+            ));
+            if (!linkedProfile) return athlete;
+            return normalizeAthlete({
+                ...athlete,
+                photoUrl: linkedProfile.photoUrl
+            });
+        });
+        const brackets = normalizeArray(parsed.brackets)
+            .map(normalizeBracket)
+            .filter(Boolean);
         const maxBracketNumber = brackets.reduce((max, bracket) => (
             Math.max(max, Number(bracket.number) || 0)
         ), 0);
@@ -252,25 +819,35 @@ const useStoreState = () => {
             Number.isFinite(parsed.nextBracketNumber) ? parsed.nextBracketNumber : initialData.nextBracketNumber,
             maxBracketNumber + 1
         );
-        const eventIds = new Set(events.map((event) => event.id));
-        const activeEventId = eventIds.has(parsed.activeEventId) ? parsed.activeEventId : null;
-        const currentUser = parsed.currentUser
-            ? {
-                ...parsed.currentUser,
-                role: parsed.currentUser.role
-                    || (authService.getRoleForUsername
-                        ? authService.getRoleForUsername(parsed.currentUser.username)
-                        : parsed.currentUser.role)
-            }
+        const normalizedActiveEventId = normalizeId(parsed.activeEventId);
+        const activeEventId = normalizedActiveEventId && eventIds.has(normalizedActiveEventId)
+            ? normalizedActiveEventId
             : null;
+        let currentUser = normalizeUser(parsed.currentUser);
+        if (currentUser && !currentUser.role) {
+            currentUser = {
+                ...currentUser,
+                role: authService.getRoleForUsername
+                    ? authService.getRoleForUsername(currentUser.username)
+                    : currentUser.role
+            };
+        }
+        const rankHistory = parsed.rankHistory && typeof parsed.rankHistory === 'object' && !Array.isArray(parsed.rankHistory)
+            ? parsed.rankHistory
+            : {};
         const merged = {
             ...initialData,
             ...parsed,
-            athletes,
+            schemaVersion: STORAGE_VERSION,
+            athletes: normalizedAthletes,
             events,
+            news,
+            academies,
+            memberProfiles,
+            logs,
+            notifications,
+            rankHistory,
             activeEventId,
-            notifications: parsed.notifications || [],
-            rankHistory: parsed.rankHistory || {},
             brackets,
             nextBracketNumber,
             currentUser
@@ -278,7 +855,7 @@ const useStoreState = () => {
 
         return {
             ...merged,
-            rankHistory: ensureRankHistory(athletes, merged.rankHistory)
+            rankHistory: ensureRankHistory(normalizedAthletes, merged.rankHistory)
         };
     });
 
@@ -287,14 +864,75 @@ const useStoreState = () => {
 
     useEffect(() => {
         const timeout = setTimeout(() => {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            const payload = { ...data, schemaVersion: STORAGE_VERSION };
+            const serialized = JSON.stringify(payload);
+            try {
+                localStorage.setItem(STORAGE_KEY, serialized);
+            } catch {
+                try {
+                    localStorage.setItem(STORAGE_BACKUP_KEY, serialized);
+                } catch {
+                    // Ignore storage write errors to avoid white screen when quota is exceeded.
+                }
+                return;
+            }
+
+            try {
+                localStorage.setItem(STORAGE_BACKUP_KEY, serialized);
+            } catch {
+                // Backup storage is best effort.
+            }
         }, 250);
 
         return () => clearTimeout(timeout);
     }, [data]);
 
+    useEffect(() => {
+        if (data.events.length > 0) return undefined;
+        let cancelled = false;
+
+        const bootstrapEventsFromApi = async () => {
+            try {
+                const response = await fetch('/api/public/events');
+                if (!response.ok) return;
+                const payload = await response.json();
+                const remoteEvents = normalizeArray(payload).map(normalizeEvent).filter(Boolean);
+                if (!remoteEvents.length || cancelled) return;
+
+                setData((prev) => {
+                    if (prev.events.length > 0) return prev;
+                    const mergedEvents = mergeEvents(prev.events, remoteEvents);
+                    if (!mergedEvents.length) return prev;
+                    const activeEventStillExists = prev.activeEventId
+                        && mergedEvents.some((event) => event.id === prev.activeEventId);
+                    return {
+                        ...prev,
+                        events: mergedEvents,
+                        activeEventId: activeEventStillExists
+                            ? prev.activeEventId
+                            : (mergedEvents[0]?.id || null)
+                    };
+                });
+            } catch {
+                // Ignore bootstrap failures; local mode still works.
+            }
+        };
+
+        bootstrapEventsFromApi();
+        return () => {
+            cancelled = true;
+        };
+    }, [data.events.length]);
+
     const addLog = (log) => {
-        const newLog = { ...log, id: Date.now(), timestamp: new Date().toISOString() };
+        const newLog = {
+            ...log,
+            id: Date.now(),
+            timestamp: new Date().toISOString()
+        };
+        newLog.type = normalizeText(newLog.type);
+        newLog.action = normalizeText(newLog.action);
+        newLog.details = normalizeText(newLog.details);
         setData(prev => ({
             ...prev,
             logs: [newLog, ...prev.logs].slice(0, 100)
@@ -319,8 +957,230 @@ const useStoreState = () => {
         setUiState((prev) => ({ ...prev, eventModalOpen: false }));
     };
 
+    const addNews = (payload = {}) => {
+        const normalized = normalizeNews({
+            ...payload,
+            id: payload.id || `${Date.now()}`,
+            createdAt: payload.createdAt || new Date().toISOString()
+        });
+
+        if (!normalized) {
+            addLog({ type: 'ERROR', action: 'ADD_NEWS', details: 'Noticia invalida.' });
+            throw new Error('Informe o titulo da noticia.');
+        }
+
+        setData((prev) => ({
+            ...prev,
+            news: [normalized, ...prev.news]
+                .map(normalizeNews)
+                .filter(Boolean)
+                .sort((a, b) => new Date(b.publishedAt || b.createdAt || 0).getTime() - new Date(a.publishedAt || a.createdAt || 0).getTime())
+        }));
+
+        addLog({ type: 'INFO', action: 'ADD_NEWS', details: `Noticia criada: ${normalized.title}` });
+        return normalized;
+    };
+
+    const addAcademy = (payload = {}) => {
+        const normalized = normalizeAcademy({
+            ...payload,
+            id: payload.id || `academy-${Date.now()}`,
+            createdAt: payload.createdAt || new Date().toISOString()
+        });
+
+        if (!normalized) {
+            addLog({ type: 'ERROR', action: 'ADD_ACADEMY', details: 'Dados invalidos para academia.' });
+            throw new Error('Informe o nome da academia.');
+        }
+
+        const exists = data.academies.find((academy) => normalizeKeyPart(academy.name) === normalizeKeyPart(normalized.name));
+        if (exists) {
+            addLog({ type: 'ERROR', action: 'ADD_ACADEMY', details: `Academia duplicada: ${normalized.name}` });
+            throw new Error('Ja existe uma academia com este nome.');
+        }
+
+        setData((prev) => ({
+            ...prev,
+            academies: [...prev.academies, normalized]
+                .map(normalizeAcademy)
+                .filter(Boolean)
+                .sort((a, b) => a.name.localeCompare(b.name))
+        }));
+
+        addLog({ type: 'INFO', action: 'ADD_ACADEMY', details: `Academia cadastrada: ${normalized.name}` });
+        return normalized;
+    };
+
+    const deleteAcademy = (academyId) => {
+        const id = normalizeId(academyId);
+        if (!id) {
+            addLog({ type: 'ERROR', action: 'DELETE_ACADEMY', details: 'Academia invalida para exclusao.' });
+            throw new Error('Academia invalida.');
+        }
+
+        const academy = data.academies.find((item) => item.id === id);
+        if (!academy) {
+            addLog({ type: 'ERROR', action: 'DELETE_ACADEMY', details: `Academia nao encontrada: ${id}` });
+            throw new Error('Academia nao encontrada.');
+        }
+
+        setData((prev) => ({
+            ...prev,
+            academies: prev.academies.filter((item) => item.id !== id),
+            memberProfiles: prev.memberProfiles.map((profile) => (
+                profile.academyId === id
+                    ? { ...profile, academyId: '', academyName: profile.academyName || academy.name }
+                    : profile
+            ))
+        }));
+
+        addLog({ type: 'WARN', action: 'DELETE_ACADEMY', details: `Academia removida: ${academy.name}` });
+    };
+
+    const addMemberProfile = (payload = {}) => {
+        const normalized = normalizeMemberProfile({
+            ...payload,
+            id: payload.id || `member-${Date.now()}`,
+            createdAt: payload.createdAt || new Date().toISOString()
+        });
+
+        if (!normalized) {
+            addLog({ type: 'ERROR', action: 'ADD_MEMBER', details: 'Perfil de filiacao invalido.' });
+            throw new Error('Informe o nome completo do atleta.');
+        }
+
+        const academy = normalized.academyId
+            ? data.academies.find((item) => item.id === normalized.academyId)
+            : data.academies.find((item) => normalizeKeyPart(item.name) === normalizeKeyPart(normalized.academyName || ''));
+        const academyId = academy?.id || normalized.academyId || '';
+        const academyName = academy?.name || normalized.academyName || 'Sem academia';
+
+        const profileToSave = {
+            ...normalized,
+            academyId,
+            academyName
+        };
+
+        const duplicate = data.memberProfiles.find((profile) => (
+            normalizeKeyPart(profile.fullName) === normalizeKeyPart(profileToSave.fullName)
+            && normalizeKeyPart(profile.academyName || '') === normalizeKeyPart(profileToSave.academyName || '')
+        ));
+
+        const targetId = duplicate?.id || profileToSave.id;
+
+        setData((prev) => {
+            const nextProfiles = duplicate
+                ? prev.memberProfiles.map((profile) => (profile.id === duplicate.id ? { ...profile, ...profileToSave, id: duplicate.id } : profile))
+                : [profileToSave, ...prev.memberProfiles];
+
+            const nextAthletes = prev.athletes.map((athlete) => {
+                const sameName = namesLikelySame(athlete.nome, profileToSave.fullName);
+                const sameAcademy = academyLikelySame(athlete.academia || '', profileToSave.academyName || '');
+                const canLinkWithoutAcademy = (
+                    !normalizeKeyPart(profileToSave.academyName || '')
+                    || !normalizeKeyPart(athlete.academia || '')
+                    || normalizeKeyPart(athlete.academia || '') === normalizeKeyPart('Sem academia')
+                );
+                if (!sameName || (!sameAcademy && !canLinkWithoutAcademy)) return athlete;
+                return {
+                    ...athlete,
+                    photoUrl: profileToSave.photoUrl || athlete.photoUrl || ''
+                };
+            });
+
+            return {
+                ...prev,
+                memberProfiles: nextProfiles
+                    .map(normalizeMemberProfile)
+                    .filter(Boolean)
+                    .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()),
+                athletes: nextAthletes.map(normalizeAthlete)
+            };
+        });
+
+        addLog({ type: 'INFO', action: 'ADD_MEMBER', details: `Filiacao salva: ${profileToSave.fullName}` });
+        return {
+            ...profileToSave,
+            id: targetId
+        };
+    };
+
+    const deleteMemberProfile = (profileId) => {
+        const id = normalizeId(profileId);
+        if (!id) {
+            addLog({ type: 'ERROR', action: 'DELETE_MEMBER', details: 'Perfil invalido para exclusao.' });
+            throw new Error('Perfil invalido.');
+        }
+
+        const existing = data.memberProfiles.find((item) => item.id === id);
+        if (!existing) {
+            addLog({ type: 'ERROR', action: 'DELETE_MEMBER', details: `Perfil nao encontrado: ${id}` });
+            throw new Error('Perfil nao encontrado.');
+        }
+
+        setData((prev) => ({
+            ...prev,
+            memberProfiles: prev.memberProfiles.filter((item) => item.id !== id)
+        }));
+
+        addLog({ type: 'WARN', action: 'DELETE_MEMBER', details: `Perfil removido: ${existing.fullName}` });
+    };
+
+    const updateNews = (newsId, updates = {}) => {
+        const id = normalizeId(newsId);
+        if (!id) {
+            addLog({ type: 'ERROR', action: 'UPDATE_NEWS', details: 'Noticia invalida para edicao.' });
+            throw new Error('Noticia invalida.');
+        }
+
+        const current = data.news.find((item) => item.id === id);
+        if (!current) {
+            addLog({ type: 'ERROR', action: 'UPDATE_NEWS', details: `Noticia nao encontrada: ${id}` });
+            throw new Error('Noticia nao encontrada.');
+        }
+
+        const normalized = normalizeNews({
+            ...current,
+            ...updates,
+            id: current.id,
+            createdAt: current.createdAt || new Date().toISOString()
+        });
+
+        if (!normalized) {
+            addLog({ type: 'ERROR', action: 'UPDATE_NEWS', details: 'Conteudo invalido para noticia.' });
+            throw new Error('Conteudo da noticia invalido.');
+        }
+
+        setData((prev) => ({
+            ...prev,
+            news: prev.news
+                .map((item) => (item.id === id ? normalized : item))
+                .map(normalizeNews)
+                .filter(Boolean)
+                .sort((a, b) => new Date(b.publishedAt || b.createdAt || 0).getTime() - new Date(a.publishedAt || a.createdAt || 0).getTime())
+        }));
+
+        addLog({ type: 'INFO', action: 'UPDATE_NEWS', details: `Noticia atualizada: ${normalized.title}` });
+        return normalized;
+    };
+
+    const deleteNews = (newsId) => {
+        const id = normalizeId(newsId);
+        if (!id) {
+            addLog({ type: 'ERROR', action: 'DELETE_NEWS', details: 'Noticia invalida para exclusao.' });
+            throw new Error('Noticia invalida.');
+        }
+
+        const title = data.news.find((item) => item.id === id)?.title || id;
+        setData((prev) => ({
+            ...prev,
+            news: prev.news.filter((item) => item.id !== id)
+        }));
+        addLog({ type: 'WARN', action: 'DELETE_NEWS', details: `Noticia removida: ${title}` });
+    };
+
     const addEvent = (event) => {
-        const name = (event?.name || '').toString().trim();
+        const name = normalizeTextTrimmed(event?.name || '');
         if (!name) {
             addLog({ type: 'ERROR', action: 'ADD_EVENT', details: 'Nome do evento nao informado.' });
             throw new Error('Informe o nome do evento.');
@@ -330,12 +1190,23 @@ const useStoreState = () => {
             addLog({ type: 'ERROR', action: 'ADD_EVENT', details: `Evento duplicado: ${name}` });
             throw new Error('Ja existe um evento com este nome.');
         }
+        const fees = normalizeEventFees(event);
+        const pixKey = resolveEventPixKey(event);
 
         const newEvent = {
             id: Date.now().toString(),
             name,
-            date: event?.date || '',
-            location: event?.location || '',
+            date: typeof event?.date === 'string' ? event.date.trim() : event?.date || '',
+            location: normalizeTextTrimmed(event?.location || ''),
+            posterUrl: normalizeOptionalUrl(event?.posterUrl || event?.imageUrl || ''),
+            registrationUrl: normalizeOptionalUrl(event?.registrationUrl || event?.registrationLink || ''),
+            pixKey,
+            feeUnder15: fees.under15,
+            feeOver15: fees.over15,
+            feeCombo: fees.combo,
+            feeAbsolute: fees.absolute,
+            registrationOpen: normalizeBoolean(event?.registrationOpen, true),
+            internalRegistration: normalizeBoolean(event?.internalRegistration, true),
             createdAt: new Date().toISOString()
         };
 
@@ -360,7 +1231,7 @@ const useStoreState = () => {
             throw new Error('Evento nao encontrado.');
         }
 
-        const name = (updates?.name ?? current.name).toString().trim();
+        const name = normalizeTextTrimmed(updates?.name ?? current.name);
         if (!name) {
             addLog({ type: 'ERROR', action: 'UPDATE_EVENT', details: 'Nome do evento nao informado.' });
             throw new Error('Informe o nome do evento.');
@@ -374,12 +1245,36 @@ const useStoreState = () => {
             addLog({ type: 'ERROR', action: 'UPDATE_EVENT', details: `Evento duplicado: ${name}` });
             throw new Error('Ja existe um evento com este nome.');
         }
+        const fees = normalizeEventFees({
+            feeUnder15: updates?.feeUnder15 ?? current.feeUnder15,
+            feeOver15: updates?.feeOver15 ?? current.feeOver15,
+            feeCombo: updates?.feeCombo ?? current.feeCombo,
+            feeAbsolute: updates?.feeAbsolute ?? current.feeAbsolute
+        });
+        const pixKey = resolveEventPixKey({ pixKey: updates?.pixKey ?? current.pixKey });
 
         const updatedEvent = {
             ...current,
             name,
-            date: updates?.date ?? current.date ?? '',
-            location: (updates?.location ?? current.location ?? '').toString().trim()
+            date: typeof updates?.date === 'string'
+                ? updates.date.trim()
+                : updates?.date ?? current.date ?? '',
+            location: normalizeTextTrimmed(updates?.location ?? current.location ?? ''),
+            posterUrl: normalizeOptionalUrl(updates?.posterUrl ?? current.posterUrl ?? ''),
+            registrationUrl: normalizeOptionalUrl(updates?.registrationUrl ?? current.registrationUrl ?? ''),
+            pixKey,
+            feeUnder15: fees.under15,
+            feeOver15: fees.over15,
+            feeCombo: fees.combo,
+            feeAbsolute: fees.absolute,
+            registrationOpen: normalizeBoolean(
+                updates?.registrationOpen,
+                current.registrationOpen ?? true
+            ),
+            internalRegistration: normalizeBoolean(
+                updates?.internalRegistration,
+                current.internalRegistration ?? true
+            )
         };
 
         setData(prev => ({
@@ -498,6 +1393,64 @@ const useStoreState = () => {
             };
         });
         addLog({ type: 'INFO', action: 'ADD_ATHLETE', details: `Novo atleta: ${athlete.nome} (${athlete.academia})` });
+    };
+
+    const removeAthlete = (id) => {
+        const normalizedId = normalizeId(id);
+        if (!normalizedId) {
+            addLog({ type: 'ERROR', action: 'REMOVE_ATHLETE', details: 'ID invalido para remocao.' });
+            throw new Error('Atleta invalido.');
+        }
+
+        const targetAthlete = data.athletes.find((athlete) => athlete.id === normalizedId);
+        if (!targetAthlete) {
+            addLog({ type: 'ERROR', action: 'REMOVE_ATHLETE', details: `Atleta ${normalizedId} nao encontrado.` });
+            throw new Error('Atleta nao encontrado.');
+        }
+
+        setData((prev) => {
+            const previousRanks = buildRankMap(prev.athletes);
+            const updatedAthletes = prev.athletes.filter((athlete) => athlete.id !== normalizedId);
+            const nextRanks = buildRankMap(updatedAthletes);
+
+            const nextBrackets = prev.brackets.map((bracket) => {
+                const seedIds = (bracket.seedIds || []).filter((seedId) => seedId !== normalizedId);
+                const podium = bracket.podium || {};
+                return {
+                    ...bracket,
+                    seedIds,
+                    podium: {
+                        ...podium,
+                        goldId: podium.goldId === normalizedId ? '' : (podium.goldId || ''),
+                        silverId: podium.silverId === normalizedId ? '' : (podium.silverId || ''),
+                        bronzeId: podium.bronzeId === normalizedId ? '' : (podium.bronzeId || '')
+                    }
+                };
+            });
+
+            const filteredNotifications = (prev.notifications || []).filter((item) => item.athleteId !== normalizedId);
+            const nextRankHistory = { ...(prev.rankHistory || {}) };
+            delete nextRankHistory[normalizedId];
+
+            return {
+                ...prev,
+                athletes: updatedAthletes,
+                brackets: nextBrackets,
+                rankHistory: ensureRankHistory(updatedAthletes, nextRankHistory),
+                notifications: buildRankNotifications(
+                    previousRanks,
+                    nextRanks,
+                    updatedAthletes,
+                    filteredNotifications
+                )
+            };
+        });
+
+        addLog({
+            type: 'WARN',
+            action: 'REMOVE_ATHLETE',
+            details: `Atleta removido: ${targetAthlete.nome} (${targetAthlete.academia || 'Sem academia'})`
+        });
     };
 
     const updateAthletePoints = (id, historyItem) => {
@@ -747,7 +1700,7 @@ const useStoreState = () => {
 
     const importAthletes = (newList, options = {}) => {
         const fallbackEventId = options.eventId || data.activeEventId || '';
-        const validAthletes = newList.filter((athlete) => athlete.nome);
+        const validAthletes = newList.filter((athlete) => normalizeTextTrimmed(athlete.nome));
         const invalidCount = newList.length - validAthletes.length;
         const existingKeys = new Set(data.athletes.map(buildAthleteKey));
         const prepared = [];
@@ -804,6 +1757,9 @@ const useStoreState = () => {
     return {
         athletes: data.athletes,
         events: data.events,
+        news: data.news,
+        academies: data.academies,
+        memberProfiles: data.memberProfiles,
         activeEventId: data.activeEventId,
         logs: data.logs,
         notifications: data.notifications,
@@ -816,12 +1772,20 @@ const useStoreState = () => {
         logout,
         openEventModal,
         closeEventModal,
+        addNews,
+        updateNews,
+        deleteNews,
+        addAcademy,
+        deleteAcademy,
+        addMemberProfile,
+        deleteMemberProfile,
         addEvent,
         updateEvent,
         deleteEvent,
         setActiveEvent,
         assignAthletesToEvent,
         addAthlete,
+        removeAthlete,
         updateAthletePoints,
         setManualPoints,
         resetAthletePoints,

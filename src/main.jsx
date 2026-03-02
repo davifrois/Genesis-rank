@@ -3,11 +3,14 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 import { StoreProvider } from './hooks/useStore'
+import { I18nProvider } from './hooks/useI18n'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <StoreProvider>
-      <App />
-    </StoreProvider>
+    <I18nProvider>
+      <StoreProvider>
+        <App />
+      </StoreProvider>
+    </I18nProvider>
   </StrictMode>,
 )

@@ -11,6 +11,12 @@ node_modules
 dist
 dist-ssr
 *.local
+target
+backend/target
+backend/.m2repo
+backend/.m2repo/
+backend/data
+backend/data/
 
 # Editor directories and files
 .vscode/*

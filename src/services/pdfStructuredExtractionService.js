@@ -57,6 +57,20 @@ const FAIXA_MAP = new Map([
   ['amarelas', 'amarelo'],
   ['azul', 'azul'],
   ['azuis', 'azul'],
+  ['laranja', 'laranja'],
+  ['laranjas', 'laranja'],
+  ['verde', 'verde'],
+  ['verdes', 'verde'],
+  ['roxa', 'roxa'],
+  ['roxo', 'roxa'],
+  ['roxas', 'roxa'],
+  ['roxos', 'roxa'],
+  ['marrom', 'marrom'],
+  ['marrons', 'marrom'],
+  ['preta', 'preta'],
+  ['preto', 'preta'],
+  ['pretas', 'preta'],
+  ['pretos', 'preta'],
 ]);
 
 const normalizeForMatch = (value) => (

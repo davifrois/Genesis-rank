@@ -407,6 +407,136 @@ export const generateRankingPDF = (athletes, options = {}) => {
     doc.save(fileName);
 };
 
+export const generateFilteredRankingPDF = ({ groups = [], winners = [], options = {} }) => {
+    const {
+        eventName = '',
+        eventDate = '',
+        eventLocation = '',
+        modeLabel = '',
+        searchTerm = ''
+    } = options;
+    const doc = new jsPDF();
+    const pageHeight = doc.internal.pageSize.getHeight();
+
+    doc.setFillColor(...BRAND_PRIMARY);
+    doc.rect(0, 0, 210, 34, 'F');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.setTextColor(255, 255, 255);
+    doc.text('GENESIS ESPORTES', 14, 21);
+
+    doc.setFontSize(9);
+    doc.text('RELATORIO DE RANKING FILTRADO', 14, 28);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(90);
+    let cursorY = 42;
+    doc.text(`Documento gerado em: ${new Date().toLocaleString()}`, 14, cursorY);
+    cursorY += 6;
+
+    if (eventName) {
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(20);
+        doc.text(`Evento: ${eventName}`, 14, cursorY);
+        cursorY += 6;
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(90);
+    }
+
+    const metaParts = [
+        eventDate ? `Data: ${formatDate(eventDate)}` : '',
+        eventLocation ? `Local: ${eventLocation}` : '',
+        modeLabel ? `Modalidade: ${modeLabel}` : '',
+        searchTerm ? `Filtro: ${searchTerm}` : ''
+    ].filter(Boolean);
+
+    if (metaParts.length) {
+        doc.text(metaParts.join(' | '), 14, cursorY);
+        cursorY += 6;
+    }
+
+    if (modeLabel && modeLabel.toUpperCase().includes('GERAL')) {
+        const tableColumn = ['POS', 'ATLETA', 'CATEGORIA', 'ACADEMIA', 'PTS'];
+        const tableRows = (winners || []).map((item, index) => [
+            index + 1,
+            item.athlete?.nome || '',
+            item.label || '',
+            item.athlete?.academia || '',
+            item.athlete?.pontos ?? ''
+        ]);
+
+        runAutoTable(doc, {
+            head: [tableColumn],
+            body: tableRows,
+            startY: cursorY + 2,
+            theme: 'grid',
+            headStyles: {
+                fillColor: BRAND_PRIMARY,
+                textColor: [255, 255, 255],
+                fontSize: 8,
+                halign: 'center'
+            },
+            styles: { fontSize: 8 },
+            columnStyles: {
+                0: { halign: 'center', fontStyle: 'bold' },
+                4: { halign: 'center', fontStyle: 'bold', textColor: BRAND_ACCENT }
+            }
+        });
+    } else {
+        const tableColumn = ['POS', 'ATLETA', 'ACADEMIA', 'FAIXA', 'PESO', 'PTS'];
+        (groups || []).forEach((group) => {
+            if (!group || !Array.isArray(group.entries) || group.entries.length === 0) return;
+            if (cursorY > pageHeight - 30) {
+                doc.addPage();
+                cursorY = 20;
+            }
+
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(20);
+            doc.setFontSize(11);
+            doc.text(group.label || 'Categoria', 14, cursorY);
+            cursorY += 4;
+
+            const tableRows = group.entries.map((athlete, index) => [
+                index + 1,
+                athlete?.nome || '',
+                athlete?.academia || '',
+                athlete?.faixa || '',
+                athlete?.peso || '',
+                athlete?.pontos ?? ''
+            ]);
+
+            runAutoTable(doc, {
+                head: [tableColumn],
+                body: tableRows,
+                startY: cursorY + 2,
+                theme: 'grid',
+                headStyles: {
+                    fillColor: BRAND_PRIMARY,
+                    textColor: [255, 255, 255],
+                    fontSize: 8,
+                    halign: 'center'
+                },
+                styles: { fontSize: 8 },
+                columnStyles: {
+                    0: { halign: 'center', fontStyle: 'bold' },
+                    5: { halign: 'center', fontStyle: 'bold', textColor: BRAND_ACCENT }
+                }
+            });
+
+            if (doc.lastAutoTable && doc.lastAutoTable.finalY) {
+                cursorY = doc.lastAutoTable.finalY + 8;
+            } else {
+                cursorY += 8;
+            }
+        });
+    }
+
+    const fileName = `Ranking_Filtrado_${buildFileSafeName(eventName)}_${buildFileSafeName(modeLabel || 'geral')}.pdf`;
+    doc.save(fileName);
+};
+
 export const generateEventResultsPDF = (eventName, podiums) => {
     const doc = new jsPDF();
 

@@ -4,24 +4,24 @@ import { calculateTotalPoints, rankAthletes } from './scoringService';
 describe('scoringService', () => {
     it('should calculate points correctly for wins', () => {
         const history = [{ type: 'win' }, { type: 'win' }];
-        expect(calculateTotalPoints(history)).toBe(10);
+        expect(calculateTotalPoints(history)).toBe(0);
     });
 
     it('should calculate points correctly for podiums', () => {
         const history = [
-            { type: 'podium', position: 1 }, // 9
-            { type: 'podium', position: 2 }, // 3
+            { type: 'podium', position: 1 }, // 3
+            { type: 'podium', position: 2 }, // 2
             { type: 'podium', position: 3 }  // 1
         ];
-        expect(calculateTotalPoints(history)).toBe(13);
+        expect(calculateTotalPoints(history)).toBe(6);
     });
 
     it('should handle mixed history', () => {
         const history = [
-            { type: 'win' }, // 5
-            { type: 'podium', position: 1 } // 9
+            { type: 'win' }, // 0
+            { type: 'podium', position: 1 } // 3
         ];
-        expect(calculateTotalPoints(history)).toBe(14);
+        expect(calculateTotalPoints(history)).toBe(3);
     });
 
     it('should break ties by first-place podiums', () => {

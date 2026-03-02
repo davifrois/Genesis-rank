@@ -1,8 +1,8 @@
 // Points configuration
 export const SCORE_RULES = {
-  WIN: 5,
-  PODIUM_1ST: 9,
-  PODIUM_2ND: 3,
+  WIN: 0,
+  PODIUM_1ST: 3,
+  PODIUM_2ND: 2,
   PODIUM_3RD: 1,
 };
 

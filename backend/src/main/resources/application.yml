@@ -1,0 +1,33 @@
+﻿server:
+  port: 8080
+
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:h2:file:./data/genesis_ranking;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH}
+    driver-class-name: ${DB_DRIVER:org.h2.Driver}
+    username: ${DB_USER:sa}
+    password: ${DB_PASS:}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:dev-secret-change-me-please-32-bytes-min}
+    expiration-minutes: ${JWT_EXP_MIN:720}
+  cors:
+    allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:4173}
+  bootstrap:
+    admin:
+      username: ${BOOTSTRAP_ADMIN_USER:admin}
+      password: ${BOOTSTRAP_ADMIN_PASS:admin123}
+      name: ${BOOTSTRAP_ADMIN_NAME:Administrador}
+      role: ${BOOTSTRAP_ADMIN_ROLE:ADMIN}
