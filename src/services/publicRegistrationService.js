@@ -3,8 +3,10 @@ import { REGISTRATION_STATUS, normalizeRegistrationStatus } from '../utils/regis
 const ENV_API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').trim();
 const API_BASE_URL = ENV_API_BASE_URL ? ENV_API_BASE_URL.replace(/\/$/, '') : '';
 const LOCAL_PENDING_REGISTRATIONS_KEY = 'genesis_public_registration_pending_v1';
+const LOCAL_SYNC_DIAGNOSTICS_KEY = 'genesis_public_registration_sync_diag_v1';
 const MAX_PENDING_RECORDS = 20;
 const MAX_PENDING_STORAGE_CHARS = 3_500_000;
+const TRACE_ID_HEADER = 'X-Trace-Id';
 const DEFAULT_NETWORK_ERROR_MESSAGE = (
   'Servidor de inscricao indisponivel no momento. '
   + 'Inicie o backend na porta 8080 ou configure VITE_API_BASE_URL.'
@@ -66,6 +68,55 @@ const isUnavailableHttpError = (error) => (
   || isUnavailableProxyMessage(error?.message)
 );
 
+const safeReadSyncDiagnostics = () => {
+  try {
+    const raw = localStorage.getItem(LOCAL_SYNC_DIAGNOSTICS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const writeSyncDiagnostics = (diag) => {
+  try {
+    localStorage.setItem(LOCAL_SYNC_DIAGNOSTICS_KEY, JSON.stringify(diag));
+  } catch {
+    // Ignore diagnostics storage errors.
+  }
+};
+
+const updateSyncDiagnostics = (type, details = {}) => {
+  const nowIso = new Date().toISOString();
+  const current = safeReadSyncDiagnostics() || {};
+  const base = {
+    successCount: Number(current.successCount || 0),
+    failureCount: Number(current.failureCount || 0),
+    lastSuccessAt: current.lastSuccessAt || '',
+    lastFailureAt: current.lastFailureAt || '',
+    lastFailureMessage: current.lastFailureMessage || '',
+    lastTraceId: current.lastTraceId || '',
+    updatedAt: nowIso
+  };
+
+  if (type === 'success') {
+    base.successCount += 1;
+    base.lastSuccessAt = nowIso;
+  }
+  if (type === 'failure') {
+    base.failureCount += 1;
+    base.lastFailureAt = nowIso;
+    base.lastFailureMessage = (details.message || '').toString().trim();
+    base.lastTraceId = (details.traceId || '').toString().trim();
+  }
+
+  base.updatedAt = nowIso;
+  writeSyncDiagnostics(base);
+  return base;
+};
+
 const parseJsonSafe = async (response) => {
   try {
     return await response.json();
@@ -74,22 +125,65 @@ const parseJsonSafe = async (response) => {
   }
 };
 
+const resolveErrorTraceId = (payload, response) => {
+  const payloadTrace = (payload?.traceId || '').toString().trim();
+  if (payloadTrace) return payloadTrace;
+  try {
+    const headerTrace = (response?.headers?.get(TRACE_ID_HEADER) || '').toString().trim();
+    return headerTrace;
+  } catch {
+    return '';
+  }
+};
+
+const appendTraceToMessage = (message, traceId) => {
+  const base = (message || '').toString().trim();
+  const trace = (traceId || '').toString().trim();
+  if (!trace) return base;
+  if (base.toLowerCase().includes('trace:')) return base;
+  return `${base} (trace: ${trace})`;
+};
+
 const parseErrorMessage = async (response, fallback = 'Falha ao enviar inscricao.') => {
   const payload = await parseJsonSafe(response);
-  if (payload?.message) return payload.message;
-  if (typeof payload?.error === 'string' && payload.error.trim()) return payload.error.trim();
+  const traceId = resolveErrorTraceId(payload, response);
+  if (payload?.message) return {
+    message: appendTraceToMessage(payload.message, traceId),
+    code: payload?.code || '',
+    traceId
+  };
+  if (typeof payload?.error === 'string' && payload.error.trim()) {
+    return {
+      message: appendTraceToMessage(payload.error.trim(), traceId),
+      code: payload?.code || '',
+      traceId
+    };
+  }
   try {
     const text = await response.text();
-    if (text?.trim()) return text.trim();
+    if (text?.trim()) {
+      return {
+        message: appendTraceToMessage(text.trim(), traceId),
+        code: payload?.code || '',
+        traceId
+      };
+    }
   } catch {
     // ignore parse errors
   }
-  return fallback;
+  return {
+    message: appendTraceToMessage(fallback, traceId),
+    code: payload?.code || '',
+    traceId
+  };
 };
 
 const buildHttpError = async (response, fallbackMessage) => {
-  const message = await parseErrorMessage(response, fallbackMessage);
+  const parsed = await parseErrorMessage(response, fallbackMessage);
+  const message = parsed?.message || fallbackMessage;
   const error = new Error(message);
+  error.code = parsed?.code || '';
+  error.traceId = parsed?.traceId || '';
   error.status = response?.status;
   const status = Number(response?.status || 0);
   error.retryableUnavailable = (
@@ -128,11 +222,12 @@ const writePendingRegistrations = (items) => {
   }
 };
 
-const buildPendingRegistration = (payload, lastError = '') => ({
+const buildPendingRegistration = (payload, lastError = '', lastTraceId = '') => ({
   id: `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
   createdAt: new Date().toISOString(),
   payload,
-  lastError
+  lastError,
+  lastTraceId
 });
 
 const sanitizePayloadForOfflineQueue = (payload) => {
@@ -158,14 +253,14 @@ const sanitizePayloadForOfflineQueue = (payload) => {
   }
 };
 
-const appendPendingRegistration = (payload, lastError = '') => {
+const appendPendingRegistration = (payload, lastError = '', lastTraceId = '') => {
   const clientRequestId = (payload?.clientRequestId || '').toString().trim();
   const pending = readPendingRegistrations().filter((item) => {
     if (!clientRequestId) return true;
     const existingClientRequestId = (item?.payload?.clientRequestId || '').toString().trim();
     return existingClientRequestId !== clientRequestId;
   });
-  const fullRecord = buildPendingRegistration(payload, lastError);
+  const fullRecord = buildPendingRegistration(payload, lastError, lastTraceId);
   const nextWithFullPayload = [fullRecord, ...pending].slice(0, MAX_PENDING_RECORDS);
 
   if (writePendingRegistrations(nextWithFullPayload)) {
@@ -215,7 +310,8 @@ const toPendingRegistrationRow = (record) => {
     status: REGISTRATION_STATUS.PENDING_SYNC,
     createdAt: safeRecord.createdAt || new Date().toISOString(),
     athleteId: '',
-    lastError: safeRecord.lastError || ''
+    lastError: safeRecord.lastError || '',
+    lastTraceId: safeRecord.lastTraceId || ''
   };
 };
 
@@ -258,6 +354,8 @@ const flushPendingRegistrations = async () => {
 
   const remaining = [];
   let synced = 0;
+  let lastFailureMessage = '';
+  let lastFailureTraceId = '';
 
   for (const item of pending) {
     try {
@@ -265,23 +363,43 @@ const flushPendingRegistrations = async () => {
       synced += 1;
     } catch (err) {
       if (isNetworkError(err) || isUnavailableHttpError(err)) {
+        const errorMessage = err?.message || DEFAULT_NETWORK_ERROR_MESSAGE;
+        const traceId = err?.traceId || '';
         remaining.push({
           ...item,
-          lastError: err?.message || DEFAULT_NETWORK_ERROR_MESSAGE
+          lastError: errorMessage,
+          lastTraceId: traceId
         });
+        lastFailureMessage = errorMessage;
+        lastFailureTraceId = traceId;
         break;
       }
       // Keep invalid payload visible in admin panel until fixed manually.
+      const errorMessage = err?.message || 'Falha de validacao ao sincronizar.';
+      const traceId = err?.traceId || '';
       remaining.push({
         ...item,
-        lastError: err?.message || 'Falha de validacao ao sincronizar.'
+        lastError: errorMessage,
+        lastTraceId: traceId
       });
+      lastFailureMessage = errorMessage;
+      lastFailureTraceId = traceId;
     }
   }
 
   const remainingIds = new Set(remaining.map((item) => item.id));
   const pendingAfterLoop = pending.filter((item) => remainingIds.has(item.id));
   writePendingRegistrations(pendingAfterLoop);
+
+  if (synced > 0) {
+    updateSyncDiagnostics('success');
+  }
+  if (lastFailureMessage) {
+    updateSyncDiagnostics('failure', {
+      message: lastFailureMessage,
+      traceId: lastFailureTraceId
+    });
+  }
 
   return { synced, pending: pendingAfterLoop };
 };
@@ -299,15 +417,21 @@ export const publicRegistrationService = {
     try {
       const response = await postRegistration(payloadWithClientRequestId);
       await flushPendingRegistrations();
+      updateSyncDiagnostics('success');
       return response;
     } catch (error) {
       if (!isNetworkError(error) && !isUnavailableHttpError(error)) {
         throw error;
       }
+      updateSyncDiagnostics('failure', {
+        message: error?.message || DEFAULT_NETWORK_ERROR_MESSAGE,
+        traceId: error?.traceId || ''
+      });
 
       const pendingRecord = appendPendingRegistration(
         payloadWithClientRequestId,
-        error?.message || DEFAULT_NETWORK_ERROR_MESSAGE
+        error?.message || DEFAULT_NETWORK_ERROR_MESSAGE,
+        error?.traceId || ''
       );
       let offlineMessage = (
         'Backend indisponivel. Inscricao salva apenas neste navegador e ainda NAO '
@@ -342,6 +466,10 @@ export const publicRegistrationService = {
       return response.json();
     } catch (error) {
       if (isNetworkError(error) || isUnavailableHttpError(error)) {
+        updateSyncDiagnostics('failure', {
+          message: error?.message || DEFAULT_NETWORK_ERROR_MESSAGE,
+          traceId: error?.traceId || ''
+        });
         throw new Error(DEFAULT_NETWORK_ERROR_MESSAGE);
       }
       throw error;
@@ -363,6 +491,10 @@ export const publicRegistrationService = {
       return mergeRowsWithoutDuplicates(pendingRows, remoteRows);
     } catch (error) {
       if (isNetworkError(error) || isUnavailableHttpError(error)) {
+        updateSyncDiagnostics('failure', {
+          message: error?.message || DEFAULT_NETWORK_ERROR_MESSAGE,
+          traceId: error?.traceId || ''
+        });
         const pendingRows = listPendingRows(eventId);
         if (pendingRows.length) return pendingRows;
         throw new Error(DEFAULT_NETWORK_ERROR_MESSAGE);
@@ -373,9 +505,11 @@ export const publicRegistrationService = {
 
   syncPendingRegistrations: async () => {
     const result = await flushPendingRegistrations();
+    const diagnostics = safeReadSyncDiagnostics() || {};
     return {
       synced: result.synced || 0,
-      pending: Array.isArray(result.pending) ? result.pending.length : 0
+      pending: Array.isArray(result.pending) ? result.pending.length : 0,
+      diagnostics
     };
   },
 
@@ -406,9 +540,23 @@ export const publicRegistrationService = {
       return response.json();
     } catch (error) {
       if (isNetworkError(error) || isUnavailableHttpError(error)) {
+        updateSyncDiagnostics('failure', {
+          message: error?.message || DEFAULT_NETWORK_ERROR_MESSAGE,
+          traceId: error?.traceId || ''
+        });
         throw new Error(DEFAULT_NETWORK_ERROR_MESSAGE);
       }
       throw error;
     }
-  }
+  },
+
+  getSyncDiagnostics: () => (safeReadSyncDiagnostics() || {
+    successCount: 0,
+    failureCount: 0,
+    lastSuccessAt: '',
+    lastFailureAt: '',
+    lastFailureMessage: '',
+    lastTraceId: '',
+    updatedAt: ''
+  })
 };

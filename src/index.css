@@ -1252,6 +1252,11 @@ select {
   line-height: 1.25;
 }
 
+.registration-sync-monitor {
+  margin-top: 0.45rem;
+  color: #f7c34f;
+}
+
 .registration-status-actions {
   display: flex;
   flex-direction: column;

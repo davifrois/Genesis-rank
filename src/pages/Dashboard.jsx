@@ -140,6 +140,7 @@ const parseRegistrationRecord = (item, eventMap, copy) => {
         isPendingPaymentReview: !isPendingSync && !isPaymentConfirmed && !isPaymentError,
         statusLabel,
         syncError: source.lastError || '',
+        syncTraceId: source.lastTraceId || '',
         eventName: source.eventName || eventMap[source.eventId]?.name || copy.common.noEvent,
         paymentReviewNotes: source.paymentReviewNotes || '',
         paymentReviewedBy: source.paymentReviewedBy || '',
@@ -508,7 +509,9 @@ const Dashboard = () => {
                     proofPreviewTitle: 'Receipt preview',
                     proofPreviewPdf: 'PDF preview',
                     openReceipt: 'Open receipt',
-                    lastError: 'Sync error'
+                    lastError: 'Sync error',
+                    traceId: 'Trace',
+                    syncMonitorLastFailure: (at) => `Last sync failure: ${at}`
                 },
                 bracketsPanel: {
                     title: 'Brackets',
@@ -892,7 +895,9 @@ const Dashboard = () => {
                     proofPreviewTitle: 'Previa do comprovante',
                     proofPreviewPdf: 'Previa PDF',
                     openReceipt: 'Abrir comprovante',
-                    lastError: 'Erro de sincronizacao'
+                    lastError: 'Erro de sincronizacao',
+                    traceId: 'Trace',
+                    syncMonitorLastFailure: (at) => `Ultima falha de sincronizacao: ${at}`
                 },
                 bracketsPanel: {
                     title: 'Chaveamento',
@@ -1215,6 +1220,7 @@ const Dashboard = () => {
     const [registrationsSyncing, setRegistrationsSyncing] = useState(false);
     const [registrationsError, setRegistrationsError] = useState('');
     const [registrationStatusUpdatingId, setRegistrationStatusUpdatingId] = useState('');
+    const [syncDiagnostics, setSyncDiagnostics] = useState(() => publicRegistrationService.getSyncDiagnostics());
     const [suppressedRegistrationKeys, setSuppressedRegistrationKeys] = useState(loadSuppressedRegistrationKeys);
     const deferredSearchTerm = useDeferredValue(searchTerm);
     const deferredRegistrationSearch = useDeferredValue(registrationSearch);
@@ -1226,6 +1232,10 @@ const Dashboard = () => {
     const showFeedback = useCallback((type, message) => {
         setToast({ type, message });
         setTimeout(() => setToast(null), 3000);
+    }, []);
+
+    const refreshSyncDiagnostics = useCallback(() => {
+        setSyncDiagnostics(publicRegistrationService.getSyncDiagnostics());
     }, []);
 
     useEffect(() => {
@@ -1679,9 +1689,10 @@ const Dashboard = () => {
             setRegistrationsError(message);
             showFeedback('error', message);
         } finally {
+            refreshSyncDiagnostics();
             setRegistrationsLoading(false);
         }
-    }, [showFeedback, copy.feedback.registrationLoadFail]);
+    }, [showFeedback, refreshSyncDiagnostics, copy.feedback.registrationLoadFail]);
 
     const handleSyncPendingRegistrations = useCallback(async () => {
         setRegistrationsSyncing(true);
@@ -1699,9 +1710,10 @@ const Dashboard = () => {
             setRegistrationsError(message);
             showFeedback('error', message);
         } finally {
+            refreshSyncDiagnostics();
             setRegistrationsSyncing(false);
         }
-    }, [showFeedback, copy.feedback]);
+    }, [showFeedback, refreshSyncDiagnostics, copy.feedback]);
 
     const handleUpdateRegistrationPaymentStatus = useCallback(async (registration, nextStatus) => {
         if (!registration?.id || !nextStatus) return;
@@ -2900,6 +2912,14 @@ const Dashboard = () => {
                             </button>
                         </div>
                     </div>
+                    {syncDiagnostics?.lastFailureAt && (
+                        <div className="table-meta table-meta--tight registration-sync-monitor">
+                            {copy.registrationsPanel.syncMonitorLastFailure(formatEventDate(syncDiagnostics.lastFailureAt))}
+                            {syncDiagnostics?.lastTraceId
+                                ? ` - ${copy.registrationsPanel.traceId}: ${syncDiagnostics.lastTraceId}`
+                                : ''}
+                        </div>
+                    )}
                     {registrationsError && (
                         <div className="login-error" role="alert">
                             <AlertCircle size={18} />
@@ -3041,6 +3061,7 @@ const Dashboard = () => {
                                             {item.syncError && (
                                                 <div className="table-meta table-meta--tight registration-sync-error">
                                                     {copy.registrationsPanel.lastError}: {item.syncError}
+                                                    {item.syncTraceId ? ` - ${copy.registrationsPanel.traceId}: ${item.syncTraceId}` : ''}
                                                 </div>
                                             )}
                                         </td>

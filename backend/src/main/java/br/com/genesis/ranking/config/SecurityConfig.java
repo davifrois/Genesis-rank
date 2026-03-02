@@ -13,9 +13,11 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
+  private final RequestTraceFilter requestTraceFilter;
   private final JwtAuthFilter jwtAuthFilter;
 
-  public SecurityConfig(JwtAuthFilter jwtAuthFilter) {
+  public SecurityConfig(RequestTraceFilter requestTraceFilter, JwtAuthFilter jwtAuthFilter) {
+    this.requestTraceFilter = requestTraceFilter;
     this.jwtAuthFilter = jwtAuthFilter;
   }
 
@@ -32,6 +34,7 @@ public class SecurityConfig {
             .requestMatchers("/api/health").permitAll()
             .anyRequest().authenticated()
         )
+        .addFilterBefore(requestTraceFilter, JwtAuthFilter.class)
         .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
     return http.build();
