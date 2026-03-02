@@ -34,8 +34,8 @@ public class SecurityConfig {
             .requestMatchers("/api/health").permitAll()
             .anyRequest().authenticated()
         )
-        .addFilterBefore(requestTraceFilter, JwtAuthFilter.class)
-        .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+        .addFilterBefore(requestTraceFilter, UsernamePasswordAuthenticationFilter.class)
+        .addFilterAfter(jwtAuthFilter, RequestTraceFilter.class);
 
     return http.build();
   }
