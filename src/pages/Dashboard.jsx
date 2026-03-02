@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useStore } from '../hooks/useStore';
 import {
@@ -40,6 +40,8 @@ import { DEFAULT_EVENT_FEES, DEFAULT_EVENT_PIX_KEY } from '../utils/eventPricing
 import { buildFileSafeName, downloadCsv } from '../services/exportService';
 import { translateBelt, translateCategory, translateCompositeLabel, translateWeight } from '../utils/localeLabels';
 import { REGISTRATION_STATUS, normalizeRegistrationStatus } from '../utils/registrationStatus';
+
+const ATHLETE_PAGE_SIZE_OPTIONS = [20, 40, 80];
 
 const createEventEditFormState = () => ({
     id: '',
@@ -566,6 +568,11 @@ const Dashboard = () => {
                     removeAthleteAria: 'Remove athlete',
                     clearBase: 'Clear athlete base',
                     clearReimportLocks: 'Clear reimport locks',
+                    paginationPrev: 'Prev',
+                    paginationNext: 'Next',
+                    paginationPerPage: 'Per page',
+                    paginationPage: 'Page',
+                    paginationShowing: (from, to, total) => `Showing ${from}-${to} of ${total}`,
                     belt: 'Belt',
                     weight: 'Weight',
                     category: 'Category',
@@ -945,6 +952,11 @@ const Dashboard = () => {
                     removeAthleteAria: 'Remover atleta',
                     clearBase: 'Limpar base de atletas',
                     clearReimportLocks: 'Limpar bloqueios de reimportacao',
+                    paginationPrev: 'Anterior',
+                    paginationNext: 'Proxima',
+                    paginationPerPage: 'Por pagina',
+                    paginationPage: 'Pagina',
+                    paginationShowing: (from, to, total) => `Mostrando ${from}-${to} de ${total}`,
                     belt: 'Faixa',
                     weight: 'Peso',
                     category: 'Categoria',
@@ -1151,6 +1163,8 @@ const Dashboard = () => {
     const [navOpen, setNavOpen] = useState(false);
     const [activeSection, setActiveSection] = useState('overview');
     const [viewMode, setViewMode] = useState('table');
+    const [athletesPage, setAthletesPage] = useState(1);
+    const [athletesPageSize, setAthletesPageSize] = useState(ATHLETE_PAGE_SIZE_OPTIONS[0]);
     const [now, setNow] = useState(new Date());
     const importInputRef = useRef(null);
     const [importMode, setImportMode] = useState('GI');
@@ -1202,6 +1216,8 @@ const Dashboard = () => {
     const [registrationsError, setRegistrationsError] = useState('');
     const [registrationStatusUpdatingId, setRegistrationStatusUpdatingId] = useState('');
     const [suppressedRegistrationKeys, setSuppressedRegistrationKeys] = useState(loadSuppressedRegistrationKeys);
+    const deferredSearchTerm = useDeferredValue(searchTerm);
+    const deferredRegistrationSearch = useDeferredValue(registrationSearch);
     const suppressedRegistrationKeySet = useMemo(
         () => new Set(suppressedRegistrationKeys),
         [suppressedRegistrationKeys]
@@ -1975,8 +1991,9 @@ const Dashboard = () => {
     const isLocalAuth = authService.isLocalAuth ? authService.isLocalAuth() : true;
     const localUsers = isLocalAuth && authService.listUsers ? authService.listUsers() : [];
 
-    const filteredAthletes = useMemo(() => (
-        athletes.filter((athlete) => {
+    const filteredAthletes = useMemo(() => {
+        const normalizedSearchTerm = deferredSearchTerm.trim().toLowerCase();
+        return athletes.filter((athlete) => {
             const profileKey = buildAthleteLookupKey(athlete.nome, athlete.academia);
             const profile = profileByAthleteKey.get(profileKey);
             const searchable = [
@@ -1994,15 +2011,15 @@ const Dashboard = () => {
                 .filter(Boolean)
                 .join(' ')
                 .toLowerCase();
-            const matchesSearch = searchable.includes(searchTerm.toLowerCase());
+            const matchesSearch = searchable.includes(normalizedSearchTerm);
             const matchesEvent = eventFilter === 'all'
                 ? true
                 : eventFilter === 'none'
                     ? !athlete.eventId
                     : athlete.eventId === eventFilter;
             return matchesSearch && matchesEvent;
-        })
-    ), [athletes, searchTerm, eventFilter, profileByAthleteKey]);
+        });
+    }, [athletes, deferredSearchTerm, eventFilter, profileByAthleteKey]);
 
     const athleteRows = useMemo(() => (
         [...filteredAthletes]
@@ -2018,6 +2035,28 @@ const Dashboard = () => {
             })
             .sort((a, b) => (a.athlete?.nome || '').localeCompare(b.athlete?.nome || ''))
     ), [filteredAthletes, profileByAthleteKey, eventMap, copy.common.noEvent]);
+
+    const athletesPageCount = useMemo(
+        () => Math.max(1, Math.ceil(athleteRows.length / athletesPageSize)),
+        [athleteRows.length, athletesPageSize]
+    );
+
+    useEffect(() => {
+        setAthletesPage((prev) => Math.min(prev, athletesPageCount));
+    }, [athletesPageCount]);
+
+    const pagedAthleteRows = useMemo(() => {
+        const start = (athletesPage - 1) * athletesPageSize;
+        return athleteRows.slice(start, start + athletesPageSize);
+    }, [athleteRows, athletesPage, athletesPageSize]);
+
+    const athletePageRange = useMemo(() => {
+        const total = athleteRows.length;
+        if (!total) return { from: 0, to: 0, total: 0 };
+        const from = (athletesPage - 1) * athletesPageSize + 1;
+        const to = Math.min(athletesPage * athletesPageSize, total);
+        return { from, to, total };
+    }, [athleteRows.length, athletesPage, athletesPageSize]);
 
     const currencyFormatter = useMemo(() => (
         new Intl.NumberFormat(locale, {
@@ -2159,7 +2198,7 @@ const Dashboard = () => {
     }, [latestRegistrationDecisions, memberProfiles, suppressedRegistrationKeySet, addMemberProfile, currentUser]);
 
     const registrationRows = useMemo(() => {
-        const term = registrationSearch.trim().toLowerCase();
+        const term = deferredRegistrationSearch.trim().toLowerCase();
         return parsedPublicRegistrations
             .filter((item) => (
                 registrationEventFilter === 'all'
@@ -2187,7 +2226,7 @@ const Dashboard = () => {
             });
     }, [
         parsedPublicRegistrations,
-        registrationSearch,
+        deferredRegistrationSearch,
         registrationEventFilter,
         registrationPendingOnly
     ]);
@@ -2200,6 +2239,10 @@ const Dashboard = () => {
         if (registrationPendingFilterTouched) return;
         setRegistrationPendingOnly(pendingSyncCount > 0);
     }, [pendingSyncCount, registrationPendingFilterTouched]);
+
+    useEffect(() => {
+        setAthletesPage(1);
+    }, [searchTerm, eventFilter, athletesPageSize]);
 
     const assignCandidates = useMemo(() => {
         const term = assignSearch.trim().toLowerCase();
@@ -3296,7 +3339,7 @@ const Dashboard = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {athleteRows.map(({ athlete, profile, eventLabel, photoUrl }) => {
+                                {pagedAthleteRows.map(({ athlete, profile, eventLabel, photoUrl }) => {
                                     const profileMeta = [profile?.city, profile?.country].filter(Boolean).join(' - ');
                                     return (
                                     <tr key={athlete.id}>
@@ -3409,7 +3452,7 @@ const Dashboard = () => {
                         </table>
                     ) : (
                         <div className="card-grid">
-                            {athleteRows.map(({ athlete, profile, eventLabel, photoUrl }) => {
+                            {pagedAthleteRows.map(({ athlete, profile, eventLabel, photoUrl }) => {
                                 const profileMeta = [profile?.city, profile?.country].filter(Boolean).join(' - ');
                                 return (
                                 <div key={athlete.id} className="athlete-card">
@@ -3512,6 +3555,50 @@ const Dashboard = () => {
                                 </div>
                                 );
                             })}
+                        </div>
+                    )}
+                    {athleteRows.length > 0 && (
+                        <div className="athletes-pagination">
+                            <div className="table-meta">
+                                {copy.athletesPanel.paginationShowing(
+                                    athletePageRange.from,
+                                    athletePageRange.to,
+                                    athletePageRange.total
+                                )}
+                            </div>
+                            <div className="athletes-pagination__controls">
+                                <label className="athletes-pagination__label">
+                                    <span>{copy.athletesPanel.paginationPerPage}</span>
+                                    <select
+                                        className="input select-compact"
+                                        value={athletesPageSize}
+                                        onChange={(event) => setAthletesPageSize(Number(event.target.value) || ATHLETE_PAGE_SIZE_OPTIONS[0])}
+                                    >
+                                        {ATHLETE_PAGE_SIZE_OPTIONS.map((size) => (
+                                            <option key={size} value={size}>{size}</option>
+                                        ))}
+                                    </select>
+                                </label>
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary btn-event btn-event--small"
+                                    onClick={() => setAthletesPage((prev) => Math.max(1, prev - 1))}
+                                    disabled={athletesPage <= 1}
+                                >
+                                    {copy.athletesPanel.paginationPrev}
+                                </button>
+                                <span className="tag">
+                                    {copy.athletesPanel.paginationPage} {athletesPage}/{athletesPageCount}
+                                </span>
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary btn-event btn-event--small"
+                                    onClick={() => setAthletesPage((prev) => Math.min(athletesPageCount, prev + 1))}
+                                    disabled={athletesPage >= athletesPageCount}
+                                >
+                                    {copy.athletesPanel.paginationNext}
+                                </button>
+                            </div>
                         </div>
                     )}
                     {athleteRows.length === 0 && (
