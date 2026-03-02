@@ -3,6 +3,7 @@ package br.com.genesis.ranking.dto;
 public class PublicRegistrationResponse {
   private String id;
   private String eventId;
+  private String clientRequestId;
   private String eventName;
   private String eventDate;
   private String eventLocation;
@@ -37,6 +38,14 @@ public class PublicRegistrationResponse {
 
   public void setEventId(String eventId) {
     this.eventId = eventId;
+  }
+
+  public String getClientRequestId() {
+    return clientRequestId;
+  }
+
+  public void setClientRequestId(String clientRequestId) {
+    this.clientRequestId = clientRequestId;
   }
 
   public String getEventName() {

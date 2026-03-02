@@ -43,6 +43,9 @@ public class EventRegistration extends BaseEntity {
   @Column(length = 20)
   private String modalidade;
 
+  @Column(length = 80, unique = true)
+  private String clientRequestId;
+
   @Column(length = 40)
   private String status;
 
@@ -135,6 +138,14 @@ public class EventRegistration extends BaseEntity {
 
   public void setModalidade(String modalidade) {
     this.modalidade = modalidade;
+  }
+
+  public String getClientRequestId() {
+    return clientRequestId;
+  }
+
+  public void setClientRequestId(String clientRequestId) {
+    this.clientRequestId = clientRequestId;
   }
 
   public String getStatus() {

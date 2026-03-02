@@ -11,6 +11,28 @@ const DEFAULT_NETWORK_ERROR_MESSAGE = (
 );
 const UNAVAILABLE_HTTP_STATUSES = new Set([500, 502, 503, 504]);
 
+const generateClientRequestId = () => {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return `reg-${crypto.randomUUID()}`;
+    }
+  } catch {
+    // Ignore crypto errors and fallback to timestamp/random.
+  }
+  return `reg-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
+const ensurePayloadWithClientRequestId = (payload) => {
+  const base = payload && typeof payload === 'object' ? { ...payload } : {};
+  const current = (base.clientRequestId || '').toString().trim();
+  if (current) {
+    base.clientRequestId = current;
+    return base;
+  }
+  base.clientRequestId = generateClientRequestId();
+  return base;
+};
+
 const buildApiUrl = (path) => {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   return `${API_BASE_URL}${normalizedPath}`;
@@ -137,7 +159,12 @@ const sanitizePayloadForOfflineQueue = (payload) => {
 };
 
 const appendPendingRegistration = (payload, lastError = '') => {
-  const pending = readPendingRegistrations();
+  const clientRequestId = (payload?.clientRequestId || '').toString().trim();
+  const pending = readPendingRegistrations().filter((item) => {
+    if (!clientRequestId) return true;
+    const existingClientRequestId = (item?.payload?.clientRequestId || '').toString().trim();
+    return existingClientRequestId !== clientRequestId;
+  });
   const fullRecord = buildPendingRegistration(payload, lastError);
   const nextWithFullPayload = [fullRecord, ...pending].slice(0, MAX_PENDING_RECORDS);
 
@@ -183,6 +210,7 @@ const toPendingRegistrationRow = (record) => {
     categoria: payload.categoria || '',
     genero: payload.genero || '',
     modalidade: payload.modalidade || '',
+    clientRequestId: payload.clientRequestId || '',
     notes: payload.notes || '',
     status: REGISTRATION_STATUS.PENDING_SYNC,
     createdAt: safeRecord.createdAt || new Date().toISOString(),
@@ -205,6 +233,23 @@ const postRegistration = async (payload) => {
   }
 
   return response.json();
+};
+
+const buildRegistrationIdentityKey = (row) => (
+  (row?.clientRequestId || row?.id || '')
+    .toString()
+    .trim()
+);
+
+const mergeRowsWithoutDuplicates = (pendingRows, remoteRows) => {
+  const remote = Array.isArray(remoteRows) ? remoteRows : [];
+  const pending = Array.isArray(pendingRows) ? pendingRows : [];
+  const remoteKeys = new Set(remote.map(buildRegistrationIdentityKey).filter(Boolean));
+  const pendingOnly = pending.filter((row) => {
+    const key = buildRegistrationIdentityKey(row);
+    return !key || !remoteKeys.has(key);
+  });
+  return [...pendingOnly, ...remote];
 };
 
 const flushPendingRegistrations = async () => {
@@ -250,8 +295,9 @@ const listPendingRows = (eventId = '') => {
 
 export const publicRegistrationService = {
   register: async (payload) => {
+    const payloadWithClientRequestId = ensurePayloadWithClientRequestId(payload);
     try {
-      const response = await postRegistration(payload);
+      const response = await postRegistration(payloadWithClientRequestId);
       await flushPendingRegistrations();
       return response;
     } catch (error) {
@@ -259,7 +305,10 @@ export const publicRegistrationService = {
         throw error;
       }
 
-      const pendingRecord = appendPendingRegistration(payload, error?.message || DEFAULT_NETWORK_ERROR_MESSAGE);
+      const pendingRecord = appendPendingRegistration(
+        payloadWithClientRequestId,
+        error?.message || DEFAULT_NETWORK_ERROR_MESSAGE
+      );
       let offlineMessage = (
         'Backend indisponivel. Inscricao salva apenas neste navegador e ainda NAO '
         + 'enviada ao sistema/admin. Quando o backend voltar, reenvie para confirmar.'
@@ -311,7 +360,7 @@ export const publicRegistrationService = {
       const payload = await response.json();
       const remoteRows = Array.isArray(payload) ? payload : [];
       const pendingRows = listPendingRows(eventId);
-      return [...pendingRows, ...remoteRows];
+      return mergeRowsWithoutDuplicates(pendingRows, remoteRows);
     } catch (error) {
       if (isNetworkError(error) || isUnavailableHttpError(error)) {
         const pendingRows = listPendingRows(eventId);

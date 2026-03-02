@@ -6,6 +6,7 @@ public class PublicRegistrationRequest {
   @NotBlank(message = "Evento invalido.")
   private String eventId;
 
+  private String clientRequestId;
   private String eventName;
   private String eventDate;
   private String eventLocation;
@@ -29,6 +30,14 @@ public class PublicRegistrationRequest {
 
   public void setEventId(String eventId) {
     this.eventId = eventId;
+  }
+
+  public String getClientRequestId() {
+    return clientRequestId;
+  }
+
+  public void setClientRequestId(String clientRequestId) {
+    this.clientRequestId = clientRequestId;
   }
 
   public String getEventName() {

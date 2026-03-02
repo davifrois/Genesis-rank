@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,6 +52,14 @@ public class PublicRegistrationService {
     if (eventId.isBlank()) {
       throw new IllegalArgumentException("Evento invalido.");
     }
+    String clientRequestId = clean(request.getClientRequestId());
+    if (!clientRequestId.isBlank()) {
+      Optional<EventRegistration> existingRegistration = registrationRepository.findByClientRequestId(clientRequestId);
+      if (existingRegistration.isPresent()) {
+        EventRegistration existing = existingRegistration.get();
+        return toResponse(existing, resolveAthleteIdIfConfirmed(existing, new HashMap<>()));
+      }
+    }
 
     Event event = resolveEvent(eventId, request);
     if (!event.isRegistrationOpen()) {
@@ -68,11 +77,23 @@ public class PublicRegistrationService {
     registration.setCategoria(clean(request.getCategoria()));
     registration.setGenero(clean(request.getGenero()));
     registration.setModalidade(normalizeMode(request.getModalidade()));
+    registration.setClientRequestId(clientRequestId.isBlank() ? null : clientRequestId);
     registration.setNotes(clean(request.getNotes()));
     registration.setStatus(RegistrationPaymentStatus.PENDING.name());
 
-    EventRegistration saved = registrationRepository.save(registration);
-    return toResponse(saved, null);
+    try {
+      EventRegistration saved = registrationRepository.save(registration);
+      return toResponse(saved, null);
+    } catch (DataIntegrityViolationException ex) {
+      if (!clientRequestId.isBlank()) {
+        Optional<EventRegistration> existingRegistration = registrationRepository.findByClientRequestId(clientRequestId);
+        if (existingRegistration.isPresent()) {
+          EventRegistration existing = existingRegistration.get();
+          return toResponse(existing, resolveAthleteIdIfConfirmed(existing, new HashMap<>()));
+        }
+      }
+      throw ex;
+    }
   }
 
   @Transactional(readOnly = true)
@@ -205,6 +226,7 @@ public class PublicRegistrationService {
     Event event = registration.getEvent();
     response.setId(registration.getId());
     response.setEventId(event != null ? event.getId() : null);
+    response.setClientRequestId(registration.getClientRequestId());
     response.setEventName(event != null ? event.getName() : null);
     response.setEventDate(event != null && event.getDate() != null ? event.getDate().toString() : null);
     response.setEventLocation(event != null ? event.getLocation() : null);
@@ -228,6 +250,15 @@ public class PublicRegistrationService {
         registration.getPaymentReviewedAt() != null ? registration.getPaymentReviewedAt().toString() : null
     );
     return response;
+  }
+
+  private String resolveAthleteIdIfConfirmed(
+      EventRegistration registration,
+      Map<String, List<Athlete>> athletesByEvent
+  ) {
+    RegistrationPaymentStatus status = RegistrationPaymentStatus.fromStored(registration.getStatus());
+    if (!RegistrationPaymentStatus.PAYMENT_CONFIRMED.equals(status)) return null;
+    return resolveAthleteId(registration, athletesByEvent);
   }
 
   private String resolveAthleteId(EventRegistration registration, Map<String, List<Athlete>> athletesByEvent) {
