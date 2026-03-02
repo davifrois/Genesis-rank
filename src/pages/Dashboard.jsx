@@ -1723,31 +1723,9 @@ const Dashboard = () => {
             }
 
             if (normalizedUpdated.isPaymentConfirmed) {
-                const alreadyActive = athletes.some((athlete) => (
-                    athleteMatchesRegistrationRecord(athlete, normalizedUpdated)
-                ));
-                if (!alreadyActive) {
-                    importAthletes([toAthleteFromRegistration(normalizedUpdated)], {
-                        eventId: normalizedUpdated.eventId || ''
-                    });
-                }
                 setActiveSection('brackets');
                 const section = document.getElementById('brackets');
                 if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-
-            if (normalizedUpdated.isPaymentError && normalizedUpdated.eventId) {
-                const matchedIds = athletes
-                    .filter((athlete) => athleteMatchesRegistrationRecord(athlete, normalizedUpdated))
-                    .map((athlete) => athlete.id);
-
-                if (matchedIds.length) {
-                    const matchedSet = new Set(matchedIds);
-                    const keepIds = athletes
-                        .filter((athlete) => athlete.eventId === normalizedUpdated.eventId && !matchedSet.has(athlete.id))
-                        .map((athlete) => athlete.id);
-                    assignAthletesToEvent(normalizedUpdated.eventId, keepIds);
-                }
             }
 
             showFeedback('success', copy.feedback.registrationStatusUpdated);
@@ -1760,12 +1738,9 @@ const Dashboard = () => {
         }
     }, [
         currentUser,
-        athletes,
         events,
         addSuppressedRegistrationKeys,
         removeSuppressedRegistrationKey,
-        importAthletes,
-        assignAthletesToEvent,
         showFeedback,
         copy
     ]);
@@ -2089,23 +2064,65 @@ const Dashboard = () => {
         return [...decisionMap.values()];
     }, [parsedPublicRegistrations]);
 
-    useEffect(() => {
+    const registrationReconcilePlan = useMemo(() => {
         const confirmed = latestRegistrationDecisions.filter((item) => (
             item.isPaymentConfirmed
             && item.eventId
             && !suppressedRegistrationKeySet.has(buildRegistrationIdentityKey(item))
         ));
-        if (!confirmed.length) return;
 
-        const toImport = confirmed
+        const paymentError = latestRegistrationDecisions.filter((item) => (
+            item.isPaymentError && item.eventId
+        ));
+
+        const toImportAthletes = confirmed
             .filter((registration) => !athletes.some((athlete) => (
                 athleteMatchesRegistrationRecord(athlete, registration)
             )))
             .map(toAthleteFromRegistration);
 
-        if (!toImport.length) return;
-        importAthletes(toImport);
-    }, [latestRegistrationDecisions, athletes, suppressedRegistrationKeySet, importAthletes]);
+        const blockedByEvent = new Map();
+        paymentError.forEach((registration) => {
+            const blockedIds = athletes
+                .filter((athlete) => athleteMatchesRegistrationRecord(athlete, registration))
+                .map((athlete) => athlete.id);
+            if (!blockedIds.length) return;
+            const blockedSet = blockedByEvent.get(registration.eventId) || new Set();
+            blockedIds.forEach((id) => blockedSet.add(id));
+            blockedByEvent.set(registration.eventId, blockedSet);
+        });
+
+        const eventAssignments = [];
+        blockedByEvent.forEach((blockedSet, eventId) => {
+            const currentIds = athletes
+                .filter((athlete) => athlete.eventId === eventId)
+                .map((athlete) => athlete.id);
+            const keepIds = currentIds.filter((id) => !blockedSet.has(id));
+            const isSameSelection = (
+                currentIds.length === keepIds.length
+                && currentIds.every((id) => keepIds.includes(id))
+            );
+            if (isSameSelection) return;
+            eventAssignments.push({ eventId, keepIds });
+        });
+
+        return {
+            toImportAthletes,
+            eventAssignments
+        };
+    }, [latestRegistrationDecisions, suppressedRegistrationKeySet, athletes]);
+
+    useEffect(() => {
+        const { toImportAthletes, eventAssignments } = registrationReconcilePlan;
+        if (toImportAthletes.length) {
+            importAthletes(toImportAthletes);
+        }
+        if (eventAssignments.length) {
+            eventAssignments.forEach((assignment) => {
+                assignAthletesToEvent(assignment.eventId, assignment.keepIds);
+            });
+        }
+    }, [registrationReconcilePlan, importAthletes, assignAthletesToEvent]);
 
     useEffect(() => {
         const confirmed = latestRegistrationDecisions.filter((item) => (
@@ -2140,36 +2157,6 @@ const Dashboard = () => {
             }
         });
     }, [latestRegistrationDecisions, memberProfiles, suppressedRegistrationKeySet, addMemberProfile, currentUser]);
-
-    useEffect(() => {
-        const eventToBlockedAthleteIds = new Map();
-        latestRegistrationDecisions
-            .filter((item) => item.isPaymentError && item.eventId)
-            .forEach((registration) => {
-                const blocked = athletes
-                    .filter((athlete) => athleteMatchesRegistrationRecord(athlete, registration))
-                    .map((athlete) => athlete.id);
-                if (!blocked.length) return;
-                const current = eventToBlockedAthleteIds.get(registration.eventId) || new Set();
-                blocked.forEach((id) => current.add(id));
-                eventToBlockedAthleteIds.set(registration.eventId, current);
-            });
-
-        eventToBlockedAthleteIds.forEach((blockedSet, eventId) => {
-            const keepIds = athletes
-                .filter((athlete) => athlete.eventId === eventId && !blockedSet.has(athlete.id))
-                .map((athlete) => athlete.id);
-            const currentIds = athletes
-                .filter((athlete) => athlete.eventId === eventId)
-                .map((athlete) => athlete.id);
-            const isSameSelection = (
-                currentIds.length === keepIds.length
-                && currentIds.every((id) => keepIds.includes(id))
-            );
-            if (isSameSelection) return;
-            assignAthletesToEvent(eventId, keepIds);
-        });
-    }, [latestRegistrationDecisions, athletes, assignAthletesToEvent]);
 
     const registrationRows = useMemo(() => {
         const term = registrationSearch.trim().toLowerCase();
