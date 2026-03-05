@@ -8,7 +8,7 @@ const MAX_PENDING_RECORDS = 20;
 const MAX_PENDING_STORAGE_CHARS = 3_500_000;
 const TRACE_ID_HEADER = 'X-Trace-Id';
 const DEFAULT_NETWORK_ERROR_MESSAGE = (
-  'Servidor de inscricao indisponivel no momento. '
+  'Servidor de inscrição indisponível no momento. '
   + 'Inicie o backend na porta 8080 ou configure VITE_API_BASE_URL.'
 );
 const UNAVAILABLE_HTTP_STATUSES = new Set([500, 502, 503, 504]);
@@ -144,7 +144,7 @@ const appendTraceToMessage = (message, traceId) => {
   return `${base} (trace: ${trace})`;
 };
 
-const parseErrorMessage = async (response, fallback = 'Falha ao enviar inscricao.') => {
+const parseErrorMessage = async (response, fallback = 'Falha ao enviar inscrição.') => {
   const payload = await parseJsonSafe(response);
   const traceId = resolveErrorTraceId(payload, response);
   if (payload?.message) return {
@@ -325,7 +325,7 @@ const postRegistration = async (payload) => {
   });
 
   if (!response.ok) {
-    throw await buildHttpError(response, 'Falha ao enviar inscricao.');
+    throw await buildHttpError(response, 'Falha ao enviar inscrição.');
   }
 
   return response.json();
@@ -375,7 +375,7 @@ const flushPendingRegistrations = async () => {
         break;
       }
       // Keep invalid payload visible in admin panel until fixed manually.
-      const errorMessage = err?.message || 'Falha de validacao ao sincronizar.';
+      const errorMessage = err?.message || 'Falha de validação ao sincronizar.';
       const traceId = err?.traceId || '';
       remaining.push({
         ...item,
@@ -434,15 +434,15 @@ export const publicRegistrationService = {
         error?.traceId || ''
       );
       let offlineMessage = (
-        'Backend indisponivel. Inscricao salva apenas neste navegador e ainda NAO '
+        'Backend indisponível. Inscrição salva apenas neste navegador e ainda NÃO '
         + 'enviada ao sistema/admin. Quando o backend voltar, reenvie para confirmar.'
       );
       try {
         const notes = JSON.parse(pendingRecord?.payload?.notes || '{}');
         if (notes?.comprovanteOfflineRemovido) {
           offlineMessage = (
-            'Backend indisponivel. Inscricao salva apenas neste navegador e sem o comprovante '
-            + '(limite de armazenamento). Ela NAO foi enviada ao sistema/admin.'
+            'Backend indisponível. Inscrição salva apenas neste navegador e sem o comprovante '
+            + '(limite de armazenamento). Ela NÃO foi enviada ao sistema/admin.'
           );
         }
       } catch {
@@ -516,12 +516,12 @@ export const publicRegistrationService = {
   updatePaymentStatus: async (registrationId, { status, reviewNotes = '', reviewedBy = '' }) => {
     const normalizedId = (registrationId || '').toString().trim();
     if (!normalizedId) {
-      throw new Error('Inscricao invalida.');
+      throw new Error('Inscrição inválida.');
     }
 
     const normalizedStatus = normalizeRegistrationStatus(status);
     if (normalizedStatus === REGISTRATION_STATUS.PENDING_SYNC) {
-      throw new Error('Status de pagamento invalido.');
+      throw new Error('Status de pagamento inválido.');
     }
 
     try {

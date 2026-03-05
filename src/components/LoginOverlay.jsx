@@ -72,16 +72,16 @@ const LoginOverlay = ({ onClose, onSuccess }) => {
         : {
             loadingReset: 'Atualizando senha...',
             loadingAuth: 'Validando credenciais...',
-            title: 'Area do Organizador',
-            subtitle: 'Acesso a administracao Genesis',
+            title: 'Área do Organizador',
+            subtitle: 'Acesso à administração Genesis',
             close: 'Fechar',
-            resetUnavailable: 'Redefinicao de senha indisponivel neste modo.',
-            registerUnavailable: 'Cadastro indisponivel neste modo.',
-            mismatch: 'As senhas nao conferem.',
-            resetSuccess: 'Senha atualizada. Faca login com a nova senha.',
-            registerSuccess: 'Conta criada. Faca login para continuar.',
+            resetUnavailable: 'Redefinição de senha indisponível neste modo.',
+            registerUnavailable: 'Cadastro indisponível neste modo.',
+            mismatch: 'As senhas não conferem.',
+            resetSuccess: 'Senha atualizada. Faça login com a nova senha.',
+            registerSuccess: 'Conta criada. Faça login para continuar.',
             form: {
-                user: 'Usuario',
+                user: 'Usuário',
                 userPlaceholder: 'Ex: simone',
                 password: 'Senha de acesso',
                 passwordPlaceholder: '********',
@@ -91,7 +91,7 @@ const LoginOverlay = ({ onClose, onSuccess }) => {
             },
             reset: {
                 title: 'Nova senha',
-                placeholder: 'Minimo 6 caracteres',
+                placeholder: 'Mínimo de 6 caracteres',
                 confirm: 'Confirmar senha',
                 confirmPlaceholder: 'Repita a nova senha',
                 button: 'Atualizar senha',
@@ -100,10 +100,10 @@ const LoginOverlay = ({ onClose, onSuccess }) => {
             register: {
                 name: 'Nome completo',
                 namePlaceholder: 'Ex: Davi Frois',
-                user: 'Usuario',
+                user: 'Usuário',
                 userPlaceholder: 'Ex: davifrois',
                 password: 'Senha',
-                passwordPlaceholder: 'Minimo 6 caracteres',
+                passwordPlaceholder: 'Mínimo de 6 caracteres',
                 confirm: 'Confirmar senha',
                 confirmPlaceholder: 'Repita a senha',
                 button: 'Criar conta',
@@ -120,7 +120,7 @@ const LoginOverlay = ({ onClose, onSuccess }) => {
         try {
             const user = await authService.login(username, password);
             login(user);
-            addLog({ type: 'AUTH', action: 'LOGIN_SUCCESS', details: `Usuario ${user.username} autenticado.` });
+            addLog({ type: 'AUTH', action: 'LOGIN_SUCCESS', details: `Usuário ${user.username} autenticado.` });
             if (onSuccess) {
                 onSuccess(user);
             }

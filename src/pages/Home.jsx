@@ -1,6 +1,6 @@
 ﻿import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Activity, Calendar, MapPin, Trophy, Users } from 'lucide-react';
+import { Activity, Calendar, ChevronLeft, ChevronRight, MapPin, Trophy, Users } from 'lucide-react';
 import { useStore } from '../hooks/useStore';
 import { useI18n } from '../hooks/useI18n';
 import { rankAthletes } from '../services/scoringService';
@@ -36,6 +36,11 @@ const Home = () => {
           'Constant updates, transparent history and a full view of who is on top right now. Everything feeds the ranking.',
         heroPrimary: 'View full ranking',
         heroSecondary: 'Events calendar',
+        heroNewsHeadline: 'Latest headlines',
+        heroNewsFallbackTitle: 'Official ranking updates',
+        breakingBadge: 'Breaking news',
+        prevHeadline: 'Previous headline',
+        nextHeadline: 'Next headline',
         tagA: 'Multi-tournament',
         tagB: 'Transparent scoring',
         tagC: 'Fast updates',
@@ -77,22 +82,27 @@ const Home = () => {
       }
     : {
         heroKicker: 'Ranking ao vivo',
-        heroTitle: 'O ranking que conecta eventos, atletas e academias em um unico lugar.',
+        heroTitle: 'O ranking que conecta eventos, atletas e academias em um único ambiente.',
         heroDescription:
-          'Atualizacoes constantes, historico transparente e uma visao completa de quem esta no topo agora. Tudo gira em torno do ranking.',
+          'Atualizações constantes, histórico transparente e visão completa de quem ocupa o topo no momento. Todas as informações convergem para o ranking.',
         heroPrimary: 'Ver ranking completo',
-        heroSecondary: 'Calendario de eventos',
+        heroSecondary: 'Calendário de eventos',
+        heroNewsHeadline: 'Últimas manchetes',
+        heroNewsFallbackTitle: 'Atualizações oficiais do ranking',
+        breakingBadge: 'Plantão',
+        prevHeadline: 'Manchete anterior',
+        nextHeadline: 'Próxima manchete',
         tagA: 'Multi-campeonatos',
-        tagB: 'Pontuacao transparente',
-        tagC: 'Atualizacao rapida',
+        tagB: 'Pontuação transparente',
+        tagC: 'Atualização rápida',
         seasonSummary: 'Resumo da temporada',
         activeAthletes: 'Atletas ativos',
         eventsInSystem: 'Eventos no sistema',
         distributedPoints: 'Pontos distribuídos',
-        refresh: 'Atualizacao',
+        refresh: 'Atualização',
         realTime: 'Em tempo real',
-        lastOfficial: 'Ultima atualizacao oficial',
-        followEvolution: 'Acompanhe as evolucoes',
+        lastOfficial: 'Última atualização oficial',
+        followEvolution: 'Acompanhe a evolução',
         exploreRanking: 'Explorar ranking',
         topKicker: 'Top 10',
         topTitle: 'Os atletas mais consistentes da temporada.',
@@ -102,22 +112,22 @@ const Home = () => {
         pointsSuffix: 'pts',
         emptyAthletes: 'Nenhum atleta cadastrado ainda. O ranking aparece aqui automaticamente.',
         eventsKicker: 'Eventos',
-        eventsTitle: 'Proximos eventos com inscricao direta.',
-        fullCalendar: 'Ver calendario completo',
-        newsKicker: 'Noticias',
-        newsTitle: 'Ultimas atualizacoes',
-        newsCta: 'Abrir pagina de noticias',
-        newsEmpty: 'Nenhuma noticia publicada ainda.',
+        eventsTitle: 'Próximos eventos com inscrição direta.',
+        fullCalendar: 'Ver calendário completo',
+        newsKicker: 'Notícias',
+        newsTitle: 'Últimas atualizações',
+        newsCta: 'Abrir página de notícias',
+        newsEmpty: 'Nenhuma notícia publicada ainda.',
         eventFallback: 'Evento oficial',
         locationFallback: 'Local a definir',
-        soon: 'Inscricoes abertas',
+        soon: 'Inscrições abertas',
         accessEvent: 'Acessar evento',
-        closedEvent: 'Inscricoes fechadas',
+        closedEvent: 'Inscrições fechadas',
         emptyEvents: 'Cadastre um evento para ele aparecer aqui e alimentar o ranking.',
-        membershipKicker: 'Filiacao',
+        membershipKicker: 'Filiação',
         membershipTitle: 'Cadastro simples para atletas e academias.',
         membershipDescription:
-          'Um formulario rapido para entrar na base oficial. Seu perfil passa a gerar historico e pontuacao a cada evento.',
+          'Um formulário rápido para ingressar na base oficial. Seu perfil passa a gerar histórico e pontuação a cada evento.',
         membershipButton: 'Fazer cadastro',
         fallbackDate: 'Data a confirmar'
       };
@@ -167,27 +177,143 @@ const Home = () => {
       .slice(0, 3)
   ), [news]);
 
+  const heroNewsItems = useMemo(() => {
+    if (latestNews.length) return latestNews;
+    return [
+      {
+        id: 'hero-news-fallback',
+        title: copy.heroNewsFallbackTitle,
+        summary: copy.heroDescription
+      }
+    ];
+  }, [latestNews, copy.heroDescription, copy.heroNewsFallbackTitle]);
+
+  const [heroNewsIndex, setHeroNewsIndex] = React.useState(0);
+  const [isHeroNewsPaused, setIsHeroNewsPaused] = React.useState(false);
+
+  React.useEffect(() => {
+    setHeroNewsIndex(0);
+  }, [heroNewsItems.length]);
+
+  React.useEffect(() => {
+    if (heroNewsItems.length <= 1 || isHeroNewsPaused) return undefined;
+    const rotationTimer = window.setInterval(() => {
+      setHeroNewsIndex((previous) => ((previous + 1) % heroNewsItems.length));
+    }, 5500);
+    return () => window.clearInterval(rotationTimer);
+  }, [heroNewsItems.length, isHeroNewsPaused]);
+
+  const activeHeroNews = heroNewsItems[heroNewsIndex] || heroNewsItems[0];
+  const heroTickerItems = useMemo(
+    () => (heroNewsItems.length > 1 ? [...heroNewsItems, ...heroNewsItems] : heroNewsItems),
+    [heroNewsItems]
+  );
+  const isBreakingNews = Boolean(
+    activeHeroNews?.breaking || (latestNews.length > 0 && activeHeroNews?.id === latestNews[0]?.id)
+  );
+  const handlePrevHeroNews = React.useCallback(() => {
+    if (heroNewsItems.length <= 1) return;
+    setHeroNewsIndex((previous) => (previous - 1 + heroNewsItems.length) % heroNewsItems.length);
+  }, [heroNewsItems.length]);
+  const handleNextHeroNews = React.useCallback(() => {
+    if (heroNewsItems.length <= 1) return;
+    setHeroNewsIndex((previous) => (previous + 1) % heroNewsItems.length);
+  }, [heroNewsItems.length]);
+
   return (
     <div className="public-page">
       <section className="public-hero">
         <div className="public-hero__content">
-          <span className="section-kicker">{copy.heroKicker}</span>
-          <h1>{copy.heroTitle}</h1>
-          <p>
-            {copy.heroDescription}
-          </p>
-          <div className="public-hero__actions">
-            <Link className="btn btn-primary" to="/ranking">
-              {copy.heroPrimary}
-            </Link>
-            <Link className="btn btn-secondary" to="/eventos">
-              {copy.heroSecondary}
-            </Link>
-          </div>
-          <div className="public-hero__meta">
-            <span className="tag">{copy.tagA}</span>
-            <span className="tag">{copy.tagB}</span>
-            <span className="tag">{copy.tagC}</span>
+          <div
+            className="hero-news"
+            onMouseEnter={() => setIsHeroNewsPaused(true)}
+            onMouseLeave={() => setIsHeroNewsPaused(false)}
+          >
+            <div className="hero-news__header">
+              <span className="section-kicker">{copy.heroNewsHeadline}</span>
+              <Link className="text-link" to="/noticias">{copy.newsCta}</Link>
+            </div>
+            <div className="hero-news__ticker" aria-hidden="true">
+              <div className="hero-news__ticker-track">
+                {heroTickerItems.map((item, index) => (
+                  <span className="hero-news__ticker-item" key={`${item.id || item.title || 'headline'}-${index}`}>
+                    {item.title || copy.heroNewsFallbackTitle}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <article className="hero-news__feature" key={activeHeroNews?.id || `hero-news-${heroNewsIndex}`}>
+              {activeHeroNews?.imageUrl ? (
+                <div className="hero-news__feature-bg">
+                  <img src={activeHeroNews.imageUrl} alt={activeHeroNews.title || copy.heroNewsFallbackTitle} loading="lazy" />
+                </div>
+              ) : (
+                <div className="hero-news__feature-bg hero-news__feature-bg--fallback">
+                  <span>{copy.heroNewsFallbackTitle}</span>
+                </div>
+              )}
+              <div className="hero-news__feature-overlay" />
+              {isBreakingNews && (
+                <span className="hero-news__badge">{copy.breakingBadge}</span>
+              )}
+              {heroNewsItems.length > 1 && (
+                <div className="hero-news__controls" aria-label={copy.heroNewsHeadline}>
+                  <button
+                    type="button"
+                    className="hero-news__control-btn"
+                    onClick={handlePrevHeroNews}
+                    aria-label={copy.prevHeadline}
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    className="hero-news__control-btn"
+                    onClick={handleNextHeroNews}
+                    aria-label={copy.nextHeadline}
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              )}
+              <div className="hero-news__body">
+                <div className="news-card__meta">
+                  {formatDate(activeHeroNews?.publishedAt || activeHeroNews?.createdAt, locale, copy.fallbackDate)}
+                </div>
+                <h1>{activeHeroNews?.title || copy.heroNewsFallbackTitle}</h1>
+                <p>
+                  {activeHeroNews?.summary || copy.heroDescription}
+                </p>
+                <div className="public-hero__actions">
+                  <Link className="btn btn-primary" to="/ranking">
+                    {copy.heroPrimary}
+                  </Link>
+                  <Link className="btn btn-secondary" to="/eventos">
+                    {copy.heroSecondary}
+                  </Link>
+                </div>
+                <div className="public-hero__meta">
+                  <span className="tag">{copy.tagA}</span>
+                  <span className="tag">{copy.tagB}</span>
+                  <span className="tag">{copy.tagC}</span>
+                </div>
+              </div>
+            </article>
+            {heroNewsItems.length > 1 && (
+              <div className="hero-news__dots" role="tablist" aria-label={copy.heroNewsHeadline}>
+                {heroNewsItems.map((item, index) => (
+                  <button
+                    type="button"
+                    key={item.id || `${item.title || 'news'}-${index}`}
+                    className={`hero-news__dot ${index === heroNewsIndex ? 'is-active' : ''}`}
+                    onClick={() => setHeroNewsIndex(index)}
+                    aria-label={item.title || copy.heroNewsFallbackTitle}
+                    aria-selected={index === heroNewsIndex}
+                    role="tab"
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -302,11 +428,13 @@ const Home = () => {
           {latestNews.length ? (
             latestNews.map((item) => (
               <article className="news-card" key={item.id}>
-                {item.imageUrl && (
-                  <div className="news-card__cover">
+                <div className={`news-card__cover ${item.imageUrl ? '' : 'news-card__cover--fallback'}`.trim()}>
+                  {item.imageUrl ? (
                     <img src={item.imageUrl} alt={item.title} loading="lazy" />
-                  </div>
-                )}
+                  ) : (
+                    <span>{copy.newsKicker}</span>
+                  )}
+                </div>
                 <div className="news-card__meta">{formatDate(item.publishedAt || item.createdAt, locale, copy.fallbackDate)}</div>
                 <h3>{item.title}</h3>
                 <p>{item.summary}</p>

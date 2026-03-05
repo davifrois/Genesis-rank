@@ -35,71 +35,71 @@ const BELT_GUIDE = {
   Branca: {
     ptTitle: 'FAIXA BRANCA',
     ptText:
-      'Para iniciantes de todas as idades. Nesta graduacao existem as maiores restricoes de aplicacao de golpes, e nenhum competidor pode ultrapassar 2 anos nesta faixa.',
+      'Destinada a iniciantes de todas as idades. Nesta graduação há maiores restrições de aplicação de golpes, e nenhum competidor deve permanecer por mais de dois anos nessa faixa.',
     enTitle: 'WHITE BELT',
     enText:
       'For beginners of all ages. This belt has more restrictions in official matches and usually has a maximum stay period before promotion.'
   },
   Cinza: {
-    ptTitle: 'FAIXA CINZA - 4 A 6 ANOS | FAIXA INFANTIL',
+    ptTitle: 'FAIXA CINZA - 4 A 6 ANOS | CATEGORIA INFANTIL',
     ptText:
-      'Faixa estimulante e opcional para criancas que estao tecnicamente entre a branca e a amarela.',
+      'Faixa opcional para crianças que se encontram tecnicamente entre as faixas branca e amarela.',
     enTitle: 'GRAY BELT - 4 TO 6 YEARS',
     enText:
       'Optional youth belt for children who are technically between white and yellow levels.'
   },
   Amarela: {
-    ptTitle: 'FAIXA AMARELA - 7 A 15 ANOS | FAIXA INFANTIL',
+    ptTitle: 'FAIXA AMARELA - 7 A 15 ANOS | CATEGORIA INFANTIL',
     ptText:
-      'Esta graduacao pode ser recebida no ano em que o aluno completa 7 anos ou mais.',
+      'Esta graduação pode ser concedida no ano em que o aluno completa sete anos ou mais.',
     enTitle: 'YELLOW BELT - 7 TO 15 YEARS',
     enText:
       'Can be awarded in the year the athlete turns 7 years old or older.'
   },
   Laranja: {
-    ptTitle: 'FAIXA LARANJA - 9 A 15 ANOS | FAIXA INFANTIL',
+    ptTitle: 'FAIXA LARANJA - 9 A 15 ANOS | CATEGORIA INFANTIL',
     ptText:
-      'Pode ser recebida quando o aluno completa 9 anos ou mais.',
+      'Pode ser concedida quando o aluno completa nove anos ou mais.',
     enTitle: 'ORANGE BELT - 9 TO 15 YEARS',
     enText:
       'Can be awarded when the athlete reaches 9 years old or older.'
   },
   Verde: {
-    ptTitle: 'FAIXA VERDE - 11 A 15 ANOS | FAIXA INFANTIL',
+    ptTitle: 'FAIXA VERDE - 11 A 15 ANOS | CATEGORIA INFANTIL',
     ptText:
-      'Pode ser recebida no ano em que o aluno completa 11 anos ou mais.',
+      'Pode ser concedida no ano em que o aluno completa onze anos ou mais.',
     enTitle: 'GREEN BELT - 11 TO 15 YEARS',
     enText:
       'Can be awarded in the year the athlete turns 11 years old or older.'
   },
   Azul: {
-    ptTitle: 'FAIXA AZUL - A PARTIR DE 16 ANOS | JUVENIL OU ADULTO',
+    ptTitle: 'FAIXA AZUL - A PARTIR DOS 16 ANOS | JUVENIL OU ADULTO',
     ptText:
-      'Pode ser usada a partir de 16 anos. Aluno menor de 16 anos que esteja na faixa verde recebe automaticamente a graduacao azul ao completar 16 anos.',
+      'Pode ser utilizada a partir dos 16 anos. O aluno que estiver na faixa verde recebe automaticamente a graduação azul ao completar essa idade.',
     enTitle: 'BLUE BELT - FROM 16 YEARS',
     enText:
       'Usually used from 16 years old. Green belt athletes are promoted to blue when turning 16.'
   },
   Roxa: {
-    ptTitle: 'FAIXA ROXA - A PARTIR DE 17 ANOS | JUVENIL OU ADULTO',
+    ptTitle: 'FAIXA ROXA - A PARTIR DOS 17 ANOS | JUVENIL OU ADULTO',
     ptText:
-      'Pode ser usada a partir de 17 anos. Em competicao oficial, normalmente disputa na roxa a partir da categoria adulto.',
+      'Pode ser utilizada a partir dos 17 anos. Em competição oficial, a disputa nessa faixa ocorre, em regra, a partir da categoria adulto.',
     enTitle: 'PURPLE BELT - FROM 17 YEARS',
     enText:
       'Can be used from 17 years old; official competition at this belt is commonly in adult divisions.'
   },
   Marrom: {
-    ptTitle: 'FAIXA MARROM - A PARTIR DE 18 ANOS | ADULTO',
+    ptTitle: 'FAIXA MARROM - A PARTIR DOS 18 ANOS | ADULTO',
     ptText:
-      'Graduacao importante, permitida a partir de 18 anos (ano em que completa).',
+      'Graduação de alta responsabilidade técnica, permitida a partir dos 18 anos (ano em que completa).',
     enTitle: 'BROWN BELT - FROM 18 YEARS',
     enText:
       'Important senior belt, usually from 18 years old onward.'
   },
   Preta: {
-    ptTitle: 'FAIXA PRETA - A PARTIR DE 19 ANOS | ADULTO',
+    ptTitle: 'FAIXA PRETA - A PARTIR DOS 19 ANOS | ADULTO',
     ptText:
-      'Graduacao maxima esportiva, permitida a partir de 19 anos.',
+      'Graduação máxima esportiva, permitida a partir dos 19 anos.',
     enTitle: 'BLACK BELT - FROM 19 YEARS',
     enText:
       'Highest sport belt level, usually from 19 years old onward.'
@@ -110,7 +110,7 @@ const fileToDataUrl = (file) => (
   new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
-    reader.onerror = () => reject(new Error('Falha ao ler arquivo de imagem.'));
+    reader.onerror = () => reject(new Error('Falha ao ler o arquivo de imagem.'));
     reader.readAsDataURL(file);
   })
 );
@@ -224,43 +224,43 @@ const Membership = () => {
         dbNote: 'Data is stored in system database and used across pages.'
       }
     : {
-        kicker: 'Filiacao',
-        title: 'Cadastro de filiacao e academias',
+        kicker: 'Filiação',
+        title: 'Cadastro de filiação e academias',
         subtitle:
-          'Cadastre academia e atleta uma vez. Isso organiza a base e permite reaproveitar foto do atleta no ranking.',
+          'Cadastre academia e atleta uma única vez. Isso organiza a base e permite reaproveitar a foto do atleta no ranking.',
         academyBlockKicker: 'Academias',
-        academyBlockTitle: 'Gestao de academias',
-        academyBlockSubtitle: 'Cadastre e mantenha os dados das equipes em uma area separada.',
+        academyBlockTitle: 'Gestão de academias',
+        academyBlockSubtitle: 'Cadastre e mantenha os dados das equipes em uma área específica.',
         athleteBlockKicker: 'Atletas',
-        athleteBlockTitle: 'Gestao de atletas',
-        athleteBlockSubtitle: 'Cadastre perfis com foto, faixa e dados de categoria em area separada.',
+        athleteBlockTitle: 'Gestão de atletas',
+        athleteBlockSubtitle: 'Cadastre perfis com foto, faixa e dados de categoria em área específica.',
         academySection: 'Cadastro de academia',
-        academyHint: 'Crie a equipe com foto/logo e dados do responsavel.',
+        academyHint: 'Cadastre a equipe com foto/logo e dados do responsável.',
         athleteSection: 'Cadastro de atleta',
         athleteHint: 'Vincule o atleta a uma academia e salve a foto para aparecer no ranking.',
         saveAcademy: 'Salvar academia',
         saveAthlete: 'Salvar atleta',
         clear: 'Limpar',
         academyName: 'Nome da academia *',
-        academyCountry: 'Pais',
+        academyCountry: 'País',
         academyCity: 'Cidade',
         academyState: 'Estado',
-        academyOwner: 'Responsavel',
+        academyOwner: 'Responsável',
         academyPhone: 'Telefone',
-        academyEmail: 'Email',
+        academyEmail: 'E-mail',
         academyLogo: 'Foto/logo da academia',
         academyLogoUrl: 'URL da foto (opcional)',
         athleteName: 'Nome do atleta *',
         athleteLastName: 'Sobrenome',
-        athleteEmail: 'Email',
+        athleteEmail: 'E-mail',
         athletePhone: 'Telefone',
         athleteBirthDate: 'Data de nascimento',
         athleteAge: 'Idade',
-        athleteCountry: 'Pais',
+        athleteCountry: 'País',
         athleteCity: 'Cidade',
         athleteBelt: 'Faixa',
         athleteBeltSelect: 'Selecione a faixa',
-        athleteWeight: 'Peso / divisao',
+        athleteWeight: 'Peso / divisão',
         athleteAcademy: 'Academia *',
         athletePhoto: 'Foto do atleta',
         athletePhotoUrl: 'URL da foto (opcional)',
@@ -273,13 +273,13 @@ const Membership = () => {
         createdAt: 'Criado em',
         noAcademy: 'Nenhuma academia cadastrada ainda.',
         noAthlete: 'Nenhum atleta cadastrado ainda.',
-        noBeltData: 'Sem faixa/peso informado',
+        noBeltData: 'Sem faixa ou peso informado',
         yearsOld: 'anos',
         adminOnlyRecords: 'As listas de cadastros aparecem somente no painel de controle.',
         academySaved: 'Academia cadastrada com sucesso.',
         athleteSaved: 'Atleta cadastrado com sucesso.',
-        academyFail: 'Nao foi possivel salvar academia.',
-        athleteFail: 'Nao foi possivel salvar atleta.',
+        academyFail: 'Não foi possível salvar a academia.',
+        athleteFail: 'Não foi possível salvar o atleta.',
         academyDeleteConfirm: (name) => `Remover a academia "${name}"?`,
         athleteDeleteConfirm: (name) => `Remover o atleta "${name}"?`,
         dbNote: 'Dados salvos no banco do sistema e reaproveitados nas outras telas.'
@@ -648,7 +648,7 @@ const Membership = () => {
                   type="text"
                   value={athleteAge === '' ? '' : `${athleteAge}`}
                   readOnly
-                  placeholder={isEnglish ? 'Auto' : 'Automatica'}
+                  placeholder={isEnglish ? 'Auto' : 'Automática'}
                 />
               </div>
               <div className="profile-field">

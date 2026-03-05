@@ -21,7 +21,7 @@ const DEFAULT_NEWS_ITEMS = [
     {
         id: 'news-1',
         title: 'Temporada aberta com novos campeonatos',
-        summary: 'Novas etapas regionais e estaduais foram adicionadas e ja alimentam o ranking oficial.',
+        summary: 'Novas etapas regionais e estaduais foram adicionadas e já alimentam o ranking oficial.',
         imageUrl: '',
         publishedAt: '2026-02-12',
         createdAt: '2026-02-12T12:00:00.000Z'
@@ -29,15 +29,15 @@ const DEFAULT_NEWS_ITEMS = [
     {
         id: 'news-2',
         title: 'Ranking atualizado em tempo real',
-        summary: 'Agora cada resultado processado atualiza pontos e posicao do atleta automaticamente.',
+        summary: 'Agora, cada resultado processado atualiza pontos e posição do atleta automaticamente.',
         imageUrl: '',
         publishedAt: '2026-02-05',
         createdAt: '2026-02-05T12:00:00.000Z'
     },
     {
         id: 'news-3',
-        title: 'Regras de pontuacao revisadas',
-        summary: 'A tabela de eventos por estrelas segue valida para manter transparencia no sistema.',
+        title: 'Regras de pontuação revisadas',
+        summary: 'A tabela de eventos por estrelas segue válida para manter transparência no sistema.',
         imageUrl: '',
         publishedAt: '2026-01-25',
         createdAt: '2026-01-25T12:00:00.000Z'
@@ -107,7 +107,7 @@ const normalizeBoolean = (value, fallback = false) => {
     if (typeof value === 'string') {
         const parsed = value.trim().toLowerCase();
         if (['true', '1', 'yes', 'sim', 'open', 'aberto', 'active', 'ativo'].includes(parsed)) return true;
-        if (['false', '0', 'no', 'nao', 'closed', 'fechado', 'inactive', 'inativo'].includes(parsed)) return false;
+        if (['false', '0', 'no', 'nao', 'não', 'closed', 'fechado', 'inactive', 'inativo'].includes(parsed)) return false;
     }
     return fallback;
 };
@@ -945,6 +945,9 @@ const useStoreState = () => {
     };
 
     const logout = () => {
+        if (authService.clearApiToken) {
+            authService.clearApiToken();
+        }
         addLog({ type: 'AUTH', action: 'LOGOUT', details: `Usuário ${data.currentUser?.name} saiu.` });
         setData(prev => ({ ...prev, currentUser: null }));
     };
@@ -965,8 +968,8 @@ const useStoreState = () => {
         });
 
         if (!normalized) {
-            addLog({ type: 'ERROR', action: 'ADD_NEWS', details: 'Noticia invalida.' });
-            throw new Error('Informe o titulo da noticia.');
+            addLog({ type: 'ERROR', action: 'ADD_NEWS', details: 'Notícia inválida.' });
+            throw new Error('Informe o título da notícia.');
         }
 
         setData((prev) => ({
@@ -977,7 +980,7 @@ const useStoreState = () => {
                 .sort((a, b) => new Date(b.publishedAt || b.createdAt || 0).getTime() - new Date(a.publishedAt || a.createdAt || 0).getTime())
         }));
 
-        addLog({ type: 'INFO', action: 'ADD_NEWS', details: `Noticia criada: ${normalized.title}` });
+        addLog({ type: 'INFO', action: 'ADD_NEWS', details: `Notícia criada: ${normalized.title}` });
         return normalized;
     };
 
@@ -989,14 +992,14 @@ const useStoreState = () => {
         });
 
         if (!normalized) {
-            addLog({ type: 'ERROR', action: 'ADD_ACADEMY', details: 'Dados invalidos para academia.' });
+            addLog({ type: 'ERROR', action: 'ADD_ACADEMY', details: 'Dados inválidos para academia.' });
             throw new Error('Informe o nome da academia.');
         }
 
         const exists = data.academies.find((academy) => normalizeKeyPart(academy.name) === normalizeKeyPart(normalized.name));
         if (exists) {
             addLog({ type: 'ERROR', action: 'ADD_ACADEMY', details: `Academia duplicada: ${normalized.name}` });
-            throw new Error('Ja existe uma academia com este nome.');
+            throw new Error('Já existe uma academia com este nome.');
         }
 
         setData((prev) => ({
@@ -1014,14 +1017,14 @@ const useStoreState = () => {
     const deleteAcademy = (academyId) => {
         const id = normalizeId(academyId);
         if (!id) {
-            addLog({ type: 'ERROR', action: 'DELETE_ACADEMY', details: 'Academia invalida para exclusao.' });
-            throw new Error('Academia invalida.');
+            addLog({ type: 'ERROR', action: 'DELETE_ACADEMY', details: 'Academia inválida para exclusão.' });
+            throw new Error('Academia inválida.');
         }
 
         const academy = data.academies.find((item) => item.id === id);
         if (!academy) {
-            addLog({ type: 'ERROR', action: 'DELETE_ACADEMY', details: `Academia nao encontrada: ${id}` });
-            throw new Error('Academia nao encontrada.');
+            addLog({ type: 'ERROR', action: 'DELETE_ACADEMY', details: `Academia não encontrada: ${id}` });
+            throw new Error('Academia não encontrada.');
         }
 
         setData((prev) => ({
@@ -1045,7 +1048,7 @@ const useStoreState = () => {
         });
 
         if (!normalized) {
-            addLog({ type: 'ERROR', action: 'ADD_MEMBER', details: 'Perfil de filiacao invalido.' });
+            addLog({ type: 'ERROR', action: 'ADD_MEMBER', details: 'Perfil de filiação inválido.' });
             throw new Error('Informe o nome completo do atleta.');
         }
 
@@ -1098,7 +1101,7 @@ const useStoreState = () => {
             };
         });
 
-        addLog({ type: 'INFO', action: 'ADD_MEMBER', details: `Filiacao salva: ${profileToSave.fullName}` });
+        addLog({ type: 'INFO', action: 'ADD_MEMBER', details: `Filiação salva: ${profileToSave.fullName}` });
         return {
             ...profileToSave,
             id: targetId
@@ -1108,14 +1111,14 @@ const useStoreState = () => {
     const deleteMemberProfile = (profileId) => {
         const id = normalizeId(profileId);
         if (!id) {
-            addLog({ type: 'ERROR', action: 'DELETE_MEMBER', details: 'Perfil invalido para exclusao.' });
-            throw new Error('Perfil invalido.');
+            addLog({ type: 'ERROR', action: 'DELETE_MEMBER', details: 'Perfil inválido para exclusão.' });
+            throw new Error('Perfil inválido.');
         }
 
         const existing = data.memberProfiles.find((item) => item.id === id);
         if (!existing) {
-            addLog({ type: 'ERROR', action: 'DELETE_MEMBER', details: `Perfil nao encontrado: ${id}` });
-            throw new Error('Perfil nao encontrado.');
+            addLog({ type: 'ERROR', action: 'DELETE_MEMBER', details: `Perfil não encontrado: ${id}` });
+            throw new Error('Perfil não encontrado.');
         }
 
         setData((prev) => ({
@@ -1129,14 +1132,14 @@ const useStoreState = () => {
     const updateNews = (newsId, updates = {}) => {
         const id = normalizeId(newsId);
         if (!id) {
-            addLog({ type: 'ERROR', action: 'UPDATE_NEWS', details: 'Noticia invalida para edicao.' });
-            throw new Error('Noticia invalida.');
+            addLog({ type: 'ERROR', action: 'UPDATE_NEWS', details: 'Notícia inválida para edição.' });
+            throw new Error('Notícia inválida.');
         }
 
         const current = data.news.find((item) => item.id === id);
         if (!current) {
-            addLog({ type: 'ERROR', action: 'UPDATE_NEWS', details: `Noticia nao encontrada: ${id}` });
-            throw new Error('Noticia nao encontrada.');
+            addLog({ type: 'ERROR', action: 'UPDATE_NEWS', details: `Notícia não encontrada: ${id}` });
+            throw new Error('Notícia não encontrada.');
         }
 
         const normalized = normalizeNews({
@@ -1147,8 +1150,8 @@ const useStoreState = () => {
         });
 
         if (!normalized) {
-            addLog({ type: 'ERROR', action: 'UPDATE_NEWS', details: 'Conteudo invalido para noticia.' });
-            throw new Error('Conteudo da noticia invalido.');
+            addLog({ type: 'ERROR', action: 'UPDATE_NEWS', details: 'Conteúdo inválido para notícia.' });
+            throw new Error('Conteúdo da notícia inválido.');
         }
 
         setData((prev) => ({
@@ -1160,15 +1163,15 @@ const useStoreState = () => {
                 .sort((a, b) => new Date(b.publishedAt || b.createdAt || 0).getTime() - new Date(a.publishedAt || a.createdAt || 0).getTime())
         }));
 
-        addLog({ type: 'INFO', action: 'UPDATE_NEWS', details: `Noticia atualizada: ${normalized.title}` });
+        addLog({ type: 'INFO', action: 'UPDATE_NEWS', details: `Notícia atualizada: ${normalized.title}` });
         return normalized;
     };
 
     const deleteNews = (newsId) => {
         const id = normalizeId(newsId);
         if (!id) {
-            addLog({ type: 'ERROR', action: 'DELETE_NEWS', details: 'Noticia invalida para exclusao.' });
-            throw new Error('Noticia invalida.');
+            addLog({ type: 'ERROR', action: 'DELETE_NEWS', details: 'Notícia inválida para exclusão.' });
+            throw new Error('Notícia inválida.');
         }
 
         const title = data.news.find((item) => item.id === id)?.title || id;
@@ -1176,19 +1179,19 @@ const useStoreState = () => {
             ...prev,
             news: prev.news.filter((item) => item.id !== id)
         }));
-        addLog({ type: 'WARN', action: 'DELETE_NEWS', details: `Noticia removida: ${title}` });
+        addLog({ type: 'WARN', action: 'DELETE_NEWS', details: `Notícia removida: ${title}` });
     };
 
     const addEvent = (event) => {
         const name = normalizeTextTrimmed(event?.name || '');
         if (!name) {
-            addLog({ type: 'ERROR', action: 'ADD_EVENT', details: 'Nome do evento nao informado.' });
+            addLog({ type: 'ERROR', action: 'ADD_EVENT', details: 'Nome do evento não informado.' });
             throw new Error('Informe o nome do evento.');
         }
         const exists = data.events.find((item) => normalizeKeyPart(item.name) === normalizeKeyPart(name));
         if (exists) {
             addLog({ type: 'ERROR', action: 'ADD_EVENT', details: `Evento duplicado: ${name}` });
-            throw new Error('Ja existe um evento com este nome.');
+            throw new Error('Já existe um evento com este nome.');
         }
         const fees = normalizeEventFees(event);
         const pixKey = resolveEventPixKey(event);
@@ -1221,19 +1224,19 @@ const useStoreState = () => {
 
     const updateEvent = (eventId, updates = {}) => {
         if (!eventId) {
-            addLog({ type: 'ERROR', action: 'UPDATE_EVENT', details: 'Evento invalido para edicao.' });
-            throw new Error('Evento invalido.');
+            addLog({ type: 'ERROR', action: 'UPDATE_EVENT', details: 'Evento inválido para edição.' });
+            throw new Error('Evento inválido.');
         }
 
         const current = data.events.find((event) => event.id === eventId);
         if (!current) {
-            addLog({ type: 'ERROR', action: 'UPDATE_EVENT', details: `Evento nao encontrado: ${eventId}` });
-            throw new Error('Evento nao encontrado.');
+            addLog({ type: 'ERROR', action: 'UPDATE_EVENT', details: `Evento não encontrado: ${eventId}` });
+            throw new Error('Evento não encontrado.');
         }
 
         const name = normalizeTextTrimmed(updates?.name ?? current.name);
         if (!name) {
-            addLog({ type: 'ERROR', action: 'UPDATE_EVENT', details: 'Nome do evento nao informado.' });
+            addLog({ type: 'ERROR', action: 'UPDATE_EVENT', details: 'Nome do evento não informado.' });
             throw new Error('Informe o nome do evento.');
         }
 
@@ -1243,7 +1246,7 @@ const useStoreState = () => {
         ));
         if (duplicate) {
             addLog({ type: 'ERROR', action: 'UPDATE_EVENT', details: `Evento duplicado: ${name}` });
-            throw new Error('Ja existe um evento com este nome.');
+            throw new Error('Já existe um evento com este nome.');
         }
         const fees = normalizeEventFees({
             feeUnder15: updates?.feeUnder15 ?? current.feeUnder15,
@@ -1288,8 +1291,8 @@ const useStoreState = () => {
 
     const deleteEvent = (eventId) => {
         if (!eventId) {
-            addLog({ type: 'ERROR', action: 'DELETE_EVENT', details: 'Evento invalido para exclusao.' });
-            throw new Error('Evento invalido.');
+            addLog({ type: 'ERROR', action: 'DELETE_EVENT', details: 'Evento inválido para exclusão.' });
+            throw new Error('Evento inválido.');
         }
 
         const eventName = data.events.find((event) => event.id === eventId)?.name || eventId;
@@ -1329,8 +1332,8 @@ const useStoreState = () => {
 
     const assignAthletesToEvent = (eventId, athleteIds = []) => {
         if (!eventId) {
-            addLog({ type: 'ERROR', action: 'ASSIGN_EVENT', details: 'Evento invalido para vinculo.' });
-            throw new Error('Evento invalido.');
+            addLog({ type: 'ERROR', action: 'ASSIGN_EVENT', details: 'Evento inválido para vínculo.' });
+            throw new Error('Evento inválido.');
         }
         const selected = new Set(athleteIds);
         const eventName = data.events.find((event) => event.id === eventId)?.name || eventId;
@@ -1398,14 +1401,14 @@ const useStoreState = () => {
     const removeAthlete = (id) => {
         const normalizedId = normalizeId(id);
         if (!normalizedId) {
-            addLog({ type: 'ERROR', action: 'REMOVE_ATHLETE', details: 'ID invalido para remocao.' });
-            throw new Error('Atleta invalido.');
+            addLog({ type: 'ERROR', action: 'REMOVE_ATHLETE', details: 'ID inválido para remoção.' });
+            throw new Error('Atleta inválido.');
         }
 
         const targetAthlete = data.athletes.find((athlete) => athlete.id === normalizedId);
         if (!targetAthlete) {
-            addLog({ type: 'ERROR', action: 'REMOVE_ATHLETE', details: `Atleta ${normalizedId} nao encontrado.` });
-            throw new Error('Atleta nao encontrado.');
+            addLog({ type: 'ERROR', action: 'REMOVE_ATHLETE', details: `Atleta ${normalizedId} não encontrado.` });
+            throw new Error('Atleta não encontrado.');
         }
 
         setData((prev) => {
@@ -1456,7 +1459,7 @@ const useStoreState = () => {
     const updateAthletePoints = (id, historyItem) => {
         const sanitized = sanitizeHistoryItem(historyItem);
         if (!sanitized) {
-            addLog({ type: 'ERROR', action: 'UPDATE_POINTS', details: `Registro invalido para ID ${id}` });
+            addLog({ type: 'ERROR', action: 'UPDATE_POINTS', details: `Registro inválido para o ID ${id}` });
             return;
         }
 
@@ -1486,7 +1489,7 @@ const useStoreState = () => {
     const setManualPoints = (id, points) => {
         const parsed = Number(points);
         if (!Number.isFinite(parsed) || parsed < 0) {
-            addLog({ type: 'ERROR', action: 'SET_POINTS', details: `Valor invalido para ID ${id}` });
+            addLog({ type: 'ERROR', action: 'SET_POINTS', details: `Valor inválido para o ID ${id}` });
             return false;
         }
 
@@ -1537,7 +1540,7 @@ const useStoreState = () => {
 
     const generateBrackets = ({ eventId, mode = 'ALL', replaceExisting = false } = {}) => {
         if (!eventId) {
-            addLog({ type: 'ERROR', action: 'GENERATE_BRACKETS', details: 'Evento nao informado.' });
+            addLog({ type: 'ERROR', action: 'GENERATE_BRACKETS', details: 'Evento não informado.' });
             throw new Error('Selecione um evento para gerar as chaves.');
         }
 
@@ -1598,8 +1601,8 @@ const useStoreState = () => {
     const applyBracketPodium = (bracketId) => {
         const bracket = data.brackets.find((item) => item.id === bracketId);
         if (!bracket) {
-            addLog({ type: 'ERROR', action: 'APPLY_BRACKET', details: `Chave ${bracketId} nao encontrada.` });
-            return { ok: false, message: 'Chave nao encontrada.' };
+            addLog({ type: 'ERROR', action: 'APPLY_BRACKET', details: `Chave ${bracketId} não encontrada.` });
+            return { ok: false, message: 'Chave não encontrada.' };
         }
 
         const participantIds = new Set(bracket.seedIds || []);
@@ -1622,18 +1625,18 @@ const useStoreState = () => {
 
         const missing = required.filter((key) => !positions[key]);
         if (missing.length) {
-            return { ok: false, message: 'Selecione o podio completo para aplicar.' };
+            return { ok: false, message: 'Selecione o pódio completo para aplicar.' };
         }
 
         const chosen = Object.values(positions).filter(Boolean);
         const unique = new Set(chosen);
         if (unique.size !== chosen.length) {
-            return { ok: false, message: 'Os atletas do podio devem ser diferentes.' };
+            return { ok: false, message: 'Os atletas do pódio devem ser diferentes.' };
         }
 
         for (const id of chosen) {
             if (!participantIds.has(id)) {
-                return { ok: false, message: 'Podio precisa ser composto por atletas da chave.' };
+                return { ok: false, message: 'Pódio precisa ser composto por atletas da chave.' };
             }
         }
 
@@ -1682,7 +1685,7 @@ const useStoreState = () => {
         addLog({
             type: 'INFO',
             action: 'APPLY_BRACKET',
-            details: `Podio aplicado para chave ${bracket.number || bracketId}.`
+            details: `Pódio aplicado para a chave ${bracket.number || bracketId}.`
         });
 
         return { ok: true };
@@ -1742,7 +1745,7 @@ const useStoreState = () => {
         addLog({
             type: 'IMPORT',
             action: 'BATCH',
-            details: `Importação: ${prepared.length} ok, ${invalidCount} invalidos, ${duplicateCount} duplicados.`
+            details: `Importação: ${prepared.length} ok, ${invalidCount} inválidos, ${duplicateCount} duplicados.`
         });
 
         return { imported: prepared.length, invalid: invalidCount, duplicate: duplicateCount };
@@ -1812,3 +1815,4 @@ export const useStore = () => {
     }
     return context;
 };
+

@@ -311,7 +311,7 @@ const extractInlineAthleteFromHeader = (line) => {
 
 export const extractTextFromPdfFile = async (file) => {
   if (!file) {
-    throw new Error('Arquivo nao encontrado.');
+    throw new Error('Arquivo não encontrado.');
   }
 
   try {

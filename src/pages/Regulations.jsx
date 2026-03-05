@@ -40,30 +40,30 @@ const Regulations = () => {
       }
     : {
         kicker: 'Regulamento',
-        title: 'Pontuacao clara para manter o ranking transparente.',
+        title: 'Pontuação clara para manter o ranking transparente.',
         description:
-          'Regras simples e publicas. Cada evento possui um peso definido e o ranking e atualizado automaticamente.',
+          'Regras simples e públicas. Cada evento possui um peso definido e o ranking é atualizado automaticamente.',
         values: 'Valores',
         tableTitle: 'Tabela de pontos',
-        placement: 'Colocacao',
+        placement: 'Colocação',
         points: 'Pontos',
         pointsCountTitle: 'Como os pontos contam',
-        pointsCountA: '1o lugar soma 3 pontos.',
-        pointsCountB: '2o lugar soma 2 pontos.',
-        pointsCountC: '3o lugar soma 1 ponto.',
-        weightTables: 'Tabela de peso',
+        pointsCountA: '1º lugar soma 3 pontos.',
+        pointsCountB: '2º lugar soma 2 pontos.',
+        pointsCountC: '3º lugar soma 1 ponto.',
+        weightTables: 'Tabelas de peso',
         weightTablesTitle: 'Tabelas oficiais de peso por idade e categoria',
-        weightTablesDesc: 'Use as imagens abaixo para validar a divisao de peso de cada atleta antes da checagem.',
+        weightTablesDesc: 'Use as imagens abaixo para validar a divisão de peso de cada atleta antes da checagem.',
         youthWeightTitle: 'Tabela Infantil (4 a 15 anos)',
-        youthWeightDesc: 'Divisao de peso por faixa etaria para categorias de base.',
+        youthWeightDesc: 'Divisão de peso por faixa etária para categorias de base.',
         mainWeightTitle: 'Infantojuvenil, Juvenil, Adulto e Master',
-        mainWeightDesc: 'Tabela de referencia para inscricao GI / NO-GI nas categorias juvenis e adultas.',
-        transparencyTitle: 'Transparencia total',
+        mainWeightDesc: 'Tabela de referência para inscrição GI / NO-GI nas categorias juvenis e adultas.',
+        transparencyTitle: 'Transparência total',
         transparencyText:
-          'Todas as regras ficam publicas para atletas e academias. O objetivo e manter clareza e confianca.',
-        updateTitle: 'Atualizacao',
+          'Todas as regras ficam públicas para atletas e academias. O objetivo é manter clareza e confiança.',
+        updateTitle: 'Atualização',
         updateText:
-          'Cada evento encerrado atualiza o ranking em minutos. O atleta ja visualiza o impacto no perfil.'
+          'Cada evento encerrado atualiza o ranking em minutos. O atleta visualiza o impacto no perfil.'
       };
 
   return (

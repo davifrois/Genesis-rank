@@ -32,7 +32,7 @@ const runAutoTable = (doc, config) => {
         autoTable(doc, config);
         return;
     }
-    throw new Error('Modulo de tabela do PDF nao esta disponivel.');
+    throw new Error('Módulo de tabela do PDF não está disponível.');
 };
 
 const loadImage = (src) => new Promise((resolve, reject) => {
@@ -321,7 +321,7 @@ export const generateBracketsPDF = async (brackets, athletes, options = {}) => {
         doc.setFontSize(7);
         doc.setTextColor(50);
         doc.text('Chamador', leftMargin + signWidth / 2, signLineY + 4, { align: 'center' });
-        doc.text('Mesario', pageWidth - rightMargin - signWidth / 2, signLineY + 4, { align: 'center' });
+        doc.text('Mesário', pageWidth - rightMargin - signWidth / 2, signLineY + 4, { align: 'center' });
     });
 
     const fileName = `Chaves_${buildFileSafeName(eventName)}_${buildFileSafeName(modeLabel || 'geral')}.pdf`;
@@ -346,7 +346,7 @@ export const generateRankingPDF = (athletes, options = {}) => {
     doc.text('GENESIS ESPORTES', 14, 25);
 
     doc.setFontSize(10);
-    doc.text('RELATORIO OFICIAL DE RANKING 2025', 14, 32);
+    doc.text('RELATÓRIO OFICIAL DE RANKING 2025', 14, 32);
 
     doc.setFont("helvetica", "normal");
     doc.setTextColor(90);
@@ -427,7 +427,7 @@ export const generateFilteredRankingPDF = ({ groups = [], winners = [], options 
     doc.text('GENESIS ESPORTES', 14, 21);
 
     doc.setFontSize(9);
-    doc.text('RELATORIO DE RANKING FILTRADO', 14, 28);
+    doc.text('RELATÓRIO DE RANKING FILTRADO', 14, 28);
 
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(90);

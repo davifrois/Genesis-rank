@@ -9,7 +9,7 @@ describe('authService', () => {
     });
 
     it('should throw error if username is missing', async () => {
-        await expect(authService.login('', 'pass')).rejects.toThrow('Por favor, informe o nome de usuario.');
+        await expect(authService.login('', 'pass')).rejects.toThrow('Por favor, informe o nome de usuário.');
     });
 
     it('should throw error if password is missing', async () => {
@@ -17,7 +17,7 @@ describe('authService', () => {
     });
 
     it('should throw error for invalid user', async () => {
-        await expect(authService.login('wrongUser', 'pass')).rejects.toThrow('Usuario nao encontrado.');
+        await expect(authService.login('wrongUser', 'pass')).rejects.toThrow('Usuário não encontrado.');
     });
 
     it('should throw error for invalid password', async () => {

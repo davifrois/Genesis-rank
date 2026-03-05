@@ -3,7 +3,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 const I18N_STORAGE_KEY = 'genesis_site_language';
 
 const LANGUAGE_OPTIONS = [
-  { id: 'pt-BR', label: 'Portugues', country: 'Brasil', flag: '\uD83C\uDDE7\uD83C\uDDF7' },
+  { id: 'pt-BR', label: 'Português', country: 'Brasil', flag: '\uD83C\uDDE7\uD83C\uDDF7' },
   { id: 'en-US', label: 'English', country: 'United States', flag: '\uD83C\uDDFA\uD83C\uDDF8' }
 ];
 

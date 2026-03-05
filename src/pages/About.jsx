@@ -50,42 +50,42 @@ const About = () => {
     : {
         kicker: 'Sobre',
         title: 'Genesis Esportes',
-        subtitle: 'Perfil da empresa, missao e valores.',
+        subtitle: 'Perfil da empresa, missão e valores.',
         companyTitle: 'A EMPRESA',
         companyText:
-          'A Genesis Esportes e uma empresa especializada na organizacao e realizacao de eventos de Jiu-Jitsu. Fundada em 2017, com sede em Belo Horizonte, registrada sob o CNPJ 27.835.080/0001-51, atende os principais eventos realizados em Minas Gerais. Temos toda a estrutura material e profissional para dar o suporte que o nosso cliente precisa na hora de realizar o seu evento. Somos especialistas em qualquer area que envolve um evento de Jiu-Jitsu e possuimos ferramentas que facilitam a criacao e a execucao de um evento competitivo.',
-        missionTitle: 'NOSSA MISSAO',
+          'A Genesis Esportes é uma empresa especializada na organização e realização de eventos de Jiu-Jitsu. Fundada em 2017, com sede em Belo Horizonte e registrada sob o CNPJ 27.835.080/0001-51, atende aos principais eventos realizados em Minas Gerais. Contamos com estrutura material e equipe profissional para oferecer o suporte necessário em todas as etapas do evento. Somos especialistas nas áreas que envolvem competições de Jiu-Jitsu e dispomos de ferramentas que facilitam a criação e a execução de eventos competitivos.',
+        missionTitle: 'NOSSA MISSÃO',
         missionText:
-          'A missao da Genesis Esportes e fornecer um servico de alta excelencia que auxilie o cliente a organizar e realizar seu evento com a maxima qualidade para todos os atletas.',
+          'A missão da Genesis Esportes é prestar um serviço de alta excelência, auxiliando o cliente na organização e realização de eventos com qualidade máxima para todos os atletas.',
         valuesTitle: 'NOSSOS VALORES',
         values: [
           'Credibilidade no mercado.',
           'Comprometimento e parceria.',
           'Rapidez na entrega.',
-          'Responsabilidade e transparencia.',
-          'Etica e entrega de resultado.',
-          'Competencia e excelencia em atendimento.'
+          'Responsabilidade e transparência.',
+          'Ética e entrega de resultados.',
+          'Competência e excelência no atendimento.'
         ],
         whyTitle: 'POR QUE CONTRATAR A GENESIS ESPORTES?',
         whyItems: [
           'Somos especialistas em realizar e organizar qualquer formato de evento de Jiu-Jitsu.',
-          'Possuimos ferramentas digitais e modernas que agilizam e trazem a melhor solucao para cada modelo de evento.',
-          'Desenvolvemos seu evento desde a elaboracao do projeto.',
-          'Divulgacao do seu evento em nossas plataformas.',
-          'Confeccionamos o chaveamento, cronograma e recebimento de inscricoes.',
-          'Montamos e desmontamos toda a estrutura fisica do seu evento.',
-          'Suporte ao cliente disponivel online 24h.',
+          'Possuímos ferramentas digitais modernas que agilizam e oferecem a melhor solução para cada modelo de evento.',
+          'Desenvolvemos seu evento desde a elaboração do projeto.',
+          'Realizamos a divulgação do seu evento em nossas plataformas.',
+          'Executamos o chaveamento, o cronograma e o recebimento de inscrições.',
+          'Montamos e desmontamos toda a estrutura física do seu evento.',
+          'Suporte ao cliente disponível on-line 24h.',
           'Equipe de profissionais especializada e experiente.',
-          'Realizamos seu evento do inicio ao fim.'
+          'Realizamos seu evento do início ao fim.'
         ],
-        benefitsTitle: 'QUAIS SAO AS VANTAGENS QUANDO NOS CONTRATA?',
+        benefitsTitle: 'QUAIS SÃO AS VANTAGENS AO NOS CONTRATAR?',
         benefits: [
           'Reduz a sua sobrecarga de trabalho com o evento.',
-          'Equipe especializada e com experiencia.',
-          'Maior assertividade no tratamento das questoes.',
+          'Equipe especializada e com experiência.',
+          'Maior assertividade no tratamento das questões.',
           'Organiza melhor o evento.',
           'Evita erros operacionais.',
-          'Melhor controle na organizacao.'
+          'Melhor controle na organização.'
         ]
       };
 

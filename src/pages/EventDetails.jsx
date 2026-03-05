@@ -71,9 +71,9 @@ const EventDetails = () => {
         fallbackEvent: 'Evento oficial',
         fallbackLocation: 'Local a definir',
         backEvents: 'Voltar para eventos',
-        location: 'Localizacao',
+        location: 'Localização',
         values: 'Valores',
-        valuesLineA: 'Ate 15 anos (GI ou NO GI)',
+        valuesLineA: 'Até 15 anos (GI ou NO-GI)',
         valuesLineB: 'Acima de 15 anos (GI ou NO GI)',
         valuesLineC: 'Combo GI + NO GI',
         valuesLineD: 'Absoluto GI / NO GI',
@@ -81,27 +81,27 @@ const EventDetails = () => {
         options: {
           academy: 'Atletas por academia',
           category: 'Atletas por categoria',
-          academyNoGi: 'Atletas por academia no GI',
-          categoryNoGi: 'Atletas por categoria no GI',
+          academyNoGi: 'Atletas por academia no NO-GI',
+          categoryNoGi: 'Atletas por categoria no NO-GI',
           table: 'Tabela de peso',
-          tableNoGi: 'Tabela de peso no GI',
+          tableNoGi: 'Tabela de peso no NO-GI',
           circular: 'Circular'
         },
-        registerNow: 'Se inscreva agora',
-        registrationClosed: 'Inscricoes fechadas',
-        registrationExternal: 'Este evento usa inscricao em link externo.',
-        accessExternal: 'Abrir inscricao externa',
+        registerNow: 'Inscreva-se agora',
+        registrationClosed: 'Inscrições encerradas',
+        registrationExternal: 'Este evento utiliza inscrição em link externo.',
+        accessExternal: 'Abrir inscrição externa',
         scheduleTitle: 'Datas e prazos',
         scheduleItems: [
-          'Check-in de atletas e validacao de documentos.',
+          'Check-in de atletas e validação de documentos.',
           'Check-in por academias com representante.',
-          'Divulgacao do cronograma oficial.',
-          'Divulgacao das chaves e chamada final.'
+          'Divulgação do cronograma oficial.',
+          'Divulgação das chaves e chamada final.'
         ],
-        importantTitle: 'Informacoes importantes',
+        importantTitle: 'Informações importantes',
         importantText:
-          'Todos os atletas devem apresentar documentos validos e seguir o regulamento do evento.',
-        openForm: 'Se inscreva agora'
+          'Todos os atletas devem apresentar documentos válidos e seguir o regulamento do evento.',
+        openForm: 'Inscreva-se agora'
       };
 
   const event = useMemo(() => events.find((item) => item.id === eventId), [events, eventId]);

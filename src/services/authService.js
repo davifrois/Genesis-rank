@@ -12,7 +12,9 @@ const ADMIN_USERS = new Set(['simone', 'davifrois']);
 const VALID_ROLES = new Set(['admin', 'athlete']);
 
 const AUTH_USERS_KEY = 'genesis_auth_users_v1';
+export const API_AUTH_TOKEN_STORAGE_KEY = 'genesis_api_auth_token_v1';
 let memoryUsers = null;
+let memoryApiToken = '';
 
 const env = import.meta.env || {};
 const AUTH_MODE = env.MODE === 'test' ? 'local' : (env.VITE_AUTH_MODE || 'local');
@@ -36,6 +38,34 @@ const getStorage = () => {
         return localStorage;
     } catch (err) {
         return null;
+    }
+};
+
+const readApiToken = () => {
+    const storage = getStorage();
+    if (!storage) return memoryApiToken || '';
+    try {
+        const token = (storage.getItem(API_AUTH_TOKEN_STORAGE_KEY) || '').toString().trim();
+        if (token) return token;
+    } catch (err) {
+        // ignore storage read failures
+    }
+    return memoryApiToken || '';
+};
+
+const writeApiToken = (token) => {
+    const normalized = (token || '').toString().trim();
+    memoryApiToken = normalized;
+    const storage = getStorage();
+    if (!storage) return;
+    try {
+        if (!normalized) {
+            storage.removeItem(API_AUTH_TOKEN_STORAGE_KEY);
+            return;
+        }
+        storage.setItem(API_AUTH_TOKEN_STORAGE_KEY, normalized);
+    } catch (err) {
+        // ignore storage write failures
     }
 };
 
@@ -98,7 +128,7 @@ const loginLocal = async (username, password) => {
     const user = users.find((entry) => normalizeUsername(entry.username) === normalized);
 
     if (!user) {
-        throw new Error('Usuario nao encontrado.');
+        throw new Error('Usuário não encontrado.');
     }
 
     if (password !== user.password) {
@@ -127,7 +157,7 @@ const resetPasswordLocal = async (username, newPassword) => {
     const normalized = normalizeUsername(username);
 
     if (!normalized) {
-        throw new Error('Informe o usuario para redefinir a senha.');
+        throw new Error('Informe o usuário para redefinir a senha.');
     }
 
     if (!newPassword || newPassword.length < 6) {
@@ -136,7 +166,7 @@ const resetPasswordLocal = async (username, newPassword) => {
 
     const index = users.findIndex((entry) => normalizeUsername(entry.username) === normalized);
     if (index === -1) {
-        throw new Error('Usuario nao encontrado.');
+        throw new Error('Usuário não encontrado.');
     }
 
     const updated = [...users];
@@ -154,7 +184,7 @@ const resetPasswordLocal = async (username, newPassword) => {
 const registerLocal = async ({ username, password, name }) => {
     const normalized = normalizeUsername(username);
     if (!normalized) {
-        throw new Error('Informe um usuario valido.');
+        throw new Error('Informe um usuário válido.');
     }
     if (!password || password.length < 6) {
         throw new Error('Senha deve ter ao menos 6 caracteres.');
@@ -162,7 +192,7 @@ const registerLocal = async ({ username, password, name }) => {
     const users = ensureLocalUsers();
     const exists = users.some((entry) => normalizeUsername(entry.username) === normalized);
     if (exists) {
-        throw new Error('Usuario ja cadastrado.');
+        throw new Error('Usuário já cadastrado.');
     }
 
     const newUser = {
@@ -184,7 +214,7 @@ const registerLocal = async ({ username, password, name }) => {
 
 const loginWithApi = async (username, password) => {
     if (!AUTH_URL) {
-        throw new Error('Login remoto nao configurado.');
+        throw new Error('Login remoto não configurado.');
     }
 
     const response = await fetch(AUTH_URL, {
@@ -207,10 +237,15 @@ const loginWithApi = async (username, password) => {
     }
 
     const data = await response.json();
+    const token = (data?.token || '').toString().trim();
+    writeApiToken(token);
     return {
-        username: data.username || username,
-        name: data.name || data.nome || username,
-        role: resolveRole({ username: data.username || username, role: data.role || data.perfil || data.tipo }),
+        username: data?.user?.username || data.username || username,
+        name: data?.user?.name || data.name || data.nome || username,
+        role: resolveRole({
+            username: data?.user?.username || data.username || username,
+            role: data?.user?.role || data.role || data.perfil || data.tipo
+        }),
         lastLogin: data.lastLogin || new Date().toISOString()
     };
 };
@@ -225,7 +260,7 @@ export const authService = {
      */
     login: async (username, password) => {
         if (!username) {
-            throw new Error('Por favor, informe o nome de usuario.');
+            throw new Error('Por favor, informe o nome de usuário.');
         }
 
         if (!password) {
@@ -237,6 +272,7 @@ export const authService = {
         }
 
         await new Promise(resolve => setTimeout(resolve, 600));
+        writeApiToken('');
         return loginLocal(username, password);
     },
     listUsers: () => {
@@ -249,7 +285,7 @@ export const authService = {
     getRoleForUsername: (username) => resolveRole({ username }),
     register: async ({ username, password, name }) => {
         if (AUTH_MODE === 'api') {
-            throw new Error('Cadastro indisponivel no modo remoto.');
+            throw new Error('Cadastro indisponível no modo remoto.');
         }
 
         await new Promise(resolve => setTimeout(resolve, 600));
@@ -257,10 +293,12 @@ export const authService = {
     },
     resetPassword: async (username, newPassword) => {
         if (AUTH_MODE === 'api') {
-            throw new Error('Redefinicao de senha disponivel apenas no modo local.');
+            throw new Error('Redefinição de senha disponível apenas no modo local.');
         }
 
         await new Promise(resolve => setTimeout(resolve, 600));
         return resetPasswordLocal(username, newPassword);
-    }
+    },
+    getApiToken: () => readApiToken(),
+    clearApiToken: () => writeApiToken('')
 };

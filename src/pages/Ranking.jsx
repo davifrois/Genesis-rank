@@ -1,5 +1,5 @@
 import React, { useDeferredValue, useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronUp, Search } from 'lucide-react';
+import { ChevronDown, ChevronUp, Search, Trophy, X } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { useStore } from '../hooks/useStore';
 import { useI18n } from '../hooks/useI18n';
@@ -119,21 +119,21 @@ const COUNTRY_LABEL_BY_CODE = {
     US: { pt: 'Estados Unidos', en: 'United States' },
     PT: { pt: 'Portugal', en: 'Portugal' },
     AR: { pt: 'Argentina', en: 'Argentina' },
-    MX: { pt: 'Mexico', en: 'Mexico' },
+    MX: { pt: 'México', en: 'Mexico' },
     CL: { pt: 'Chile', en: 'Chile' },
-    CO: { pt: 'Colombia', en: 'Colombia' },
+    CO: { pt: 'Colômbia', en: 'Colombia' },
     PE: { pt: 'Peru', en: 'Peru' },
     UY: { pt: 'Uruguai', en: 'Uruguay' },
     PY: { pt: 'Paraguai', en: 'Paraguay' },
-    BO: { pt: 'Bolivia', en: 'Bolivia' },
+    BO: { pt: 'Bolívia', en: 'Bolivia' },
     VE: { pt: 'Venezuela', en: 'Venezuela' },
     ES: { pt: 'Espanha', en: 'Spain' },
-    FR: { pt: 'Franca', en: 'France' },
-    IT: { pt: 'Italia', en: 'Italy' },
+    FR: { pt: 'França', en: 'France' },
+    IT: { pt: 'Itália', en: 'Italy' },
     DE: { pt: 'Alemanha', en: 'Germany' },
-    RU: { pt: 'Russia', en: 'Russia' },
-    AE: { pt: 'Emirados Arabes Unidos', en: 'United Arab Emirates' },
-    JP: { pt: 'Japao', en: 'Japan' }
+    RU: { pt: 'Rússia', en: 'Russia' },
+    AE: { pt: 'Emirados Árabes Unidos', en: 'United Arab Emirates' },
+    JP: { pt: 'Japão', en: 'Japan' }
 };
 
 const countryCodeFromAthlete = (athlete) => {
@@ -183,26 +183,11 @@ const photoUrlFromAthlete = (athlete) => (
     || ''
 );
 
-const parseDate = (value) => {
-    if (!value) return null;
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return null;
-    return parsed;
-};
-
-const formatShortDate = (value, locale, fallback) => {
-    const date = value instanceof Date ? value : parseDate(value);
-    if (!date) return fallback;
-    return date.toLocaleDateString(locale, {
-        day: '2-digit',
-        month: 'short'
-    });
-};
-
 const Ranking = () => {
-    const { athletes, events, activeEventId, memberProfiles } = useStore();
-    const { language, locale } = useI18n();
+    const { athletes, events, activeEventId, memberProfiles, currentUser } = useStore();
+    const { language } = useI18n();
     const isEnglish = language === 'en-US';
+    const isAdmin = currentUser?.role === 'admin';
     const [searchParams, setSearchParams] = useSearchParams();
     const [activeTab, setActiveTab] = useState(() => resolveTab(searchParams.get('tab')));
     const [selectedEventId, setSelectedEventId] = useState(() => (
@@ -211,6 +196,7 @@ const Ranking = () => {
     const [searchTerm, setSearchTerm] = useState(() => normalizeQueryParam(searchParams.get('q')));
     const deferredSearch = useDeferredValue(searchTerm);
     const [compactView, setCompactView] = useState(() => searchParams.get('compact') !== '0');
+    const [competitionMode, setCompetitionMode] = useState(() => searchParams.get('comp') === '1');
     const [expandedGroups, setExpandedGroups] = useState(() => new Set());
     const [groupLimit, setGroupLimit] = useState(GROUP_PAGE_SIZE);
     const [winnersLimit, setWinnersLimit] = useState(WINNERS_PAGE_SIZE);
@@ -224,6 +210,8 @@ const Ranking = () => {
                 GERAL: 'OVERALL'
             },
             noDate: 'Date TBD',
+            rankingTitle: 'Official ranking',
+            rankingDescription: 'Track event standings in real time with clear categories, visible points and fast filtering.',
             correction: 'Request correction',
             allEvents: 'All events',
             noEvent: 'No event',
@@ -236,6 +224,8 @@ const Ranking = () => {
             selectEventAria: 'Select event',
             searchPlaceholder: 'Search athlete, academy or category',
             searchAria: 'Search athlete',
+            clearSearch: 'Clear search',
+            competitionMode: 'Competition mode',
             showAll: 'Show all',
             compactMode: 'Compact mode',
             athletes: 'Athletes',
@@ -256,7 +246,11 @@ const Ranking = () => {
             showMoreCategories: 'Show more categories',
             noAthleteInEvent: 'No athlete linked to this event.',
             noAthleteInCategory: 'No athlete found in this category.',
-            noWinner: 'No winner found.'
+            noWinner: 'No winner found.',
+            podiumHighlight: 'Podium highlight',
+            placeFirst: '1st',
+            placeSecond: '2nd',
+            placeThird: '3rd'
         }
         : {
             tabs: {
@@ -267,7 +261,9 @@ const Ranking = () => {
                 GERAL: 'GERAL'
             },
             noDate: 'Data a confirmar',
-            correction: 'Solicitar Correcao',
+            rankingTitle: 'Ranking oficial',
+            rankingDescription: 'Acompanhe os resultados por evento em tempo real, com categorias claras, pontuação visível e filtros rápidos.',
+            correction: 'Solicitar correção',
             allEvents: 'Todos os eventos',
             noEvent: 'Sem evento',
             noTournament: 'Nenhum campeonato cadastrado ainda.',
@@ -279,6 +275,8 @@ const Ranking = () => {
             selectEventAria: 'Selecionar evento',
             searchPlaceholder: 'Buscar atleta, academia ou categoria',
             searchAria: 'Buscar atleta',
+            clearSearch: 'Limpar busca',
+            competitionMode: 'Modo competição',
             showAll: 'Mostrar tudo',
             compactMode: 'Modo compacto',
             athletes: 'Atletas',
@@ -287,9 +285,9 @@ const Ranking = () => {
             overallRanking: 'Ranking geral',
             updatedNow: 'Atualizado agora',
             points: 'Pontos',
-            wins: 'Vitorias',
-            podiums: 'Podios',
-            victories: 'Vitorias',
+            wins: 'Vitórias',
+            podiums: 'Pódios',
+            victories: 'Vitórias',
             beltFallback: 'Faixa',
             weightFallback: 'Peso',
             hiddenAthletes: 'atletas ocultos',
@@ -299,7 +297,11 @@ const Ranking = () => {
             showMoreCategories: 'Mostrar mais categorias',
             noAthleteInEvent: 'Nenhum atleta vinculado a este evento.',
             noAthleteInCategory: 'Nenhum atleta encontrado nesta categoria.',
-            noWinner: 'Nenhum vencedor encontrado.'
+            noWinner: 'Nenhum vencedor encontrado.',
+            podiumHighlight: 'Pódio em destaque',
+            placeFirst: '1º',
+            placeSecond: '2º',
+            placeThird: '3º'
         };
 
     const isEventMode = selectedEventId !== 'all' && selectedEventId !== 'none';
@@ -318,6 +320,7 @@ const Ranking = () => {
         const paramEvent = searchParams.get('event');
         const paramQuery = normalizeQueryParam(searchParams.get('q'));
         const paramCompact = searchParams.get('compact');
+        const paramCompetition = searchParams.get('comp');
 
         if (paramTab && paramTab !== activeTab) {
             setActiveTab(paramTab);
@@ -332,6 +335,12 @@ const Ranking = () => {
             const nextCompact = paramCompact !== '0';
             if (nextCompact !== compactView) {
                 setCompactView(nextCompact);
+            }
+        }
+        if (paramCompetition !== null) {
+            const nextCompetitionMode = paramCompetition === '1';
+            if (nextCompetitionMode !== competitionMode) {
+                setCompetitionMode(nextCompetitionMode);
             }
         }
     }, [searchParamsKey]);
@@ -376,10 +385,20 @@ const Ranking = () => {
             changed = true;
         }
 
+        if (competitionMode) {
+            if (params.get('comp') !== '1') {
+                params.set('comp', '1');
+                changed = true;
+            }
+        } else if (params.has('comp')) {
+            params.delete('comp');
+            changed = true;
+        }
+
         if (changed) {
             setSearchParams(params, { replace: true });
         }
-    }, [activeTab, selectedEventId, searchTerm, compactView, searchParams, setSearchParams]);
+    }, [activeTab, selectedEventId, searchTerm, compactView, competitionMode, searchParams, setSearchParams]);
 
     const selectedEvent = useMemo(() => (
         events.find((event) => event.id === selectedEventId)
@@ -437,19 +456,6 @@ const Ranking = () => {
             return athlete.eventId === selectedEventId;
         });
     }, [athletes, selectedEventId]);
-
-    const sortedEvents = useMemo(() => {
-        return [...events]
-            .map((event) => ({ ...event, parsedDate: parseDate(event.date) }))
-            .sort((a, b) => {
-                if (a.parsedDate && b.parsedDate) {
-                    return b.parsedDate.getTime() - a.parsedDate.getTime();
-                }
-                if (a.parsedDate) return -1;
-                if (b.parsedDate) return 1;
-                return (b.createdAt || '').localeCompare(a.createdAt || '');
-            });
-    }, [events]);
 
     const filteredAthletes = useMemo(() => {
         return eventFilteredAthletes.filter((athlete) => {
@@ -594,7 +600,17 @@ const Ranking = () => {
 
     const eventLabel = selectedEvent?.name || (selectedEventId === 'none' ? copy.noEvent : copy.allEvents);
     const modeLabel = tabs.find((tab) => tab.id === activeTab)?.label || activeTab;
+    const hasSearch = searchTerm.trim().length > 0;
     const showGeneralWinners = activeTab === 'GERAL' && !isEventMode;
+    const podiumOverallEntries = useMemo(() => (
+        filteredWinners.slice(0, 3)
+    ), [filteredWinners]);
+
+    const podiumPlaceLabel = (index) => {
+        if (index === 0) return copy.placeFirst;
+        if (index === 1) return copy.placeSecond;
+        return copy.placeThird;
+    };
 
     const buildModeTag = (athlete) => {
         if (!athlete) return '';
@@ -672,88 +688,35 @@ const Ranking = () => {
     };
 
     return (
-        <div className={`ranking-minimal ranking-ajp ${isEventMode ? 'ranking-event-mode' : ''}`}>
-            <div className="correction-banner">
-                <button type="button" className="correction-link">{copy.correction}</button>
-            </div>
-
-            <div className="rank-event-strip">
-                <button
-                    type="button"
-                    className={`rank-event-chip ${selectedEventId === 'all' ? 'is-active' : ''}`}
-                    onClick={() => setSelectedEventId('all')}
-                >
-                    {copy.allEvents}
-                </button>
-                <button
-                    type="button"
-                    className={`rank-event-chip ${selectedEventId === 'none' ? 'is-active' : ''}`}
-                    onClick={() => setSelectedEventId('none')}
-                >
-                    {copy.noEvent}
-                </button>
-                {sortedEvents.length ? (
-                    sortedEvents.map((eventItem) => (
-                        <button
-                            key={eventItem.id}
-                            type="button"
-                            className={`rank-event-card ${selectedEventId === eventItem.id ? 'is-active' : ''}`}
-                            onClick={() => setSelectedEventId(eventItem.id)}
-                        >
-                            <span className="rank-event-title">{eventItem.name}</span>
-                            <span className="rank-event-meta">
-                                {formatShortDate(eventItem.parsedDate || eventItem.date, locale, copy.noDate)}
-                                {eventItem.location ? ` - ${eventItem.location}` : ''}
-                            </span>
-                        </button>
-                    ))
-                ) : (
-                    <div className="rank-event-empty">
-                        {copy.noTournament}
-                    </div>
-                )}
-            </div>
-
-            {isEventMode && (
-                <div className="rank-event-hero">
-                    <div>
-                        <span className="rank-event-eyebrow">{copy.eventRanking}</span>
-                        <h2>{selectedEvent?.name || copy.eventFallback}</h2>
-                        <div className="rank-event-hero__meta">
-                            {selectedEvent?.date ? formatShortDate(selectedEvent.date, locale, copy.noDate) : copy.noDate}
-                            {selectedEvent?.location ? ` - ${selectedEvent.location}` : ''}
-                        </div>
-                    </div>
-                    <div className="rank-event-hero__actions">
-                        <button type="button" className="btn btn-secondary" onClick={handleExportPdf}>
-                            {copy.exportPdf}
-                        </button>
-                        <button type="button" className="btn btn-ghost" onClick={handleExportCsv}>
-                            {copy.exportCsv}
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            <div className="rank-controls">
+        <div className={`ranking-minimal ranking-ajp ranking-clean ${isEventMode ? 'ranking-event-mode' : ''}`}>
+            <div className="rank-page-head">
                 <div>
-                    <div className="rank-controls__label">{copy.eventLabel}</div>
-                    <div className="rank-controls__value">
-                        {selectedEvent?.name || (selectedEventId === 'none' ? copy.noEvent : copy.allEvents)}
-                    </div>
+                    <span className="rank-page-head__kicker">{copy.overallRanking}</span>
+                    <h1>{copy.rankingTitle}</h1>
+                    <p>{copy.rankingDescription}</p>
                 </div>
-                <select
-                    className="input select-compact"
-                    value={selectedEventId}
-                    onChange={(event) => setSelectedEventId(event.target.value)}
-                    aria-label={copy.selectEventAria}
-                >
-                    <option value="all">{copy.allEvents}</option>
-                    <option value="none">{copy.noEvent}</option>
-                    {events.map((eventItem) => (
-                        <option key={eventItem.id} value={eventItem.id}>{eventItem.name}</option>
-                    ))}
-                </select>
+            </div>
+
+            <div className="rank-event-picker">
+                <label htmlFor="ranking-event-select">{copy.eventLabel}</label>
+                <div className="rank-event-picker__control">
+                    <span className="rank-event-picker__icon" aria-hidden="true">
+                        <Trophy size={14} />
+                    </span>
+                    <select
+                        id="ranking-event-select"
+                        className="input select-compact"
+                        value={selectedEventId}
+                        onChange={(event) => setSelectedEventId(event.target.value)}
+                        aria-label={copy.selectEventAria}
+                    >
+                        <option value="all">{copy.allEvents}</option>
+                        <option value="none">{copy.noEvent}</option>
+                        {events.map((eventItem) => (
+                            <option key={eventItem.id} value={eventItem.id}>{eventItem.name}</option>
+                        ))}
+                    </select>
+                </div>
             </div>
 
             <div className="rank-toolbar">
@@ -766,8 +729,25 @@ const Ranking = () => {
                         onChange={(event) => setSearchTerm(event.target.value)}
                         aria-label={copy.searchAria}
                     />
+                    {hasSearch && (
+                        <button
+                            type="button"
+                            className="rank-search-clear"
+                            onClick={() => setSearchTerm('')}
+                            aria-label={copy.clearSearch}
+                        >
+                            <X size={14} />
+                        </button>
+                    )}
                 </div>
                 <div className="rank-toolbar__actions">
+                    <button
+                        type="button"
+                        className={`btn btn-secondary ${competitionMode ? 'is-active' : ''}`}
+                        onClick={() => setCompetitionMode((prev) => !prev)}
+                    >
+                        {copy.competitionMode}
+                    </button>
                     {!isEventMode && (
                         <button
                             type="button"
@@ -777,7 +757,7 @@ const Ranking = () => {
                             {compactView ? copy.showAll : copy.compactMode}
                         </button>
                     )}
-                    {!isEventMode && (
+                    {isAdmin && (
                         <>
                             <button type="button" className="btn btn-ghost" onClick={handleExportCsv}>
                                 {copy.exportCsv}
@@ -827,12 +807,28 @@ const Ranking = () => {
                             </div>
                             <span className="ajp-card__status">{copy.updatedNow}</span>
                         </div>
+                        {competitionMode && podiumOverallEntries.length > 0 && (
+                            <div className="ajp-podium">
+                                <div className="ajp-podium__title">{copy.podiumHighlight}</div>
+                                <div className="ajp-podium__grid">
+                                    {podiumOverallEntries.map((item, index) => (
+                                        <article key={`overall-podium-${item.athlete.id}`} className={`ajp-podium__item is-place-${index + 1}`}>
+                                            <span className="ajp-podium__place">{podiumPlaceLabel(index)}</span>
+                                            <strong className="ajp-podium__name">{item.athlete.nome}</strong>
+                                            <span className="ajp-podium__meta">{item.athlete.academia || '-'}</span>
+                                            <span className="ajp-podium__score">{item.athlete.pontos} {copy.points}</span>
+                                        </article>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                         <div className="ajp-list">
                             {pagedWinners.map((item, index) => {
                                 const athlete = item.athlete;
                                 const photoUrl = resolvePhotoUrl(athlete);
                                 const countryCode = countryCodeFromAthlete(athlete);
                                 const countryLabel = countryLabelFromAthlete(athlete, isEnglish);
+                                const podiumClass = competitionMode && index < 3 ? ` is-podium is-podium-${index + 1}` : '';
                                 const metrics = athleteMetrics.get(athlete.id) || {
                                     wins: 0,
                                     podium1: 0,
@@ -841,8 +837,13 @@ const Ranking = () => {
                                     podiumTotal: 0
                                 };
                                 return (
-                                    <div key={`${athlete.id}-${item.label}`} className="ajp-row">
-                                        <div className={`ajp-rank ${index < 3 ? 'is-top' : ''}`}>{index + 1}</div>
+                                    <div key={`${athlete.id}-${item.label}`} className={`ajp-row${podiumClass}`}>
+                                        <div className={`ajp-rank ${index < 3 ? 'is-top' : ''}`}>
+                                            {index + 1}
+                                            {competitionMode && index < 3 && (
+                                                <span className="ajp-rank-pill">P{index + 1}</span>
+                                            )}
+                                        </div>
                                         <div className={`ajp-avatar ${photoUrl ? '' : 'ajp-avatar--empty'}`}>
                                             {photoUrl ? (
                                                 <img src={photoUrl} alt={athlete.nome || copy.eventFallback} className="ajp-avatar__img" loading="lazy" />
@@ -896,11 +897,27 @@ const Ranking = () => {
                                     </div>
                                     <span className="ajp-card__status">{copy.updatedNow}</span>
                                 </div>
+                                {competitionMode && group.entries.length > 0 && (
+                                    <div className="ajp-podium">
+                                        <div className="ajp-podium__title">{copy.podiumHighlight}</div>
+                                        <div className="ajp-podium__grid">
+                                            {group.entries.slice(0, 3).map((athlete, index) => (
+                                                <article key={`group-podium-${group.key}-${athlete.id}`} className={`ajp-podium__item is-place-${index + 1}`}>
+                                                    <span className="ajp-podium__place">{podiumPlaceLabel(index)}</span>
+                                                    <strong className="ajp-podium__name">{athlete.nome}</strong>
+                                                    <span className="ajp-podium__meta">{athlete.academia || '-'}</span>
+                                                    <span className="ajp-podium__score">{athlete.pontos} {copy.points}</span>
+                                                </article>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                                 <div className="ajp-list">
                                     {group.entries.map((athlete, index) => {
                                         const photoUrl = resolvePhotoUrl(athlete);
                                         const countryCode = countryCodeFromAthlete(athlete);
                                         const countryLabel = countryLabelFromAthlete(athlete, isEnglish);
+                                        const podiumClass = competitionMode && index < 3 ? ` is-podium is-podium-${index + 1}` : '';
                                         const metrics = athleteMetrics.get(athlete.id) || {
                                             wins: 0,
                                             podium1: 0,
@@ -909,8 +926,13 @@ const Ranking = () => {
                                             podiumTotal: 0
                                         };
                                         return (
-                                            <div key={athlete.id} className="ajp-row">
-                                                <div className={`ajp-rank ${index < 3 ? 'is-top' : ''}`}>{index + 1}</div>
+                                            <div key={athlete.id} className={`ajp-row${podiumClass}`}>
+                                                <div className={`ajp-rank ${index < 3 ? 'is-top' : ''}`}>
+                                                    {index + 1}
+                                                    {competitionMode && index < 3 && (
+                                                        <span className="ajp-rank-pill">P{index + 1}</span>
+                                                    )}
+                                                </div>
                                                 <div className={`ajp-avatar ${photoUrl ? '' : 'ajp-avatar--empty'}`}>
                                                     {photoUrl ? (
                                                         <img src={photoUrl} alt={athlete.nome || copy.eventFallback} className="ajp-avatar__img" loading="lazy" />

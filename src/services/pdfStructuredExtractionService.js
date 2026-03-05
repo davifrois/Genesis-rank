@@ -362,27 +362,27 @@ export const validateAthleteRecord = (record) => {
   const errors = [];
 
   if (!record.nome || record.nome.split(' ').length < 2) {
-    errors.push({ field: 'nome', message: 'Campo nome obrigatorio ou invalido.' });
+    errors.push({ field: 'nome', message: 'Campo nome obrigatório ou inválido.' });
   }
 
   if (record.sexo !== 'masculino' && record.sexo !== 'feminino') {
-    errors.push({ field: 'sexo', message: 'Campo sexo obrigatorio ou invalido.' });
+    errors.push({ field: 'sexo', message: 'Campo sexo obrigatório ou inválido.' });
   }
 
   if (!FAIXA_MAP.has(record.faixa)) {
-    errors.push({ field: 'faixa', message: 'Campo faixa obrigatorio ou invalido.' });
+    errors.push({ field: 'faixa', message: 'Campo faixa obrigatório ou inválido.' });
   }
 
   if (!Number.isFinite(record.idade) || record.idade <= 0) {
-    errors.push({ field: 'idade', message: 'Campo idade obrigatorio ou invalido.' });
+    errors.push({ field: 'idade', message: 'Campo idade obrigatório ou inválido.' });
   }
 
   if (!record.academia) {
-    errors.push({ field: 'academia', message: 'Campo academia obrigatorio.' });
+    errors.push({ field: 'academia', message: 'Campo academia obrigatório.' });
   }
 
   if (record.idade && !record.categoriaIdade) {
-    errors.push({ field: 'categoriaIdade', message: 'Classificacao de idade ausente.' });
+    errors.push({ field: 'categoriaIdade', message: 'Classificação de idade ausente.' });
   }
 
   return errors;

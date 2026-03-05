@@ -9,13 +9,13 @@ const YEARS = Array.from({ length: 70 }, (_, index) => CURRENT_YEAR - index);
 
 const BELT_OPTIONS = ['Branca', 'Cinza', 'Laranja', 'Verde', 'Azul', 'Roxa', 'Marrom', 'Preta'];
 const YOUTH_CATEGORIES = ['Juvenil', 'Infantil', 'Infantojuvenil'];
-const GI_MALE_WEIGHTS = ['Galo', 'Pluma', 'Pena', 'Leve', 'Medio', 'Meio Pesado', 'Pesado', 'Super Pesado', 'Pesadissimo'];
-const GI_FEMALE_WEIGHTS = ['Galo', 'Pluma', 'Pena', 'Leve', 'Medio', 'Meio Pesado', 'Pesado', 'Super Pesado', 'Pesadissimo'];
-const JUVENILE_WEIGHTS = ['Galo', 'Pluma', 'Pena', 'Leve', 'Medio', 'Meio Pesado', 'Pesado', 'Super Pesado', 'Pesadissimo'];
-const INFANTIL_WEIGHTS = ['Galo', 'Pluma', 'Pena', 'Leve', 'Medio', 'Meio Pesado', 'Pesado', 'Super Pesado', 'Pesadissimo'];
-const INFANTOJUVENIL_WEIGHTS = ['Galo', 'Pluma', 'Pena', 'Leve', 'Medio', 'Meio Pesado', 'Pesado', 'Super Pesado', 'Pesadissimo'];
-const NOGI_MALE_WEIGHTS = ['Galo', 'Pluma', 'Pena', 'Leve', 'Medio', 'Meio Pesado', 'Pesado', 'Super Pesado', 'Pesadissimo'];
-const NOGI_FEMALE_WEIGHTS = ['Galo', 'Pluma', 'Pena', 'Leve', 'Medio', 'Meio Pesado', 'Pesado', 'Super Pesado', 'Pesadissimo'];
+const GI_MALE_WEIGHTS = ['Galo', 'Pluma', 'Pena', 'Leve', 'Médio', 'Meio Pesado', 'Pesado', 'Super Pesado', 'Pesadíssimo'];
+const GI_FEMALE_WEIGHTS = ['Galo', 'Pluma', 'Pena', 'Leve', 'Médio', 'Meio Pesado', 'Pesado', 'Super Pesado', 'Pesadíssimo'];
+const JUVENILE_WEIGHTS = ['Galo', 'Pluma', 'Pena', 'Leve', 'Médio', 'Meio Pesado', 'Pesado', 'Super Pesado', 'Pesadíssimo'];
+const INFANTIL_WEIGHTS = ['Galo', 'Pluma', 'Pena', 'Leve', 'Médio', 'Meio Pesado', 'Pesado', 'Super Pesado', 'Pesadíssimo'];
+const INFANTOJUVENIL_WEIGHTS = ['Galo', 'Pluma', 'Pena', 'Leve', 'Médio', 'Meio Pesado', 'Pesado', 'Super Pesado', 'Pesadíssimo'];
+const NOGI_MALE_WEIGHTS = ['Galo', 'Pluma', 'Pena', 'Leve', 'Médio', 'Meio Pesado', 'Pesado', 'Super Pesado', 'Pesadíssimo'];
+const NOGI_FEMALE_WEIGHTS = ['Galo', 'Pluma', 'Pena', 'Leve', 'Médio', 'Meio Pesado', 'Pesado', 'Super Pesado', 'Pesadíssimo'];
 const MAX_PROOF_FILE_BYTES = 1_200_000;
 
 const createInitialForm = () => ({
@@ -85,7 +85,7 @@ const getModeLabel = (value) => {
 const readFileAsDataUrl = (file) => new Promise((resolve, reject) => {
   const reader = new FileReader();
   reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
-  reader.onerror = () => reject(new Error('Falha ao processar arquivo.'));
+  reader.onerror = () => reject(new Error('Falha ao processar o arquivo.'));
   reader.readAsDataURL(file);
 });
 
@@ -442,11 +442,11 @@ const EventRegistration = () => {
     setSuccess('');
 
     if (!event) {
-      setError('Evento nao encontrado.');
+      setError('Evento não encontrado.');
       return;
     }
     if (!form.genero) {
-      setError('Selecione o genero do atleta.');
+      setError('Selecione o gênero do atleta.');
       return;
     }
     if (academyOptions.length > 0 && !form.academyId) {
@@ -458,7 +458,7 @@ const EventRegistration = () => {
       return;
     }
     if (!form.categoriaConfirmada || !form.tipoInscricao || !form.faixa) {
-      setError('Preencha categoria, tipo de inscricao e faixa.');
+      setError('Preencha categoria, tipo de inscrição e faixa.');
       return;
     }
     if (requiresGi && !giWeightValue) {
@@ -470,7 +470,7 @@ const EventRegistration = () => {
       return;
     }
     if (!form.termosAceitos) {
-      setError('Voce precisa aceitar o termo de responsabilidade.');
+      setError('Você precisa aceitar o termo de responsabilidade.');
       return;
     }
     if (!form.comprovanteNome || !form.comprovanteArquivoDataUrl) {
@@ -534,7 +534,7 @@ const EventRegistration = () => {
       if (registrationResult?.queued) {
         setError(
           registrationResult.message
-          || 'Backend indisponivel. A inscricao nao foi enviada ao sistema/admin.'
+          || 'Backend indisponível. A inscrição não foi enviada ao sistema administrativo.'
         );
         return;
       }
@@ -556,11 +556,11 @@ const EventRegistration = () => {
         // Keep registration flow successful even if member profile already exists.
       }
 
-      setSuccess('Inscricao enviada com sucesso e salva no banco de dados.');
+      setSuccess('Inscrição enviada com sucesso e salva no banco de dados.');
       setForm(createInitialForm());
       setSelectedMemberId('');
     } catch (err) {
-      setError(err?.message || 'Falha ao enviar inscricao.');
+      setError(err?.message || 'Falha ao enviar inscrição.');
     } finally {
       setSubmitting(false);
     }
@@ -570,7 +570,7 @@ const EventRegistration = () => {
     return (
       <div className="registration-page">
         <div className="registration-shell">
-          <h2>Evento nao encontrado</h2>
+          <h2>Evento não encontrado</h2>
           <Link className="text-link" to="/eventos">Voltar para eventos</Link>
         </div>
       </div>
@@ -582,11 +582,11 @@ const EventRegistration = () => {
       <form className="registration-shell" onSubmit={handleSubmit}>
         <div className="registration-top">
           <div>
-            <span className="section-kicker">Inscricao oficial</span>
+            <span className="section-kicker">Inscrição oficial</span>
             <h2>{event.name}</h2>
             <div className="table-meta">{eventMeta}</div>
           </div>
-          <Link className="text-link" to={`/eventos/${event.id}`}>Voltar para pagina do evento</Link>
+          <Link className="text-link" to={`/eventos/${event.id}`}>Voltar para a página do evento</Link>
         </div>
 
         <div className="registration-layout">
@@ -594,11 +594,11 @@ const EventRegistration = () => {
             <section className="registration-section">
               <div className="registration-section__head">
                 <h3>Dados do atleta</h3>
-                <p>Preencha os dados principais para identificacao no sistema.</p>
+                <p>Preencha os dados principais para identificação no sistema.</p>
               </div>
 
               <div className="registration-fieldset">
-                <label className="registration-label">Cadastro na filiacao</label>
+                <label className="registration-label">Cadastro na filiação</label>
                 <div className="registration-member-row">
                   <select
                     value={selectedMemberId}
@@ -616,12 +616,12 @@ const EventRegistration = () => {
                   </Link>
                 </div>
                 <small className="registration-helper">
-                  Selecione um atleta da filiacao para preencher dados automaticamente.
+                  Selecione um atleta da filiação para preencher os dados automaticamente.
                 </small>
               </div>
 
               <div className="registration-fieldset">
-                <label className="registration-label">Genero *</label>
+                <label className="registration-label">Gênero *</label>
                 <div className="registration-radio-row">
                   <label>
                     <input
@@ -728,8 +728,8 @@ const EventRegistration = () => {
 
             <section className="registration-section">
               <div className="registration-section__head">
-                <h3>Categoria e inscricao</h3>
-                <p>A tela mostra somente os campos necessarios para o tipo de inscricao escolhido.</p>
+                <h3>Categoria e inscrição</h3>
+                <p>A tela apresenta apenas os campos necessários para o tipo de inscrição escolhido.</p>
               </div>
 
               <div className="registration-grid">
@@ -750,13 +750,13 @@ const EventRegistration = () => {
                 </div>
 
                 <div className="registration-field">
-                  <label>Tipo de inscricao *</label>
+                  <label>Tipo de inscrição *</label>
                   <select
                     required
                     value={form.tipoInscricao}
                     onChange={(eventInput) => handleTypeChange(eventInput.target.value)}
                   >
-                    <option value="">Informe o tipo de inscricao</option>
+                    <option value="">Informe o tipo de inscrição</option>
                     <option value="GI">GI</option>
                     <option value="NO-GI">NO-GI</option>
                     <option value="COMBO">Combo GI + NO-GI</option>
@@ -785,7 +785,7 @@ const EventRegistration = () => {
                     <div className="registration-field">
                       <label>
                         {isYouthCategory
-                          ? 'Categoria de peso categorias de base (GI) *'
+                          ? 'Categoria de peso para categorias de base (GI) *'
                           : `Categoria de peso ${form.genero || 'Adulto/Master'} (GI) *`}
                       </label>
                       <select
@@ -795,7 +795,7 @@ const EventRegistration = () => {
                         onChange={(eventInput) => updateField(activeGiField, eventInput.target.value)}
                       >
                         <option value="">
-                          {canPickWeights ? 'Selecione a categoria de peso GI' : 'Primeiro selecione genero e categoria'}
+                          {canPickWeights ? 'Selecione a categoria de peso GI' : 'Primeiro selecione gênero e categoria'}
                         </option>
                         {giWeightOptions.map((option) => (
                           <option key={option} value={option}>{option}</option>
@@ -809,8 +809,8 @@ const EventRegistration = () => {
                         value={form.absolutoGi}
                         onChange={(eventInput) => updateField('absolutoGi', eventInput.target.value)}
                       >
-                        <option value="">Nao participar</option>
-                        <option value="NAO">Nao</option>
+                        <option value="">Não participar</option>
+                        <option value="NAO">Não</option>
                         <option value="SIM">Sim</option>
                       </select>
                     </div>
@@ -825,7 +825,7 @@ const EventRegistration = () => {
                     <div className="registration-field registration-field--full">
                       <label>
                         {isYouthCategory
-                          ? `Categoria de peso categorias de base ${form.genero || ''} (NO-GI) *`
+                          ? `Categoria de peso para categorias de base ${form.genero || ''} (NO-GI) *`
                           : `Categoria de peso ${form.genero || 'Adulto/Master'} (NO-GI) *`}
                       </label>
                       <select
@@ -835,7 +835,7 @@ const EventRegistration = () => {
                         onChange={(eventInput) => updateField(activeNoGiField, eventInput.target.value)}
                       >
                         <option value="">
-                          {canPickWeights ? 'Selecione a categoria de peso NO-GI' : 'Primeiro selecione genero e categoria'}
+                          {canPickWeights ? 'Selecione a categoria de peso NO-GI' : 'Primeiro selecione gênero e categoria'}
                         </option>
                         {noGiWeightOptions.map((option) => (
                           <option key={option} value={option}>{option}</option>
@@ -847,14 +847,14 @@ const EventRegistration = () => {
               )}
 
               {!form.tipoInscricao && (
-                <p className="registration-helper">Escolha o tipo de inscricao para liberar os campos de peso.</p>
+                <p className="registration-helper">Escolha o tipo de inscrição para liberar os campos de peso.</p>
               )}
             </section>
 
             <section className="registration-section">
               <div className="registration-section__head">
                 <h3>Contato e pagamento</h3>
-                <p>Use o mesmo email e telefone que sera usado para receber confirmacao.</p>
+                <p>Use o mesmo e-mail e telefone que serão utilizados para o recebimento da confirmação.</p>
               </div>
 
               <div className="registration-grid">
@@ -869,18 +869,18 @@ const EventRegistration = () => {
                 </div>
 
                 <div className="registration-field">
-                  <label>Email *</label>
+                  <label>E-mail *</label>
                   <input
                     required
                     type="email"
                     value={form.email}
                     onChange={(eventInput) => updateField('email', eventInput.target.value)}
-                    placeholder="voce@email.com"
+                    placeholder="voce@exemplo.com"
                   />
                 </div>
 
                 <div className="registration-field">
-                  <label>Valor total da inscricao</label>
+                  <label>Valor total da inscrição</label>
                   <input value={formatBrlCurrency(totalValue)} readOnly />
                 </div>
 
@@ -895,16 +895,16 @@ const EventRegistration = () => {
                   <small>
                     {form.comprovanteNome
                       ? `${form.comprovanteNome} (${Math.round((form.comprovanteTamanhoBytes || 0) / 1024)} KB)`
-                      : 'Nenhum arquivo selecionado (maximo 1.2 MB)'}
+                      : 'Nenhum arquivo selecionado (máximo de 1,2 MB)'}
                   </small>
                 </div>
 
                 <div className="registration-field registration-field--full">
-                  <label>Observacoes</label>
+                  <label>Observações</label>
                   <textarea
                     value={form.observacoes}
                     onChange={(eventInput) => updateField('observacoes', eventInput.target.value)}
-                    placeholder="Exemplo: observacoes sobre check-in, categoria ou equipe."
+                    placeholder="Exemplo: observações sobre check-in, categoria ou equipe."
                   />
                 </div>
               </div>
@@ -913,13 +913,13 @@ const EventRegistration = () => {
             <section className="registration-section registration-section--terms">
               <div className="registration-section__head">
                 <h3>Termo de responsabilidade</h3>
-                <p>Leia com atencao antes de concluir a inscricao.</p>
+                <p>Leia com atenção antes de concluir a inscrição.</p>
               </div>
 
               <div className="registration-terms">
-                <p>Declaro estar apto para pratica esportiva e ciente das regras do evento.</p>
-                <p>Autorizo o uso de imagem e confirmo que as informacoes enviadas sao verdadeiras.</p>
-                <p>O competidor e responsavel pelos dados informados no ato da inscricao e pela apresentacao de documento oficial na checagem.</p>
+                <p>Declaro estar apto para a prática esportiva e ciente das regras do evento.</p>
+                <p>Autorizo o uso de imagem e confirmo que as informações enviadas são verdadeiras.</p>
+                <p>O competidor é responsável pelos dados informados no ato da inscrição e pela apresentação de documento oficial na checagem.</p>
                 <label className="checkbox-inline">
                   <input
                     type="checkbox"
@@ -936,14 +936,14 @@ const EventRegistration = () => {
 
             <div className="registration-actions">
               <button type="submit" className="btn btn-event registration-submit" disabled={submitting}>
-                {submitting ? 'Enviando...' : 'Enviar inscricao'}
+                {submitting ? 'Enviando...' : 'Enviar inscrição'}
               </button>
             </div>
           </div>
 
           <aside className="registration-side">
             <div className="registration-summary">
-              <h3>Resumo rapido</h3>
+              <h3>Resumo rápido</h3>
 
               <div className="registration-progress">
                 <div className="registration-progress__head">

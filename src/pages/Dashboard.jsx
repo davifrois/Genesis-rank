@@ -33,6 +33,7 @@ import { extractTextFromPdfFile, parseAthletesFromText } from '../services/pdfIm
 import { buildBracketMatches } from '../services/bracketService';
 import { authService } from '../services/authService';
 import { publicRegistrationService } from '../services/publicRegistrationService';
+import { socialMediaService } from '../services/socialMediaService';
 import { motion, AnimatePresence } from 'framer-motion';
 import LoginOverlay from '../components/LoginOverlay';
 import { useI18n } from '../hooks/useI18n';
@@ -42,6 +43,21 @@ import { translateBelt, translateCategory, translateCompositeLabel, translateWei
 import { REGISTRATION_STATUS, normalizeRegistrationStatus } from '../utils/registrationStatus';
 
 const ATHLETE_PAGE_SIZE_OPTIONS = [20, 40, 80];
+const MAX_NEWS_IMAGE_UPLOAD_BYTES = 8_000_000;
+const TARGET_NEWS_IMAGE_STORED_BYTES = 320_000;
+const MAX_NEWS_IMAGE_STORED_BYTES = 850_000;
+const NEWS_IMAGE_MAX_WIDTH = 1600;
+const NEWS_IMAGE_MAX_HEIGHT = 900;
+const NEWS_IMAGE_MIN_DIMENSION = 420;
+const MAX_EVENT_POSTER_UPLOAD_BYTES = 8_000_000;
+const TARGET_EVENT_POSTER_STORED_BYTES = 420_000;
+const MAX_EVENT_POSTER_STORED_BYTES = 1_000_000;
+const EVENT_POSTER_MAX_WIDTH = 1400;
+const EVENT_POSTER_MAX_HEIGHT = 1800;
+const EVENT_POSTER_MIN_DIMENSION = 360;
+const NEWS_IMAGE_INITIAL_QUALITY = 0.86;
+const NEWS_IMAGE_MIN_QUALITY = 0.5;
+const NEWS_IMAGE_MAX_ATTEMPTS = 8;
 
 const createEventEditFormState = () => ({
     id: '',
@@ -64,6 +80,126 @@ const createNewsFormState = () => ({
     summary: '',
     imageUrl: '',
     publishedAt: ''
+});
+
+const readFileAsDataUrl = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.onerror = () => reject(new Error('Falha ao ler arquivo.'));
+    reader.readAsDataURL(file);
+});
+
+const isDataImageUrl = (value) => /^data:image\//i.test((value || '').toString().trim());
+
+const estimateDataUrlBytes = (dataUrl) => {
+    const value = (dataUrl || '').toString();
+    const separatorIndex = value.indexOf(',');
+    if (separatorIndex < 0) return value.length;
+    const base64 = value.slice(separatorIndex + 1);
+    const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
+    return Math.max(0, Math.floor((base64.length * 3) / 4) - padding);
+};
+
+const formatBytes = (bytes) => {
+    const value = Number(bytes);
+    if (!Number.isFinite(value) || value <= 0) return '0 KB';
+    if (value < 1024) return `${value} B`;
+    const kb = value / 1024;
+    if (kb < 1024) return `${kb.toFixed(kb >= 100 ? 0 : 1)} KB`;
+    const mb = kb / 1024;
+    return `${mb.toFixed(2)} MB`;
+};
+
+const loadImageFromDataUrl = (dataUrl) => new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('Falha ao processar imagem.'));
+    image.src = dataUrl;
+});
+
+const compressImageFileWithConstraints = async (file, options = {}) => {
+    const {
+        maxWidth = NEWS_IMAGE_MAX_WIDTH,
+        maxHeight = NEWS_IMAGE_MAX_HEIGHT,
+        minDimension = NEWS_IMAGE_MIN_DIMENSION,
+        targetBytes = TARGET_NEWS_IMAGE_STORED_BYTES
+    } = options;
+    const originalDataUrl = await readFileAsDataUrl(file);
+    const image = await loadImageFromDataUrl(originalDataUrl);
+    const naturalWidth = Math.max(1, image.naturalWidth || image.width || minDimension);
+    const naturalHeight = Math.max(1, image.naturalHeight || image.height || minDimension);
+    const fitRatio = Math.min(
+        1,
+        maxWidth / naturalWidth,
+        maxHeight / naturalHeight
+    );
+
+    let width = Math.max(1, Math.floor(naturalWidth * fitRatio));
+    let height = Math.max(1, Math.floor(naturalHeight * fitRatio));
+    let quality = NEWS_IMAGE_INITIAL_QUALITY;
+    let bestDataUrl = '';
+    let bestBytes = Number.POSITIVE_INFINITY;
+
+    for (let attempt = 0; attempt < NEWS_IMAGE_MAX_ATTEMPTS; attempt += 1) {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext('2d');
+        if (!context) {
+            throw new Error('Falha ao comprimir imagem.');
+        }
+
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = 'high';
+        context.clearRect(0, 0, width, height);
+        context.drawImage(image, 0, 0, width, height);
+
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        const bytes = estimateDataUrlBytes(dataUrl);
+        if (bytes < bestBytes) {
+            bestDataUrl = dataUrl;
+            bestBytes = bytes;
+        }
+        if (bytes <= targetBytes) {
+            return { dataUrl, bytes };
+        }
+
+        if (quality > NEWS_IMAGE_MIN_QUALITY) {
+            quality = Math.max(NEWS_IMAGE_MIN_QUALITY, quality - 0.1);
+            continue;
+        }
+
+        const nextWidth = Math.max(minDimension, Math.floor(width * 0.86));
+        const nextHeight = Math.max(minDimension, Math.floor(height * 0.86));
+        if (nextWidth === width && nextHeight === height) {
+            break;
+        }
+        width = nextWidth;
+        height = nextHeight;
+        quality = NEWS_IMAGE_INITIAL_QUALITY;
+    }
+
+    if (!bestDataUrl) {
+        throw new Error('Falha ao comprimir imagem.');
+    }
+    return {
+        dataUrl: bestDataUrl,
+        bytes: bestBytes
+    };
+};
+
+const compressNewsImageFile = async (file) => compressImageFileWithConstraints(file, {
+    maxWidth: NEWS_IMAGE_MAX_WIDTH,
+    maxHeight: NEWS_IMAGE_MAX_HEIGHT,
+    minDimension: NEWS_IMAGE_MIN_DIMENSION,
+    targetBytes: TARGET_NEWS_IMAGE_STORED_BYTES
+});
+
+const compressEventPosterFile = async (file) => compressImageFileWithConstraints(file, {
+    maxWidth: EVENT_POSTER_MAX_WIDTH,
+    maxHeight: EVENT_POSTER_MAX_HEIGHT,
+    minDimension: EVENT_POSTER_MIN_DIMENSION,
+    targetBytes: TARGET_EVENT_POSTER_STORED_BYTES
 });
 
 const buildImportDebug = (rawText) => {
@@ -193,6 +329,8 @@ const buildAthleteRegistrationIdentityKey = (athlete) => (
 );
 
 const REGISTRATION_SUPPRESSED_STORAGE_KEY = 'genesis_dashboard_suppressed_registration_keys_v1';
+const INSTAGRAM_LAST_REFRESH_STORAGE_KEY = 'genesis_dashboard_instagram_last_refresh_v1';
+const INSTAGRAM_FEED_STATUS_STORAGE_KEY = 'genesis_dashboard_instagram_feed_status_v1';
 
 const loadSuppressedRegistrationKeys = () => {
     if (typeof window === 'undefined') return [];
@@ -219,6 +357,53 @@ const saveSuppressedRegistrationKeys = (keys) => {
             return;
         }
         window.localStorage.setItem(REGISTRATION_SUPPRESSED_STORAGE_KEY, JSON.stringify(keys));
+    } catch {
+        // Ignore localStorage write failures.
+    }
+};
+
+const loadInstagramLastRefresh = () => {
+    if (typeof window === 'undefined') return '';
+    try {
+        const value = window.localStorage.getItem(INSTAGRAM_LAST_REFRESH_STORAGE_KEY);
+        return typeof value === 'string' ? value.trim() : '';
+    } catch {
+        return '';
+    }
+};
+
+const saveInstagramLastRefresh = (value) => {
+    if (typeof window === 'undefined') return;
+    const normalized = (value || '').toString().trim();
+    try {
+        if (!normalized) {
+            window.localStorage.removeItem(INSTAGRAM_LAST_REFRESH_STORAGE_KEY);
+            return;
+        }
+        window.localStorage.setItem(INSTAGRAM_LAST_REFRESH_STORAGE_KEY, normalized);
+    } catch {
+        // Ignore localStorage write failures.
+    }
+};
+
+const loadInstagramFeedStatus = () => {
+    if (typeof window === 'undefined') return '';
+    try {
+        return (window.localStorage.getItem(INSTAGRAM_FEED_STATUS_STORAGE_KEY) || '').toString().trim().toUpperCase();
+    } catch {
+        return '';
+    }
+};
+
+const saveInstagramFeedStatus = (value) => {
+    if (typeof window === 'undefined') return;
+    const normalized = (value || '').toString().trim().toUpperCase();
+    try {
+        if (!normalized) {
+            window.localStorage.removeItem(INSTAGRAM_FEED_STATUS_STORAGE_KEY);
+            return;
+        }
+        window.localStorage.setItem(INSTAGRAM_FEED_STATUS_STORAGE_KEY, normalized);
     } catch {
         // Ignore localStorage write failures.
     }
@@ -322,6 +507,10 @@ const Dashboard = () => {
                     removeEventConfirm: (name) => `Delete ${name}? This action cannot be undone.`,
                     eventRemoved: 'Event removed successfully.',
                     eventRemoveFail: 'Failed to remove event.',
+                    eventPosterTypeInvalid: 'Select a valid image file for the poster.',
+                    eventPosterUploadTooLarge: 'Poster file too large. Maximum upload size is 8 MB.',
+                    eventPosterTooLargeAfterCompression: 'Poster is still too large after compression. Choose a lighter file.',
+                    eventPosterReadFail: 'Failed to process selected poster image.',
                     clearAthletesConfirm: 'This will clear all athletes from the athlete base panel. Continue?',
                     allAthletesRemoved: 'All athletes were removed.',
                     noTextPdf: 'PDF has no text. Generate searchable PDF (OCR) and try again.',
@@ -368,6 +557,12 @@ const Dashboard = () => {
                     newsDeleteConfirm: (title) => `Remove news "${title}"?`,
                     newsDeleted: 'News removed.',
                     newsDeleteFail: 'Failed to remove news.',
+                    newsImageTypeInvalid: 'Select a valid image file (JPG, PNG, WEBP or GIF).',
+                    newsImageTooLarge: 'Image too large. Maximum upload size is 8 MB.',
+                    newsImageReadFail: 'Failed to process selected image.',
+                    newsImageStillLarge: 'Image is still too large after compression. Choose a lighter file.',
+                    instagramRefreshDone: (count) => `Instagram feed refreshed (${count} posts).`,
+                    instagramRefreshFail: 'Failed to refresh Instagram feed.',
                     registrationLoadFail: 'Failed to load public registrations.',
                     registrationSyncDone: (synced, pending) => `Sync finished: ${synced} sent, ${pending} pending.`,
                     registrationSyncFail: 'Failed to sync pending registrations.',
@@ -456,12 +651,24 @@ const Dashboard = () => {
                     title: 'News',
                     subtitle: 'Create official announcements and publish directly to public news page.',
                     openNewsPage: 'Open news page',
+                    refreshSocial: 'Refresh Instagram feed',
+                    lastInstagramRefresh: 'Instagram updated at',
+                    instagramNeverUpdated: 'Not synchronized yet',
+                    feedStatusCache: 'Cache',
+                    feedStatusUpdatedNow: 'Updated now',
                     titleLabel: 'Title',
                     titlePlaceholder: 'Ex: Registration for Stage 2 is now open',
                     summaryLabel: 'Summary',
                     summaryPlaceholder: 'Write a short summary that will appear on home and news page.',
                     imageLabel: 'Cover image URL (optional)',
                     imagePlaceholder: 'https://.../news.jpg',
+                    imageUploadHint: 'Or upload from your computer',
+                    imageUploadAction: 'Choose image',
+                    imageClearAction: 'Remove image',
+                    imageSelectedFile: 'Selected file',
+                    imagePreviewLabel: 'Preview',
+                    imageCompressionHint: 'Uploaded image is automatically compressed to save storage.',
+                    imageCompressedSize: 'Compressed size',
                     dateLabel: 'Publish date',
                     publish: 'Publish news',
                     noNews: 'No published news yet.',
@@ -637,6 +844,8 @@ const Dashboard = () => {
                     posterUrl: 'Poster image URL',
                     posterUrlPlaceholder: 'https://.../poster.jpg',
                     posterFile: 'Or upload poster image',
+                    posterCompressionHint: 'Uploaded poster is automatically compressed.',
+                    posterCompressedSize: 'Compressed size',
                     registrationUrl: 'Registration URL',
                     registrationUrlPlaceholder: 'https://...',
                     pixKey: 'Pix key (event owner)',
@@ -699,39 +908,43 @@ const Dashboard = () => {
             }
             : {
                 feedback: {
-                    activateEventForReport: 'Ative um evento para gerar o relatorio.',
+                    activateEventForReport: 'Ative um evento para gerar o relatório.',
                     noAthletesOnActiveEvent: 'Nenhum atleta vinculado ao evento ativo.',
-                    reportGenerated: (name) => `Relatorio gerado para ${name || 'evento ativo'}.`,
-                    reportFail: 'Falha ao gerar o relatorio.',
+                    reportGenerated: (name) => `Relatório gerado para ${name || 'evento ativo'}.`,
+                    reportFail: 'Falha ao gerar o relatório.',
                     eventUpdated: (name) => `Evento atualizado: ${name || 'evento'}.`,
                     eventUpdateFail: 'Falha ao atualizar evento.',
-                    removeEventConfirm: (name) => `Deseja apagar o ${name}? Esta acao nao pode ser desfeita.`,
+                    removeEventConfirm: (name) => `Deseja excluir o evento ${name}? Esta ação não pode ser desfeita.`,
                     eventRemoved: 'Evento removido com sucesso.',
                     eventRemoveFail: 'Falha ao remover evento.',
-                    clearAthletesConfirm: 'Isto limpara todos os atletas do painel da base. Deseja continuar?',
+                    eventPosterTypeInvalid: 'Selecione um arquivo de imagem válido para o cartaz.',
+                    eventPosterUploadTooLarge: 'Arquivo do cartaz muito grande. Tamanho máximo de envio: 8 MB.',
+                    eventPosterTooLargeAfterCompression: 'O cartaz ainda ficou grande após a compressão. Escolha um arquivo menor.',
+                    eventPosterReadFail: 'Falha ao processar a imagem do cartaz.',
+                    clearAthletesConfirm: 'Isso limpará todos os atletas do painel da base. Deseja continuar?',
                     allAthletesRemoved: 'Todos os atletas foram removidos.',
                     noTextPdf: 'PDF sem texto. Gere um PDF pesquisavel (OCR) e tente novamente.',
                     noTextImport: 'PDF sem texto para importar.',
                     noAthleteInFile: 'Nenhum atleta encontrado. Verifique se o PDF tem texto.',
-                    noValidAthleteImport: 'Nenhum atleta valido para importar.',
+                    noValidAthleteImport: 'Nenhum atleta válido para importação.',
                     importReadFail: 'Falha ao ler o arquivo.',
-                    invalidManualPoints: 'Informe um valor valido para pontos.',
+                    invalidManualPoints: 'Informe um valor válido para pontos.',
                     manualPointsUpdated: 'Pontos atualizados manualmente.',
-                    manualPointsFail: 'Nao foi possivel atualizar os pontos.',
+                    manualPointsFail: 'Não foi possível atualizar os pontos.',
                     beltSummaryUpdated: 'Resumo por faixa atualizado.',
                     selectEventForBracket: 'Selecione um evento para gerar as chaves.',
-                    existingBracketsConfirm: 'Ja existem chaves para este evento. Deseja gerar novamente?',
+                    existingBracketsConfirm: 'Já existem chaves para este evento. Deseja gerar novamente?',
                     bracketsGenerated: (count) => `${count} chaves geradas.`,
                     noBracketCategory: 'Nenhuma categoria encontrada para gerar chaves.',
                     bracketGenerateFail: 'Falha ao gerar chaves.',
-                    noBracketForPdf: 'Nenhuma chave disponivel para exportar em PDF.',
+                    noBracketForPdf: 'Nenhuma chave disponível para exportação em PDF.',
                     bracketPdfSaved: 'PDF das chaves salvo com sucesso.',
                     bracketPdfFail: 'Falha ao salvar PDF das chaves.',
-                    podiumApplied: 'Podio aplicado com sucesso.',
-                    podiumApplyFail: 'Nao foi possivel aplicar o podio.',
-                    resetOnlyLocal: 'Redefinicao de senha disponivel apenas no modo local.',
-                    selectUser: 'Selecione um usuario.',
-                    mismatchPassword: 'As senhas nao conferem.',
+                    podiumApplied: 'Pódio aplicado com sucesso.',
+                    podiumApplyFail: 'Não foi possível aplicar o pódio.',
+                    resetOnlyLocal: 'Redefinição de senha disponível apenas no modo local.',
+                    selectUser: 'Selecione um usuário.',
+                    mismatchPassword: 'As senhas não conferem.',
                     passwordUpdated: 'Senha atualizada com sucesso.',
                     passwordResetFor: (username) => `Senha redefinida para ${username}.`,
                     passwordResetFail: 'Falha ao redefinir senha.',
@@ -741,38 +954,44 @@ const Dashboard = () => {
                     athletesAssigned: 'Atletas vinculados ao evento.',
                     athleteAssignFail: 'Falha ao vincular atletas.',
                     pointsClearedFor: (name) => `Pontos limpos para ${name}`,
-                    removeAthleteConfirm: (name) => `Excluir o atleta ${name}? Esta acao nao pode ser desfeita.`,
+                    removeAthleteConfirm: (name) => `Excluir o atleta ${name}? Esta ação não pode ser desfeita.`,
                     athleteRemoved: (name) => `Atleta removido: ${name}.`,
-                    athleteRemoveFail: 'Nao foi possivel remover o atleta.',
+                    athleteRemoveFail: 'Não foi possível remover o atleta.',
                     goldFor: (name) => `Ouro para ${name}`,
                     silverFor: (name) => `Prata para ${name}`,
                     bronzeFor: (name) => `Bronze para ${name}`,
-                    newsTitleRequired: 'Informe o titulo da noticia.',
-                    newsSummaryRequired: 'Informe o resumo da noticia.',
-                    newsCreated: (title) => `Noticia publicada: ${title}.`,
-                    newsCreateFail: 'Falha ao publicar noticia.',
-                    newsDeleteConfirm: (title) => `Remover noticia "${title}"?`,
-                    newsDeleted: 'Noticia removida.',
-                    newsDeleteFail: 'Falha ao remover noticia.',
-                    registrationLoadFail: 'Falha ao carregar inscricoes publicas.',
-                    registrationSyncDone: (synced, pending) => `Sincronizacao concluida: ${synced} enviadas, ${pending} pendentes.`,
-                    registrationSyncFail: 'Falha ao sincronizar inscricoes pendentes.',
+                    newsTitleRequired: 'Informe o título da notícia.',
+                    newsSummaryRequired: 'Informe o resumo da notícia.',
+                    newsCreated: (title) => `Notícia publicada: ${title}.`,
+                    newsCreateFail: 'Falha ao publicar notícia.',
+                    newsDeleteConfirm: (title) => `Remover notícia "${title}"?`,
+                    newsDeleted: 'Notícia removida.',
+                    newsDeleteFail: 'Falha ao remover notícia.',
+                    newsImageTypeInvalid: 'Selecione um arquivo de imagem válido (JPG, PNG, WEBP ou GIF).',
+                    newsImageTooLarge: 'Imagem muito grande. Tamanho máximo de envio: 8 MB.',
+                    newsImageReadFail: 'Falha ao processar a imagem selecionada.',
+                    newsImageStillLarge: 'A imagem ainda ficou grande após a compressão. Escolha um arquivo menor.',
+                    instagramRefreshDone: (count) => `Feed do Instagram atualizado (${count} posts).`,
+                    instagramRefreshFail: 'Falha ao atualizar feed do Instagram.',
+                    registrationLoadFail: 'Falha ao carregar inscrições públicas.',
+                    registrationSyncDone: (synced, pending) => `Sincronização concluída: ${synced} enviadas, ${pending} pendentes.`,
+                    registrationSyncFail: 'Falha ao sincronizar inscrições pendentes.',
                     registrationStatusUpdated: 'Status de pagamento atualizado.',
                     registrationStatusFail: 'Falha ao atualizar status de pagamento.',
-                    registrationExportDone: (count) => `${count} inscricoes exportadas para planilha.`,
-                    registrationExportNoData: 'Nenhuma inscricao disponivel para exportar.',
-                    clearReimportLocksConfirm: (count) => `Limpar ${count} bloqueios de reimportacao de inscricao?`,
-                    reimportLocksCleared: (count) => `${count} bloqueios de reimportacao removidos.`,
-                    reimportLocksNone: 'Nenhum bloqueio de reimportacao para limpar.'
+                    registrationExportDone: (count) => `${count} inscrições exportadas para planilha.`,
+                    registrationExportNoData: 'Nenhuma inscrição disponível para exportar.',
+                    clearReimportLocksConfirm: (count) => `Limpar ${count} bloqueios de reimportação de inscrição?`,
+                    reimportLocksCleared: (count) => `${count} bloqueios de reimportação removidos.`,
+                    reimportLocksNone: 'Nenhum bloqueio de reimportação para limpar.'
                 },
                 nav: {
-                    overview: 'Visao geral',
+                    overview: 'Visão geral',
                     events: 'Eventos',
-                    news: 'Noticias',
-                    registrations: 'Inscricoes',
+                    news: 'Notícias',
+                    registrations: 'Inscrições',
                     brackets: 'Chaveamento',
                     athletes: 'Atletas',
-                    automation: 'Automacoes',
+                    automation: 'Automações',
                     activity: 'Atividade'
                 },
                 common: {
@@ -790,7 +1009,7 @@ const Dashboard = () => {
                     update: 'Atualizar'
                 },
                 sidebar: {
-                    title: 'Menu rapido',
+                    title: 'Menu rápido',
                     activeAthletes: 'Atletas ativos',
                     totalPoints: 'Pontos totais',
                     registeredEvents: 'Eventos cadastrados',
@@ -801,25 +1020,25 @@ const Dashboard = () => {
                     noActiveEvent: 'Sem evento ativo',
                     title: 'Painel de Controle',
                     subtitle: 'Acompanhe registros, ajustes e resultados do ranking com indicadores em tempo real e atalhos inteligentes para as rotinas administrativas.',
-                    updatedAt: 'Atualizado as',
-                    secureSessionFor: 'Sessao segura para',
-                    average: 'Media',
+                    updatedAt: 'Atualizado às',
+                    secureSessionFor: 'Sessão segura para',
+                    average: 'Média',
                     newAthlete: 'Novo atleta',
                     logs: 'Logs',
                     menu: 'Menu',
                     rankingUpdated: 'Ranking atualizado',
                     athletes: 'atletas',
-                    noLeader: 'Sem lider'
+                    noLeader: 'Sem líder'
                 },
                 stats: {
                     enrolled: 'Inscritos',
                     activeTrend: 'ativos',
                     totalPoints: 'Pontos totais',
-                    average: 'Media',
+                    average: 'Média',
                     registeredEvents: 'Eventos cadastrados',
                     centralizedControl: 'Controle centralizado',
                     records: 'Registros',
-                    continuousMonitoring: 'Monitoramento continuo'
+                    continuousMonitoring: 'Monitoramento contínuo'
                 },
                 eventsPanel: {
                     title: 'Eventos',
@@ -833,36 +1052,48 @@ const Dashboard = () => {
                     activate: 'Ativar',
                     manageAthletes: 'Gerenciar atletas',
                     edit: 'Editar',
-                    registration: 'Inscricao',
+                    registration: 'Inscrição',
                     noPoster: 'Sem cartaz',
                     open: 'Aberto',
                     closed: 'Fechado'
                 },
                 newsPanel: {
-                    title: 'Noticias',
-                    subtitle: 'Crie comunicados oficiais e publique direto na pagina de noticias.',
-                    openNewsPage: 'Abrir pagina de noticias',
-                    titleLabel: 'Titulo',
-                    titlePlaceholder: 'Ex: Inscricoes da Etapa 2 abertas',
+                    title: 'Notícias',
+                    subtitle: 'Crie comunicados oficiais e publique direto na página de notícias.',
+                    openNewsPage: 'Abrir página de notícias',
+                    refreshSocial: 'Atualizar feed do Instagram',
+                    lastInstagramRefresh: 'Instagram atualizado em',
+                    instagramNeverUpdated: 'Ainda não sincronizado',
+                    feedStatusCache: 'Cache',
+                    feedStatusUpdatedNow: 'Atualizado agora',
+                    titleLabel: 'Título',
+                    titlePlaceholder: 'Ex: Inscrições da Etapa 2 abertas',
                     summaryLabel: 'Resumo',
-                    summaryPlaceholder: 'Escreva um resumo curto para aparecer na home e em noticias.',
+                    summaryPlaceholder: 'Escreva um resumo curto para aparecer na página inicial e em notícias.',
                     imageLabel: 'URL da imagem de capa (opcional)',
-                    imagePlaceholder: 'https://.../noticia.jpg',
-                    dateLabel: 'Data de publicacao',
-                    publish: 'Publicar noticia',
-                    noNews: 'Nenhuma noticia publicada ainda.',
+                    imagePlaceholder: 'https://.../noticia-capa.jpg',
+                    imageUploadHint: 'Ou envie uma imagem do computador',
+                    imageUploadAction: 'Escolher imagem',
+                    imageClearAction: 'Remover imagem',
+                    imageSelectedFile: 'Arquivo selecionado',
+                    imagePreviewLabel: 'Pré-visualização',
+                    imageCompressionHint: 'A imagem enviada é comprimida automaticamente para economizar armazenamento.',
+                    imageCompressedSize: 'Tamanho comprimido',
+                    dateLabel: 'Data de publicação',
+                    publish: 'Publicar notícia',
+                    noNews: 'Nenhuma notícia publicada ainda.',
                     remove: 'Remover'
                 },
                 registrationsPanel: {
-                    title: 'Inscricoes publicas',
-                    subtitle: 'Todas as inscricoes recebidas pelo formulario publico em um unico painel.',
+                    title: 'Inscrições públicas',
+                    subtitle: 'Todas as inscrições recebidas pelo formulário público em um único painel.',
                     refresh: 'Atualizar',
                     syncNow: 'Sincronizar agora',
-                    pendingLabel: 'Pendentes de sincronizacao',
+                    pendingLabel: 'Pendentes de sincronização',
                     filterPending: 'Mostrar apenas pendentes',
                     filterAll: 'Mostrar todos',
-                    searchPlaceholder: 'Buscar por atleta, academia, telefone, email ou anotacoes',
-                    searchAria: 'Buscar inscricao',
+                    searchPlaceholder: 'Buscar por atleta, academia, telefone, e-mail ou anotações',
+                    searchAria: 'Buscar inscrição',
                     eventFilter: 'Filtro de evento',
                     allEvents: 'Todos os eventos',
                     tablePhoto: 'Foto',
@@ -871,44 +1102,44 @@ const Dashboard = () => {
                     tableCategory: 'Categoria',
                     tableContact: 'Contato',
                     tablePayment: 'Pagamento',
-                    tableNotes: 'Observacoes',
+                    tableNotes: 'Observações',
                     tableStatus: 'Status',
                     totalValue: 'Total',
                     pixKey: 'Chave Pix',
                     receipt: 'Comprovante',
                     noReceipt: 'Sem comprovante',
-                    noData: 'Nenhuma inscricao publica encontrada.',
-                    noNotes: 'Sem observacoes',
+                    noData: 'Nenhuma inscrição pública encontrada.',
+                    noNotes: 'Sem observações',
                     noPhoto: 'Sem foto',
-                    statusPendingSync: 'Pendente de sincronizacao',
+                    statusPendingSync: 'Pendente de sincronização',
                     statusDefault: 'Pendente',
                     statusPaymentConfirmed: 'Pagamento confirmado - Atleta ativo',
                     statusPaymentError: 'Erro no pagamento',
                     confirmPayment: 'Confirmar pagamento',
                     markPaymentError: 'Marcar erro no pagamento',
                     exportSpreadsheet: 'Exportar planilha',
-                    confirmReviewPrompt: 'Observacao da conferencia (opcional):',
+                    confirmReviewPrompt: 'Observação da conferência (opcional):',
                     errorReviewPrompt: 'Descreva o erro de pagamento (opcional):',
                     reviewedBy: 'Conferido por',
                     reviewedAt: 'Conferido em',
-                    reviewNotes: 'Observacao da conferencia',
-                    proofPreviewTitle: 'Previa do comprovante',
-                    proofPreviewPdf: 'Previa PDF',
+                    reviewNotes: 'Observação da conferência',
+                    proofPreviewTitle: 'Prévia do comprovante',
+                    proofPreviewPdf: 'Prévia PDF',
                     openReceipt: 'Abrir comprovante',
-                    lastError: 'Erro de sincronizacao',
+                    lastError: 'Erro de sincronização',
                     traceId: 'Trace',
-                    syncMonitorLastFailure: (at) => `Ultima falha de sincronizacao: ${at}`
+                    syncMonitorLastFailure: (at) => `Última falha de sincronização: ${at}`
                 },
                 bracketsPanel: {
                     title: 'Chaveamento',
-                    subtitle: 'Gere chaves por categoria e aplique o podio automaticamente.',
+                    subtitle: 'Gere chaves por categoria e aplique o pódio automaticamente.',
                     selectEvent: 'Selecionar evento',
                     selectEventAria: 'Selecionar evento para chaveamento',
                     selectCategoryAria: 'Selecionar categoria de chaveamento',
                     allCategories: 'Todas as categorias',
                     generate: 'Gerar chaves',
                     savePdf: 'Salvar PDF das chaves',
-                    searchPlaceholder: 'Buscar chave por numero ou categoria',
+                    searchPlaceholder: 'Buscar chave por número ou categoria',
                     searchAria: 'Buscar chave',
                     brackets: 'chaves',
                     bracket: 'Chave',
@@ -918,37 +1149,37 @@ const Dashboard = () => {
                     round1: 'Rodada 1',
                     athlete: 'Atleta',
                     noAthleteBracket: 'Sem atletas nesta chave.',
-                    podium: 'Podio',
-                    firstPlace: '1o lugar',
-                    secondPlace: '2o lugar',
-                    thirdPlace: '3o lugar',
+                    podium: 'Pódio',
+                    firstPlace: '1º lugar',
+                    secondPlace: '2º lugar',
+                    thirdPlace: '3º lugar',
                     selectAthlete: 'Selecionar atleta',
-                    apply: 'Aplicar podio',
-                    reapply: 'Reaplicar podio',
+                    apply: 'Aplicar pódio',
+                    reapply: 'Reaplicar pódio',
                     noBracketFound: 'Nenhuma chave encontrada.'
                 },
                 beltSummary: {
                     title: 'Resumo por faixa',
-                    subtitle: 'Distribuicao de pontos por graduacao',
-                    updateTitle: 'Atualizado as'
+                    subtitle: 'Distribuição de pontos por graduação',
+                    updateTitle: 'Atualizado às'
                 },
                 athletesPanel: {
                     title: 'Base de atletas',
-                    subtitle: 'Gerencie registros e ajuste pontuacoes rapidamente',
+                    subtitle: 'Gerencie registros e ajuste pontuações rapidamente',
                     searchPlaceholder: 'Pesquisar por nome ou academia',
                     searchAria: 'Pesquisar atleta',
                     filterEventAria: 'Filtrar por evento',
                     noEvent: 'Sem evento',
-                    listView: 'Visualizacao em lista',
-                    cardView: 'Visualizacao em cards',
+                    listView: 'Visualização em lista',
+                    cardView: 'Visualização em cards',
                     athlete: 'Atleta',
                     academy: 'Academia',
                     event: 'Evento',
                     contact: 'Contato',
                     profile: 'Perfil',
-                    noProfile: 'Sem perfil de filiacao',
+                    noProfile: 'Sem perfil de filiação',
                     noPhoto: 'Sem foto',
-                    actions: 'Acoes',
+                    actions: 'Ações',
                     pointsPlaceholder: 'Pontos',
                     clearPointsAria: 'Limpar pontos',
                     registerGoldAria: 'Registrar ouro',
@@ -956,11 +1187,11 @@ const Dashboard = () => {
                     registerBronzeAria: 'Registrar bronze',
                     removeAthleteAria: 'Remover atleta',
                     clearBase: 'Limpar base de atletas',
-                    clearReimportLocks: 'Limpar bloqueios de reimportacao',
+                    clearReimportLocks: 'Limpar bloqueios de reimportação',
                     paginationPrev: 'Anterior',
-                    paginationNext: 'Proxima',
-                    paginationPerPage: 'Por pagina',
-                    paginationPage: 'Pagina',
+                    paginationNext: 'Próxima',
+                    paginationPerPage: 'Por página',
+                    paginationPage: 'Página',
                     paginationShowing: (from, to, total) => `Mostrando ${from}-${to} de ${total}`,
                     belt: 'Faixa',
                     weight: 'Peso',
@@ -968,21 +1199,21 @@ const Dashboard = () => {
                     noAthleteFound: 'Nenhum atleta encontrado.'
                 },
                 automation: {
-                    title: 'Automacoes e atalhos',
+                    title: 'Automações e atalhos',
                     subtitle: 'Ferramentas organizadas para agilizar o trabalho',
-                    fast: 'Rapido',
-                    importFromPdf: 'Importar relacao por PDF',
-                    importDescription: 'Le o PDF e separa nome, faixa, categoria e academia.',
+                    fast: 'Rápido',
+                    importFromPdf: 'Importar relação por PDF',
+                    importDescription: 'Lê o PDF e separa nome, faixa, categoria e academia.',
                     importPdf: 'Importar PDF',
                     debugPreview: 'Debug preview (primeiras linhas)',
                     importFile: 'Importar arquivo',
                     importFileDesc: 'Abra o seletor de PDF/TXT para atualizar o ranking.',
                     select: 'Selecionar',
-                    exportReport: 'Exportar relatorio',
+                    exportReport: 'Exportar relatório',
                     exportReportDesc: 'Gere o PDF oficial do evento ativo.',
                     generatePdf: 'Gerar PDF',
                     immediateControl: 'Controle imediato',
-                    immediateControlDesc: 'Limpe resultados temporarios e reinicie o painel.',
+                    immediateControlDesc: 'Limpe resultados temporários e reinicie o painel.',
                     clear: 'Limpar',
                     safe: 'Seguro',
                     clearAthletes: 'Limpar atletas',
@@ -1001,12 +1232,12 @@ const Dashboard = () => {
                     subtitle: 'Auditoria em tempo real com logs recentes',
                     viewAll: 'Ver todos',
                     noRecent: 'Nenhum registro recente.',
-                    secureSession: 'Sessao segura',
-                    secureSessionSubtitle: 'Controle de acesso com confirmacao visual',
-                    endSession: 'Encerrar sessao',
-                    localUsers: 'Usuarios locais',
+                    secureSession: 'Sessão segura',
+                    secureSessionSubtitle: 'Controle de acesso com confirmação visual',
+                    endSession: 'Encerrar sessão',
+                    localUsers: 'Usuários locais',
                     localUsersDesc: 'Gerencie senhas das contas do painel.',
-                    noUser: 'Nenhum usuario cadastrado.',
+                    noUser: 'Nenhum usuário cadastrado.',
                     resetPassword: 'Redefinir senha',
                     local: 'Local'
                 },
@@ -1023,18 +1254,20 @@ const Dashboard = () => {
                     posterUrl: 'URL da imagem do cartaz',
                     posterUrlPlaceholder: 'https://.../cartaz.jpg',
                     posterFile: 'Ou envie a imagem do cartaz',
-                    registrationUrl: 'URL de inscricao',
+                    posterCompressionHint: 'O cartaz enviado e comprimido automaticamente.',
+                    posterCompressedSize: 'Tamanho comprimido',
+                    registrationUrl: 'URL de inscrição',
                     registrationUrlPlaceholder: 'https://...',
-                    pixKey: 'Chave Pix (responsavel do campeonato)',
-                    pixKeyPlaceholder: 'CPF / CNPJ / email / telefone / chave aleatoria',
-                    feeUnder15: 'Valor ate 15 anos (GI/NO-GI)',
+                    pixKey: 'Chave Pix (responsável do campeonato)',
+                    pixKeyPlaceholder: 'CPF / CNPJ / email / telefone / chave aleatória',
+                    feeUnder15: 'Valor até 15 anos (GI/NO-GI)',
                     feeOver15: 'Valor acima de 15 anos (GI/NO-GI)',
                     feeCombo: 'Valor Combo GI + NO-GI',
                     feeAbsolute: 'Valor Absoluto GI / NO-GI',
-                    registrationOpen: 'Inscricoes abertas agora',
-                    internalRegistration: 'Inscricao na nossa plataforma',
+                    registrationOpen: 'Inscrições abertas agora',
+                    internalRegistration: 'Inscrição na nossa plataforma',
                     deleteEvent: 'Apagar evento',
-                    saveChanges: 'Salvar alteracoes'
+                    saveChanges: 'Salvar alterações'
                 },
                 modalAthlete: {
                     title: 'Novo atleta',
@@ -1042,7 +1275,7 @@ const Dashboard = () => {
                     fullNamePlaceholder: 'Ex: Rodrigo Cavaca',
                     event: 'Evento',
                     noEvent: 'Sem evento',
-                    graduation: 'Graduacao',
+                    graduation: 'Graduação',
                     weight: 'Peso',
                     absoluteWeightPlaceholder: 'Absoluto',
                     weightPlaceholder: 'Ex: Pena',
@@ -1056,7 +1289,7 @@ const Dashboard = () => {
                     modalityNoGi: 'NO-GI (sem pano)',
                     teamAcademy: 'Equipe / Academia',
                     teamAcademyPlaceholder: 'Ex: Zenith JJ',
-                    country: 'Pais',
+                    country: 'País',
                     countryPlaceholder: 'Ex: Brasil',
                     photoUrl: 'URL da foto (opcional)',
                     saveRegister: 'Salvar registro'
@@ -1072,12 +1305,12 @@ const Dashboard = () => {
                     current: 'Atual',
                     otherEvent: 'Outro evento',
                     noAthleteFound: 'Nenhum atleta encontrado.',
-                    saveLink: 'Salvar vinculo'
+                    saveLink: 'Salvar vínculo'
                 },
                 modalReset: {
                     title: 'Redefinir senha',
-                    noUser: 'Nenhum usuario disponivel.',
-                    user: 'Usuario',
+                    noUser: 'Nenhum usuário disponível.',
+                    user: 'Usuário',
                     newPassword: 'Nova senha',
                     confirmPassword: 'Confirmar senha',
                     updatePassword: 'Atualizar senha'
@@ -1134,7 +1367,7 @@ const Dashboard = () => {
     const translateLogDetails = useCallback((details) => {
         if (!isEnglish || !details) return details;
         const replacements = [
-            [/Usuario/gi, 'User'],
+            [/Usuário/gi, 'User'],
             [/Usuário/gi, 'User'],
             [/UsuÃ¡rio/gi, 'User'],
             [/acessou o sistema/gi, 'accessed the system'],
@@ -1151,12 +1384,13 @@ const Dashboard = () => {
             [/Pontos definidos manualmente/gi, 'Points manually set'],
             [/Importacao/gi, 'Import'],
             [/Importação/gi, 'Import'],
+            [/inválidos/gi, 'invalid'],
             [/invalidos/gi, 'invalid'],
             [/duplicados/gi, 'duplicate'],
             [/Chaves geradas/gi, 'Brackets generated'],
-            [/Podio aplicado/gi, 'Podium applied'],
+            [/Pódio aplicado/gi, 'Podium applied'],
             [/Falha/gi, 'Failure'],
-            [/Nao encontrado/gi, 'Not found'],
+            [/Não encontrado/gi, 'Not found'],
             [/não encontrado/gi, 'Not found']
         ];
         return replacements.reduce((value, [pattern, replacement]) => value.replace(pattern, replacement), details);
@@ -1172,6 +1406,7 @@ const Dashboard = () => {
     const [athletesPageSize, setAthletesPageSize] = useState(ATHLETE_PAGE_SIZE_OPTIONS[0]);
     const [now, setNow] = useState(new Date());
     const importInputRef = useRef(null);
+    const newsImageInputRef = useRef(null);
     const [importMode, setImportMode] = useState('GI');
     const [importStatus, setImportStatus] = useState('');
     const [importError, setImportError] = useState('');
@@ -1185,8 +1420,14 @@ const Dashboard = () => {
     const [showEventEditModal, setShowEventEditModal] = useState(false);
     const [eventEditForm, setEventEditForm] = useState(createEventEditFormState);
     const [eventEditError, setEventEditError] = useState('');
+    const [eventPosterStoredSizeBytes, setEventPosterStoredSizeBytes] = useState(0);
     const [newsForm, setNewsForm] = useState(createNewsFormState);
+    const [newsImageName, setNewsImageName] = useState('');
+    const [newsImageStoredSizeBytes, setNewsImageStoredSizeBytes] = useState(0);
     const [newsError, setNewsError] = useState('');
+    const [instagramRefreshing, setInstagramRefreshing] = useState(false);
+    const [instagramLastUpdatedAt, setInstagramLastUpdatedAt] = useState(loadInstagramLastRefresh);
+    const [instagramFeedStatus, setInstagramFeedStatus] = useState(loadInstagramFeedStatus);
     const [newAthlete, setNewAthlete] = useState({
         nome: '',
         faixa: 'Branca',
@@ -1241,6 +1482,40 @@ const Dashboard = () => {
     useEffect(() => {
         saveSuppressedRegistrationKeys(suppressedRegistrationKeys);
     }, [suppressedRegistrationKeys]);
+
+    useEffect(() => {
+        saveInstagramLastRefresh(instagramLastUpdatedAt);
+    }, [instagramLastUpdatedAt]);
+
+    useEffect(() => {
+        saveInstagramFeedStatus(instagramFeedStatus);
+    }, [instagramFeedStatus]);
+
+    useEffect(() => {
+        if (instagramLastUpdatedAt) return undefined;
+        let cancelled = false;
+
+        const loadInstagramMeta = async () => {
+            try {
+                const result = await socialMediaService.fetchInstagramFeed(1);
+                const lastUpdated = (result?.lastUpdatedAt || '').toString().trim();
+                const status = (result?.status || '').toString().trim().toUpperCase();
+                if (!cancelled && lastUpdated) {
+                    setInstagramLastUpdatedAt(lastUpdated);
+                }
+                if (!cancelled && status) {
+                    setInstagramFeedStatus(status);
+                }
+            } catch {
+                // Ignore metadata bootstrap failures.
+            }
+        };
+
+        loadInstagramMeta();
+        return () => {
+            cancelled = true;
+        };
+    }, [instagramLastUpdatedAt]);
 
     const addSuppressedRegistrationKeys = useCallback((keys) => {
         const normalized = (Array.isArray(keys) ? keys : [keys])
@@ -1298,12 +1573,13 @@ const Dashboard = () => {
     const handleOpenEditEvent = useCallback((eventItem) => {
         if (!eventItem) return;
         setEventEditError('');
+        const posterUrl = eventItem.posterUrl || '';
         setEventEditForm({
             id: eventItem.id,
             name: eventItem.name || '',
             date: eventItem.date || '',
             location: eventItem.location || '',
-            posterUrl: eventItem.posterUrl || '',
+            posterUrl,
             registrationUrl: eventItem.registrationUrl || '',
             pixKey: eventItem.pixKey || DEFAULT_EVENT_PIX_KEY,
             feeUnder15: eventItem.feeUnder15 ?? DEFAULT_EVENT_FEES.under15,
@@ -1313,12 +1589,14 @@ const Dashboard = () => {
             registrationOpen: eventItem.registrationOpen !== false,
             internalRegistration: eventItem.internalRegistration !== false
         });
+        setEventPosterStoredSizeBytes(isDataImageUrl(posterUrl) ? estimateDataUrlBytes(posterUrl) : 0);
         setShowEventEditModal(true);
     }, []);
 
     const handleCloseEditEvent = useCallback(() => {
         setShowEventEditModal(false);
         setEventEditError('');
+        setEventPosterStoredSizeBytes(0);
         setEventEditForm(createEventEditFormState());
     }, []);
 
@@ -1349,19 +1627,51 @@ const Dashboard = () => {
         }
     }, [eventEditForm, updateEvent, showFeedback, handleCloseEditEvent, copy.feedback]);
 
-    const handleEventEditPosterFile = useCallback((event) => {
+    const handleEventEditPosterUrlChange = useCallback((event) => {
+        const value = event.target.value;
+        setEventEditForm((prev) => ({ ...prev, posterUrl: value }));
+        setEventPosterStoredSizeBytes(isDataImageUrl(value) ? estimateDataUrlBytes(value) : 0);
+    }, []);
+
+    const handleEventEditPosterFile = useCallback(async (event) => {
         const file = event.target.files?.[0];
         if (!file) return;
-        const reader = new FileReader();
-        reader.onload = () => {
-            if (typeof reader.result === 'string') {
-                setEventEditForm((prev) => ({ ...prev, posterUrl: reader.result }));
+
+        if (!/^image\//i.test(file.type || '')) {
+            const message = copy.feedback.eventPosterTypeInvalid;
+            setEventEditError(message);
+            showFeedback('error', message);
+            event.target.value = '';
+            return;
+        }
+
+        if (file.size > MAX_EVENT_POSTER_UPLOAD_BYTES) {
+            const message = copy.feedback.eventPosterUploadTooLarge;
+            setEventEditError(message);
+            showFeedback('error', message);
+            event.target.value = '';
+            return;
+        }
+
+        try {
+            const compressed = await compressEventPosterFile(file);
+            if (!compressed?.dataUrl || compressed.bytes > MAX_EVENT_POSTER_STORED_BYTES) {
+                const message = copy.feedback.eventPosterTooLargeAfterCompression;
+                setEventEditError(message);
+                showFeedback('error', message);
+                return;
             }
-        };
-        reader.onerror = () => setEventEditError(copy.feedback.eventUpdateFail);
-        reader.readAsDataURL(file);
-        event.target.value = '';
-    }, [copy.feedback.eventUpdateFail]);
+            setEventEditForm((prev) => ({ ...prev, posterUrl: compressed.dataUrl }));
+            setEventPosterStoredSizeBytes(compressed.bytes || 0);
+            setEventEditError('');
+        } catch {
+            const message = copy.feedback.eventPosterReadFail;
+            setEventEditError(message);
+            showFeedback('error', message);
+        } finally {
+            event.target.value = '';
+        }
+    }, [copy.feedback, showFeedback]);
 
     const handleDeleteEvent = useCallback(() => {
         if (!eventEditForm.id) return;
@@ -1826,7 +2136,7 @@ const Dashboard = () => {
                 'Created at'
             ]
             : [
-                'ID inscricao',
+                'ID inscrição',
                 'ID evento',
                 'Evento',
                 'Data evento',
@@ -1835,14 +2145,14 @@ const Dashboard = () => {
                 'Academia',
                 'Email',
                 'Telefone',
-                'Genero',
+                'Gênero',
                 'Categoria',
                 'Faixa',
                 'Peso',
                 'Modalidade',
                 'Ano nascimento',
                 'Idade',
-                'Tipo inscricao',
+                'Tipo de inscrição',
                 'Peso GI',
                 'Peso NO-GI',
                 'Absoluto GI',
@@ -1852,9 +2162,9 @@ const Dashboard = () => {
                 'Tipo comprovante',
                 'Tamanho comprovante (bytes)',
                 'Comprovante anexado',
-                'Observacoes atleta',
+                'Observações atleta',
                 'Status pagamento',
-                'Observacao conferencia',
+                'Observação da conferência',
                 'Conferido por',
                 'Conferido em',
                 'Criado em'
@@ -1877,7 +2187,7 @@ const Dashboard = () => {
             item.modalidade || '',
             item.notes?.anoNascimento || '',
             item.notes?.idade || '',
-            item.notes?.tipoInscricao || '',
+            item.notes?.tipoInscrição || '',
             item.notes?.pesoGiSelecionado || '',
             item.notes?.pesoNoGiSelecionado || '',
             item.notes?.absolutoGi || '',
@@ -2344,6 +2654,33 @@ const Dashboard = () => {
         }
     };
 
+    const handleRefreshInstagramFeed = useCallback(async () => {
+        setInstagramRefreshing(true);
+        try {
+            const result = await socialMediaService.syncInstagramFeedAdmin(10);
+            const posts = Array.isArray(result?.posts) ? result.posts : [];
+            const count = posts.length;
+            const lastUpdated = (result?.lastUpdatedAt || new Date().toISOString()).toString().trim();
+            const status = (result?.status || '').toString().trim().toUpperCase();
+            if (lastUpdated) {
+                setInstagramLastUpdatedAt(lastUpdated);
+            }
+            if (status) {
+                setInstagramFeedStatus(status);
+            }
+            showFeedback('success', copy.feedback.instagramRefreshDone(count));
+        } catch (err) {
+            if (err?.code === 'AUTH_REQUIRED') {
+                showFeedback('error', err?.message || copy.feedback.instagramRefreshFail);
+                logout();
+                return;
+            }
+            showFeedback('error', err?.message || copy.feedback.instagramRefreshFail);
+        } finally {
+            setInstagramRefreshing(false);
+        }
+    }, [showFeedback, copy.feedback, logout]);
+
     const handlePublishNews = useCallback((event) => {
         event.preventDefault();
         setNewsError('');
@@ -2371,6 +2708,11 @@ const Dashboard = () => {
                 publishedAt: newsForm.publishedAt
             });
             setNewsForm(createNewsFormState());
+            setNewsImageName('');
+            setNewsImageStoredSizeBytes(0);
+            if (newsImageInputRef.current) {
+                newsImageInputRef.current.value = '';
+            }
             showFeedback('success', copy.feedback.newsCreated(created.title));
         } catch (err) {
             const message = err?.message || copy.feedback.newsCreateFail;
@@ -2378,6 +2720,71 @@ const Dashboard = () => {
             showFeedback('error', message);
         }
     }, [newsForm, addNews, showFeedback, copy.feedback]);
+
+    const handleNewsImageUrlChange = useCallback((event) => {
+        const value = event.target.value;
+        setNewsForm((prev) => ({ ...prev, imageUrl: value }));
+        if (isDataImageUrl(value)) {
+            setNewsImageStoredSizeBytes(estimateDataUrlBytes(value));
+            return;
+        }
+        setNewsImageName('');
+        setNewsImageStoredSizeBytes(0);
+    }, []);
+
+    const handleSelectNewsImageFromComputer = useCallback(() => {
+        newsImageInputRef.current?.click();
+    }, []);
+
+    const handleClearNewsImage = useCallback(() => {
+        setNewsForm((prev) => ({ ...prev, imageUrl: '' }));
+        setNewsImageName('');
+        setNewsImageStoredSizeBytes(0);
+        if (newsImageInputRef.current) {
+            newsImageInputRef.current.value = '';
+        }
+    }, []);
+
+    const handleNewsImageFileChange = useCallback(async (eventFile) => {
+        const file = eventFile.target.files?.[0];
+        if (!file) return;
+
+        if (!/^image\//i.test(file.type || '')) {
+            const message = copy.feedback.newsImageTypeInvalid;
+            setNewsError(message);
+            showFeedback('error', message);
+            eventFile.target.value = '';
+            return;
+        }
+
+        if (file.size > MAX_NEWS_IMAGE_UPLOAD_BYTES) {
+            const message = copy.feedback.newsImageTooLarge;
+            setNewsError(message);
+            showFeedback('error', message);
+            eventFile.target.value = '';
+            return;
+        }
+
+        try {
+            const compressed = await compressNewsImageFile(file);
+            if (!compressed?.dataUrl || compressed.bytes > MAX_NEWS_IMAGE_STORED_BYTES) {
+                const message = copy.feedback.newsImageStillLarge;
+                setNewsError(message);
+                showFeedback('error', message);
+                return;
+            }
+            setNewsForm((prev) => ({ ...prev, imageUrl: compressed.dataUrl }));
+            setNewsImageName(file.name || '');
+            setNewsImageStoredSizeBytes(compressed.bytes || 0);
+            setNewsError('');
+        } catch {
+            const message = copy.feedback.newsImageReadFail;
+            setNewsError(message);
+            showFeedback('error', message);
+        } finally {
+            eventFile.target.value = '';
+        }
+    }, [copy.feedback, showFeedback]);
 
     const handleDeleteNews = useCallback((item) => {
         const confirmed = window.confirm(copy.feedback.newsDeleteConfirm(item.title));
@@ -2430,6 +2837,26 @@ const Dashboard = () => {
         if (Number.isNaN(parsed.getTime())) return dateString;
         return parsed.toLocaleDateString(locale);
     };
+
+    const formatEventDateTime = (dateString) => {
+        if (!dateString) return '';
+        const parsed = new Date(dateString);
+        if (Number.isNaN(parsed.getTime())) return dateString;
+        return parsed.toLocaleString(locale, {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+    };
+
+    const instagramFeedStatusLabel = instagramFeedStatus === 'UPDATED_NOW'
+        ? copy.newsPanel.feedStatusUpdatedNow
+        : instagramFeedStatus === 'CACHE'
+            ? copy.newsPanel.feedStatusCache
+            : '';
 
     const handleOpenAssignModal = (eventItem) => {
         const selection = {};
@@ -2602,7 +3029,7 @@ const Dashboard = () => {
                 </section>
 
                 <section className="stats-grid">
-                    <div className="stat-card">
+                    <div className="stat-card stat-card--focus">
                         <div className="stat-card__icon">
                             <Users size={18} />
                         </div>
@@ -2610,7 +3037,7 @@ const Dashboard = () => {
                         <div className="stat-card__label">{copy.stats.enrolled}</div>
                         <div className="stat-card__trend">{totals.activeAthletes} {copy.stats.activeTrend}</div>
                     </div>
-                    <div className="stat-card">
+                    <div className="stat-card stat-card--focus">
                         <div className="stat-card__icon">
                             <Trophy size={18} />
                         </div>
@@ -2618,7 +3045,7 @@ const Dashboard = () => {
                         <div className="stat-card__label">{copy.stats.totalPoints}</div>
                         <div className="stat-card__trend">{copy.stats.average} {totals.averagePoints} pts</div>
                     </div>
-                    <div className="stat-card">
+                    <div className="stat-card stat-card--focus">
                         <div className="stat-card__icon">
                             <Zap size={18} />
                         </div>
@@ -2626,7 +3053,7 @@ const Dashboard = () => {
                         <div className="stat-card__label">{copy.stats.registeredEvents}</div>
                         <div className="stat-card__trend">{copy.stats.centralizedControl}</div>
                     </div>
-                    <div className="stat-card">
+                    <div className="stat-card stat-card--secondary">
                         <div className="stat-card__icon">
                             <Activity size={18} />
                         </div>
@@ -2743,7 +3170,32 @@ const Dashboard = () => {
                             <Link className="btn btn-secondary" to="/noticias" target="_blank" rel="noreferrer">
                                 {copy.newsPanel.openNewsPage}
                             </Link>
+                            <button
+                                type="button"
+                                className="btn btn-secondary"
+                                onClick={handleRefreshInstagramFeed}
+                                disabled={instagramRefreshing}
+                            >
+                                {instagramRefreshing
+                                    ? `${copy.newsPanel.refreshSocial}...`
+                                    : copy.newsPanel.refreshSocial}
+                            </button>
                         </div>
+                    </div>
+
+                    <div className="table-meta table-meta--tight">
+                        {copy.newsPanel.lastInstagramRefresh}: {' '}
+                        {instagramLastUpdatedAt
+                            ? formatEventDateTime(instagramLastUpdatedAt)
+                            : copy.newsPanel.instagramNeverUpdated}
+                        {instagramFeedStatusLabel && (
+                            <>
+                                {' '}
+                            <span className={`tag ${instagramFeedStatus === 'UPDATED_NOW' ? 'tag--open' : 'tag--warning'}`}>
+                                {instagramFeedStatusLabel}
+                            </span>
+                            </>
+                        )}
                     </div>
 
                     {newsError && (
@@ -2781,11 +3233,49 @@ const Dashboard = () => {
                                 <label className="table-meta">{copy.newsPanel.imageLabel}</label>
                                 <input
                                     className="input"
-                                    type="url"
+                                    type="text"
                                     value={newsForm.imageUrl}
-                                    onChange={(event) => setNewsForm({ ...newsForm, imageUrl: event.target.value })}
+                                    onChange={handleNewsImageUrlChange}
                                     placeholder={copy.newsPanel.imagePlaceholder}
                                 />
+                                <div className="table-meta table-meta--tight">{copy.newsPanel.imageUploadHint}</div>
+                                <div className="table-meta table-meta--tight">{copy.newsPanel.imageCompressionHint}</div>
+                                <div className="news-admin-form__image-actions">
+                                    <button type="button" className="btn btn-secondary" onClick={handleSelectNewsImageFromComputer}>
+                                        <Upload size={14} />
+                                        {copy.newsPanel.imageUploadAction}
+                                    </button>
+                                    {newsForm.imageUrl && (
+                                        <button type="button" className="btn btn-ghost" onClick={handleClearNewsImage}>
+                                            {copy.newsPanel.imageClearAction}
+                                        </button>
+                                    )}
+                                </div>
+                                <input
+                                    ref={newsImageInputRef}
+                                    type="file"
+                                    accept="image/png,image/jpeg,image/webp,image/gif"
+                                    className="news-admin-file-input"
+                                    onChange={handleNewsImageFileChange}
+                                />
+                                {newsImageName && (
+                                    <div className="table-meta table-meta--tight news-admin-form__image-file">
+                                        {copy.newsPanel.imageSelectedFile}: {newsImageName}
+                                    </div>
+                                )}
+                                {newsImageStoredSizeBytes > 0 && (
+                                    <div className="table-meta table-meta--tight news-admin-form__image-file">
+                                        {copy.newsPanel.imageCompressedSize}: {formatBytes(newsImageStoredSizeBytes)}
+                                    </div>
+                                )}
+                                {newsForm.imageUrl && (
+                                    <div className="news-admin-form__image-preview">
+                                        <div className="table-meta table-meta--tight">{copy.newsPanel.imagePreviewLabel}</div>
+                                        <div className="news-admin-form__image-preview-frame">
+                                            <img src={newsForm.imageUrl} alt={copy.newsPanel.imageLabel} loading="lazy" />
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                             <div>
                                 <label className="table-meta">{copy.newsPanel.summaryLabel}</label>
@@ -3807,6 +4297,36 @@ const Dashboard = () => {
                     )}
                 </section>
             </div>
+            <nav className="mobile-quickbar mobile-only" aria-label={copy.sidebar.title}>
+                <button
+                    type="button"
+                    className="mobile-quickbar__btn"
+                    onClick={() => document.getElementById('overview')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                >
+                    <LayoutDashboard size={15} />
+                    <span>{copy.nav.overview}</span>
+                </button>
+                <button
+                    type="button"
+                    className="mobile-quickbar__btn"
+                    onClick={() => document.getElementById('registrations')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                >
+                    <ClipboardList size={15} />
+                    <span>{copy.nav.registrations}</span>
+                </button>
+                <button
+                    type="button"
+                    className="mobile-quickbar__btn"
+                    onClick={() => document.getElementById('athletes')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                >
+                    <Users size={15} />
+                    <span>{copy.nav.athletes}</span>
+                </button>
+                <button type="button" className="mobile-quickbar__btn mobile-quickbar__btn--primary" onClick={() => setShowAddModal(true)}>
+                    <UserPlus size={15} />
+                    <span>{copy.hero.newAthlete}</span>
+                </button>
+            </nav>
             <AnimatePresence>
                 {showLogs && (
                     <>
@@ -3921,7 +4441,7 @@ const Dashboard = () => {
                                                 className="input"
                                                 type="text"
                                                 value={eventEditForm.posterUrl}
-                                                onChange={(event) => setEventEditForm({ ...eventEditForm, posterUrl: event.target.value })}
+                                                onChange={handleEventEditPosterUrlChange}
                                                 placeholder={copy.modalEventEdit.posterUrlPlaceholder}
                                             />
                                         </div>
@@ -3933,6 +4453,12 @@ const Dashboard = () => {
                                                 accept="image/*"
                                                 onChange={handleEventEditPosterFile}
                                             />
+                                            <div className="table-meta table-meta--tight">{copy.modalEventEdit.posterCompressionHint}</div>
+                                            {eventPosterStoredSizeBytes > 0 && (
+                                                <div className="table-meta table-meta--tight">
+                                                    {copy.modalEventEdit.posterCompressedSize}: {formatBytes(eventPosterStoredSizeBytes)}
+                                                </div>
+                                            )}
                                         </div>
                                         {eventEditForm.posterUrl && (
                                             <div>

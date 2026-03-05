@@ -47,9 +47,9 @@ const Athletes = () => {
       }
     : {
         kicker: 'Atletas',
-        title: 'Perfis individuais com historico e pontuacao.',
+        title: 'Perfis individuais com histórico e pontuação.',
         description:
-          'Busque atletas por faixa, peso ou categoria. Cada perfil acumula pontos e ranking automaticamente.',
+          'Pesquise atletas por faixa, peso ou categoria. Cada perfil acumula pontos e classificação automaticamente.',
         searchPlaceholder: 'Buscar por atleta, academia ou categoria',
         allBelts: 'Todas as faixas',
         allWeights: 'Todos os pesos',
@@ -62,7 +62,7 @@ const Athletes = () => {
         beltFallback: 'Faixa',
         weightFallback: 'Peso',
         categoryFallback: 'Categoria',
-        emptyState: 'Nenhum atleta cadastrado nessa combinacao.'
+        emptyState: 'Nenhum atleta encontrado com essa combinação de filtros.'
       };
 
   const filterOptions = useMemo(() => {

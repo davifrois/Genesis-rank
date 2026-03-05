@@ -37,6 +37,16 @@ import LoginOverlay from './components/LoginOverlay';
 import { DEFAULT_EVENT_FEES, DEFAULT_EVENT_PIX_KEY } from './utils/eventPricing';
 import './index.css';
 
+const MAX_EVENT_POSTER_UPLOAD_BYTES = 8_000_000;
+const TARGET_EVENT_POSTER_STORED_BYTES = 420_000;
+const MAX_EVENT_POSTER_STORED_BYTES = 1_000_000;
+const EVENT_POSTER_MAX_WIDTH = 1400;
+const EVENT_POSTER_MAX_HEIGHT = 1800;
+const EVENT_POSTER_MIN_DIMENSION = 360;
+const EVENT_POSTER_INITIAL_QUALITY = 0.86;
+const EVENT_POSTER_MIN_QUALITY = 0.5;
+const EVENT_POSTER_MAX_ATTEMPTS = 8;
+
 const createEventFormState = () => ({
   name: '',
   date: '',
@@ -51,6 +61,106 @@ const createEventFormState = () => ({
   registrationOpen: true,
   internalRegistration: true
 });
+
+const isDataImageUrl = (value) => /^data:image\//i.test((value || '').toString().trim());
+
+const estimateDataUrlBytes = (dataUrl) => {
+  const value = (dataUrl || '').toString();
+  const separatorIndex = value.indexOf(',');
+  if (separatorIndex < 0) return value.length;
+  const base64 = value.slice(separatorIndex + 1);
+  const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
+  return Math.max(0, Math.floor((base64.length * 3) / 4) - padding);
+};
+
+const formatBytes = (bytes) => {
+  const value = Number(bytes);
+  if (!Number.isFinite(value) || value <= 0) return '0 KB';
+  if (value < 1024) return `${value} B`;
+  const kb = value / 1024;
+  if (kb < 1024) return `${kb.toFixed(kb >= 100 ? 0 : 1)} KB`;
+  const mb = kb / 1024;
+  return `${mb.toFixed(2)} MB`;
+};
+
+const readFileAsDataUrl = (file) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+  reader.onerror = () => reject(new Error('Falha ao ler o arquivo.'));
+  reader.readAsDataURL(file);
+});
+
+const loadImageFromDataUrl = (dataUrl) => new Promise((resolve, reject) => {
+  const image = new Image();
+  image.onload = () => resolve(image);
+  image.onerror = () => reject(new Error('Falha ao processar imagem.'));
+  image.src = dataUrl;
+});
+
+const compressEventPosterFile = async (file) => {
+  const originalDataUrl = await readFileAsDataUrl(file);
+  const image = await loadImageFromDataUrl(originalDataUrl);
+  const naturalWidth = Math.max(1, image.naturalWidth || image.width || EVENT_POSTER_MIN_DIMENSION);
+  const naturalHeight = Math.max(1, image.naturalHeight || image.height || EVENT_POSTER_MIN_DIMENSION);
+  const fitRatio = Math.min(
+    1,
+    EVENT_POSTER_MAX_WIDTH / naturalWidth,
+    EVENT_POSTER_MAX_HEIGHT / naturalHeight
+  );
+
+  let width = Math.max(1, Math.floor(naturalWidth * fitRatio));
+  let height = Math.max(1, Math.floor(naturalHeight * fitRatio));
+  let quality = EVENT_POSTER_INITIAL_QUALITY;
+  let bestDataUrl = '';
+  let bestBytes = Number.POSITIVE_INFINITY;
+
+  for (let attempt = 0; attempt < EVENT_POSTER_MAX_ATTEMPTS; attempt += 1) {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d');
+    if (!context) {
+      throw new Error('Falha ao comprimir imagem.');
+    }
+
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = 'high';
+    context.clearRect(0, 0, width, height);
+    context.drawImage(image, 0, 0, width, height);
+
+    const dataUrl = canvas.toDataURL('image/jpeg', quality);
+    const bytes = estimateDataUrlBytes(dataUrl);
+    if (bytes < bestBytes) {
+      bestDataUrl = dataUrl;
+      bestBytes = bytes;
+    }
+    if (bytes <= TARGET_EVENT_POSTER_STORED_BYTES) {
+      return { dataUrl, bytes };
+    }
+
+    if (quality > EVENT_POSTER_MIN_QUALITY) {
+      quality = Math.max(EVENT_POSTER_MIN_QUALITY, quality - 0.1);
+      continue;
+    }
+
+    const nextWidth = Math.max(EVENT_POSTER_MIN_DIMENSION, Math.floor(width * 0.86));
+    const nextHeight = Math.max(EVENT_POSTER_MIN_DIMENSION, Math.floor(height * 0.86));
+    if (nextWidth === width && nextHeight === height) {
+      break;
+    }
+    width = nextWidth;
+    height = nextHeight;
+    quality = EVENT_POSTER_INITIAL_QUALITY;
+  }
+
+  if (!bestDataUrl) {
+    throw new Error('Falha ao comprimir imagem.');
+  }
+  return {
+    dataUrl: bestDataUrl,
+    bytes: bestBytes
+  };
+};
 
 const AppLayout = () => {
   const {
@@ -68,8 +178,10 @@ const AppLayout = () => {
   const [showLogin, setShowLogin] = useState(false);
   const canAccessAdmin = currentUser?.role === 'admin';
   const isAdminRoute = location.pathname === '/admin';
+  const isHomeRoute = location.pathname === '/';
   const { language, setLanguage, currentLanguage, languages } = useI18n();
   const isEnglish = language === 'en-US';
+  const [eventPosterStoredSizeBytes, setEventPosterStoredSizeBytes] = useState(0);
 
   const copy = useMemo(() => (
     isEnglish
@@ -163,6 +275,12 @@ const AppLayout = () => {
             posterUrl: 'Poster image URL (optional)',
             posterUrlPlaceholder: 'https://.../poster.jpg',
             posterFile: 'Or upload poster image',
+            posterCompressionHint: 'Uploaded poster is automatically compressed.',
+            posterCompressedSize: 'Compressed size',
+            posterTypeInvalid: 'Select a valid image file for the poster.',
+            posterUploadTooLarge: 'Poster file too large. Maximum upload size is 8 MB.',
+            posterTooLargeAfterCompression: 'Poster is still too large after compression. Choose a lighter file.',
+            posterReadFail: 'Failed to process selected poster image.',
             registrationUrl: 'Registration URL (optional)',
             registrationUrlPlaceholder: 'https://...',
             pixKey: 'Pix key (event owner)',
@@ -193,13 +311,13 @@ const AppLayout = () => {
             events: 'Eventos',
             rankings: 'Rankings',
             athletes: 'Atletas',
-            membership: 'Filiacao',
-            news: 'Noticias',
+            membership: 'Filiação',
+            news: 'Notícias',
             regulations: 'Regulamento'
           },
           eventsMenu: {
-            upcoming: 'Proximos eventos',
-            calendar: 'Calendario de eventos 2026',
+            upcoming: 'Próximos eventos',
+            calendar: 'Calendário de eventos 2026',
             past: 'Eventos passados'
           },
           rankingMenu: {
@@ -211,23 +329,23 @@ const AppLayout = () => {
             emptyEvents: 'Nenhum campeonato cadastrado'
           },
           membershipMenu: {
-            member: 'Area do membro',
-            registerAcademy: 'Area da academia'
+            member: 'Área do membro',
+            registerAcademy: 'Área da academia'
           },
           newsMenu: {
-            blog: 'Blog e noticias',
-            videos: 'Biblioteca de videos',
+            blog: 'Blog e notícias',
+            videos: 'Biblioteca de vídeos',
             magazine: 'Revista Jiu-Jitsu World',
-            social: 'Midias sociais'
+            social: 'Mídias sociais'
           },
           regulationsMenu: {
             rankingRules: 'Regras do ranking',
             pointsSystem: 'Sistema de pontos',
-            eventLevels: 'Niveis de evento'
+            eventLevels: 'Níveis de evento'
           },
           accountMenu: {
             myAccount: 'Minha conta',
-            settings: 'Configuracoes',
+            settings: 'Configurações',
             manageProfiles: 'Gerenciar perfis',
             logout: 'Sair',
             login: 'Entrar',
@@ -235,26 +353,26 @@ const AppLayout = () => {
           },
           footer: {
             description:
-              'A Genesis Esportes organiza eventos de Jiu-Jitsu e monitora rankings com transparencia e excelencia operacional. Fundada em 2017, com sede em Belo Horizonte.',
+              'A Genesis Esportes organiza eventos de Jiu-Jitsu e monitora rankings com transparência e excelência operacional. Fundada em 2017, com sede em Belo Horizonte.',
             followUs: 'Siga-nos',
             contact: 'Contato',
             phone: 'Telefone / WhatsApp',
-            email: 'Email',
-            location: 'Localizacao',
+            email: 'E-mail',
+            location: 'Localização',
             mapLabel: 'Parque Turista - Contagem / MG',
             mapAddress: 'Rua Pains, 139',
             viewMap: 'Ver no mapa',
             menu: 'Menu do site',
-            home: 'Inicio',
+            home: 'Início',
             institutional: 'Institucional',
             events: 'Eventos',
             ranking: 'Ranking',
             rankingTeams: 'Ranking Equipes',
             athletes: 'Atletas',
-            membership: 'Filiacao',
+            membership: 'Filiação',
             regulations: 'Regulamento',
-            news: 'Noticias',
-            adminPanel: 'Painel Admin',
+            news: 'Notícias',
+            adminPanel: 'Painel administrativo',
             rights: 'Todos os direitos reservados.'
           },
           eventModal: {
@@ -268,16 +386,22 @@ const AppLayout = () => {
             posterUrl: 'URL da imagem do cartaz (opcional)',
             posterUrlPlaceholder: 'https://.../cartaz.jpg',
             posterFile: 'Ou envie a imagem do cartaz',
-            registrationUrl: 'URL de inscricao (opcional)',
+            posterCompressionHint: 'O cartaz enviado é comprimido automaticamente.',
+            posterCompressedSize: 'Tamanho comprimido',
+            posterTypeInvalid: 'Selecione um arquivo de imagem válido para o cartaz.',
+            posterUploadTooLarge: 'Arquivo do cartaz muito grande. Tamanho máximo de envio: 8 MB.',
+            posterTooLargeAfterCompression: 'O cartaz permaneceu grande após a compressão. Escolha um arquivo menor.',
+            posterReadFail: 'Falha ao processar a imagem do cartaz.',
+            registrationUrl: 'URL de inscrição (opcional)',
             registrationUrlPlaceholder: 'https://...',
-            pixKey: 'Chave Pix (responsavel do campeonato)',
-            pixKeyPlaceholder: 'CPF / CNPJ / email / telefone / chave aleatoria',
-            feeUnder15: 'Valor ate 15 anos (GI/NO-GI)',
+            pixKey: 'Chave Pix (responsável pelo campeonato)',
+            pixKeyPlaceholder: 'CPF / CNPJ / e-mail / telefone / chave aleatória',
+            feeUnder15: 'Valor até 15 anos (GI/NO-GI)',
             feeOver15: 'Valor acima de 15 anos (GI/NO-GI)',
             feeCombo: 'Valor Combo GI + NO-GI',
             feeAbsolute: 'Valor Absoluto GI / NO-GI',
-            registrationOpen: 'Inscricoes abertas agora',
-            internalRegistration: 'Inscricao dentro da nossa plataforma',
+            registrationOpen: 'Inscrições abertas no momento',
+            internalRegistration: 'Inscrição dentro da nossa plataforma',
             cancel: 'Cancelar',
             save: 'Salvar evento',
             error: 'Falha ao criar evento.'
@@ -347,7 +471,7 @@ const AppLayout = () => {
         { label: copy.newsMenu.blog, path: '/noticias' },
         { label: copy.newsMenu.videos, path: '/noticias' },
         { label: copy.newsMenu.magazine, path: '/noticias' },
-        { label: copy.newsMenu.social, path: '/noticias' }
+        { label: copy.newsMenu.social, path: '/noticias#midias-sociais' }
       ]
     },
     {
@@ -366,6 +490,7 @@ const AppLayout = () => {
   const handleCloseEventModal = () => {
     setEventError('');
     setEventForm(createEventFormState());
+    setEventPosterStoredSizeBytes(0);
     closeEventModal();
   };
 
@@ -376,24 +501,49 @@ const AppLayout = () => {
     try {
       addEvent(eventForm);
       setEventForm(createEventFormState());
+      setEventPosterStoredSizeBytes(0);
       closeEventModal();
     } catch (err) {
       setEventError(err?.message || copy.eventModal.error);
     }
   };
 
-  const handleEventPosterFileChange = (event) => {
+  const handleEventPosterUrlChange = (event) => {
+    const value = event.target.value;
+    setEventForm((prev) => ({ ...prev, posterUrl: value }));
+    setEventPosterStoredSizeBytes(isDataImageUrl(value) ? estimateDataUrlBytes(value) : 0);
+  };
+
+  const handleEventPosterFileChange = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setEventForm((prev) => ({ ...prev, posterUrl: reader.result }));
+
+    if (!/^image\//i.test(file.type || '')) {
+      setEventError(copy.eventModal.posterTypeInvalid);
+      event.target.value = '';
+      return;
+    }
+
+    if (file.size > MAX_EVENT_POSTER_UPLOAD_BYTES) {
+      setEventError(copy.eventModal.posterUploadTooLarge);
+      event.target.value = '';
+      return;
+    }
+
+    try {
+      const compressed = await compressEventPosterFile(file);
+      if (!compressed?.dataUrl || compressed.bytes > MAX_EVENT_POSTER_STORED_BYTES) {
+        setEventError(copy.eventModal.posterTooLargeAfterCompression);
+        return;
       }
-    };
-    reader.onerror = () => setEventError(copy.eventModal.error);
-    reader.readAsDataURL(file);
-    event.target.value = '';
+      setEventForm((prev) => ({ ...prev, posterUrl: compressed.dataUrl }));
+      setEventPosterStoredSizeBytes(compressed.bytes || 0);
+      setEventError('');
+    } catch {
+      setEventError(copy.eventModal.posterReadFail || copy.eventModal.error);
+    } finally {
+      event.target.value = '';
+    }
   };
 
   const accountItems = currentUser
@@ -573,7 +723,7 @@ const AppLayout = () => {
       </header>
 
       <main className={`app-main ${isAdminRoute ? 'app-main--admin' : ''}`}>
-        <div className={`container ${isAdminRoute ? 'container--admin' : ''}`}>
+        <div className={`container ${isAdminRoute ? 'container--admin' : ''} ${isHomeRoute ? 'container--home' : ''}`}>
           <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}
@@ -787,7 +937,7 @@ const AppLayout = () => {
                         className="input"
                         type="text"
                         value={eventForm.posterUrl}
-                        onChange={(event) => setEventForm({ ...eventForm, posterUrl: event.target.value })}
+                        onChange={handleEventPosterUrlChange}
                         placeholder={copy.eventModal.posterUrlPlaceholder}
                       />
                     </div>
@@ -799,6 +949,12 @@ const AppLayout = () => {
                         accept="image/*"
                         onChange={handleEventPosterFileChange}
                       />
+                      <div className="table-meta table-meta--tight">{copy.eventModal.posterCompressionHint}</div>
+                      {eventPosterStoredSizeBytes > 0 && (
+                        <div className="table-meta table-meta--tight">
+                          {copy.eventModal.posterCompressedSize}: {formatBytes(eventPosterStoredSizeBytes)}
+                        </div>
+                      )}
                     </div>
                     {eventForm.posterUrl && (
                       <div>
