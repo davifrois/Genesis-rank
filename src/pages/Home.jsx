@@ -1,6 +1,6 @@
 ﻿import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Activity, Calendar, ChevronLeft, ChevronRight, MapPin, Trophy, Users } from 'lucide-react';
+import { Activity, Calendar, ChevronLeft, ChevronRight, MapPin, Newspaper, Trophy, Users } from 'lucide-react';
 import { useStore } from '../hooks/useStore';
 import { useI18n } from '../hooks/useI18n';
 import { rankAthletes } from '../services/scoringService';
@@ -432,7 +432,10 @@ const Home = () => {
                   {item.imageUrl ? (
                     <img src={item.imageUrl} alt={item.title} loading="lazy" />
                   ) : (
-                    <span>{copy.newsKicker}</span>
+                    <div className="news-card__cover-fallback" aria-hidden="true">
+                      <Newspaper className="news-card__cover-fallback-icon" />
+                      <span>{copy.newsKicker}</span>
+                    </div>
                   )}
                 </div>
                 <div className="news-card__meta">{formatDate(item.publishedAt || item.createdAt, locale, copy.fallbackDate)}</div>

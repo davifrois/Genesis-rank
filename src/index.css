@@ -6253,11 +6253,27 @@ select {
 }
 
 .news-card__cover--fallback {
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background:
     radial-gradient(circle at 18% 18%, rgba(59, 130, 246, 0.28), transparent 58%),
     linear-gradient(140deg, rgba(37, 99, 235, 0.2), rgba(12, 20, 36, 0.94));
+}
+
+.news-card__cover-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+}
+
+.news-card__cover-fallback-icon {
+  width: 2.15rem;
+  height: 2.15rem;
+  color: rgba(219, 234, 254, 0.9);
+  filter: drop-shadow(0 8px 14px rgba(11, 22, 40, 0.45));
 }
 
 .news-card__cover--fallback span {

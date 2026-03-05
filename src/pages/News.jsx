@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, ExternalLink, ImageOff, PlayCircle, RefreshCcw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ExternalLink, ImageOff, Newspaper, PlayCircle, RefreshCcw } from 'lucide-react';
 import { useI18n } from '../hooks/useI18n';
 import { useStore } from '../hooks/useStore';
 import { socialMediaService } from '../services/socialMediaService';
@@ -477,7 +477,10 @@ const News = () => {
                   {item.imageUrl ? (
                     <img src={item.imageUrl} alt={item.title} loading="lazy" />
                   ) : (
-                    <span>{copy.kicker}</span>
+                    <div className="news-card__cover-fallback" aria-hidden="true">
+                      <Newspaper className="news-card__cover-fallback-icon" />
+                      <span>{copy.kicker}</span>
+                    </div>
                   )}
                 </div>
                 <div className="news-card__meta">
