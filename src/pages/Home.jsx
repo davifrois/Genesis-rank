@@ -249,7 +249,10 @@ const Home = () => {
                 </div>
               ) : (
                 <div className="hero-news__feature-bg hero-news__feature-bg--fallback">
-                  <span>{copy.heroNewsFallbackTitle}</span>
+                  <div className="hero-news__feature-fallback" aria-hidden="true">
+                    <Newspaper className="hero-news__feature-fallback-icon" />
+                    <span>{copy.newsKicker}</span>
+                  </div>
                 </div>
               )}
               <div className="hero-news__feature-overlay" />

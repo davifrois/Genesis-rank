@@ -5123,11 +5123,27 @@ select {
 }
 
 .hero-news__feature-bg--fallback {
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background:
     radial-gradient(circle at 18% 18%, rgba(59, 130, 246, 0.35), transparent 58%),
     linear-gradient(140deg, rgba(37, 99, 235, 0.26), rgba(12, 20, 36, 0.96));
+}
+
+.hero-news__feature-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.72rem;
+}
+
+.hero-news__feature-fallback-icon {
+  width: 2.9rem;
+  height: 2.9rem;
+  color: rgba(219, 234, 254, 0.92);
+  filter: drop-shadow(0 10px 16px rgba(10, 18, 35, 0.42));
 }
 
 .hero-news__feature-bg--fallback span {
