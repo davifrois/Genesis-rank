@@ -50,7 +50,7 @@ public class PublicRegistrationService {
   public PublicRegistrationResponse register(PublicRegistrationRequest request) {
     String eventId = clean(request.getEventId());
     if (eventId.isBlank()) {
-      throw new IllegalArgumentException("Evento invalido.");
+      throw new IllegalArgumentException("Evento inválido.");
     }
     String clientRequestId = clean(request.getClientRequestId());
     if (!clientRequestId.isBlank()) {
@@ -63,12 +63,12 @@ public class PublicRegistrationService {
 
     Event event = resolveEvent(eventId, request);
     if (!event.isRegistrationOpen()) {
-      throw new IllegalArgumentException("Inscricoes fechadas para este evento.");
+      throw new IllegalArgumentException("Inscrições fechadas para este evento.");
     }
 
     EventRegistration registration = new EventRegistration();
     registration.setEvent(event);
-    registration.setNome(required(request.getNome(), "Nome completo e obrigatorio."));
+    registration.setNome(required(request.getNome(), "Nome completo é obrigatório."));
     registration.setEmail(clean(request.getEmail()));
     registration.setPhone(clean(request.getPhone()));
     registration.setAcademia(clean(request.getAcademia()));
@@ -122,11 +122,11 @@ public class PublicRegistrationService {
   ) {
     String normalizedRegistrationId = clean(registrationId);
     if (normalizedRegistrationId.isBlank()) {
-      throw new IllegalArgumentException("Inscricao nao encontrada.");
+      throw new IllegalArgumentException("Inscrição não encontrada.");
     }
 
     EventRegistration registration = registrationRepository.findById(normalizedRegistrationId)
-        .orElseThrow(() -> new IllegalArgumentException("Inscricao nao encontrada."));
+        .orElseThrow(() -> new IllegalArgumentException("Inscrição não encontrada."));
 
     RegistrationPaymentStatus normalizedStatus = RegistrationPaymentStatus.fromExternal(request.getStatus());
     registration.setStatus(normalizedStatus.name());
@@ -152,7 +152,7 @@ public class PublicRegistrationService {
 
     Event event = new Event();
     event.setId(eventId);
-    event.setName(required(request.getEventName(), "Nome do evento nao informado."));
+    event.setName(required(request.getEventName(), "Nome do evento não informado."));
     event.setDate(parseDate(request.getEventDate()));
     event.setLocation(clean(request.getEventLocation()));
     event.setRegistrationOpen(true);
@@ -189,7 +189,7 @@ public class PublicRegistrationService {
       String generoRaw,
       String modalidadeRaw
   ) {
-    String nome = required(nomeRaw, "Nome completo e obrigatorio.");
+    String nome = required(nomeRaw, "Nome completo é obrigatório.");
     String categoria = clean(categoriaRaw);
     String faixa = clean(faixaRaw);
     String peso = clean(pesoRaw);

@@ -63,7 +63,7 @@ public class BracketService {
 
   public Bracket getOrThrow(String id) {
     return bracketRepository.findById(id)
-        .orElseThrow(() -> new IllegalArgumentException("Chave nao encontrada."));
+        .orElseThrow(() -> new IllegalArgumentException("Chave não encontrada."));
   }
 
   private void apply(Bracket bracket, BracketRequest request) {

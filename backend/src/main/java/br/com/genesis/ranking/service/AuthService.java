@@ -34,7 +34,7 @@ public class AuthService {
   public AuthResponse login(LoginRequest request) {
     String username = userService.normalizeUsername(request.getUsername());
     User user = userRepository.findByUsernameIgnoreCase(username)
-        .orElseThrow(() -> new IllegalArgumentException("Usuario nao encontrado."));
+        .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado."));
 
     if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
       throw new IllegalArgumentException("Senha incorreta.");

@@ -3,7 +3,7 @@ package br.com.genesis.ranking.dto;
 import jakarta.validation.constraints.NotBlank;
 
 public class RegistrationPaymentStatusRequest {
-  @NotBlank(message = "Status de pagamento invalido.")
+  @NotBlank(message = "Status de pagamento inválido.")
   private String status;
 
   private String reviewNotes;

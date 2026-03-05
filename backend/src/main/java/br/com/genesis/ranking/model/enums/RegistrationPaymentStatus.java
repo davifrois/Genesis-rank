@@ -42,7 +42,7 @@ public enum RegistrationPaymentStatus {
     ) {
       return PAYMENT_ERROR;
     }
-    throw new IllegalArgumentException("Status de pagamento invalido.");
+    throw new IllegalArgumentException("Status de pagamento inválido.");
   }
 
   private static String normalize(String value) {

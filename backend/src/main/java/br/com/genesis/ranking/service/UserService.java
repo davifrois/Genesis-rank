@@ -27,7 +27,7 @@ public class UserService {
   public UserResponse createUser(UserCreateRequest request) {
     String username = normalizeUsername(request.getUsername());
     if (userRepository.existsByUsernameIgnoreCase(username)) {
-      throw new IllegalArgumentException("Usuario ja cadastrado.");
+      throw new IllegalArgumentException("Usuário já cadastrado.");
     }
 
     User user = new User();

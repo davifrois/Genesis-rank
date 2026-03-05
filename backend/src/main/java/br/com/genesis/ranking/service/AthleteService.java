@@ -60,7 +60,7 @@ public class AthleteService {
 
   public Athlete getOrThrow(String id) {
     return athleteRepository.findById(id)
-        .orElseThrow(() -> new IllegalArgumentException("Atleta nao encontrado."));
+        .orElseThrow(() -> new IllegalArgumentException("Atleta não encontrado."));
   }
 
   private void apply(Athlete athlete, AthleteRequest request) {

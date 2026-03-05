@@ -58,7 +58,7 @@ public class EventService {
 
   public Event getOrThrow(String id) {
     return eventRepository.findById(id)
-        .orElseThrow(() -> new IllegalArgumentException("Evento nao encontrado."));
+        .orElseThrow(() -> new IllegalArgumentException("Evento não encontrado."));
   }
 
   private void apply(Event event, EventRequest request) {
@@ -82,7 +82,7 @@ public class EventService {
     try {
       return LocalDate.parse(value.trim());
     } catch (DateTimeParseException ex) {
-      throw new IllegalArgumentException("Data invalida. Use formato YYYY-MM-DD.");
+      throw new IllegalArgumentException("Data inválida. Use o formato YYYY-MM-DD.");
     }
   }
 

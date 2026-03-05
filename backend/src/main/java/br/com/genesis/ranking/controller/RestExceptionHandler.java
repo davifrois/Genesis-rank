@@ -39,7 +39,7 @@ public class RestExceptionHandler {
       MethodArgumentNotValidException ex,
       HttpServletRequest request
   ) {
-    String message = "Dados invalidos.";
+    String message = "Dados inválidos.";
     FieldError error = ex.getBindingResult().getFieldError();
     if (error != null) {
       message = error.getDefaultMessage();

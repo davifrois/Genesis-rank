@@ -31,3 +31,11 @@ app:
       password: ${BOOTSTRAP_ADMIN_PASS:admin123}
       name: ${BOOTSTRAP_ADMIN_NAME:Administrador}
       role: ${BOOTSTRAP_ADMIN_ROLE:ADMIN}
+  social:
+    instagram:
+      base-url: ${INSTAGRAM_API_BASE_URL:https://graph.instagram.com}
+      web-base-url: ${INSTAGRAM_WEB_BASE_URL:https://www.instagram.com}
+      access-token: ${INSTAGRAM_ACCESS_TOKEN:}
+      user-id: ${INSTAGRAM_USER_ID:}
+      username: ${INSTAGRAM_USERNAME:genesis_esportes}
+      default-limit: ${INSTAGRAM_FEED_LIMIT:10}

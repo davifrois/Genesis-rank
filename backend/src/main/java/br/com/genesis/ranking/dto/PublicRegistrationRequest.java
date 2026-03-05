@@ -3,7 +3,7 @@ package br.com.genesis.ranking.dto;
 import jakarta.validation.constraints.NotBlank;
 
 public class PublicRegistrationRequest {
-  @NotBlank(message = "Evento invalido.")
+  @NotBlank(message = "Evento inválido.")
   private String eventId;
 
   private String clientRequestId;
@@ -11,7 +11,7 @@ public class PublicRegistrationRequest {
   private String eventDate;
   private String eventLocation;
 
-  @NotBlank(message = "Nome completo e obrigatorio.")
+  @NotBlank(message = "Nome completo é obrigatório.")
   private String nome;
 
   private String email;
