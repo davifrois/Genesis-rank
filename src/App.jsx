@@ -488,12 +488,7 @@ const AppLayout = () => {
     {
       label: copy.nav.news,
       activePaths: ['/noticias'],
-      items: [
-        { label: copy.newsMenu.blog, path: '/noticias' },
-        { label: copy.newsMenu.videos, path: '/noticias' },
-        { label: copy.newsMenu.magazine, path: '/noticias' },
-        { label: copy.newsMenu.social, path: '/noticias#midias-sociais' }
-      ]
+      path: '/noticias'
     },
     {
       label: copy.nav.regulations,
