@@ -7,85 +7,99 @@ const About = () => {
 
   const copy = isEnglish
     ? {
-        kicker: 'About',
+        kicker: 'About Genesis',
         title: 'Genesis Esportes',
-        subtitle: 'Company profile, mission and values.',
-        companyTitle: 'The company',
+        subtitle:
+          'Institutional profile, mission, values and complete operational expertise for Jiu-Jitsu championships.',
+        highlights: [
+          { value: '2017', label: 'Founded in Belo Horizonte' },
+          { value: '27.835.080/0001-51', label: 'Registered CNPJ' },
+          { value: 'End to End', label: 'Complete event operation' }
+        ],
+        companyTitle: 'Who we are',
+        companyLead:
+          'Genesis Esportes is a specialized sports management company focused on Jiu-Jitsu competitions and ranking operations.',
         companyText:
-          'Genesis Esportes is a company specialized in organizing and running Jiu-Jitsu events. Founded in 2017, based in Belo Horizonte and registered under CNPJ 27.835.080/0001-51, we support major events in Minas Gerais. We have the full material and professional structure needed to support clients in every event stage. We are specialists in every area involved in Jiu-Jitsu events and we provide tools that simplify creation and execution of competitive events.',
+          'Since 2017, we provide professional support from strategic planning to final delivery, combining on-site execution and digital systems. Our team works with technical rigor, practical experience and specialized tools to ensure organization, predictability and quality across every event stage.',
         missionTitle: 'Our mission',
         missionText:
-          'Our mission is to provide a high excellence service that helps clients organize and run events with maximum quality for all athletes.',
-        valuesTitle: 'Our values',
+          'Deliver high-standard service for organizers, federations, academies and athletes, ensuring reliable planning, efficient execution and transparent management in every championship.',
+        valuesTitle: 'Our institutional values',
         values: [
-          'Market credibility.',
-          'Commitment and partnership.',
-          'Speed in delivery.',
-          'Responsibility and transparency.',
-          'Ethics and results delivery.',
-          'Competence and excellence in service.'
+          'Credibility and technical consistency in every delivery.',
+          'Commitment to strategic partnership with each client.',
+          'Responsibility, transparency and ethical conduct.',
+          'Operational agility without compromising quality standards.',
+          'Focus on measurable results and continuous improvement.',
+          'Professional service excellence across all channels.'
         ],
-        whyTitle: 'Why hire Genesis Esportes?',
+        whyTitle: 'Why choose Genesis Esportes?',
         whyItems: [
-          'We are specialists in organizing any format of Jiu-Jitsu event.',
-          'We use modern digital tools that accelerate and improve each event model.',
-          'We build your event from project planning to execution.',
-          'Event promotion in our platforms.',
-          'We handle brackets, schedule and registration management.',
-          'We set up and remove the complete physical event structure.',
-          '24/7 online customer support.',
-          'Specialized and experienced professional team.',
-          'We deliver your event from start to finish.'
+          'Specialized planning for different event formats and audience sizes.',
+          'Modern digital systems for registrations, ranking and brackets.',
+          'Operational control of schedules, categories and athlete flow.',
+          'Qualified communication and promotion in our channels.',
+          'On-site structure setup and takedown with technical supervision.',
+          'Experienced team prepared for critical competition moments.',
+          'Dedicated support before, during and after the event.',
+          'Single partner capable of delivering complete end-to-end execution.'
         ],
-        benefitsTitle: 'Advantages when hiring us',
+        benefitsTitle: 'Strategic benefits for your event',
         benefits: [
-          'Reduces your operational workload.',
-          'Specialized and experienced team.',
-          'Higher assertiveness in handling critical issues.',
-          'Better event organization.',
-          'Avoids operational errors.',
-          'Better control across planning and execution.'
+          'Lower operational overload for organizers and coordination teams.',
+          'Higher process control with more predictability and governance.',
+          'Fewer operational failures through standardized procedures.',
+          'Faster decisions based on qualified event data.',
+          'Better experience for athletes, teams and partners.',
+          'Stronger event reputation and institutional credibility.'
         ]
       }
     : {
-        kicker: 'Sobre',
+        kicker: 'Sobre a Genesis',
         title: 'Genesis Esportes',
-        subtitle: 'Perfil da empresa, missão e valores.',
-        companyTitle: 'A EMPRESA',
+        subtitle:
+          'Perfil institucional, missão, valores e atuação completa na organização de campeonatos de Jiu-Jitsu.',
+        highlights: [
+          { value: '2017', label: 'Fundada em Belo Horizonte' },
+          { value: '27.835.080/0001-51', label: 'CNPJ regularizado' },
+          { value: 'Ponta a ponta', label: 'Operação completa de eventos' }
+        ],
+        companyTitle: 'Quem somos',
+        companyLead:
+          'A Genesis Esportes é uma empresa especializada em gestão esportiva, com foco em campeonatos de Jiu-Jitsu e operações de ranking.',
         companyText:
-          'A Genesis Esportes é uma empresa especializada na organização e realização de eventos de Jiu-Jitsu. Fundada em 2017, com sede em Belo Horizonte e registrada sob o CNPJ 27.835.080/0001-51, atende aos principais eventos realizados em Minas Gerais. Contamos com estrutura material e equipe profissional para oferecer o suporte necessário em todas as etapas do evento. Somos especialistas nas áreas que envolvem competições de Jiu-Jitsu e dispomos de ferramentas que facilitam a criação e a execução de eventos competitivos.',
-        missionTitle: 'NOSSA MISSÃO',
+          'Desde 2017, entregamos suporte profissional desde o planejamento estratégico até a execução final, unindo operação presencial e digital. Nossa equipe atua com rigor técnico, experiência prática e ferramentas especializadas para garantir organização, previsibilidade e qualidade em todas as etapas do evento.',
+        missionTitle: 'Nossa missão',
         missionText:
-          'A missão da Genesis Esportes é prestar um serviço de alta excelência, auxiliando o cliente na organização e realização de eventos com qualidade máxima para todos os atletas.',
-        valuesTitle: 'NOSSOS VALORES',
+          'Prestar serviços de alto padrão para organizadores, federações, academias e atletas, assegurando planejamento confiável, execução eficiente e gestão transparente em cada campeonato.',
+        valuesTitle: 'Nossos valores institucionais',
         values: [
-          'Credibilidade no mercado.',
-          'Comprometimento e parceria.',
-          'Rapidez na entrega.',
-          'Responsabilidade e transparência.',
-          'Ética e entrega de resultados.',
-          'Competência e excelência no atendimento.'
+          'Credibilidade e consistência técnica em cada entrega.',
+          'Comprometimento com parceria estratégica junto ao cliente.',
+          'Responsabilidade, transparência e conduta ética.',
+          'Agilidade operacional sem perder padrão de qualidade.',
+          'Foco em resultados mensuráveis e melhoria contínua.',
+          'Excelência profissional no atendimento em todos os canais.'
         ],
-        whyTitle: 'POR QUE CONTRATAR A GENESIS ESPORTES?',
+        whyTitle: 'Por que escolher a Genesis Esportes?',
         whyItems: [
-          'Somos especialistas em realizar e organizar qualquer formato de evento de Jiu-Jitsu.',
-          'Possuímos ferramentas digitais modernas que agilizam e oferecem a melhor solução para cada modelo de evento.',
-          'Desenvolvemos seu evento desde a elaboração do projeto.',
-          'Realizamos a divulgação do seu evento em nossas plataformas.',
-          'Executamos o chaveamento, o cronograma e o recebimento de inscrições.',
-          'Montamos e desmontamos toda a estrutura física do seu evento.',
-          'Suporte ao cliente disponível on-line 24h.',
-          'Equipe de profissionais especializada e experiente.',
-          'Realizamos seu evento do início ao fim.'
+          'Planejamento especializado para diferentes formatos e portes de evento.',
+          'Sistemas digitais modernos para inscrições, ranking e chaveamento.',
+          'Controle operacional de cronograma, categorias e fluxo de atletas.',
+          'Comunicação e divulgação qualificada em nossos canais.',
+          'Montagem e desmontagem da estrutura física com supervisão técnica.',
+          'Equipe experiente preparada para momentos críticos de competição.',
+          'Acompanhamento dedicado antes, durante e após o campeonato.',
+          'Um único parceiro capaz de entregar execução completa de ponta a ponta.'
         ],
-        benefitsTitle: 'QUAIS SÃO AS VANTAGENS AO NOS CONTRATAR?',
+        benefitsTitle: 'Benefícios estratégicos para o seu evento',
         benefits: [
-          'Reduz a sua sobrecarga de trabalho com o evento.',
-          'Equipe especializada e com experiência.',
-          'Maior assertividade no tratamento das questões.',
-          'Organiza melhor o evento.',
-          'Evita erros operacionais.',
-          'Melhor controle na organização.'
+          'Redução da sobrecarga operacional para organizadores e coordenação.',
+          'Maior controle dos processos com previsibilidade e governança.',
+          'Menos falhas operacionais por meio de procedimentos padronizados.',
+          'Decisões mais rápidas com base em dados qualificados do evento.',
+          'Melhor experiência para atletas, equipes e parceiros envolvidos.',
+          'Fortalecimento da reputação e da credibilidade institucional do campeonato.'
         ]
       };
 
@@ -100,9 +114,21 @@ const About = () => {
       </section>
 
       <section className="public-section">
+        <div className="about-highlights">
+          {copy.highlights.map((item) => (
+            <article className="about-highlight-card" key={item.label}>
+              <strong>{item.value}</strong>
+              <span>{item.label}</span>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="public-section">
         <div className="content-grid about-grid">
           <article className="content-card about-card">
             <h3>{copy.companyTitle}</h3>
+            <p className="about-card__lead">{copy.companyLead}</p>
             <p>{copy.companyText}</p>
           </article>
           <article className="content-card about-card">

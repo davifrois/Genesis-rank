@@ -6899,25 +6899,70 @@ select {
 }
 
 .about-grid {
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 1.5rem;
 }
 
-.about-card {
-  padding: 1.8rem;
+.about-highlights {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 1rem;
 }
 
+.about-highlight-card {
+  background: linear-gradient(150deg, rgba(19, 31, 48, 0.92), rgba(11, 19, 32, 0.96));
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  border-radius: 16px;
+  padding: 1.15rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.about-highlight-card strong {
+  font-family: var(--font-display);
+  font-size: clamp(1.08rem, 1.7vw, 1.34rem);
+  color: #f3f4f6;
+  line-height: 1.15;
+}
+
+.about-highlight-card span {
+  font-size: 0.9rem;
+  color: rgba(203, 213, 225, 0.92);
+  line-height: 1.45;
+}
+
+.about-card {
+  padding: 2.15rem;
+  gap: 1.1rem;
+}
+
+.about-card h3 {
+  font-family: var(--font-display);
+  font-size: clamp(1.18rem, 1.55vw, 1.48rem);
+  letter-spacing: 0.01em;
+  color: #f8fafc;
+  line-height: 1.2;
+}
+
+.about-card__lead {
+  font-size: clamp(1.01rem, 1.2vw, 1.1rem);
+  color: rgba(241, 245, 249, 0.98);
+  line-height: 1.82;
+  font-weight: 500;
+}
+
 .about-card p {
-  color: var(--muted-strong);
-  line-height: 1.85;
+  font-size: clamp(0.98rem, 1.08vw, 1.06rem);
+  color: rgba(214, 224, 240, 0.95);
+  line-height: 1.92;
   text-wrap: pretty;
 }
 
 .about-card .text-list {
-  gap: 0.85rem;
-  font-size: 0.92rem;
-  line-height: 1.7;
+  gap: 0.9rem;
+  font-size: clamp(0.96rem, 1.03vw, 1.03rem);
+  line-height: 1.76;
 }
 
 @media (max-width: 820px) {
@@ -6925,8 +6970,21 @@ select {
     grid-template-columns: 1fr;
   }
 
+  .about-highlights {
+    grid-template-columns: 1fr;
+  }
+
+  .about-highlight-card {
+    padding: 1.02rem 1.08rem;
+  }
+
   .about-card {
-    padding: 1.35rem;
+    padding: 1.5rem;
+  }
+
+  .about-card p,
+  .about-card .text-list {
+    font-size: 0.98rem;
   }
 }
 
