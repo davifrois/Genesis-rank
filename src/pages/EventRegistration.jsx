@@ -1,13 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useStore } from '../hooks/useStore';
 import { publicRegistrationService } from '../services/publicRegistrationService';
 import { formatBrlCurrency, normalizeEventFees, resolveEventPixKey } from '../utils/eventPricing';
+import LoginOverlay from '../components/LoginOverlay';
 
 const CURRENT_YEAR = new Date().getFullYear();
-const YEARS = Array.from({ length: 70 }, (_, index) => CURRENT_YEAR - index);
-
-const BELT_OPTIONS = ['Branca', 'Cinza', 'Laranja', 'Verde', 'Azul', 'Roxa', 'Marrom', 'Preta'];
 const YOUTH_CATEGORIES = ['Juvenil', 'Infantil', 'Infantojuvenil'];
 const GI_MALE_WEIGHTS = ['Galo', 'Pluma', 'Pena', 'Leve', 'Médio', 'Meio Pesado', 'Pesado', 'Super Pesado', 'Pesadíssimo'];
 const GI_FEMALE_WEIGHTS = ['Galo', 'Pluma', 'Pena', 'Leve', 'Médio', 'Meio Pesado', 'Pesado', 'Super Pesado', 'Pesadíssimo'];
@@ -56,11 +54,42 @@ const normalizeLookup = (value) => (
 );
 
 const compactLookup = (value) => normalizeLookup(value).replace(/\s+/g, '');
+const emailLocalPart = (value) => {
+  const text = (value || '').toString().trim();
+  if (!text) return '';
+  const local = text.includes('@') ? text.split('@')[0] : text;
+  return normalizeLookup(local);
+};
 
 const computeAge = (year) => {
   const parsed = Number(year);
   if (!Number.isFinite(parsed) || parsed <= 1900) return '';
   return String(CURRENT_YEAR - parsed);
+};
+
+const normalizeGenderLabel = (value) => {
+  const raw = (value || '')
+    .toString()
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  if (raw === 'f') return 'Feminino';
+  if (raw === 'm') return 'Masculino';
+  if (raw.startsWith('fem')) return 'Feminino';
+  if (raw.startsWith('mas')) return 'Masculino';
+  return '';
+};
+
+const resolveCategoryByAge = (ageValue) => {
+  const age = Number(ageValue);
+  if (!Number.isFinite(age) || age < 0) return '';
+  if (age >= 30) return 'Master';
+  if (age >= 18) return 'Adulto';
+  if (age >= 16) return 'Juvenil';
+  if (age >= 12) return 'Infantojuvenil';
+  return 'Infantil';
 };
 
 const resolveBirthYear = (profile) => {
@@ -78,7 +107,6 @@ const resolveBirthYear = (profile) => {
 const getModeLabel = (value) => {
   if (value === 'GI') return 'GI';
   if (value === 'NO-GI') return 'NO-GI';
-  if (value === 'COMBO') return 'Combo GI + NO-GI';
   return '-';
 };
 
@@ -104,7 +132,6 @@ const EventRegistration = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [form, setForm] = useState(createInitialForm);
-  const [selectedMemberId, setSelectedMemberId] = useState('');
   const academyOptions = useMemo(() => (
     [...academies].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
   ), [academies]);
@@ -112,13 +139,7 @@ const EventRegistration = () => {
     academies.find((academy) => academy.id === form.academyId) || null
   ), [academies, form.academyId]);
 
-  const memberOptions = useMemo(() => (
-    [...memberProfiles]
-      .filter((profile) => profile?.id && profile?.fullName)
-      .sort((a, b) => (a.fullName || '').localeCompare(b.fullName || ''))
-  ), [memberProfiles]);
-
-  const resolveAcademyIdForProfile = (profile) => {
+  const resolveAcademyIdForProfile = useCallback((profile) => {
     if (!profile) return '';
     if (profile.academyId) return profile.academyId;
     if (!profile.academyName) return '';
@@ -126,24 +147,31 @@ const EventRegistration = () => {
       normalizeLookup(academy.name) === normalizeLookup(profile.academyName)
     ));
     return academyByName?.id || '';
-  };
+  }, [academyOptions]);
 
   const currentUserProfile = useMemo(() => {
     if (!currentUser) return null;
 
     const normalizedUserName = normalizeLookup(currentUser.name || '');
     const normalizedUsername = normalizeLookup(currentUser.username || '');
+    const normalizedUsernameLocal = emailLocalPart(currentUser.username || '');
     const compactUserName = compactLookup(currentUser.name || '');
     const compactUsername = compactLookup(currentUser.username || '');
 
-    return memberOptions.find((profile) => {
+    return memberProfiles.find((profile) => {
       const profileFullName = normalizeLookup(profile.fullName || '');
       const profileCompactName = compactLookup(profile.fullName || '');
       const profileEmail = normalizeLookup(profile.email || '');
+      const profileEmailLocal = emailLocalPart(profile.email || '');
       const profileCreatedByUser = normalizeLookup(profile.createdByUsername || '');
+      const profileAccountUsername = normalizeLookup(
+        profile.accountUsername || profile.loginUsername || profile.username || ''
+      );
 
+      if (normalizedUsername && profileAccountUsername === normalizedUsername) return true;
       if (normalizedUsername && profileCreatedByUser === normalizedUsername) return true;
       if (normalizedUsername && profileEmail === normalizedUsername) return true;
+      if (normalizedUsernameLocal && profileEmailLocal === normalizedUsernameLocal) return true;
       if (normalizedUserName && profileFullName === normalizedUserName) return true;
       if (normalizedUsername && profileFullName === normalizedUsername) return true;
       if (compactUserName && profileCompactName && (
@@ -159,12 +187,13 @@ const EventRegistration = () => {
 
       return false;
     }) || null;
-  }, [currentUser, memberOptions]);
+  }, [currentUser, memberProfiles]);
 
   const age = computeAge(form.anoNascimento);
+  const autoCategory = resolveCategoryByAge(age);
   const isYouthCategory = YOUTH_CATEGORIES.includes(form.categoriaConfirmada);
-  const requiresGi = form.tipoInscricao === 'GI' || form.tipoInscricao === 'COMBO';
-  const requiresNoGi = form.tipoInscricao === 'NO-GI' || form.tipoInscricao === 'COMBO';
+  const requiresGi = form.tipoInscricao === 'GI';
+  const requiresNoGi = form.tipoInscricao === 'NO-GI';
 
   const activeGiField = useMemo(() => {
     if (isYouthCategory) return 'juvenilPeso';
@@ -193,13 +222,14 @@ const EventRegistration = () => {
   const giWeightValue = form[activeGiField] || '';
   const noGiWeightValue = form[activeNoGiField] || '';
   const resolvedWeight = giWeightValue || noGiWeightValue || '';
+  const selectedWeightOptions = form.tipoInscricao === 'NO-GI' ? noGiWeightOptions : giWeightOptions;
+  const selectedWeightValue = form.tipoInscricao === 'NO-GI' ? noGiWeightValue : giWeightValue;
 
   const eventFees = useMemo(() => normalizeEventFees(event || {}), [event]);
   const eventPixKey = useMemo(() => resolveEventPixKey(event || {}), [event]);
   const basePrice = age && Number(age) <= 15 ? eventFees.under15 : eventFees.over15;
-  const isCombo = form.tipoInscricao === 'COMBO';
   const includesAbsolute = form.absolutoGi === 'SIM';
-  const totalValue = (form.tipoInscricao ? (isCombo ? eventFees.combo : basePrice) : 0)
+  const totalValue = (form.tipoInscricao ? basePrice : 0)
     + (includesAbsolute ? eventFees.absolute : 0);
 
   const canPickWeights = Boolean(form.genero) && Boolean(form.categoriaConfirmada);
@@ -230,26 +260,18 @@ const EventRegistration = () => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSelectMember = (memberId) => {
-    setSelectedMemberId(memberId);
-    if (!memberId) return;
-
-    const profile = memberOptions.find((item) => item.id === memberId);
-    if (!profile) return;
-
-    const resolvedAcademyId = resolveAcademyIdForProfile(profile);
-
-    setForm((prev) => ({
-      ...prev,
-      nome: profile.fullName || prev.nome,
-      academyId: resolvedAcademyId,
-      equipe: profile.academyName || prev.equipe,
-      athletePhotoUrl: profile.photoUrl || prev.athletePhotoUrl,
-      anoNascimento: resolveBirthYear(profile) || prev.anoNascimento,
-      faixa: profile.belt || prev.faixa,
-      telefone: profile.phone || prev.telefone,
-      email: profile.email || prev.email
-    }));
+  const handleWeightChange = (value) => {
+    setForm((prev) => {
+      const next = { ...prev };
+      if (prev.tipoInscricao === 'NO-GI') {
+        next[activeNoGiField] = value;
+        next[activeGiField] = '';
+      } else {
+        next[activeGiField] = value;
+        next[activeNoGiField] = '';
+      }
+      return next;
+    });
   };
 
   useEffect(() => {
@@ -277,55 +299,35 @@ const EventRegistration = () => {
   }, [currentUser]);
 
   useEffect(() => {
-    if (!currentUserProfile || selectedMemberId) return;
+    if (!currentUserProfile) return;
     const resolvedAcademyId = resolveAcademyIdForProfile(currentUserProfile);
-    setSelectedMemberId(currentUserProfile.id);
+    const birthYear = resolveBirthYear(currentUserProfile);
+    const profileAge = birthYear ? computeAge(birthYear) : `${currentUserProfile.age || ''}`;
+    const inferredCategory = resolveCategoryByAge(profileAge);
+    const inferredGender = normalizeGenderLabel(
+      currentUserProfile.gender || currentUserProfile.genero || currentUserProfile.sexo || ''
+    );
+
     setForm((prev) => ({
       ...prev,
       nome: currentUserProfile.fullName || prev.nome,
       academyId: resolvedAcademyId || prev.academyId,
       equipe: currentUserProfile.academyName || prev.equipe,
       athletePhotoUrl: currentUserProfile.photoUrl || prev.athletePhotoUrl,
-      anoNascimento: resolveBirthYear(currentUserProfile) || prev.anoNascimento,
+      anoNascimento: birthYear || prev.anoNascimento,
+      genero: inferredGender || prev.genero,
+      categoriaConfirmada: inferredCategory || prev.categoriaConfirmada,
       faixa: currentUserProfile.belt || prev.faixa,
       telefone: currentUserProfile.phone || prev.telefone,
       email: currentUserProfile.email || prev.email
     }));
-  }, [currentUserProfile, selectedMemberId, academyOptions]);
+  }, [currentUserProfile, resolveAcademyIdForProfile]);
 
-  const handleGenderChange = (value) => {
-    setForm((prev) => {
-      const next = { ...prev, genero: value };
-      if (value === 'Masculino') {
-        next.giFemPeso = '';
-        next.noGiFem = '';
-        next.noGiJuvenilFem = '';
-      }
-      if (value === 'Feminino') {
-        next.giMascPeso = '';
-        next.noGiMasc = '';
-        next.noGiJuvenilMasc = '';
-      }
-      return next;
-    });
-  };
-
-  const handleCategoryChange = (value) => {
-    setForm((prev) => {
-      const next = { ...prev, categoriaConfirmada: value };
-      if (YOUTH_CATEGORIES.includes(value)) {
-        next.giMascPeso = '';
-        next.giFemPeso = '';
-        next.noGiMasc = '';
-        next.noGiFem = '';
-      } else {
-        next.juvenilPeso = '';
-        next.noGiJuvenilMasc = '';
-        next.noGiJuvenilFem = '';
-      }
-      return next;
-    });
-  };
+  useEffect(() => {
+    if (!autoCategory) return;
+    if (form.categoriaConfirmada === autoCategory) return;
+    setForm((prev) => ({ ...prev, categoriaConfirmada: autoCategory }));
+  }, [autoCategory, form.categoriaConfirmada]);
 
   const handleTypeChange = (value) => {
     setForm((prev) => {
@@ -340,7 +342,6 @@ const EventRegistration = () => {
         next.giMascPeso = '';
         next.giFemPeso = '';
         next.juvenilPeso = '';
-        next.absolutoGi = '';
       }
       return next;
     });
@@ -394,22 +395,6 @@ const EventRegistration = () => {
     }
   };
 
-  const handleAthletePhotoFile = (eventFile) => {
-    const file = eventFile.target.files?.[0];
-    if (!file) {
-      updateField('athletePhotoUrl', '');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      updateField('athletePhotoUrl', typeof reader.result === 'string' ? reader.result : '');
-    };
-    reader.onerror = () => {
-      setError('Falha ao ler a foto do atleta.');
-    };
-    reader.readAsDataURL(file);
-  };
-
   useEffect(() => {
     if (!selectedAcademy) return;
     setForm((prev) => (
@@ -445,20 +430,28 @@ const EventRegistration = () => {
       setError('Evento não encontrado.');
       return;
     }
+    if (!currentUserProfile) {
+      setError('Complete seus dados em Minha conta para continuar.');
+      return;
+    }
     if (!form.genero) {
-      setError('Selecione o gênero do atleta.');
+      setError('Gênero não identificado. Atualize seus dados em Minha conta.');
       return;
     }
     if (academyOptions.length > 0 && !form.academyId) {
-      setError('Selecione a academia cadastrada.');
+      setError('Academia não identificada. Atualize seus dados em Minha conta.');
       return;
     }
-    if (!form.equipe.trim()) {
-      setError('Informe a equipe do atleta.');
+    if (!form.equipe.trim() || !form.nome.trim()) {
+      setError('Dados do atleta incompletos. Atualize seus dados em Minha conta.');
       return;
     }
-    if (!form.categoriaConfirmada || !form.tipoInscricao || !form.faixa) {
-      setError('Preencha categoria, tipo de inscrição e faixa.');
+    if (!form.categoriaConfirmada || !form.faixa) {
+      setError('Categoria ou faixa ausente. Atualize seus dados em Minha conta.');
+      return;
+    }
+    if (!form.tipoInscricao) {
+      setError('Selecione se deseja competir em GI ou NO-GI.');
       return;
     }
     if (requiresGi && !giWeightValue) {
@@ -480,6 +473,10 @@ const EventRegistration = () => {
 
     setSubmitting(true);
     try {
+      const categoriaFinal = includesAbsolute
+        ? `${form.categoriaConfirmada} Absoluto`
+        : form.categoriaConfirmada;
+
       const notesPayload = {
         academyId: form.academyId,
         academyName: form.equipe,
@@ -488,8 +485,10 @@ const EventRegistration = () => {
         anoNascimento: form.anoNascimento,
         idade: age,
         categoriaConfirmada: form.categoriaConfirmada,
+        categoriaFinal,
         tipoInscricao: form.tipoInscricao,
         faixa: form.faixa,
+        genero: form.genero,
         giMascPeso: form.giMascPeso,
         giFemPeso: form.giFemPeso,
         juvenilPeso: form.juvenilPeso,
@@ -511,6 +510,7 @@ const EventRegistration = () => {
         feeCombo: eventFees.combo,
         feeAbsolute: eventFees.absolute,
         totalValue,
+        absoluto: includesAbsolute,
         observacoes: form.observacoes
       };
 
@@ -525,7 +525,7 @@ const EventRegistration = () => {
         academia: form.equipe,
         faixa: form.faixa,
         peso: resolvedWeight,
-        categoria: form.categoriaConfirmada,
+        categoria: categoriaFinal,
         genero: form.genero,
         modalidade: form.tipoInscricao === 'NO-GI' ? 'NO-GI' : 'GI',
         notes: JSON.stringify(notesPayload)
@@ -544,10 +544,12 @@ const EventRegistration = () => {
           fullName: form.nome,
           academyId: form.academyId,
           academyName: form.equipe,
+          accountUsername: currentUser?.username || '',
           email: form.email,
           phone: form.telefone,
           birthDate: form.anoNascimento ? `${form.anoNascimento}-01-01` : '',
           age,
+          gender: form.genero,
           belt: form.faixa,
           weight: resolvedWeight,
           photoUrl: form.athletePhotoUrl
@@ -558,7 +560,6 @@ const EventRegistration = () => {
 
       setSuccess('Inscrição enviada com sucesso e salva no banco de dados.');
       setForm(createInitialForm());
-      setSelectedMemberId('');
     } catch (err) {
       setError(err?.message || 'Falha ao enviar inscrição.');
     } finally {
@@ -572,6 +573,47 @@ const EventRegistration = () => {
         <div className="registration-shell">
           <h2>Evento não encontrado</h2>
           <Link className="text-link" to="/eventos">Voltar para eventos</Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return <LoginOverlay redirectTo={`/eventos/${event.id}/inscricao`} />;
+  }
+
+  if (!currentUserProfile) {
+    return (
+      <div className="registration-page">
+        <div className="registration-shell">
+          <h2>Complete seu cadastro antes de se inscrever</h2>
+          <p className="table-meta">
+            Não localizamos seu perfil de atleta. Complete seus dados para liberar a inscrição.
+          </p>
+          <Link className="btn btn-primary" to="/minha-conta">Ir para Minha conta</Link>
+        </div>
+      </div>
+    );
+  }
+
+  const missingAccountData = !form.nome
+    || !form.equipe
+    || !form.anoNascimento
+    || !form.genero
+    || !form.categoriaConfirmada
+    || !form.faixa
+    || !form.email
+    || !form.telefone;
+
+  if (missingAccountData) {
+    return (
+      <div className="registration-page">
+        <div className="registration-shell">
+          <h2>Dados incompletos na sua conta</h2>
+          <p className="table-meta">
+            Atualize sua conta com nome, academia, nascimento, gênero, faixa, telefone e e-mail.
+          </p>
+          <Link className="btn btn-primary" to="/minha-conta">Atualizar cadastro</Link>
         </div>
       </div>
     );
@@ -598,52 +640,10 @@ const EventRegistration = () => {
               </div>
 
               <div className="registration-fieldset">
-                <label className="registration-label">Cadastro na filiação</label>
-                <div className="registration-member-row">
-                  <select
-                    value={selectedMemberId}
-                    onChange={(eventInput) => handleSelectMember(eventInput.target.value)}
-                  >
-                    <option value="">Selecionar atleta cadastrado</option>
-                    {memberOptions.map((profile) => (
-                      <option key={profile.id} value={profile.id}>
-                        {profile.fullName}{profile.academyName ? ` - ${profile.academyName}` : ''}
-                      </option>
-                    ))}
-                  </select>
-                  <Link className="btn btn-ghost" to="/filiacao?tab=member">
-                    Cadastrar novo atleta
-                  </Link>
-                </div>
+                <label className="registration-label">Dados vinculados à sua conta</label>
                 <small className="registration-helper">
-                  Selecione um atleta da filiação para preencher os dados automaticamente.
+                  Nome, faixa, idade, categoria e gênero são carregados automaticamente da sua conta.
                 </small>
-              </div>
-
-              <div className="registration-fieldset">
-                <label className="registration-label">Gênero *</label>
-                <div className="registration-radio-row">
-                  <label>
-                    <input
-                      type="radio"
-                      name="genero"
-                      value="Masculino"
-                      checked={form.genero === 'Masculino'}
-                      onChange={(eventInput) => handleGenderChange(eventInput.target.value)}
-                    />
-                    Masculino
-                  </label>
-                  <label>
-                    <input
-                      type="radio"
-                      name="genero"
-                      value="Feminino"
-                      checked={form.genero === 'Feminino'}
-                      onChange={(eventInput) => handleGenderChange(eventInput.target.value)}
-                    />
-                    Feminino
-                  </label>
-                </div>
               </div>
 
               <div className="registration-grid">
@@ -652,54 +652,24 @@ const EventRegistration = () => {
                   <input
                     required
                     value={form.nome}
-                    onChange={(eventInput) => updateField('nome', eventInput.target.value)}
-                    placeholder="Nome do atleta completo"
+                    readOnly
+                    placeholder="-"
                   />
                 </div>
 
                 <div className="registration-field">
                   <label>Academia / Equipe *</label>
-                  {academyOptions.length ? (
-                    <select
-                      required
-                      value={form.academyId}
-                      onChange={(eventInput) => {
-                        const nextAcademyId = eventInput.target.value;
-                        const nextAcademy = academyOptions.find((academy) => academy.id === nextAcademyId);
-                        setForm((prev) => ({
-                          ...prev,
-                          academyId: nextAcademyId,
-                          equipe: nextAcademy ? nextAcademy.name : ''
-                        }));
-                      }}
-                    >
-                      <option value="">Selecione a academia</option>
-                      {academyOptions.map((academy) => (
-                        <option key={academy.id} value={academy.id}>{academy.name}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      required
-                      value={form.equipe}
-                      onChange={(eventInput) => updateField('equipe', eventInput.target.value)}
-                      placeholder="Nome da equipe"
-                    />
-                  )}
+                  <input
+                    required
+                    value={form.equipe}
+                    readOnly
+                    placeholder="-"
+                  />
                 </div>
 
                 <div className="registration-field">
                   <label>Ano de nascimento *</label>
-                  <select
-                    required
-                    value={form.anoNascimento}
-                    onChange={(eventInput) => updateField('anoNascimento', eventInput.target.value)}
-                  >
-                    <option value="">Selecione o ano</option>
-                    {YEARS.map((year) => (
-                      <option key={year} value={year}>{year}</option>
-                    ))}
-                  </select>
+                  <input value={form.anoNascimento} readOnly placeholder="-" />
                 </div>
 
                 <div className="registration-field">
@@ -707,21 +677,43 @@ const EventRegistration = () => {
                   <input value={age} readOnly placeholder="-" />
                 </div>
 
+                <div className="registration-field">
+                  <label>Gênero</label>
+                  <input value={form.genero} readOnly placeholder="-" />
+                </div>
+
+                <div className="registration-field">
+                  <label>Categoria</label>
+                  <input value={form.categoriaConfirmada} readOnly placeholder="-" />
+                </div>
+
+                <div className="registration-field">
+                  <label>Faixa</label>
+                  <input value={form.faixa} readOnly placeholder="-" />
+                </div>
+
+                <div className="registration-field">
+                  <label>E-mail</label>
+                  <input value={form.email} readOnly placeholder="-" />
+                </div>
+
+                <div className="registration-field">
+                  <label>Telefone</label>
+                  <input value={form.telefone} readOnly placeholder="-" />
+                </div>
+
                 <div className="registration-field registration-field--full">
-                  <label>Foto do atleta (opcional)</label>
+                  <label>Foto do atleta</label>
                   <input
                     value={form.athletePhotoUrl}
-                    onChange={(eventInput) => updateField('athletePhotoUrl', eventInput.target.value)}
-                    placeholder="https://..."
+                    readOnly
+                    placeholder="-"
                   />
-                  <div className="registration-upload-row">
-                    <input type="file" accept="image/*" onChange={handleAthletePhotoFile} />
-                    {form.athletePhotoUrl && (
-                      <div className="registration-photo-preview">
-                        <img src={form.athletePhotoUrl} alt={form.nome || 'Atleta'} />
-                      </div>
-                    )}
-                  </div>
+                  {form.athletePhotoUrl && (
+                    <div className="registration-photo-preview">
+                      <img src={form.athletePhotoUrl} alt={form.nome || 'Atleta'} />
+                    </div>
+                  )}
                 </div>
               </div>
             </section>
@@ -735,18 +727,7 @@ const EventRegistration = () => {
               <div className="registration-grid">
                 <div className="registration-field">
                   <label>Categoria *</label>
-                  <select
-                    required
-                    value={form.categoriaConfirmada}
-                    onChange={(eventInput) => handleCategoryChange(eventInput.target.value)}
-                  >
-                    <option value="">Confirme a categoria</option>
-                    <option value="Adulto">Adulto</option>
-                    <option value="Master">Master</option>
-                    <option value="Juvenil">Juvenil</option>
-                    <option value="Infantil">Infantil</option>
-                    <option value="Infantojuvenil">Infantojuvenil</option>
-                  </select>
+                  <input value={form.categoriaConfirmada} readOnly placeholder="-" />
                 </div>
 
                 <div className="registration-field">
@@ -759,92 +740,42 @@ const EventRegistration = () => {
                     <option value="">Informe o tipo de inscrição</option>
                     <option value="GI">GI</option>
                     <option value="NO-GI">NO-GI</option>
-                    <option value="COMBO">Combo GI + NO-GI</option>
+                  </select>
+                </div>
+
+                <div className="registration-field">
+                  <label>Faixa *</label>
+                  <input value={form.faixa} readOnly placeholder="-" />
+                </div>
+
+                <div className="registration-field">
+                  <label>Categoria de peso *</label>
+                  <select
+                    required={Boolean(form.tipoInscricao)}
+                    value={selectedWeightValue}
+                    disabled={!form.tipoInscricao || !canPickWeights}
+                    onChange={(eventInput) => handleWeightChange(eventInput.target.value)}
+                  >
+                    <option value="">
+                      {form.tipoInscricao ? 'Selecione a categoria de peso' : 'Primeiro selecione GI ou NO-GI'}
+                    </option>
+                    {selectedWeightOptions.map((option) => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
                   </select>
                 </div>
 
                 <div className="registration-field registration-field--full">
-                  <label>Faixa *</label>
-                  <select
-                    required
-                    value={form.faixa}
-                    onChange={(eventInput) => updateField('faixa', eventInput.target.value)}
-                  >
-                    <option value="">Informe a faixa</option>
-                    {BELT_OPTIONS.map((belt) => (
-                      <option key={belt} value={belt}>{belt}</option>
-                    ))}
-                  </select>
+                  <label className="checkbox-inline">
+                    <input
+                      type="checkbox"
+                      checked={form.absolutoGi === 'SIM'}
+                      onChange={(eventInput) => updateField('absolutoGi', eventInput.target.checked ? 'SIM' : 'NAO')}
+                    />
+                    <span>Participar do absoluto</span>
+                  </label>
                 </div>
               </div>
-
-              {requiresGi && (
-                <div className="registration-mode-card">
-                  <h4>Modalidade GI</h4>
-                  <div className="registration-grid">
-                    <div className="registration-field">
-                      <label>
-                        {isYouthCategory
-                          ? 'Categoria de peso para categorias de base (GI) *'
-                          : `Categoria de peso ${form.genero || 'Adulto/Master'} (GI) *`}
-                      </label>
-                      <select
-                        required={requiresGi}
-                        value={giWeightValue}
-                        disabled={!canPickWeights}
-                        onChange={(eventInput) => updateField(activeGiField, eventInput.target.value)}
-                      >
-                        <option value="">
-                          {canPickWeights ? 'Selecione a categoria de peso GI' : 'Primeiro selecione gênero e categoria'}
-                        </option>
-                        {giWeightOptions.map((option) => (
-                          <option key={option} value={option}>{option}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="registration-field">
-                      <label>Absoluto GI</label>
-                      <select
-                        value={form.absolutoGi}
-                        onChange={(eventInput) => updateField('absolutoGi', eventInput.target.value)}
-                      >
-                        <option value="">Não participar</option>
-                        <option value="NAO">Não</option>
-                        <option value="SIM">Sim</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {requiresNoGi && (
-                <div className="registration-mode-card">
-                  <h4>Modalidade NO-GI</h4>
-                  <div className="registration-grid">
-                    <div className="registration-field registration-field--full">
-                      <label>
-                        {isYouthCategory
-                          ? `Categoria de peso para categorias de base ${form.genero || ''} (NO-GI) *`
-                          : `Categoria de peso ${form.genero || 'Adulto/Master'} (NO-GI) *`}
-                      </label>
-                      <select
-                        required={requiresNoGi}
-                        value={noGiWeightValue}
-                        disabled={!canPickWeights}
-                        onChange={(eventInput) => updateField(activeNoGiField, eventInput.target.value)}
-                      >
-                        <option value="">
-                          {canPickWeights ? 'Selecione a categoria de peso NO-GI' : 'Primeiro selecione gênero e categoria'}
-                        </option>
-                        {noGiWeightOptions.map((option) => (
-                          <option key={option} value={option}>{option}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {!form.tipoInscricao && (
                 <p className="registration-helper">Escolha o tipo de inscrição para liberar os campos de peso.</p>
@@ -863,8 +794,8 @@ const EventRegistration = () => {
                   <input
                     required
                     value={form.telefone}
-                    onChange={(eventInput) => updateField('telefone', eventInput.target.value)}
-                    placeholder="(31) 99999-9999"
+                    readOnly
+                    placeholder="-"
                   />
                 </div>
 
@@ -874,8 +805,8 @@ const EventRegistration = () => {
                     required
                     type="email"
                     value={form.email}
-                    onChange={(eventInput) => updateField('email', eventInput.target.value)}
-                    placeholder="voce@exemplo.com"
+                    readOnly
+                    placeholder="-"
                   />
                 </div>
 
@@ -1013,3 +944,5 @@ const EventRegistration = () => {
 };
 
 export default EventRegistration;
+
+

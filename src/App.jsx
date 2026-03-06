@@ -11,11 +11,9 @@ import {
   Mail,
   MapPin,
   Phone,
-  Settings,
   Trophy,
   User,
   Users,
-  Twitter,
   Youtube,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -26,6 +24,7 @@ import Events from './pages/Events';
 import EventDetails from './pages/EventDetails';
 import Home from './pages/Home';
 import Membership from './pages/Membership';
+import MyAccount from './pages/MyAccount';
 import News from './pages/News';
 import Regulations from './pages/Regulations';
 import Ranking from './pages/Ranking';
@@ -176,7 +175,9 @@ const AppLayout = () => {
   const [eventForm, setEventForm] = useState(createEventFormState);
   const [eventError, setEventError] = useState('');
   const [showLogin, setShowLogin] = useState(false);
-  const canAccessAdmin = currentUser?.role === 'admin';
+  const currentUserRole = (currentUser?.role || '').toString().trim().toLowerCase();
+  const canAccessAdmin = currentUserRole === 'admin';
+  const canAccessDashboard = canAccessAdmin || currentUserRole === 'mesario';
   const isAdminRoute = location.pathname === '/admin';
   const isHomeRoute = location.pathname === '/';
   const { language, setLanguage, currentLanguage, languages } = useI18n();
@@ -190,6 +191,10 @@ const AppLayout = () => {
             about: 'About Us',
             organizers: 'Organizers',
             support: 'Support'
+          },
+          supportMenu: {
+            whatsapp: 'WhatsApp',
+            email: 'Send email'
           },
           utility: {
             partnerBrands: 'Partner brands',
@@ -302,6 +307,10 @@ const AppLayout = () => {
             organizers: 'Organizadores',
             support: 'Suporte'
           },
+          supportMenu: {
+            whatsapp: 'WhatsApp',
+            email: 'Enviar e-mail'
+          },
           utility: {
             partnerBrands: 'Marcas parceiras',
             account: 'Conta',
@@ -411,9 +420,21 @@ const AppLayout = () => {
 
   const utilityLinks = useMemo(() => ([
     { label: copy.utilityLinks.about, path: '/institucional' },
-    { label: copy.utilityLinks.organizers, path: '/eventos' },
-    { label: copy.utilityLinks.support, path: '/regulamento' }
-  ]), [copy.utilityLinks.about, copy.utilityLinks.organizers, copy.utilityLinks.support]);
+    { label: copy.utilityLinks.organizers, path: '/eventos' }
+  ]), [copy.utilityLinks.about, copy.utilityLinks.organizers]);
+
+  const supportItems = useMemo(() => ([
+    {
+      label: copy.supportMenu.whatsapp,
+      href: 'https://api.whatsapp.com/send?phone=5531993383014&text=Ol%C3%A1%2C%20preciso%20de%20suporte%20no%20site%20Genesis%20Esportes.',
+      icon: Phone
+    },
+    {
+      label: copy.supportMenu.email,
+      href: 'mailto:contato@genesisesportes.com.br?subject=Suporte%20Genesis%20Esportes',
+      icon: Mail
+    }
+  ]), [copy.supportMenu.email, copy.supportMenu.whatsapp]);
 
   const rankingEventItems = useMemo(() => {
     if (!events?.length) return [];
@@ -477,11 +498,7 @@ const AppLayout = () => {
     {
       label: copy.nav.regulations,
       activePaths: ['/regulamento'],
-      items: [
-        { label: copy.regulationsMenu.rankingRules, path: '/regulamento' },
-        { label: copy.regulationsMenu.pointsSystem, path: '/regulamento' },
-        { label: copy.regulationsMenu.eventLevels, path: '/regulamento' }
-      ]
+      path: '/regulamento'
     }
   ]), [copy]);
 
@@ -548,9 +565,10 @@ const AppLayout = () => {
 
   const accountItems = currentUser
     ? [
-        { label: copy.accountMenu.myAccount, path: '/filiacao?tab=member', icon: User },
-        { label: copy.accountMenu.settings, path: '/filiacao?tab=member', icon: Settings },
-        { label: copy.accountMenu.manageProfiles, path: canAccessAdmin ? '/admin' : '/filiacao?tab=member', icon: Users },
+        { label: copy.accountMenu.myAccount, path: '/minha-conta', icon: User },
+        ...(canAccessDashboard
+          ? [{ label: copy.accountMenu.manageProfiles, path: '/admin', icon: Users }]
+          : []),
         { label: copy.accountMenu.logout, onClick: logout, icon: LogOut }
       ]
     : [
@@ -573,6 +591,23 @@ const AppLayout = () => {
         {Icon && <Icon size={14} />}
         <span>{item.label}</span>
       </Link>
+    );
+  };
+
+  const renderSupportItem = (item) => {
+    const Icon = item.icon;
+    const openInNewTab = /^https?:\/\//i.test(item.href);
+    return (
+      <a
+        key={item.label}
+        className="utility-dropdown__item"
+        href={item.href}
+        target={openInNewTab ? '_blank' : undefined}
+        rel={openInNewTab ? 'noreferrer' : undefined}
+      >
+        {Icon && <Icon size={14} />}
+        <span>{item.label}</span>
+      </a>
     );
   };
 
@@ -642,9 +677,6 @@ const AppLayout = () => {
               <a className="utility-icon" href="https://www.facebook.com/genesis.tatames" target="_blank" rel="noreferrer">
                 <Facebook size={18} />
               </a>
-              <a className="utility-icon" href="https://twitter.com" target="_blank" rel="noreferrer">
-                <Twitter size={18} />
-              </a>
               <a className="utility-icon" href="https://www.youtube.com/channel/UCg9eEbos83Rw4S6fzT4peVA" target="_blank" rel="noreferrer">
                 <Youtube size={18} />
               </a>
@@ -660,6 +692,15 @@ const AppLayout = () => {
                   {link.label}
                 </Link>
               ))}
+              <div className="utility-dropdown">
+                <button className="utility-link" type="button">
+                  {copy.utilityLinks.support}
+                  <ChevronDown size={12} />
+                </button>
+                <div className="utility-dropdown__panel">
+                  {supportItems.map(renderSupportItem)}
+                </div>
+              </div>
               <div className="utility-dropdown">
                 <button className="utility-link" type="button">
                   {copy.utility.account}
@@ -736,7 +777,7 @@ const AppLayout = () => {
                 <Route path="/" element={<Home />} />
                 <Route
                   path="/admin"
-                  element={canAccessAdmin ? <Dashboard /> : <Navigate to="/ranking" replace />}
+                  element={canAccessDashboard ? <Dashboard /> : <Navigate to="/ranking" replace />}
                 />
                 <Route path="/institucional" element={<About />} />
                 <Route path="/eventos" element={<Events />} />
@@ -746,6 +787,7 @@ const AppLayout = () => {
                 <Route path="/ranking-equipes" element={<TeamRanking />} />
                 <Route path="/atletas" element={<Athletes />} />
                 <Route path="/filiacao" element={<Membership />} />
+                <Route path="/minha-conta" element={<MyAccount />} />
                 <Route path="/regulamento" element={<Regulations />} />
                 <Route path="/noticias" element={<News />} />
               </Routes>
@@ -756,7 +798,7 @@ const AppLayout = () => {
 
       <footer className="app-footer">
         <div className="container footer-grid">
-          <div className="footer-column footer-brand">
+          <div className="footer-column footer-column--brand footer-brand">
             <div className="footer-brand__logo">
               {logoReady ? (
                 <img
@@ -788,7 +830,7 @@ const AppLayout = () => {
             </div>
           </div>
 
-          <div className="footer-column">
+          <div className="footer-column footer-column--contact">
             <div className="footer-title">{copy.footer.contact}</div>
             <div className="footer-contact">
               <div className="footer-contact__item">
@@ -810,7 +852,7 @@ const AppLayout = () => {
             </div>
           </div>
 
-          <div className="footer-column">
+          <div className="footer-column footer-column--location">
             <div className="footer-title">{copy.footer.location}</div>
             <div className="footer-map">
               <div className="footer-map__frame">
@@ -831,9 +873,9 @@ const AppLayout = () => {
             </div>
           </div>
 
-          <div className="footer-column">
+          <div className="footer-column footer-column--menu">
             <div className="footer-title">{copy.footer.menu}</div>
-            <nav className="footer-menu">
+            <nav className="footer-menu footer-menu--distributed">
               <Link to="/">{copy.footer.home}</Link>
               <Link to="/institucional">{copy.footer.institutional}</Link>
               <Link to="/eventos">{copy.footer.events}</Link>
@@ -843,7 +885,7 @@ const AppLayout = () => {
               <Link to="/filiacao">{copy.footer.membership}</Link>
               <Link to="/regulamento">{copy.footer.regulations}</Link>
               <Link to="/noticias">{copy.footer.news}</Link>
-              {canAccessAdmin && <Link to="/admin">{copy.footer.adminPanel}</Link>}
+              {canAccessDashboard && <Link to="/admin">{copy.footer.adminPanel}</Link>}
             </nav>
           </div>
         </div>

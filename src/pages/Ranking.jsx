@@ -661,18 +661,22 @@ const Ranking = () => {
         downloadCsv(fileName, headers, rows);
     };
 
-    const handleExportPdf = () => {
-        generateFilteredRankingPDF({
-            groups: searchedGroups,
-            winners: filteredWinners,
-            options: {
-                eventName: selectedEvent?.name || '',
-                eventDate: selectedEvent?.date || '',
-                eventLocation: selectedEvent?.location || '',
-                modeLabel: modeLabel,
-                searchTerm: normalizedSearch ? searchTerm.trim() : ''
-            }
-        });
+    const handleExportPdf = async () => {
+        try {
+            await generateFilteredRankingPDF({
+                groups: searchedGroups,
+                winners: filteredWinners,
+                options: {
+                    eventName: selectedEvent?.name || '',
+                    eventDate: selectedEvent?.date || '',
+                    eventLocation: selectedEvent?.location || '',
+                    modeLabel: modeLabel,
+                    searchTerm: normalizedSearch ? searchTerm.trim() : ''
+                }
+            });
+        } catch (error) {
+            console.error('PDF export failed:', error);
+        }
     };
 
     const toggleGroup = (key) => {

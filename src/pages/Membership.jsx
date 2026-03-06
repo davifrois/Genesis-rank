@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Image, Plus, Trash2, UserRound } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { useI18n } from '../hooks/useI18n';
@@ -18,6 +18,7 @@ const createAcademyForm = () => ({
 const createAthleteForm = () => ({
   fullName: '',
   lastName: '',
+  gender: '',
   email: '',
   phone: '',
   birthDate: '',
@@ -128,16 +129,18 @@ const formatDate = (value, locale) => {
 
 const calculateAgeFromBirthDate = (value) => {
   if (!value) return '';
-  const birth = new Date(value);
-  if (Number.isNaN(birth.getTime())) return '';
+  const text = (value || '').toString().trim();
+  if (!text) return '';
 
-  const today = new Date();
-  let age = today.getFullYear() - birth.getFullYear();
-  const hasBirthdayPassed = (
-    today.getMonth() > birth.getMonth()
-    || (today.getMonth() === birth.getMonth() && today.getDate() >= birth.getDate())
-  );
-  if (!hasBirthdayPassed) age -= 1;
+  let birthYear = Number(text.slice(0, 4));
+  if (!Number.isFinite(birthYear) || birthYear <= 1900) {
+    const parsed = new Date(text);
+    if (Number.isNaN(parsed.getTime())) return '';
+    birthYear = parsed.getUTCFullYear();
+  }
+
+  const currentYear = new Date().getFullYear();
+  const age = currentYear - birthYear;
   return age >= 0 ? age : '';
 };
 
@@ -160,7 +163,8 @@ const Membership = () => {
     deleteMemberProfile,
     currentUser
   } = useStore();
-  const isAdmin = currentUser?.role === 'admin';
+  const currentUserRole = (currentUser?.role || '').toString().trim().toLowerCase();
+  const isAdmin = currentUserRole === 'admin';
   const copy = isEnglish
     ? {
         kicker: 'Membership',
@@ -194,6 +198,10 @@ const Membership = () => {
         athleteEmail: 'Email',
         athletePhone: 'Phone',
         athleteBirthDate: 'Birth date',
+        athleteGender: 'Gender',
+        athleteGenderSelect: 'Select gender',
+        athleteGenderMale: 'Male',
+        athleteGenderFemale: 'Female',
         athleteAge: 'Age',
         athleteCountry: 'Country',
         athleteCity: 'City',
@@ -205,6 +213,7 @@ const Membership = () => {
         athletePhotoUrl: 'Photo URL (optional)',
         chooseAcademy: 'Select academy',
         athleteNameRequired: 'Enter athlete name.',
+        athleteGenderRequired: 'Select athlete gender.',
         athleteBeltGuide: 'Belt rules and age range',
         academiesTitle: 'Registered academies',
         athletesTitle: 'Registered athletes',
@@ -255,6 +264,10 @@ const Membership = () => {
         athleteEmail: 'E-mail',
         athletePhone: 'Telefone',
         athleteBirthDate: 'Data de nascimento',
+        athleteGender: 'Gênero',
+        athleteGenderSelect: 'Selecione o gênero',
+        athleteGenderMale: 'Masculino',
+        athleteGenderFemale: 'Feminino',
         athleteAge: 'Idade',
         athleteCountry: 'País',
         athleteCity: 'Cidade',
@@ -266,6 +279,7 @@ const Membership = () => {
         athletePhotoUrl: 'URL da foto (opcional)',
         chooseAcademy: 'Selecione a academia',
         athleteNameRequired: 'Informe o nome do atleta.',
+        athleteGenderRequired: 'Selecione o gênero do atleta.',
         athleteBeltGuide: 'Regras da faixa e idade permitida',
         academiesTitle: 'Academias cadastradas',
         athletesTitle: 'Atletas cadastrados',
@@ -291,7 +305,10 @@ const Membership = () => {
   const [athleteFeedback, setAthleteFeedback] = useState('');
   const [academyError, setAcademyError] = useState('');
   const [athleteError, setAthleteError] = useState('');
-  const [membershipView, setMembershipView] = useState(() => resolveMembershipView(searchParams.get('tab')));
+  const membershipView = useMemo(
+    () => resolveMembershipView(searchParams.get('tab')),
+    [searchParams]
+  );
 
   const academyMap = useMemo(() => (
     new Map(academies.map((academy) => [academy.id, academy]))
@@ -304,17 +321,7 @@ const Membership = () => {
     BELT_GUIDE[athleteForm.belt] || null
   ), [athleteForm.belt]);
 
-  const searchParamsKey = searchParams.toString();
-
-  useEffect(() => {
-    const nextView = resolveMembershipView(searchParams.get('tab'));
-    if (nextView !== membershipView) {
-      setMembershipView(nextView);
-    }
-  }, [searchParamsKey, membershipView, searchParams]);
-
   const handleMembershipViewChange = (nextView) => {
-    setMembershipView(nextView);
     const params = new URLSearchParams(searchParams);
     params.set('tab', nextView === 'athlete' ? 'member' : 'academy');
     setSearchParams(params, { replace: true });
@@ -369,6 +376,10 @@ const Membership = () => {
       setAthleteError(copy.athleteNameRequired);
       return;
     }
+    if (!athleteForm.gender) {
+      setAthleteError(copy.athleteGenderRequired);
+      return;
+    }
 
     const academy = academyMap.get(athleteForm.academyId);
     if (!academy) {
@@ -382,6 +393,8 @@ const Membership = () => {
         fullName,
         firstName: athleteForm.fullName.trim(),
         lastName: athleteForm.lastName.trim(),
+        gender: athleteForm.gender,
+        accountUsername: currentUserRole === 'athlete' ? (currentUser?.username || '') : '',
         createdByUsername: currentUser?.username || '',
         createdByName: currentUser?.name || '',
         age: athleteAge || '',
@@ -642,6 +655,19 @@ const Membership = () => {
                 />
               </div>
               <div className="profile-field">
+                <label>{copy.athleteGender}</label>
+                <select
+                  className="profile-input profile-input--dark"
+                  value={athleteForm.gender}
+                  onChange={(event) => setAthleteForm((prev) => ({ ...prev, gender: event.target.value }))}
+                  required
+                >
+                  <option value="">{copy.athleteGenderSelect}</option>
+                  <option value="Masculino">{copy.athleteGenderMale}</option>
+                  <option value="Feminino">{copy.athleteGenderFemale}</option>
+                </select>
+              </div>
+              <div className="profile-field">
                 <label>{copy.athleteAge}</label>
                 <input
                   className="profile-input profile-input--dark"
@@ -739,6 +765,12 @@ const Membership = () => {
         )}
       </section>
 
+      {!isAdmin && membershipView === 'athlete' && (
+      <section className="membership-block">
+        <p className="profile-note profile-note--dark">{copy.adminOnlyRecords}</p>
+      </section>
+      )}
+
       {isAdmin && (
       <section className="profile-grid profile-grid--membership-lists is-single">
         {membershipView === 'academy' && (
@@ -797,8 +829,9 @@ const Membership = () => {
                       <strong>{profile.fullName}</strong>
                       <span>{profile.academyName || copy.noAcademy}</span>
                       <div className="membership-item__details">
-                        {profile.belt || profile.weight || profile.age
+                        {profile.gender || profile.belt || profile.weight || profile.age
                           ? [
+                            profile.gender || '',
                             profile.belt || '-',
                             profile.weight || '',
                             profile.age ? `${profile.age} ${copy.yearsOld}` : ''

@@ -6,7 +6,7 @@ import { useStore } from '../hooks/useStore';
 import { useI18n } from '../hooks/useI18n';
 import { authService } from '../services/authService';
 
-const LoginOverlay = ({ onClose, onSuccess }) => {
+const LoginOverlay = ({ onClose, onSuccess, redirectTo = '' }) => {
     const { login, addLog } = useStore();
     const { language } = useI18n();
     const navigate = useNavigate();
@@ -127,7 +127,13 @@ const LoginOverlay = ({ onClose, onSuccess }) => {
             if (canClose) {
                 onClose();
             }
-            navigate(user?.role === 'admin' ? '/' : '/ranking');
+            const targetRoute = (redirectTo || '').toString().trim();
+            if (targetRoute) {
+                navigate(targetRoute, { replace: true });
+            } else {
+                const normalizedRole = (user?.role || '').toString().trim().toLowerCase();
+                navigate(normalizedRole === 'admin' || normalizedRole === 'mesario' ? '/admin' : '/ranking');
+            }
         } catch (err) {
             setError(err.message);
             addLog({ type: 'AUTH', action: 'LOGIN_FAILURE', details: `Falha: ${username} - ${err.message}` });

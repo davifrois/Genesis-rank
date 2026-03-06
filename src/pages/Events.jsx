@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { Calendar, MapPin } from 'lucide-react';
 import { useStore } from '../hooks/useStore';
 import { useI18n } from '../hooks/useI18n';
@@ -158,20 +159,35 @@ const Events = () => {
       </div>
       <div className="public-event-card__footer">
         <span>{copy.autoUpdate}</span>
-        <a
-          className={`btn ${event.registrationOpen ? 'btn-event' : 'btn-secondary btn-event--small'}`}
-          href={event.internalRegistration ? `/eventos/${event.id}` : (event.registrationUrl || '#')}
-          target={!event.internalRegistration && event.registrationUrl ? '_blank' : undefined}
-          rel={!event.internalRegistration && event.registrationUrl ? 'noreferrer' : undefined}
-          onClick={(clickEvent) => {
-            if (!event.registrationOpen || (!event.internalRegistration && !event.registrationUrl)) {
-              clickEvent.preventDefault();
-            }
-          }}
-          aria-disabled={!event.registrationOpen || (!event.internalRegistration && !event.registrationUrl)}
-        >
-          {event.registrationOpen ? copy.accessEvent : copy.closedRegistration}
-        </a>
+        {event.internalRegistration ? (
+          <Link
+            className={`btn ${event.registrationOpen ? 'btn-event' : 'btn-secondary btn-event--small'}`}
+            to={`/eventos/${event.id}`}
+            onClick={(clickEvent) => {
+              if (!event.registrationOpen) {
+                clickEvent.preventDefault();
+              }
+            }}
+            aria-disabled={!event.registrationOpen}
+          >
+            {event.registrationOpen ? copy.accessEvent : copy.closedRegistration}
+          </Link>
+        ) : (
+          <a
+            className={`btn ${event.registrationOpen ? 'btn-event' : 'btn-secondary btn-event--small'}`}
+            href={event.registrationUrl || '#'}
+            target={event.registrationUrl ? '_blank' : undefined}
+            rel={event.registrationUrl ? 'noreferrer' : undefined}
+            onClick={(clickEvent) => {
+              if (!event.registrationOpen || !event.registrationUrl) {
+                clickEvent.preventDefault();
+              }
+            }}
+            aria-disabled={!event.registrationOpen || !event.registrationUrl}
+          >
+            {event.registrationOpen ? copy.accessEvent : copy.closedRegistration}
+          </a>
+        )}
       </div>
     </article>
   );

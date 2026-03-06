@@ -3,8 +3,14 @@ import autoTable from 'jspdf-autotable';
 import { rankAthletes } from './scoringService';
 import { nextPowerOfTwo } from './bracketService';
 
-const BRAND_PRIMARY = [15, 58, 95];
-const BRAND_ACCENT = [26, 95, 161];
+const BRAND_PRIMARY = [11, 52, 84];
+const BRAND_SECONDARY = [24, 96, 152];
+const BRAND_ACCENT = [235, 168, 58];
+const BRAND_TEXT = [20, 32, 48];
+const BRAND_MUTED = [88, 105, 128];
+const BRAND_LINE = [210, 222, 236];
+const BRAND_ALT_ROW = [246, 250, 255];
+const DEFAULT_LOGO_URL = '/genesis-logo.png';
 
 const formatDate = (dateString) => {
     if (!dateString) return '';
@@ -12,6 +18,16 @@ const formatDate = (dateString) => {
     if (Number.isNaN(parsed.getTime())) return dateString;
     return parsed.toLocaleDateString('pt-BR');
 };
+
+const formatDateTime = (date = new Date()) => (
+    date.toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    })
+);
 
 const buildFileSafeName = (value) => (
     (value || 'Geral')
@@ -32,7 +48,7 @@ const runAutoTable = (doc, config) => {
         autoTable(doc, config);
         return;
     }
-    throw new Error('Módulo de tabela do PDF não está disponível.');
+    throw new Error('Modulo de tabela do PDF nao esta disponivel.');
 };
 
 const loadImage = (src) => new Promise((resolve, reject) => {
@@ -44,6 +60,117 @@ const loadImage = (src) => new Promise((resolve, reject) => {
     img.onload = () => resolve(img);
     img.onerror = () => reject(new Error('Falha ao carregar imagem.'));
     img.src = src;
+});
+
+const logoCache = new Map();
+
+const loadLogo = async (logoUrl = DEFAULT_LOGO_URL) => {
+    const source = (logoUrl || DEFAULT_LOGO_URL).toString().trim() || DEFAULT_LOGO_URL;
+    if (logoCache.has(source)) {
+        return logoCache.get(source);
+    }
+    try {
+        const logo = await loadImage(source);
+        logoCache.set(source, logo);
+        return logo;
+    } catch {
+        logoCache.set(source, null);
+        return null;
+    }
+};
+
+const buildMetaLine = (parts) => (
+    (Array.isArray(parts) ? parts : [])
+        .map((part) => (part || '').toString().trim())
+        .filter(Boolean)
+        .join(' | ')
+);
+
+const drawBrandHeader = (doc, {
+    logo = null,
+    title = 'GENESIS ESPORTES',
+    subtitle = '',
+    metaLine = ''
+} = {}) => {
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    doc.setFillColor(...BRAND_PRIMARY);
+    doc.rect(0, 0, pageWidth, 20, 'F');
+    doc.setFillColor(...BRAND_SECONDARY);
+    doc.rect(0, 20, pageWidth, 2, 'F');
+
+    if (logo) {
+        doc.addImage(logo, 'PNG', 9, 3, 26, 14);
+    }
+
+    const textX = logo ? 38 : 12;
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text(title, textX, 10.5, { baseline: 'middle' });
+
+    if (subtitle) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.text(subtitle, textX, 16, { baseline: 'middle' });
+    }
+
+    if (metaLine) {
+        doc.setTextColor(...BRAND_MUTED);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.5);
+        const wrapped = doc.splitTextToSize(metaLine, pageWidth - 24);
+        doc.text(wrapped, 12, 28);
+    }
+};
+
+const drawBrandFooter = (doc, pageNumber, totalPages) => {
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+
+    doc.setDrawColor(...BRAND_LINE);
+    doc.setLineWidth(0.25);
+    doc.line(10, pageHeight - 11, pageWidth - 10, pageHeight - 11);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.3);
+    doc.setTextColor(...BRAND_MUTED);
+    doc.text('Genesis Esportes - Documento oficial', 10, pageHeight - 6.6);
+    doc.text(`Pagina ${pageNumber}/${totalPages}`, pageWidth - 10, pageHeight - 6.6, { align: 'right' });
+};
+
+const applyBrandFrameToAllPages = (doc, headerOptions) => {
+    const totalPages = doc.getNumberOfPages();
+    for (let page = 1; page <= totalPages; page += 1) {
+        doc.setPage(page);
+        drawBrandHeader(doc, headerOptions);
+        drawBrandFooter(doc, page, totalPages);
+    }
+};
+
+const createTableTheme = (columnStyles = {}) => ({
+    theme: 'grid',
+    margin: { left: 12, right: 12, top: 36, bottom: 16 },
+    headStyles: {
+        fillColor: BRAND_PRIMARY,
+        textColor: [255, 255, 255],
+        fontSize: 8,
+        fontStyle: 'bold',
+        halign: 'center'
+    },
+    bodyStyles: {
+        fontSize: 8,
+        textColor: BRAND_TEXT
+    },
+    alternateRowStyles: {
+        fillColor: BRAND_ALT_ROW
+    },
+    styles: {
+        lineColor: BRAND_LINE,
+        lineWidth: 0.15,
+        cellPadding: 1.8
+    },
+    columnStyles
 });
 
 const fitText = (doc, text, maxWidth) => {
@@ -96,23 +223,24 @@ const drawBracketSide = ({
         const name = seed?.name || 'BYE';
         const academy = seed?.academy || '';
 
-        doc.setTextColor(20);
+        doc.setTextColor(...BRAND_TEXT);
         doc.setFontSize(nameFontSize);
         const nameText = fitText(doc, name, nameWidth - 4);
-        doc.text(nameText, alignRight ? nameX : nameX, y - lineOffset, {
+        doc.text(nameText, nameX, y - lineOffset, {
             align: alignRight ? 'right' : 'left',
             baseline: 'middle'
         });
 
         if (academy) {
-            doc.setTextColor(90);
+            doc.setTextColor(...BRAND_MUTED);
             doc.setFontSize(academyFontSize);
             const academyText = fitText(doc, academy, nameWidth - 4);
-            doc.text(academyText, alignRight ? nameX : nameX, y + lineOffset, {
+            doc.text(academyText, nameX, y + lineOffset, {
                 align: alignRight ? 'right' : 'left',
                 baseline: 'middle'
             });
         }
+
         if (sideRounds === 0) {
             doc.line(lineStartX, y, finalX, y);
         } else {
@@ -144,7 +272,7 @@ export const generateBracketsPDF = async (brackets, athletes, options = {}) => {
         eventName = '',
         eventDate = '',
         eventLocation = '',
-        logoUrl = '/genesis-logo.png',
+        logoUrl = DEFAULT_LOGO_URL,
         modeLabel = ''
     } = options;
 
@@ -153,8 +281,9 @@ export const generateBracketsPDF = async (brackets, athletes, options = {}) => {
     }
 
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-    const logo = await loadImage(logoUrl).catch(() => null);
-    const athletesMap = new Map(athletes.map((athlete) => [athlete.id, athlete]));
+    const logo = await loadLogo(logoUrl);
+    const athletesMap = new Map((athletes || []).map((athlete) => [athlete.id, athlete]));
+    const totalPages = brackets.length;
 
     brackets.forEach((bracket, index) => {
         if (index > 0) {
@@ -164,41 +293,30 @@ export const generateBracketsPDF = async (brackets, athletes, options = {}) => {
         const pageWidth = doc.internal.pageSize.getWidth();
         const pageHeight = doc.internal.pageSize.getHeight();
 
-        doc.setFillColor(...BRAND_PRIMARY);
-        doc.rect(0, 0, pageWidth, 18, 'F');
-
-        if (logo) {
-            doc.addImage(logo, 'PNG', 10, 3, 26, 12);
-        }
-
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(12);
-        doc.setTextColor(255, 255, 255);
-        doc.text('GENESIS ESPORTES - CHAVEAMENTO', 40, 12);
-
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8);
-        doc.setTextColor(40);
-
-        const metaParts = [
+        const metaLine = buildMetaLine([
             eventName ? `Evento: ${eventName}` : '',
             eventDate ? `Data: ${formatDate(eventDate)}` : '',
             eventLocation ? `Local: ${eventLocation}` : '',
             modeLabel ? `Modalidade: ${modeLabel}` : ''
-        ].filter(Boolean);
+        ]);
 
-        doc.text(metaParts.join(' | '), 10, 26);
+        drawBrandHeader(doc, {
+            logo,
+            title: 'CHAVEAMENTO OFICIAL',
+            subtitle: bracket.label || `Chave ${bracket.number || '-'}`,
+            metaLine
+        });
 
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
-        doc.setTextColor(20);
-        doc.text(`Chave ${bracket.number || '-'}`, 10, 34);
-        doc.text(bracket.label || 'Categoria', pageWidth / 2, 34, { align: 'center' });
+        doc.setFontSize(9.8);
+        doc.setTextColor(...BRAND_TEXT);
+        doc.text(`Chave ${bracket.number || '-'}`, 12, 36);
+        doc.text(bracket.label || 'Categoria', pageWidth / 2, 36, { align: 'center' });
 
         const size = nextPowerOfTwo(bracket.seedIds?.length || 0, 2);
-        const seeds = Array.from({ length: size }, (_, idx) => {
-            const id = bracket.seedIds?.[idx];
-            const athlete = id ? athletesMap.get(id) : null;
+        const seeds = Array.from({ length: size }, (_, slotIndex) => {
+            const athleteId = bracket.seedIds?.[slotIndex];
+            const athlete = athleteId ? athletesMap.get(athleteId) : null;
             if (!athlete) {
                 return { name: 'BYE', academy: '' };
             }
@@ -208,41 +326,41 @@ export const generateBracketsPDF = async (brackets, athletes, options = {}) => {
             };
         });
 
-        const topMargin = 42;
-        const footerPadding = 6;
+        const topMargin = 44;
+        const footerPadding = 4;
         const footerHeight = 38;
         const bottomMargin = footerHeight + footerPadding;
-        const leftMargin = 10;
-        const rightMargin = 10;
+        const leftMargin = 11;
+        const rightMargin = 11;
         const centerGap = 22;
-        const nameWidth = 60;
+        const nameWidth = 59;
         const totalHeight = pageHeight - topMargin - bottomMargin;
         const sideSlots = size / 2;
         const slotHeight = totalHeight / sideSlots;
-        const seedY = Array.from({ length: sideSlots }, (_, idx) => (
-            topMargin + slotHeight / 2 + idx * slotHeight
+        const seedY = Array.from({ length: sideSlots }, (_, slotIndex) => (
+            topMargin + slotHeight / 2 + slotIndex * slotHeight
         ));
 
         const rounds = Math.max(1, Math.log2(size));
         const sideRounds = Math.max(0, rounds - 1);
-        const bracketWidth = (pageWidth - leftMargin - rightMargin - 2 * nameWidth - centerGap) / 2;
+        const bracketWidth = (pageWidth - leftMargin - rightMargin - (2 * nameWidth) - centerGap) / 2;
         const roundStep = sideRounds > 0 ? bracketWidth / sideRounds : 0;
-        const leftRoundX = Array.from({ length: sideRounds }, (_, r) => (
-            leftMargin + nameWidth + 4 + roundStep * r
+        const leftRoundX = Array.from({ length: sideRounds }, (_, roundIndex) => (
+            leftMargin + nameWidth + 4 + roundStep * roundIndex
         ));
-        const rightRoundX = Array.from({ length: sideRounds }, (_, r) => (
-            pageWidth - rightMargin - nameWidth - 4 - roundStep * r
+        const rightRoundX = Array.from({ length: sideRounds }, (_, roundIndex) => (
+            pageWidth - rightMargin - nameWidth - 4 - roundStep * roundIndex
         ));
         const centerLeftX = pageWidth / 2 - centerGap / 2;
         const centerRightX = pageWidth / 2 + centerGap / 2;
 
         const leftSeeds = seeds.slice(0, sideSlots);
         const rightSeeds = seeds.slice(sideSlots);
-
         const leftCenters = computeRoundCenters(sideSlots, seedY, sideRounds);
         const rightCenters = computeRoundCenters(sideSlots, seedY, sideRounds);
 
-        doc.setDrawColor(40);
+        doc.setDrawColor(...BRAND_SECONDARY);
+        doc.setLineWidth(0.3);
         drawBracketSide({
             doc,
             seeds: leftSeeds,
@@ -256,7 +374,6 @@ export const generateBracketsPDF = async (brackets, athletes, options = {}) => {
             finalX: centerLeftX,
             alignRight: false
         });
-
         drawBracketSide({
             doc,
             seeds: rightSeeds,
@@ -272,25 +389,25 @@ export const generateBracketsPDF = async (brackets, athletes, options = {}) => {
         });
 
         const finalY = topMargin + totalHeight / 2;
-        doc.setDrawColor(80);
-        doc.circle(pageWidth / 2, finalY, 4, 'S');
+        doc.setFillColor(...BRAND_ACCENT);
+        doc.circle(pageWidth / 2, finalY, 3.8, 'F');
 
         const footerTop = pageHeight - footerHeight;
-        const podiumStartY = footerTop + 4;
-        const podiumGap = 6;
-        const podiumLineStartX = pageWidth / 2 - 4;
-        const podiumLineEndX = pageWidth / 2 + 18;
-
+        doc.setTextColor(...BRAND_MUTED);
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(8);
-        doc.setTextColor(30);
-        doc.text('1º', pageWidth / 2 - 10, podiumStartY, { align: 'center', baseline: 'middle' });
-        doc.text('2º', pageWidth / 2 - 10, podiumStartY + podiumGap, { align: 'center', baseline: 'middle' });
-        doc.text('3º', pageWidth / 2 - 10, podiumStartY + podiumGap * 2, { align: 'center', baseline: 'middle' });
-        doc.setDrawColor(120);
-        doc.line(podiumLineStartX, podiumStartY, podiumLineEndX, podiumStartY);
-        doc.line(podiumLineStartX, podiumStartY + podiumGap, podiumLineEndX, podiumStartY + podiumGap);
-        doc.line(podiumLineStartX, podiumStartY + podiumGap * 2, podiumLineEndX, podiumStartY + podiumGap * 2);
+        doc.text('Podio', pageWidth / 2, footerTop + 5, { align: 'center' });
+
+        const podiumRows = ['1o', '2o', '3o'];
+        const podiumLineStartX = pageWidth / 2 - 4;
+        const podiumLineEndX = pageWidth / 2 + 22;
+        podiumRows.forEach((row, rowIndex) => {
+            const y = footerTop + 10 + rowIndex * 6;
+            doc.setFont('helvetica', 'bold');
+            doc.text(row, pageWidth / 2 - 10, y, { align: 'center', baseline: 'middle' });
+            doc.setDrawColor(...BRAND_LINE);
+            doc.line(podiumLineStartX, y, podiumLineEndX, y);
+        });
 
         const baiaCount = 10;
         const baiaBoxWidth = 10;
@@ -298,205 +415,139 @@ export const generateBracketsPDF = async (brackets, athletes, options = {}) => {
         const baiaGap = 2;
         const baiaTotalWidth = baiaCount * baiaBoxWidth + (baiaCount - 1) * baiaGap;
         const baiaStartX = (pageWidth - baiaTotalWidth) / 2;
-        const baiaY = footerTop + 18;
-
+        const baiaY = footerTop + 24;
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(7);
-        doc.setTextColor(40);
+        doc.setTextColor(...BRAND_TEXT);
         for (let i = 0; i < baiaCount; i += 1) {
             const x = baiaStartX + i * (baiaBoxWidth + baiaGap);
+            doc.setDrawColor(...BRAND_LINE);
             doc.roundedRect(x, baiaY, baiaBoxWidth, baiaBoxHeight, 1, 1);
-            doc.text(String(i + 1), x + baiaBoxWidth / 2, baiaY + baiaBoxHeight / 2 + 1.5, {
+            doc.text(String(i + 1), x + baiaBoxWidth / 2, baiaY + baiaBoxHeight / 2 + 1.4, {
                 align: 'center',
                 baseline: 'middle'
             });
         }
 
-        const signLineY = footerTop + 28;
-        const signWidth = 42;
-        doc.setDrawColor(80);
+        const signLineY = footerTop + 35;
+        const signWidth = 44;
+        doc.setDrawColor(...BRAND_LINE);
         doc.line(leftMargin, signLineY, leftMargin + signWidth, signLineY);
         doc.line(pageWidth - rightMargin - signWidth, signLineY, pageWidth - rightMargin, signLineY);
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(7);
-        doc.setTextColor(50);
-        doc.text('Chamador', leftMargin + signWidth / 2, signLineY + 4, { align: 'center' });
-        doc.text('Mesário', pageWidth - rightMargin - signWidth / 2, signLineY + 4, { align: 'center' });
+        doc.setTextColor(...BRAND_MUTED);
+        doc.text('Chamador', leftMargin + signWidth / 2, signLineY + 3.8, { align: 'center' });
+        doc.text('Mesario', pageWidth - rightMargin - signWidth / 2, signLineY + 3.8, { align: 'center' });
+
+        drawBrandFooter(doc, index + 1, totalPages);
     });
 
     const fileName = `Chaves_${buildFileSafeName(eventName)}_${buildFileSafeName(modeLabel || 'geral')}.pdf`;
     doc.save(fileName);
 };
 
-export const generateRankingPDF = (athletes, options = {}) => {
+export const generateRankingPDF = async (athletes, options = {}) => {
     const {
         eventName = '',
         eventDate = '',
-        eventLocation = ''
+        eventLocation = '',
+        logoUrl = DEFAULT_LOGO_URL
     } = options;
+
     const doc = new jsPDF();
+    const logo = await loadLogo(logoUrl);
+    const rankedAthletes = rankAthletes(Array.isArray(athletes) ? athletes : []);
+    const generatedAt = formatDateTime();
 
-    // Header with Genesis branding
-    doc.setFillColor(...BRAND_PRIMARY);
-    doc.rect(0, 0, 210, 40, 'F');
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(22);
-    doc.setTextColor(255, 255, 255);
-    doc.text('GENESIS ESPORTES', 14, 25);
-
-    doc.setFontSize(10);
-    doc.text('RELATÓRIO OFICIAL DE RANKING 2025', 14, 32);
-
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(90);
-
-    let cursorY = 50;
-    doc.text(`Documento gerado em: ${new Date().toLocaleString()}`, 14, cursorY);
-    cursorY += 6;
-
-    if (eventName) {
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(20);
-        doc.text(`Evento: ${eventName}`, 14, cursorY);
-        cursorY += 6;
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(90);
-    }
-
-    const metaParts = [
-        eventDate ? `Data: ${formatDate(eventDate)}` : '',
-        eventLocation ? `Local: ${eventLocation}` : ''
-    ].filter(Boolean);
-
-    if (metaParts.length) {
-        doc.text(metaParts.join(' | '), 14, cursorY);
-        cursorY += 6;
-    }
-
-    const tableColumn = ["POS", "ATLETA", "FAIXA", "CATEGORIA", "ACADEMIA", "PTS"];
-    const tableRows = rankAthletes(athletes)
-        .map((a, index) => [
-            index + 1,
-            a.nome.toUpperCase(),
-            a.faixa,
-            a.categoria,
-            a.academia,
-            a.pontos
-        ]);
+    const tableColumns = ['POS', 'ATLETA', 'FAIXA', 'CATEGORIA', 'ACADEMIA', 'PTS'];
+    const tableRows = rankedAthletes.map((athlete, index) => [
+        index + 1,
+        (athlete?.nome || '').toUpperCase(),
+        athlete?.faixa || '-',
+        athlete?.categoria || '-',
+        athlete?.academia || '-',
+        athlete?.pontos ?? 0
+    ]);
 
     runAutoTable(doc, {
-        head: [tableColumn],
+        head: [tableColumns],
         body: tableRows,
-        startY: cursorY + 2,
-        theme: 'grid',
-        headStyles: {
-            fillColor: BRAND_PRIMARY,
-            textColor: [255, 255, 255],
-            fontSize: 8,
-            halign: 'center'
-        },
-        styles: { fontSize: 8 },
-        columnStyles: {
-            0: { halign: 'center', fontStyle: 'bold' },
-            5: { halign: 'center', fontStyle: 'bold', textColor: BRAND_ACCENT }
-        }
+        startY: 38,
+        ...createTableTheme({
+            0: { halign: 'center', fontStyle: 'bold', cellWidth: 12 },
+            5: { halign: 'center', fontStyle: 'bold', textColor: BRAND_ACCENT, cellWidth: 14 }
+        })
+    });
+
+    const metaLine = buildMetaLine([
+        eventName ? `Evento: ${eventName}` : '',
+        eventDate ? `Data: ${formatDate(eventDate)}` : '',
+        eventLocation ? `Local: ${eventLocation}` : '',
+        `Gerado em: ${generatedAt}`
+    ]);
+
+    applyBrandFrameToAllPages(doc, {
+        logo,
+        title: 'RANKING OFICIAL',
+        subtitle: eventName || 'Genesis Esportes',
+        metaLine
     });
 
     const fileName = `Ranking_Genesis_${buildFileSafeName(eventName)}.pdf`;
     doc.save(fileName);
 };
 
-export const generateFilteredRankingPDF = ({ groups = [], winners = [], options = {} }) => {
+export const generateFilteredRankingPDF = async ({ groups = [], winners = [], options = {} }) => {
     const {
         eventName = '',
         eventDate = '',
         eventLocation = '',
         modeLabel = '',
-        searchTerm = ''
+        searchTerm = '',
+        logoUrl = DEFAULT_LOGO_URL
     } = options;
+
     const doc = new jsPDF();
+    const logo = await loadLogo(logoUrl);
     const pageHeight = doc.internal.pageSize.getHeight();
-
-    doc.setFillColor(...BRAND_PRIMARY);
-    doc.rect(0, 0, 210, 34, 'F');
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(18);
-    doc.setTextColor(255, 255, 255);
-    doc.text('GENESIS ESPORTES', 14, 21);
-
-    doc.setFontSize(9);
-    doc.text('RELATÓRIO DE RANKING FILTRADO', 14, 28);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(90);
-    let cursorY = 42;
-    doc.text(`Documento gerado em: ${new Date().toLocaleString()}`, 14, cursorY);
-    cursorY += 6;
-
-    if (eventName) {
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(20);
-        doc.text(`Evento: ${eventName}`, 14, cursorY);
-        cursorY += 6;
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(90);
-    }
-
-    const metaParts = [
-        eventDate ? `Data: ${formatDate(eventDate)}` : '',
-        eventLocation ? `Local: ${eventLocation}` : '',
-        modeLabel ? `Modalidade: ${modeLabel}` : '',
-        searchTerm ? `Filtro: ${searchTerm}` : ''
-    ].filter(Boolean);
-
-    if (metaParts.length) {
-        doc.text(metaParts.join(' | '), 14, cursorY);
-        cursorY += 6;
-    }
+    const generatedAt = formatDateTime();
+    let cursorY = 38;
 
     if (modeLabel && modeLabel.toUpperCase().includes('GERAL')) {
-        const tableColumn = ['POS', 'ATLETA', 'CATEGORIA', 'ACADEMIA', 'PTS'];
-        const tableRows = (winners || []).map((item, index) => [
+        const tableColumns = ['POS', 'ATLETA', 'CATEGORIA', 'ACADEMIA', 'PTS'];
+        const tableRows = (Array.isArray(winners) ? winners : []).map((item, index) => [
             index + 1,
-            item.athlete?.nome || '',
-            item.label || '',
-            item.athlete?.academia || '',
-            item.athlete?.pontos ?? ''
+            item?.athlete?.nome || '',
+            item?.label || '',
+            item?.athlete?.academia || '',
+            item?.athlete?.pontos ?? ''
         ]);
 
         runAutoTable(doc, {
-            head: [tableColumn],
+            head: [tableColumns],
             body: tableRows,
-            startY: cursorY + 2,
-            theme: 'grid',
-            headStyles: {
-                fillColor: BRAND_PRIMARY,
-                textColor: [255, 255, 255],
-                fontSize: 8,
-                halign: 'center'
-            },
-            styles: { fontSize: 8 },
-            columnStyles: {
-                0: { halign: 'center', fontStyle: 'bold' },
-                4: { halign: 'center', fontStyle: 'bold', textColor: BRAND_ACCENT }
-            }
+            startY: cursorY,
+            ...createTableTheme({
+                0: { halign: 'center', fontStyle: 'bold', cellWidth: 12 },
+                4: { halign: 'center', fontStyle: 'bold', textColor: BRAND_ACCENT, cellWidth: 14 }
+            })
         });
     } else {
-        const tableColumn = ['POS', 'ATLETA', 'ACADEMIA', 'FAIXA', 'PESO', 'PTS'];
-        (groups || []).forEach((group) => {
+        const tableColumns = ['POS', 'ATLETA', 'ACADEMIA', 'FAIXA', 'PESO', 'PTS'];
+        (Array.isArray(groups) ? groups : []).forEach((group) => {
             if (!group || !Array.isArray(group.entries) || group.entries.length === 0) return;
+
             if (cursorY > pageHeight - 30) {
                 doc.addPage();
-                cursorY = 20;
+                cursorY = 38;
             }
 
             doc.setFont('helvetica', 'bold');
-            doc.setTextColor(20);
-            doc.setFontSize(11);
-            doc.text(group.label || 'Categoria', 14, cursorY);
-            cursorY += 4;
+            doc.setTextColor(...BRAND_TEXT);
+            doc.setFontSize(10);
+            doc.text(group.label || 'Categoria', 12, cursorY);
+            cursorY += 5;
 
             const tableRows = group.entries.map((athlete, index) => [
                 index + 1,
@@ -508,69 +559,93 @@ export const generateFilteredRankingPDF = ({ groups = [], winners = [], options 
             ]);
 
             runAutoTable(doc, {
-                head: [tableColumn],
+                head: [tableColumns],
                 body: tableRows,
-                startY: cursorY + 2,
-                theme: 'grid',
-                headStyles: {
-                    fillColor: BRAND_PRIMARY,
-                    textColor: [255, 255, 255],
-                    fontSize: 8,
-                    halign: 'center'
-                },
-                styles: { fontSize: 8 },
-                columnStyles: {
-                    0: { halign: 'center', fontStyle: 'bold' },
-                    5: { halign: 'center', fontStyle: 'bold', textColor: BRAND_ACCENT }
-                }
+                startY: cursorY,
+                ...createTableTheme({
+                    0: { halign: 'center', fontStyle: 'bold', cellWidth: 12 },
+                    5: { halign: 'center', fontStyle: 'bold', textColor: BRAND_ACCENT, cellWidth: 14 }
+                })
             });
 
-            if (doc.lastAutoTable && doc.lastAutoTable.finalY) {
-                cursorY = doc.lastAutoTable.finalY + 8;
-            } else {
-                cursorY += 8;
-            }
+            cursorY = doc.lastAutoTable?.finalY ? doc.lastAutoTable.finalY + 8 : cursorY + 8;
         });
     }
+
+    const metaLine = buildMetaLine([
+        eventName ? `Evento: ${eventName}` : '',
+        eventDate ? `Data: ${formatDate(eventDate)}` : '',
+        eventLocation ? `Local: ${eventLocation}` : '',
+        modeLabel ? `Modalidade: ${modeLabel}` : '',
+        searchTerm ? `Filtro: ${searchTerm}` : '',
+        `Gerado em: ${generatedAt}`
+    ]);
+
+    applyBrandFrameToAllPages(doc, {
+        logo,
+        title: 'RANKING FILTRADO',
+        subtitle: eventName || 'Genesis Esportes',
+        metaLine
+    });
 
     const fileName = `Ranking_Filtrado_${buildFileSafeName(eventName)}_${buildFileSafeName(modeLabel || 'geral')}.pdf`;
     doc.save(fileName);
 };
 
-export const generateEventResultsPDF = (eventName, podiums) => {
+export const generateEventResultsPDF = async (eventName, podiums, options = {}) => {
+    const {
+        eventDate = '',
+        eventLocation = '',
+        logoUrl = DEFAULT_LOGO_URL
+    } = options;
+
     const doc = new jsPDF();
+    const logo = await loadLogo(logoUrl);
+    let currentY = 38;
 
-    doc.setFillColor(...BRAND_PRIMARY);
-    doc.rect(0, 0, 210, 30, 'F');
+    (Array.isArray(podiums) ? podiums : []).forEach((podium) => {
+        if (currentY > doc.internal.pageSize.getHeight() - 45) {
+            doc.addPage();
+            currentY = 38;
+        }
 
-    doc.setFontSize(18);
-    doc.setTextColor(255, 255, 255);
-    doc.text(`RESULTADOS: ${eventName.toUpperCase()}`, 14, 20);
-
-    let currentY = 40;
-
-    podiums.forEach(p => {
-        doc.setFontSize(12);
-        doc.setTextColor(...BRAND_ACCENT);
-        doc.text(`${p.category} - ${p.belt}`, 14, currentY);
-
-        currentY += 5;
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...BRAND_TEXT);
+        doc.setFontSize(11);
+        doc.text(`${podium?.category || '-'} - ${podium?.belt || '-'}`, 12, currentY);
+        currentY += 4;
 
         const rows = [
-            ["1º LUGAR", p.first.nome, p.first.academia],
-            ["2º LUGAR", p.second.nome, p.second.academia],
-            ["3º LUGAR", p.third?.nome || '-', p.third?.academia || '-'],
+            ['1o LUGAR', podium?.first?.nome || '-', podium?.first?.academia || '-'],
+            ['2o LUGAR', podium?.second?.nome || '-', podium?.second?.academia || '-'],
+            ['3o LUGAR', podium?.third?.nome || '-', podium?.third?.academia || '-']
         ];
 
         runAutoTable(doc, {
+            head: [['POSICAO', 'ATLETA', 'ACADEMIA']],
             body: rows,
             startY: currentY,
-            theme: 'striped',
-            styles: { fontSize: 9 }
+            ...createTableTheme({
+                0: { fontStyle: 'bold', textColor: BRAND_SECONDARY, cellWidth: 28 }
+            })
         });
 
-        currentY = doc.lastAutoTable.finalY + 15;
+        currentY = doc.lastAutoTable?.finalY ? doc.lastAutoTable.finalY + 8 : currentY + 8;
     });
 
-    doc.save(`Boletim_${eventName}.pdf`);
+    const metaLine = buildMetaLine([
+        eventName ? `Evento: ${eventName}` : '',
+        eventDate ? `Data: ${formatDate(eventDate)}` : '',
+        eventLocation ? `Local: ${eventLocation}` : '',
+        `Gerado em: ${formatDateTime()}`
+    ]);
+
+    applyBrandFrameToAllPages(doc, {
+        logo,
+        title: 'BOLETIM OFICIAL DE RESULTADOS',
+        subtitle: eventName || 'Genesis Esportes',
+        metaLine
+    });
+
+    doc.save(`Boletim_${buildFileSafeName(eventName)}.pdf`);
 };

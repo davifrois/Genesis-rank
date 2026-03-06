@@ -18,6 +18,17 @@ spring:
     console:
       enabled: true
       path: /h2-console
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:true}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS:true}
 
 app:
   jwt:
@@ -25,6 +36,7 @@ app:
     expiration-minutes: ${JWT_EXP_MIN:720}
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:4173}
+    allowed-origin-patterns: ${CORS_ORIGIN_PATTERNS:http://localhost:*,http://127.0.0.1:*,http://192.168.*:*,http://10.*:*}
   bootstrap:
     admin:
       username: ${BOOTSTRAP_ADMIN_USER:admin}
@@ -39,3 +51,8 @@ app:
       user-id: ${INSTAGRAM_USER_ID:}
       username: ${INSTAGRAM_USERNAME:genesis_esportes}
       default-limit: ${INSTAGRAM_FEED_LIMIT:10}
+  registration-email:
+    enabled: ${REG_CONFIRM_EMAIL_ENABLED:true}
+    from: ${REG_CONFIRM_EMAIL_FROM:no-reply@genesisesportes.com.br}
+    reply-to: ${REG_CONFIRM_EMAIL_REPLY_TO:contato@genesisesportes.com.br}
+    subject-prefix: ${REG_CONFIRM_EMAIL_SUBJECT_PREFIX:Genesis Esportes}

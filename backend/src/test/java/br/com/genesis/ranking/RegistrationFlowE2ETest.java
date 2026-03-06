@@ -29,7 +29,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
     "spring.datasource.driver-class-name=org.h2.Driver",
     "spring.datasource.username=sa",
     "spring.datasource.password=",
-    "spring.jpa.hibernate.ddl-auto=create-drop"
+    "spring.jpa.hibernate.ddl-auto=create-drop",
+    "app.bootstrap.admin.username=admin",
+    "app.bootstrap.admin.password=admin123",
+    "app.bootstrap.admin.name=Admin",
+    "app.bootstrap.admin.role=ADMIN"
 })
 class RegistrationFlowE2ETest {
 
@@ -92,7 +96,7 @@ class RegistrationFlowE2ETest {
         """;
 
     MvcResult paymentResult = mockMvc.perform(
-        patch("/api/public/registrations/{registrationId}/payment", registrationId)
+        patch("/api/admin/registrations/{registrationId}/payment", registrationId)
             .contentType(MediaType.APPLICATION_JSON)
             .content(paymentPayload)
     )
@@ -144,5 +148,195 @@ class RegistrationFlowE2ETest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].eventId").value(eventId))
         .andExpect(jsonPath("$[0].seedIds[0]").value(athleteId));
+  }
+
+  @Test
+  void shouldRunEndToEndLoginRegistrationAndAdminConfirmationFlow() throws Exception {
+    String athleteUsername = "athlete_" + UUID.randomUUID().toString().substring(0, 8);
+    String athletePassword = "atleta123";
+    String athleteName = "Atleta Fluxo JWT";
+    String eventId = "JWT-EVENT-" + UUID.randomUUID().toString().substring(0, 8);
+    String clientRequestId = "JWT-REQ-" + UUID.randomUUID().toString().substring(0, 10);
+
+    String adminLoginPayload = """
+        {
+          "username": "admin",
+          "password": "admin123"
+        }
+        """;
+
+    MvcResult adminLoginResult = mockMvc.perform(
+        post("/api/auth/login")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(adminLoginPayload)
+    )
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.token").isNotEmpty())
+        .andExpect(jsonPath("$.user.role").value("ADMIN"))
+        .andReturn();
+
+    String adminToken = objectMapper
+        .readTree(adminLoginResult.getResponse().getContentAsString())
+        .path("token")
+        .asText();
+    assertThat(adminToken).isNotBlank();
+
+    String createAthleteUserPayload = """
+        {
+          "name": "%s",
+          "username": "%s",
+          "password": "%s",
+          "role": "ATHLETE"
+        }
+        """.formatted(athleteName, athleteUsername, athletePassword);
+
+    mockMvc.perform(
+        post("/api/admin/users")
+            .header("Authorization", "Bearer " + adminToken)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(createAthleteUserPayload)
+    )
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.username").value(athleteUsername))
+        .andExpect(jsonPath("$.role").value("ATHLETE"));
+
+    String athleteLoginPayload = """
+        {
+          "username": "%s",
+          "password": "%s"
+        }
+        """.formatted(athleteUsername, athletePassword);
+
+    MvcResult athleteLoginResult = mockMvc.perform(
+        post("/api/auth/login")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(athleteLoginPayload)
+    )
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.token").isNotEmpty())
+        .andExpect(jsonPath("$.user.role").value("ATHLETE"))
+        .andReturn();
+
+    String athleteToken = objectMapper
+        .readTree(athleteLoginResult.getResponse().getContentAsString())
+        .path("token")
+        .asText();
+    assertThat(athleteToken).isNotBlank();
+
+    String registrationPayload = """
+        {
+          "eventId": "%s",
+          "clientRequestId": "%s",
+          "eventName": "Evento JWT",
+          "eventDate": "2026-04-20",
+          "eventLocation": "Arena Teste",
+          "nome": "%s",
+          "email": "jwt.atleta@demo.com",
+          "phone": "31999999999",
+          "academia": "Academia JWT",
+          "faixa": "Azul",
+          "peso": "Leve",
+          "categoria": "Adulto",
+          "genero": "Masculino",
+          "modalidade": "GI",
+          "notes": "{\\"tipoInscricao\\":\\"GI\\"}"
+        }
+        """.formatted(eventId, clientRequestId, athleteName);
+
+    MvcResult registrationResult = mockMvc.perform(
+        post("/api/public/registrations")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(registrationPayload)
+    )
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("PENDING"))
+        .andExpect(jsonPath("$.id").isNotEmpty())
+        .andReturn();
+
+    String registrationId = objectMapper
+        .readTree(registrationResult.getResponse().getContentAsString())
+        .path("id")
+        .asText();
+    assertThat(registrationId).isNotBlank();
+
+    String paymentPayload = """
+        {
+          "status": "PAYMENT_CONFIRMED",
+          "reviewNotes": "Conferido no fluxo JWT",
+          "reviewedBy": "Admin JWT"
+        }
+        """;
+
+    mockMvc.perform(
+        patch("/api/admin/registrations/{registrationId}/payment", registrationId)
+            .header("Authorization", "Bearer " + athleteToken)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(paymentPayload)
+    )
+        .andExpect(status().isForbidden());
+
+    mockMvc.perform(
+        patch("/api/admin/registrations/{registrationId}/payment", registrationId)
+            .header("Authorization", "Bearer " + adminToken)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(paymentPayload)
+    )
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("PAYMENT_CONFIRMED"))
+        .andExpect(jsonPath("$.athleteId").isNotEmpty());
+  }
+
+  @Test
+  @WithMockUser(username = "atleta", roles = { "ATHLETE" })
+  void shouldBlockPaymentConfirmationForNonAdmin() throws Exception {
+    String eventId = "SEC-EVENT-" + UUID.randomUUID().toString().substring(0, 8);
+    String clientRequestId = "SEC-REQ-" + UUID.randomUUID().toString().substring(0, 10);
+
+    String registrationPayload = """
+        {
+          "eventId": "%s",
+          "clientRequestId": "%s",
+          "eventName": "Evento Segurança",
+          "eventDate": "2026-04-20",
+          "eventLocation": "Arena Teste",
+          "nome": "Atleta Segurança",
+          "email": "seguranca.teste@demo.com",
+          "phone": "31999999999",
+          "academia": "Academia Segurança",
+          "faixa": "Azul",
+          "peso": "Leve",
+          "categoria": "Adulto",
+          "genero": "Masculino",
+          "modalidade": "GI",
+          "notes": "{\\"tipoInscricao\\":\\"GI\\"}"
+        }
+        """.formatted(eventId, clientRequestId);
+
+    MvcResult registrationResult = mockMvc.perform(
+        post("/api/public/registrations")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(registrationPayload)
+    )
+        .andExpect(status().isOk())
+        .andReturn();
+
+    JsonNode registrationJson = objectMapper.readTree(registrationResult.getResponse().getContentAsString());
+    String registrationId = registrationJson.path("id").asText();
+    assertThat(registrationId).isNotBlank();
+
+    String paymentPayload = """
+        {
+          "status": "PAYMENT_CONFIRMED",
+          "reviewNotes": "Tentativa sem perfil admin",
+          "reviewedBy": "Atleta"
+        }
+        """;
+
+    mockMvc.perform(
+        patch("/api/admin/registrations/{registrationId}/payment", registrationId)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(paymentPayload)
+    )
+        .andExpect(status().isForbidden());
   }
 }

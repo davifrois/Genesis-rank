@@ -36,15 +36,18 @@ public class PublicRegistrationService {
   private final EventRepository eventRepository;
   private final EventRegistrationRepository registrationRepository;
   private final AthleteRepository athleteRepository;
+  private final RegistrationEmailService registrationEmailService;
 
   public PublicRegistrationService(
       EventRepository eventRepository,
       EventRegistrationRepository registrationRepository,
-      AthleteRepository athleteRepository
+      AthleteRepository athleteRepository,
+      RegistrationEmailService registrationEmailService
   ) {
     this.eventRepository = eventRepository;
     this.registrationRepository = registrationRepository;
     this.athleteRepository = athleteRepository;
+    this.registrationEmailService = registrationEmailService;
   }
 
   public PublicRegistrationResponse register(PublicRegistrationRequest request) {
@@ -128,6 +131,7 @@ public class PublicRegistrationService {
     EventRegistration registration = registrationRepository.findById(normalizedRegistrationId)
         .orElseThrow(() -> new IllegalArgumentException("Inscrição não encontrada."));
 
+    RegistrationPaymentStatus previousStatus = RegistrationPaymentStatus.fromStored(registration.getStatus());
     RegistrationPaymentStatus normalizedStatus = RegistrationPaymentStatus.fromExternal(request.getStatus());
     registration.setStatus(normalizedStatus.name());
     registration.setPaymentReviewNotes(clean(request.getReviewNotes()));
@@ -141,6 +145,9 @@ public class PublicRegistrationService {
       athleteId = athlete != null ? athlete.getId() : null;
       if (athleteId == null) {
         athleteId = resolveAthleteId(saved, new HashMap<>());
+      }
+      if (!RegistrationPaymentStatus.PAYMENT_CONFIRMED.equals(previousStatus)) {
+        registrationEmailService.sendPaymentConfirmedEmail(saved);
       }
     }
     return toResponse(saved, athleteId);

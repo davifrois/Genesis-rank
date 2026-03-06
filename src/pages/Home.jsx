@@ -396,20 +396,35 @@ const Home = () => {
                     </span>
                   </div>
                   <span className="tag">{copy.soon}</span>
-                  <a
-                    className={`btn ${event.registrationOpen !== false ? 'btn-event' : 'btn-secondary btn-event--small'}`}
-                    href={event.internalRegistration ? `/eventos/${event.id}` : (event.registrationUrl || '#')}
-                    target={!event.internalRegistration && event.registrationUrl ? '_blank' : undefined}
-                    rel={!event.internalRegistration && event.registrationUrl ? 'noreferrer' : undefined}
-                    onClick={(clickEvent) => {
-                      if (event.registrationOpen === false || (!event.internalRegistration && !event.registrationUrl)) {
-                        clickEvent.preventDefault();
-                      }
-                    }}
-                    aria-disabled={event.registrationOpen === false || (!event.internalRegistration && !event.registrationUrl)}
-                  >
-                    {event.registrationOpen === false ? copy.closedEvent : copy.accessEvent}
-                  </a>
+                  {event.internalRegistration ? (
+                    <Link
+                      className={`btn ${event.registrationOpen !== false ? 'btn-event' : 'btn-secondary btn-event--small'}`}
+                      to={`/eventos/${event.id}`}
+                      onClick={(clickEvent) => {
+                        if (event.registrationOpen === false) {
+                          clickEvent.preventDefault();
+                        }
+                      }}
+                      aria-disabled={event.registrationOpen === false}
+                    >
+                      {event.registrationOpen === false ? copy.closedEvent : copy.accessEvent}
+                    </Link>
+                  ) : (
+                    <a
+                      className={`btn ${event.registrationOpen !== false ? 'btn-event' : 'btn-secondary btn-event--small'}`}
+                      href={event.registrationUrl || '#'}
+                      target={event.registrationUrl ? '_blank' : undefined}
+                      rel={event.registrationUrl ? 'noreferrer' : undefined}
+                      onClick={(clickEvent) => {
+                        if (event.registrationOpen === false || !event.registrationUrl) {
+                          clickEvent.preventDefault();
+                        }
+                      }}
+                      aria-disabled={event.registrationOpen === false || !event.registrationUrl}
+                    >
+                      {event.registrationOpen === false ? copy.closedEvent : copy.accessEvent}
+                    </a>
+                  )}
                 </div>
               </article>
             ))

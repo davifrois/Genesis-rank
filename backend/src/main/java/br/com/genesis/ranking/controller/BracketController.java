@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import br.com.genesis.ranking.dto.BracketPodiumUpdateRequest;
 import br.com.genesis.ranking.dto.BracketRequest;
 import br.com.genesis.ranking.dto.BracketResponse;
 import br.com.genesis.ranking.service.BracketService;
@@ -29,6 +30,7 @@ public class BracketController {
   }
 
   @GetMapping
+  @PreAuthorize("hasAnyRole('ADMIN','MESARIO','STAFF')")
   public List<BracketResponse> listBrackets(@RequestParam(name = "eventId", required = false) String eventId) {
     return bracketService.listAll(eventId);
   }
@@ -43,6 +45,15 @@ public class BracketController {
   @PreAuthorize("hasRole('ADMIN')")
   public BracketResponse updateBracket(@PathVariable String id, @RequestBody BracketRequest request) {
     return bracketService.update(id, request);
+  }
+
+  @PutMapping("/{id}/podium")
+  @PreAuthorize("hasAnyRole('ADMIN','MESARIO','STAFF')")
+  public BracketResponse updateBracketPodium(
+      @PathVariable String id,
+      @RequestBody BracketPodiumUpdateRequest request
+  ) {
+    return bracketService.updatePodiumOnly(id, request == null ? null : request.getPodium(), request == null ? null : request.getAppliedAt());
   }
 
   @DeleteMapping("/{id}")

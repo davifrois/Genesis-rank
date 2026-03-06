@@ -217,7 +217,7 @@ const extractInlinePairs = (line) => {
     const after = line.slice(endOriginal);
     const nextChar = after.trimStart()[0];
     const hasSeparator = nextChar === ':' || nextChar === '-';
-    const boundary = before === '' || /[|;\-]$/.test(before) || hasDoubleSpaceBoundary;
+    const boundary = before === '' || /[|;-]$/.test(before) || hasDoubleSpaceBoundary;
 
     if (!hasSeparator && !boundary) return;
 
@@ -237,7 +237,7 @@ const extractInlinePairs = (line) => {
     const next = validMatches[i + 1];
     let valueStart = current.endOriginal;
 
-    while (valueStart < line.length && /[\s:\-]/.test(line[valueStart])) {
+    while (valueStart < line.length && /[\s:-]/.test(line[valueStart])) {
       valueStart += 1;
     }
 
@@ -432,7 +432,7 @@ export const extractStructuredDataFromPdfFile = async (file) => {
     const report = buildValidationReport(records);
 
     return { records, report };
-  } catch (error) {
+  } catch {
     throw new Error('Falha ao extrair dados do PDF. Verifique o arquivo.');
   }
 };

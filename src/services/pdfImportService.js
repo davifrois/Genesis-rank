@@ -151,7 +151,6 @@ const shouldIgnoreLine = (line) => {
 const parseCategoryHeader = (line) => {
   const cleaned = cleanLine(line);
   if (!cleaned.includes('/')) return null;
-  const normalized = normalizeForMatch(cleaned);
 
   const parts = cleaned.split('/').map((part) => part.trim()).filter(Boolean);
   const matchParts = parts.map((part) => normalizeForMatch(part));
@@ -335,7 +334,7 @@ export const extractTextFromPdfFile = async (file) => {
     }
 
     return combined;
-  } catch (err) {
+  } catch {
     throw new Error('Falha ao ler o PDF. Verifique o arquivo.');
   }
 };

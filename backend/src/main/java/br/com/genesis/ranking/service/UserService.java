@@ -1,6 +1,7 @@
 package br.com.genesis.ranking.service;
 
 import java.time.Instant;
+import java.text.Normalizer;
 import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
@@ -61,15 +62,24 @@ public class UserService {
     if (value == null || value.isBlank()) {
       return Role.ATHLETE;
     }
-    String normalized = value.trim().toUpperCase(Locale.ROOT);
-    try {
-      return Role.valueOf(normalized);
-    } catch (IllegalArgumentException ex) {
-      return Role.ATHLETE;
-    }
+    String normalized = normalizeRoleToken(value);
+    return switch (normalized) {
+      case "ADMIN", "ADMINISTRADOR" -> Role.ADMIN;
+      case "MESARIO", "MESA", "STAFF" -> Role.MESARIO;
+      case "COACH" -> Role.COACH;
+      case "ATHLETE", "ATLETA" -> Role.ATHLETE;
+      default -> Role.ATHLETE;
+    };
   }
 
   public String normalizeUsername(String username) {
     return username == null ? "" : username.trim().toLowerCase(Locale.ROOT);
+  }
+
+  private String normalizeRoleToken(String value) {
+    String raw = value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
+    String normalized = Normalizer.normalize(raw, Normalizer.Form.NFD)
+        .replaceAll("\\p{M}", "");
+    return normalized;
   }
 }

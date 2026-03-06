@@ -16,17 +16,30 @@ public class CorsConfig {
   @Value("${app.cors.allowed-origins}")
   private String allowedOrigins;
 
+  @Value("${app.cors.allowed-origin-patterns:}")
+  private String allowedOriginPatterns;
+
+  private List<String> parseCsv(String value) {
+    return Arrays.stream((value == null ? "" : value).split(","))
+        .map(String::trim)
+        .filter(item -> !item.isBlank())
+        .collect(Collectors.toList());
+  }
+
   @Bean
   public CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration config = new CorsConfiguration();
-    List<String> origins = Arrays.stream(allowedOrigins.split(","))
-        .map(String::trim)
-        .filter(value -> !value.isBlank())
-        .collect(Collectors.toList());
+    List<String> origins = parseCsv(allowedOrigins);
+    List<String> originPatterns = parseCsv(allowedOriginPatterns);
 
-    config.setAllowedOrigins(origins);
+    if (!origins.isEmpty()) {
+      config.setAllowedOrigins(origins);
+    }
+    if (!originPatterns.isEmpty()) {
+      config.setAllowedOriginPatterns(originPatterns);
+    }
     config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-    config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+    config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Trace-Id"));
     config.setExposedHeaders(List.of("X-Trace-Id", "X-Instagram-Feed-Updated-At", "X-Instagram-Feed-Status"));
     config.setAllowCredentials(true);
 

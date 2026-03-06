@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { calculateTotalPoints, rankAthletes } from '../services/scoringService';
 import { authService } from '../services/authService';
+import { publicRegistrationService } from '../services/publicRegistrationService';
 import { buildCategoryDescriptor, matchesBracketMode } from '../services/categoryService';
 import { nextPowerOfTwo, shuffleList } from '../services/bracketService';
 import { normalizeEventFees, resolveEventPixKey } from '../utils/eventPricing';
@@ -21,7 +22,7 @@ const DEFAULT_NEWS_ITEMS = [
     {
         id: 'news-1',
         title: 'Temporada aberta com novos campeonatos',
-        summary: 'Novas etapas regionais e estaduais foram adicionadas e já alimentam o ranking oficial.',
+        summary: 'Novas etapas regionais e estaduais foram adicionadas e j\u00e1 alimentam o ranking oficial.',
         imageUrl: '',
         publishedAt: '2026-02-12',
         createdAt: '2026-02-12T12:00:00.000Z'
@@ -29,15 +30,15 @@ const DEFAULT_NEWS_ITEMS = [
     {
         id: 'news-2',
         title: 'Ranking atualizado em tempo real',
-        summary: 'Agora, cada resultado processado atualiza pontos e posição do atleta automaticamente.',
+        summary: 'Agora, cada resultado processado atualiza pontos e posi\u00e7\u00e3o do atleta automaticamente.',
         imageUrl: '',
         publishedAt: '2026-02-05',
         createdAt: '2026-02-05T12:00:00.000Z'
     },
     {
         id: 'news-3',
-        title: 'Regras de pontuação revisadas',
-        summary: 'A tabela de eventos por estrelas segue válida para manter transparência no sistema.',
+        title: 'Regras de pontua\u00e7\u00e3o revisadas',
+        summary: 'A tabela de eventos por estrelas segue v\u00e1lida para manter transpar\u00eancia no sistema.',
         imageUrl: '',
         publishedAt: '2026-01-25',
         createdAt: '2026-01-25T12:00:00.000Z'
@@ -65,7 +66,7 @@ const DEFAULT_ACADEMIES = [
 ];
 
 const hasEncodingArtifacts = (value) => (
-    typeof value === 'string' && /Ã|Â|�/.test(value)
+    typeof value === 'string' && /\u00c3|\u00c2|\ufffd/.test(value)
 );
 
 const utf8Decoder = typeof TextDecoder !== 'undefined'
@@ -107,7 +108,7 @@ const normalizeBoolean = (value, fallback = false) => {
     if (typeof value === 'string') {
         const parsed = value.trim().toLowerCase();
         if (['true', '1', 'yes', 'sim', 'open', 'aberto', 'active', 'ativo'].includes(parsed)) return true;
-        if (['false', '0', 'no', 'nao', 'não', 'closed', 'fechado', 'inactive', 'inativo'].includes(parsed)) return false;
+        if (['false', '0', 'no', 'nao', 'n\u00e3o', 'n\u00c3\u00a3o', 'closed', 'fechado', 'inactive', 'inativo'].includes(parsed)) return false;
     }
     return fallback;
 };
@@ -166,12 +167,12 @@ const normalizeUser = (user) => {
 const initialData = {
     schemaVersion: STORAGE_VERSION,
     athletes: [
-        { id: '1', nome: 'JOÃO MIGUEL SANTOS VIEIRA', faixa: 'Branca/Cinza', peso: 'Pena', categoria: 'Pré-Mirim', academia: 'GRACIE BARRA COIMBRA', pontos: 36, historico: [] },
-        { id: '2', nome: 'Samir Daniel Silva Fraga', faixa: 'Branca/Cinza', peso: 'Pena', categoria: 'Pré-Mirim', academia: 'GRACIE BARRA COIMBRA', pontos: 12, historico: [] },
-        { id: '3', nome: 'João Pedro da Rocha Barbosa', faixa: 'Branca/Cinza', peso: 'Médio', categoria: 'Pré-Mirim', academia: 'GRACIE BARRA COIMBRA', pontos: 36, historico: [] },
-        { id: '4', nome: 'PEDRO BARROS MARTINO', faixa: 'Branca/Cinza', peso: 'Médio', categoria: 'Pré-Mirim', academia: 'GRACIE BARRA COIMBRA', pontos: 12, historico: [] },
+        { id: '1', nome: 'JO\u00c3O MIGUEL SANTOS VIEIRA', faixa: 'Branca/Cinza', peso: 'Pena', categoria: 'Pr\u00e9-Mirim', academia: 'GRACIE BARRA COIMBRA', pontos: 36, historico: [] },
+        { id: '2', nome: 'Samir Daniel Silva Fraga', faixa: 'Branca/Cinza', peso: 'Pena', categoria: 'Pr\u00e9-Mirim', academia: 'GRACIE BARRA COIMBRA', pontos: 12, historico: [] },
+        { id: '3', nome: 'Jo\u00e3o Pedro da Rocha Barbosa', faixa: 'Branca/Cinza', peso: 'M\u00e9dio', categoria: 'Pr\u00e9-Mirim', academia: 'GRACIE BARRA COIMBRA', pontos: 36, historico: [] },
+        { id: '4', nome: 'PEDRO BARROS MARTINO', faixa: 'Branca/Cinza', peso: 'M\u00e9dio', categoria: 'Pr\u00e9-Mirim', academia: 'GRACIE BARRA COIMBRA', pontos: 12, historico: [] },
         { id: '5', nome: 'EMANUELLY DA SILVA ANDRADE', faixa: 'Branca/Cinza', peso: 'Galo', categoria: 'Mirim A', academia: 'TRINDADE BRAZILIAN JJ', pontos: 36, historico: [] },
-        { id: '6', nome: 'OLÍVIA MORAES SANTANA', faixa: 'Branca/Cinza', peso: 'Galo', categoria: 'Mirim A', academia: 'GRACIE BARRA COIMBRA', pontos: 12, historico: [] },
+        { id: '6', nome: 'OL\u00cdVIA MORAES SANTANA', faixa: 'Branca/Cinza', peso: 'Galo', categoria: 'Mirim A', academia: 'GRACIE BARRA COIMBRA', pontos: 12, historico: [] },
     ],
     events: [],
     news: DEFAULT_NEWS_ITEMS,
@@ -554,16 +555,18 @@ const normalizeAcademy = (academy) => {
 
 const calculateAgeFromBirthDate = (value) => {
     if (!value) return '';
-    const birth = new Date(value);
-    if (Number.isNaN(birth.getTime())) return '';
+    const text = (value || '').toString().trim();
+    if (!text) return '';
 
-    const today = new Date();
-    let age = today.getFullYear() - birth.getFullYear();
-    const hasBirthdayPassed = (
-        today.getMonth() > birth.getMonth()
-        || (today.getMonth() === birth.getMonth() && today.getDate() >= birth.getDate())
-    );
-    if (!hasBirthdayPassed) age -= 1;
+    let birthYear = Number(text.slice(0, 4));
+    if (!Number.isFinite(birthYear) || birthYear <= 1900) {
+        const parsed = new Date(text);
+        if (Number.isNaN(parsed.getTime())) return '';
+        birthYear = parsed.getUTCFullYear();
+    }
+
+    const currentYear = new Date().getFullYear();
+    const age = currentYear - birthYear;
     return age >= 0 ? age : '';
 };
 
@@ -589,6 +592,10 @@ const normalizeMemberProfile = (profile) => {
         fullName,
         birthDate,
         age,
+        gender: normalizeTextTrimmed(profile.gender || profile.genero || profile.sexo || ''),
+        accountUsername: normalizeTextTrimmed(
+            profile.accountUsername || profile.loginUsername || profile.username || ''
+        ).toLowerCase(),
         email: normalizeTextTrimmed(profile.email || ''),
         phone: normalizeTextTrimmed(profile.phone || profile.telefone || ''),
         createdByUsername: normalizeTextTrimmed(profile.createdByUsername || profile.usuario || ''),
@@ -893,9 +900,7 @@ const useStoreState = () => {
 
         const bootstrapEventsFromApi = async () => {
             try {
-                const response = await fetch('/api/public/events');
-                if (!response.ok) return;
-                const payload = await response.json();
+                const payload = await publicRegistrationService.listPublicEvents();
                 const remoteEvents = normalizeArray(payload).map(normalizeEvent).filter(Boolean);
                 if (!remoteEvents.length || cancelled) return;
 
@@ -1041,10 +1046,15 @@ const useStoreState = () => {
     };
 
     const addMemberProfile = (payload = {}) => {
+        const requestedId = normalizeId(payload.id || '');
+        const existingById = requestedId
+            ? data.memberProfiles.find((profile) => profile.id === requestedId)
+            : null;
+
         const normalized = normalizeMemberProfile({
             ...payload,
-            id: payload.id || `member-${Date.now()}`,
-            createdAt: payload.createdAt || new Date().toISOString()
+            id: existingById?.id || payload.id || `member-${Date.now()}`,
+            createdAt: existingById?.createdAt || payload.createdAt || new Date().toISOString()
         });
 
         if (!normalized) {
@@ -1065,16 +1075,28 @@ const useStoreState = () => {
         };
 
         const duplicate = data.memberProfiles.find((profile) => (
+            profile.id !== existingById?.id
+            &&
             normalizeKeyPart(profile.fullName) === normalizeKeyPart(profileToSave.fullName)
             && normalizeKeyPart(profile.academyName || '') === normalizeKeyPart(profileToSave.academyName || '')
         ));
 
-        const targetId = duplicate?.id || profileToSave.id;
+        const targetId = existingById?.id || duplicate?.id || profileToSave.id;
 
         setData((prev) => {
-            const nextProfiles = duplicate
-                ? prev.memberProfiles.map((profile) => (profile.id === duplicate.id ? { ...profile, ...profileToSave, id: duplicate.id } : profile))
-                : [profileToSave, ...prev.memberProfiles];
+            const hasTarget = prev.memberProfiles.some((profile) => profile.id === targetId);
+            const nextProfiles = hasTarget
+                ? prev.memberProfiles.map((profile) => (
+                    profile.id === targetId
+                        ? {
+                            ...profile,
+                            ...profileToSave,
+                            id: targetId,
+                            createdAt: profile.createdAt || profileToSave.createdAt
+                        }
+                        : profile
+                ))
+                : [{ ...profileToSave, id: targetId }, ...prev.memberProfiles];
 
             const nextAthletes = prev.athletes.map((athlete) => {
                 const sameName = namesLikelySame(athlete.nome, profileToSave.fullName);

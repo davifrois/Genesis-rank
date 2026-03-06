@@ -5,11 +5,12 @@
 
 const DEFAULT_USERS = [
     { username: 'simone', password: 'simone123', name: 'Simone', role: 'admin' },
-    { username: 'davifrois', password: 'davifrois324@', name: 'Davifrois', role: 'admin' }
+    { username: 'davifrois', password: 'davifrois324@', name: 'Davifrois', role: 'admin' },
+    { username: 'mesario1', password: 'mesario123', name: 'Mesário 1', role: 'mesario' }
 ];
 
 const ADMIN_USERS = new Set(['simone', 'davifrois']);
-const VALID_ROLES = new Set(['admin', 'athlete']);
+const VALID_ROLES = new Set(['admin', 'athlete', 'mesario']);
 
 const AUTH_USERS_KEY = 'genesis_auth_users_v1';
 export const API_AUTH_TOKEN_STORAGE_KEY = 'genesis_api_auth_token_v1';
@@ -24,9 +25,24 @@ const normalizeUsername = (value) => (
     (value || '').toString().trim().toLowerCase()
 );
 
+const normalizeRole = (value) => {
+    const raw = (value || '')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+
+    if (!raw) return '';
+    if (raw === 'admin' || raw === 'administrador') return 'admin';
+    if (raw === 'mesario' || raw === 'staff' || raw === 'mesa') return 'mesario';
+    if (raw === 'athlete' || raw === 'atleta') return 'athlete';
+    return '';
+};
+
 const resolveRole = (user) => {
-    const rawRole = (user?.role || '').toString().trim().toLowerCase();
-    if (VALID_ROLES.has(rawRole)) return rawRole;
+    const normalizedRole = normalizeRole(user?.role);
+    if (VALID_ROLES.has(normalizedRole)) return normalizedRole;
     const username = normalizeUsername(user?.username);
     if (ADMIN_USERS.has(username)) return 'admin';
     return 'athlete';
@@ -36,7 +52,7 @@ const getStorage = () => {
     try {
         if (typeof localStorage === 'undefined') return null;
         return localStorage;
-    } catch (err) {
+    } catch {
         return null;
     }
 };
@@ -47,7 +63,7 @@ const readApiToken = () => {
     try {
         const token = (storage.getItem(API_AUTH_TOKEN_STORAGE_KEY) || '').toString().trim();
         if (token) return token;
-    } catch (err) {
+    } catch {
         // ignore storage read failures
     }
     return memoryApiToken || '';
@@ -64,7 +80,7 @@ const writeApiToken = (token) => {
             return;
         }
         storage.setItem(API_AUTH_TOKEN_STORAGE_KEY, normalized);
-    } catch (err) {
+    } catch {
         // ignore storage write failures
     }
 };
@@ -85,7 +101,7 @@ const readLocalUsers = () => {
                 name: user.name || user.username,
                 role: resolveRole(user)
             }));
-    } catch (err) {
+    } catch {
         return DEFAULT_USERS;
     }
 };
@@ -98,7 +114,7 @@ const writeLocalUsers = (users) => {
     }
     try {
         storage.setItem(AUTH_USERS_KEY, JSON.stringify(users));
-    } catch (err) {
+    } catch {
         // ignore storage errors
     }
 };
@@ -116,7 +132,7 @@ const ensureLocalUsers = () => {
         if (!storage.getItem(AUTH_USERS_KEY)) {
             writeLocalUsers(users);
         }
-    } catch (err) {
+    } catch {
         // ignore storage errors
     }
     return users;
@@ -146,7 +162,8 @@ const loginLocal = async (username, password) => {
 const listUsersLocal = () => (
     ensureLocalUsers().map((user) => ({
         username: user.username,
-        name: user.name
+        name: user.name,
+        role: resolveRole(user)
     }))
 );
 
@@ -181,7 +198,7 @@ const resetPasswordLocal = async (username, newPassword) => {
     };
 };
 
-const registerLocal = async ({ username, password, name }) => {
+const registerLocal = async ({ username, password, name, role = 'athlete' }) => {
     const normalized = normalizeUsername(username);
     if (!normalized) {
         throw new Error('Informe um usuário válido.');
@@ -195,11 +212,13 @@ const registerLocal = async ({ username, password, name }) => {
         throw new Error('Usuário já cadastrado.');
     }
 
+    const normalizedRole = resolveRole({ username: normalized, role });
+
     const newUser = {
         username: normalized,
         password,
         name: (name || username || normalized).toString().trim(),
-        role: 'athlete'
+        role: normalizedRole
     };
 
     writeLocalUsers([...users, newUser]);
@@ -230,7 +249,7 @@ const loginWithApi = async (username, password) => {
         try {
             const payload = await response.json();
             if (payload?.message) message = payload.message;
-        } catch (err) {
+        } catch {
             // ignore json parsing errors
         }
         throw new Error(message);
@@ -282,14 +301,25 @@ export const authService = {
         return listUsersLocal();
     },
     isLocalAuth: () => isLocalAuth(),
-    getRoleForUsername: (username) => resolveRole({ username }),
-    register: async ({ username, password, name }) => {
+    getRoleForUsername: (username) => {
+        const normalized = normalizeUsername(username);
+        if (isLocalAuth()) {
+            const localMatch = ensureLocalUsers().find((entry) => (
+                normalizeUsername(entry.username) === normalized
+            ));
+            if (localMatch) {
+                return resolveRole(localMatch);
+            }
+        }
+        return resolveRole({ username: normalized });
+    },
+    register: async ({ username, password, name, role }) => {
         if (AUTH_MODE === 'api') {
             throw new Error('Cadastro indisponível no modo remoto.');
         }
 
         await new Promise(resolve => setTimeout(resolve, 600));
-        return registerLocal({ username, password, name });
+        return registerLocal({ username, password, name, role });
     },
     resetPassword: async (username, newPassword) => {
         if (AUTH_MODE === 'api') {

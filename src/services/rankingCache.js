@@ -9,7 +9,7 @@ export const readRankingCache = () => {
     if (!parsed.timestamp || !parsed.data) return null;
     if (Date.now() - parsed.timestamp > CACHE_TTL_MS) return null;
     return parsed;
-  } catch (err) {
+  } catch {
     return null;
   }
 };
@@ -17,7 +17,7 @@ export const readRankingCache = () => {
 export const writeRankingCache = (data) => {
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify({ timestamp: Date.now(), data }));
-  } catch (err) {
+  } catch {
     // Ignore cache write errors silently
   }
 };

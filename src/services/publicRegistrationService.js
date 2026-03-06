@@ -1,4 +1,5 @@
 import { REGISTRATION_STATUS, normalizeRegistrationStatus } from '../utils/registrationStatus';
+import { authService } from './authService';
 
 const ENV_API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').trim();
 const API_BASE_URL = ENV_API_BASE_URL ? ENV_API_BASE_URL.replace(/\/$/, '') : '';
@@ -142,6 +143,24 @@ const appendTraceToMessage = (message, traceId) => {
   if (!trace) return base;
   if (base.toLowerCase().includes('trace:')) return base;
   return `${base} (trace: ${trace})`;
+};
+
+const normalizeAuthToken = () => {
+  try {
+    const token = authService?.getApiToken ? authService.getApiToken() : '';
+    return (token || '').toString().trim();
+  } catch {
+    return '';
+  }
+};
+
+const buildAuthRequiredError = (message) => {
+  const error = new Error(
+    (message || 'Sessão de administrador expirada. Faça login novamente para confirmar o pagamento.')
+      .toString()
+  );
+  error.code = 'AUTH_REQUIRED';
+  return error;
 };
 
 const parseErrorMessage = async (response, fallback = 'Falha ao enviar inscrição.') => {
@@ -524,14 +543,33 @@ export const publicRegistrationService = {
       throw new Error('Status de pagamento inválido.');
     }
 
+    const token = normalizeAuthToken();
+    if (!token) {
+      throw buildAuthRequiredError(
+        'Faça login como administrador para confirmar o pagamento da inscrição.'
+      );
+    }
+
     try {
-      const response = await fetch(buildApiUrl(`/api/public/registrations/${encodeURIComponent(normalizedId)}/payment`), {
+      const response = await fetch(buildApiUrl(`/api/admin/registrations/${encodeURIComponent(normalizedId)}/payment`), {
         method: 'PATCH',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({ status: normalizedStatus, reviewNotes, reviewedBy })
       });
+
+      if (response.status === 401 || response.status === 403) {
+        if (authService?.clearApiToken) {
+          authService.clearApiToken();
+        }
+        const parsed = await parseErrorMessage(
+          response,
+          'Sessão de administrador expirada. Faça login novamente para confirmar o pagamento.'
+        );
+        throw buildAuthRequiredError(parsed?.message);
+      }
 
       if (!response.ok) {
         throw await buildHttpError(response, 'Falha ao atualizar pagamento.');
@@ -539,6 +577,9 @@ export const publicRegistrationService = {
 
       return response.json();
     } catch (error) {
+      if (error?.code === 'AUTH_REQUIRED') {
+        throw error;
+      }
       if (isNetworkError(error) || isUnavailableHttpError(error)) {
         updateSyncDiagnostics('failure', {
           message: error?.message || DEFAULT_NETWORK_ERROR_MESSAGE,
@@ -549,7 +590,6 @@ export const publicRegistrationService = {
       throw error;
     }
   },
-
   getSyncDiagnostics: () => (safeReadSyncDiagnostics() || {
     successCount: 0,
     failureCount: 0,

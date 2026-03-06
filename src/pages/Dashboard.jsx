@@ -443,6 +443,7 @@ const toMemberProfileFromRegistration = (registration, currentUser) => {
         fullName: registration?.nome || '',
         firstName: registration?.nome || '',
         lastName: '',
+        gender: registration?.genero || '',
         email: registration?.email || '',
         phone: registration?.phone || '',
         birthDate: hasValidBirthYear ? `${birthYear}-01-01` : '',
@@ -533,11 +534,15 @@ const Dashboard = () => {
                     podiumApplied: 'Podium applied successfully.',
                     podiumApplyFail: 'Could not apply podium.',
                     resetOnlyLocal: 'Password reset is available only in local mode.',
+                    registerOnlyLocal: 'User creation is available only in local mode.',
                     selectUser: 'Select a user.',
                     mismatchPassword: 'Passwords do not match.',
                     passwordUpdated: 'Password updated successfully.',
                     passwordResetFor: (username) => `Password reset for ${username}.`,
                     passwordResetFail: 'Failed to reset password.',
+                    userCreated: (username) => `User created: ${username}.`,
+                    userCreateFail: 'Failed to create user.',
+                    accessDeniedAdmin: 'This action is restricted to administrators.',
                     minName: 'Name must have at least 3 characters.',
                     academyRequired: 'Please provide athlete academy.',
                     athleteRegistered: (name) => `Athlete ${name} registered.`,
@@ -826,9 +831,13 @@ const Dashboard = () => {
                     secureSessionSubtitle: 'Access control with visual confirmation',
                     endSession: 'End session',
                     localUsers: 'Local users',
-                    localUsersDesc: 'Manage panel account passwords.',
+                    localUsersDesc: 'Manage local panel accounts and permissions.',
                     noUser: 'No registered user.',
                     resetPassword: 'Reset password',
+                    createUser: 'Create user',
+                    roleAdmin: 'Admin',
+                    roleMesario: 'Table staff',
+                    roleAthlete: 'Athlete',
                     local: 'Local'
                 },
                 modalLogs: {
@@ -904,6 +913,15 @@ const Dashboard = () => {
                     newPassword: 'New password',
                     confirmPassword: 'Confirm password',
                     updatePassword: 'Update password'
+                },
+                modalUserCreate: {
+                    title: 'Create local user',
+                    name: 'Name',
+                    username: 'Username',
+                    role: 'Role',
+                    password: 'Password',
+                    confirmPassword: 'Confirm password',
+                    createUser: 'Create user'
                 }
             }
             : {
@@ -943,11 +961,15 @@ const Dashboard = () => {
                     podiumApplied: 'Pódio aplicado com sucesso.',
                     podiumApplyFail: 'Não foi possível aplicar o pódio.',
                     resetOnlyLocal: 'Redefinição de senha disponível apenas no modo local.',
+                    registerOnlyLocal: 'Cadastro de usuários disponível apenas no modo local.',
                     selectUser: 'Selecione um usuário.',
                     mismatchPassword: 'As senhas não conferem.',
                     passwordUpdated: 'Senha atualizada com sucesso.',
                     passwordResetFor: (username) => `Senha redefinida para ${username}.`,
                     passwordResetFail: 'Falha ao redefinir senha.',
+                    userCreated: (username) => `Usuário criado: ${username}.`,
+                    userCreateFail: 'Falha ao criar usuário.',
+                    accessDeniedAdmin: 'Esta ação é restrita a administradores.',
                     minName: 'Nome precisa ter pelo menos 3 caracteres.',
                     academyRequired: 'Informe a academia do atleta.',
                     athleteRegistered: (name) => `Atleta ${name} cadastrado.`,
@@ -1236,9 +1258,13 @@ const Dashboard = () => {
                     secureSessionSubtitle: 'Controle de acesso com confirmação visual',
                     endSession: 'Encerrar sessão',
                     localUsers: 'Usuários locais',
-                    localUsersDesc: 'Gerencie senhas das contas do painel.',
+                    localUsersDesc: 'Gerencie contas locais e permissões do painel.',
                     noUser: 'Nenhum usuário cadastrado.',
                     resetPassword: 'Redefinir senha',
+                    createUser: 'Criar usuário',
+                    roleAdmin: 'Administrador',
+                    roleMesario: 'Mesário',
+                    roleAthlete: 'Atleta',
                     local: 'Local'
                 },
                 modalLogs: {
@@ -1314,10 +1340,23 @@ const Dashboard = () => {
                     newPassword: 'Nova senha',
                     confirmPassword: 'Confirmar senha',
                     updatePassword: 'Atualizar senha'
+                },
+                modalUserCreate: {
+                    title: 'Criar usuário local',
+                    name: 'Nome',
+                    username: 'Usuário',
+                    role: 'Papel',
+                    password: 'Senha',
+                    confirmPassword: 'Confirmar senha',
+                    createUser: 'Criar usuário'
                 }
             }
     ), [isEnglish]);
     const locale = isEnglish ? 'en-US' : 'pt-BR';
+    const currentUserRole = (currentUser?.role || '').toString().trim().toLowerCase();
+    const isAdminUser = currentUserRole === 'admin';
+    const isMesarioUser = currentUserRole === 'mesario';
+    const canManagePanel = isAdminUser;
     const localizeBelt = useCallback(
         (value, fallback = copy.athletesPanel.belt) => translateBelt(value || fallback, language),
         [copy.athletesPanel.belt, language]
@@ -1334,6 +1373,12 @@ const Dashboard = () => {
         (label) => translateCompositeLabel(label, language),
         [language]
     );
+    const localizeUserRole = useCallback((role) => {
+        const normalized = (role || '').toString().trim().toLowerCase();
+        if (normalized === 'admin') return copy.activity.roleAdmin;
+        if (normalized === 'mesario') return copy.activity.roleMesario;
+        return copy.activity.roleAthlete;
+    }, [copy.activity.roleAdmin, copy.activity.roleMesario, copy.activity.roleAthlete]);
 
     const translateLogAction = useCallback((action) => {
         if (!isEnglish) return action;
@@ -1400,7 +1445,7 @@ const Dashboard = () => {
     const [showLogs, setShowLogs] = useState(false);
     const [toast, setToast] = useState(null);
     const [navOpen, setNavOpen] = useState(false);
-    const [activeSection, setActiveSection] = useState('overview');
+    const [activeSection, setActiveSection] = useState(isMesarioUser ? 'brackets' : 'overview');
     const [viewMode, setViewMode] = useState('table');
     const [athletesPage, setAthletesPage] = useState(1);
     const [athletesPageSize, setAthletesPageSize] = useState(ATHLETE_PAGE_SIZE_OPTIONS[0]);
@@ -1452,6 +1497,15 @@ const Dashboard = () => {
     const [userResetError, setUserResetError] = useState('');
     const [userResetSuccess, setUserResetSuccess] = useState('');
     const [userResetLoading, setUserResetLoading] = useState(false);
+    const [showUserCreateModal, setShowUserCreateModal] = useState(false);
+    const [userCreateName, setUserCreateName] = useState('');
+    const [userCreateUsername, setUserCreateUsername] = useState('');
+    const [userCreatePassword, setUserCreatePassword] = useState('');
+    const [userCreateConfirm, setUserCreateConfirm] = useState('');
+    const [userCreateRole, setUserCreateRole] = useState('mesario');
+    const [userCreateError, setUserCreateError] = useState('');
+    const [userCreateSuccess, setUserCreateSuccess] = useState('');
+    const [userCreateLoading, setUserCreateLoading] = useState(false);
     const [publicRegistrations, setPublicRegistrations] = useState([]);
     const [registrationSearch, setRegistrationSearch] = useState('');
     const [registrationEventFilter, setRegistrationEventFilter] = useState('all');
@@ -1541,7 +1595,7 @@ const Dashboard = () => {
         ));
     }, []);
 
-    const handleFinalizeEvent = useCallback(() => {
+    const handleFinalizeEvent = useCallback(async () => {
         if (!activeEventId) {
             showFeedback('error', copy.feedback.activateEventForReport);
             return;
@@ -1556,7 +1610,7 @@ const Dashboard = () => {
         }
 
         try {
-            generateRankingPDF(eventAthletes, {
+            await generateRankingPDF(eventAthletes, {
                 eventName: eventMeta?.name || copy.bracketsPanel.event,
                 eventDate: eventMeta?.date || '',
                 eventLocation: eventMeta?.location || ''
@@ -1832,6 +1886,10 @@ const Dashboard = () => {
     }, [brackets, bracketEventId, bracketMode, bracketSearch]);
 
     const handleGenerateBrackets = useCallback(async () => {
+        if (!canManagePanel) {
+            showFeedback('error', copy.feedback.accessDeniedAdmin);
+            return;
+        }
         if (!bracketEventId) {
             showFeedback('error', copy.feedback.selectEventForBracket);
             return;
@@ -1875,7 +1933,7 @@ const Dashboard = () => {
         } catch (err) {
             showFeedback('error', err?.message || copy.feedback.bracketGenerateFail);
         }
-    }, [bracketEventId, bracketMode, brackets, events, generateBrackets, athletes, showFeedback, copy.feedback, copy.bracketsPanel.event, isEnglish]);
+    }, [canManagePanel, bracketEventId, bracketMode, brackets, events, generateBrackets, athletes, showFeedback, copy.feedback, copy.bracketsPanel.event, isEnglish]);
 
     const handleExportBracketsPdf = useCallback(async () => {
         if (!filteredBrackets.length) {
@@ -1929,7 +1987,11 @@ const Dashboard = () => {
             showFeedback('error', copy.feedback.resetOnlyLocal);
             return;
         }
-        const users = authService.listUsers ? authService.listUsers() : [];
+        const users = (authService.listUsers ? authService.listUsers() : [])
+            .filter((user) => {
+                const role = (user?.role || '').toString().trim().toLowerCase();
+                return role === 'admin' || role === 'mesario';
+            });
         setUserResetList(users);
         setUserResetUsername(users[0]?.username || '');
         setUserResetPassword('');
@@ -1945,6 +2007,36 @@ const Dashboard = () => {
         setUserResetConfirm('');
         setUserResetError('');
         setUserResetSuccess('');
+    }, []);
+
+    const openUserCreateModal = useCallback(() => {
+        if (!canManagePanel) {
+            showFeedback('error', copy.feedback.accessDeniedAdmin);
+            return;
+        }
+        if (authService.isLocalAuth && !authService.isLocalAuth()) {
+            showFeedback('error', copy.feedback.registerOnlyLocal);
+            return;
+        }
+        setUserCreateName('');
+        setUserCreateUsername('');
+        setUserCreatePassword('');
+        setUserCreateConfirm('');
+        setUserCreateRole('mesario');
+        setUserCreateError('');
+        setUserCreateSuccess('');
+        setShowUserCreateModal(true);
+    }, [canManagePanel, showFeedback, copy.feedback]);
+
+    const closeUserCreateModal = useCallback(() => {
+        setShowUserCreateModal(false);
+        setUserCreateName('');
+        setUserCreateUsername('');
+        setUserCreatePassword('');
+        setUserCreateConfirm('');
+        setUserCreateRole('mesario');
+        setUserCreateError('');
+        setUserCreateSuccess('');
     }, []);
 
     const handleUserResetSubmit = useCallback(async (event) => {
@@ -1987,6 +2079,87 @@ const Dashboard = () => {
             setUserResetLoading(false);
         }
     }, [userResetUsername, userResetPassword, userResetConfirm, showFeedback, addLog, copy.feedback]);
+
+    const handleUserCreateSubmit = useCallback(async (event) => {
+        event.preventDefault();
+        setUserCreateError('');
+        setUserCreateSuccess('');
+
+        if (!canManagePanel) {
+            setUserCreateError(copy.feedback.accessDeniedAdmin);
+            return;
+        }
+
+        if (authService.isLocalAuth && !authService.isLocalAuth()) {
+            setUserCreateError(copy.feedback.registerOnlyLocal);
+            return;
+        }
+
+        if (userCreatePassword !== userCreateConfirm) {
+            setUserCreateError(copy.feedback.mismatchPassword);
+            return;
+        }
+
+        const normalizedUsername = (userCreateUsername || '').toString().trim().toLowerCase();
+        const normalizedName = (userCreateName || '').toString().trim();
+        if (!normalizedUsername) {
+            setUserCreateError(isEnglish ? 'Please provide username.' : 'Informe o usuário.');
+            return;
+        }
+
+        const normalizedRole = ['admin', 'mesario'].includes(userCreateRole) ? userCreateRole : 'mesario';
+        setUserCreateLoading(true);
+        try {
+            const created = await authService.register({
+                name: normalizedName || normalizedUsername,
+                username: normalizedUsername,
+                password: userCreatePassword,
+                role: normalizedRole
+            });
+            const createdUsername = created?.username || userCreateUsername;
+            setUserCreateSuccess(copy.feedback.userCreated(createdUsername));
+            showFeedback('success', copy.feedback.userCreated(createdUsername));
+            addLog({
+                type: 'AUTH',
+                action: 'REGISTER',
+                details: `Usuário ${createdUsername} cadastrado com perfil ${normalizedRole}.`
+            });
+
+            const users = (authService.listUsers ? authService.listUsers() : [])
+                .filter((user) => {
+                    const role = (user?.role || '').toString().trim().toLowerCase();
+                    return role === 'admin' || role === 'mesario';
+                });
+            setUserResetList(users);
+            setUserCreateName('');
+            setUserCreateUsername('');
+            setUserCreatePassword('');
+            setUserCreateConfirm('');
+            setUserCreateRole('mesario');
+        } catch (err) {
+            const message = err?.message || copy.feedback.userCreateFail;
+            setUserCreateError(message);
+            showFeedback('error', message);
+            addLog({
+                type: 'AUTH',
+                action: 'REGISTER_FAILURE',
+                details: `Falha: ${userCreateUsername} - ${message}`
+            });
+        } finally {
+            setUserCreateLoading(false);
+        }
+    }, [
+        canManagePanel,
+        userCreatePassword,
+        userCreateConfirm,
+        userCreateRole,
+        userCreateName,
+        userCreateUsername,
+        showFeedback,
+        addLog,
+        copy.feedback,
+        isEnglish
+    ]);
 
     const loadPublicRegistrations = useCallback(async () => {
         setRegistrationsLoading(true);
@@ -2068,6 +2241,13 @@ const Dashboard = () => {
 
             showFeedback('success', copy.feedback.registrationStatusUpdated);
         } catch (err) {
+            if (err?.code === 'AUTH_REQUIRED') {
+                const message = err?.message || copy.feedback.registrationStatusFail;
+                setRegistrationsError(message);
+                showFeedback('error', message);
+                logout();
+                return;
+            }
             const message = err?.message || copy.feedback.registrationStatusFail;
             setRegistrationsError(message);
             showFeedback('error', message);
@@ -2080,6 +2260,7 @@ const Dashboard = () => {
         addSuppressedRegistrationKeys,
         removeSuppressedRegistrationKey,
         showFeedback,
+        logout,
         copy
     ]);
 
@@ -2226,7 +2407,17 @@ const Dashboard = () => {
     }, []);
 
     useEffect(() => {
+        if (!isMesarioUser) return;
+        if (activeSection !== 'brackets' && activeSection !== 'activity') {
+            setActiveSection('brackets');
+        }
+    }, [isMesarioUser, activeSection]);
+
+    useEffect(() => {
         const handler = (event) => {
+            if (!canManagePanel) {
+                return;
+            }
             if (event.target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName)) {
                 return;
             }
@@ -2249,7 +2440,7 @@ const Dashboard = () => {
         };
         window.addEventListener('keydown', handler);
         return () => window.removeEventListener('keydown', handler);
-    }, [handleImportRanking, handleFinalizeEvent]);
+    }, [canManagePanel, handleImportRanking, handleFinalizeEvent]);
 
     useEffect(() => {
         loadPublicRegistrations();
@@ -2311,7 +2502,16 @@ const Dashboard = () => {
     }, [memberProfiles]);
 
     const isLocalAuth = authService.isLocalAuth ? authService.isLocalAuth() : true;
-    const localUsers = isLocalAuth && authService.listUsers ? authService.listUsers() : [];
+    const localUsers = useMemo(
+        () => (isLocalAuth && authService.listUsers ? authService.listUsers() : []),
+        [isLocalAuth]
+    );
+    const localPanelUsers = useMemo(() => (
+        localUsers.filter((user) => {
+            const role = (user?.role || '').toString().trim().toLowerCase();
+            return role === 'admin' || role === 'mesario';
+        })
+    ), [localUsers]);
 
     const filteredAthletes = useMemo(() => {
         const normalizedSearchTerm = deferredSearchTerm.trim().toLowerCase();
@@ -2626,16 +2826,24 @@ const Dashboard = () => {
 
     const recentLogs = logs.slice(0, 6);
 
-    const navItems = [
-        { id: 'overview', label: copy.nav.overview, icon: LayoutDashboard },
-        { id: 'events', label: copy.nav.events, icon: Calendar, meta: events.length },
-        { id: 'news', label: copy.nav.news, icon: Newspaper, meta: news.length },
-        { id: 'registrations', label: copy.nav.registrations, icon: ClipboardList, meta: publicRegistrations.length },
-        { id: 'brackets', label: copy.nav.brackets, icon: ClipboardList },
-        { id: 'athletes', label: copy.nav.athletes, icon: Users, meta: athletes.length },
-        { id: 'automation', label: copy.nav.automation, icon: Zap },
-        { id: 'activity', label: copy.nav.activity, icon: Activity }
-    ];
+    const navItems = useMemo(() => {
+        if (!canManagePanel) {
+            return [
+                { id: 'brackets', label: copy.nav.brackets, icon: ClipboardList },
+                { id: 'activity', label: copy.nav.activity, icon: Activity }
+            ];
+        }
+        return [
+            { id: 'overview', label: copy.nav.overview, icon: LayoutDashboard },
+            { id: 'events', label: copy.nav.events, icon: Calendar, meta: events.length },
+            { id: 'news', label: copy.nav.news, icon: Newspaper, meta: news.length },
+            { id: 'registrations', label: copy.nav.registrations, icon: ClipboardList, meta: publicRegistrations.length },
+            { id: 'brackets', label: copy.nav.brackets, icon: ClipboardList },
+            { id: 'athletes', label: copy.nav.athletes, icon: Users, meta: athletes.length },
+            { id: 'automation', label: copy.nav.automation, icon: Zap },
+            { id: 'activity', label: copy.nav.activity, icon: Activity }
+        ];
+    }, [canManagePanel, copy.nav, events.length, news.length, publicRegistrations.length, athletes.length]);
 
     const orderedNews = useMemo(() => (
         [...news].sort((a, b) => {
@@ -2967,11 +3175,14 @@ const Dashboard = () => {
                     </div>
                 </div>
 
-                <button type="button" className="btn btn-primary" onClick={() => setShowAddModal(true)}>
-                    {copy.sidebar.newRegister}
-                </button>
+                {canManagePanel && (
+                    <button type="button" className="btn btn-primary" onClick={() => setShowAddModal(true)}>
+                        {copy.sidebar.newRegister}
+                    </button>
+                )}
             </aside>
             <div className="admin-main">
+                {canManagePanel && (
                 <section className="admin-hero" id="overview">
                     <div>
                         <div className="meta-pill">
@@ -3027,7 +3238,9 @@ const Dashboard = () => {
                         </div>
                     </div>
                 </section>
+                )}
 
+                {canManagePanel && (
                 <section className="stats-grid">
                     <div className="stat-card stat-card--focus">
                         <div className="stat-card__icon">
@@ -3062,6 +3275,8 @@ const Dashboard = () => {
                         <div className="stat-card__trend">{copy.stats.continuousMonitoring}</div>
                     </div>
                 </section>
+                )}
+                {canManagePanel && (
                 <section className="panel" id="events">
                     <div className="panel-header">
                         <div>
@@ -3139,20 +3354,35 @@ const Dashboard = () => {
                                                 <Pencil size={14} />
                                                 {copy.eventsPanel.edit}
                                             </button>
-                                            <a
-                                                className={`btn ${event.registrationOpen ? 'btn-event btn-event--small' : 'btn-secondary btn-event--small'}`}
-                                                href={event.internalRegistration ? `/eventos/${event.id}` : (event.registrationUrl || '#')}
-                                                target={!event.internalRegistration && event.registrationUrl ? '_blank' : undefined}
-                                                rel={!event.internalRegistration && event.registrationUrl ? 'noreferrer' : undefined}
-                                                onClick={(clickEvent) => {
-                                                    if (!event.registrationOpen || (!event.internalRegistration && !event.registrationUrl)) {
-                                                        clickEvent.preventDefault();
-                                                    }
-                                                }}
-                                                aria-disabled={!event.registrationOpen || (!event.internalRegistration && !event.registrationUrl)}
-                                            >
-                                                {copy.eventsPanel.registration}
-                                            </a>
+                                            {event.internalRegistration ? (
+                                                <Link
+                                                    className={`btn ${event.registrationOpen ? 'btn-event btn-event--small' : 'btn-secondary btn-event--small'}`}
+                                                    to={`/eventos/${event.id}`}
+                                                    onClick={(clickEvent) => {
+                                                        if (!event.registrationOpen) {
+                                                            clickEvent.preventDefault();
+                                                        }
+                                                    }}
+                                                    aria-disabled={!event.registrationOpen}
+                                                >
+                                                    {copy.eventsPanel.registration}
+                                                </Link>
+                                            ) : (
+                                                <a
+                                                    className={`btn ${event.registrationOpen ? 'btn-event btn-event--small' : 'btn-secondary btn-event--small'}`}
+                                                    href={event.registrationUrl || '#'}
+                                                    target={event.registrationUrl ? '_blank' : undefined}
+                                                    rel={event.registrationUrl ? 'noreferrer' : undefined}
+                                                    onClick={(clickEvent) => {
+                                                        if (!event.registrationOpen || !event.registrationUrl) {
+                                                            clickEvent.preventDefault();
+                                                        }
+                                                    }}
+                                                    aria-disabled={!event.registrationOpen || !event.registrationUrl}
+                                                >
+                                                    {copy.eventsPanel.registration}
+                                                </a>
+                                            )}
                                         </div>
                                     </div>
                                 );
@@ -3160,6 +3390,8 @@ const Dashboard = () => {
                         </div>
                     )}
                 </section>
+                )}
+                {canManagePanel && (
                 <section className="panel" id="news">
                     <div className="panel-header">
                         <div>
@@ -3327,6 +3559,8 @@ const Dashboard = () => {
                         </div>
                     </div>
                 </section>
+                )}
+                {canManagePanel && (
                 <section className="panel" id="registrations">
                     <div className="panel-header">
                         <div>
@@ -3564,6 +3798,7 @@ const Dashboard = () => {
                         <div className="panel-subtitle">{copy.registrationsPanel.noData}</div>
                     )}
                 </section>
+                )}
                 <section className="panel" id="brackets">
                     <div className="panel-header">
                         <div>
@@ -3596,15 +3831,17 @@ const Dashboard = () => {
                                 <option value="ABS-GI">ABS GI</option>
                                 <option value="ABS-NO-GI">ABS NO-GI</option>
                             </select>
-                            <button
-                                type="button"
-                                className="btn btn-primary"
-                                onClick={handleGenerateBrackets}
-                                disabled={!events.length}
-                            >
-                                <ClipboardList size={14} />
-                                {copy.bracketsPanel.generate}
-                            </button>
+                            {canManagePanel && (
+                                <button
+                                    type="button"
+                                    className="btn btn-primary"
+                                    onClick={handleGenerateBrackets}
+                                    disabled={!events.length}
+                                >
+                                    <ClipboardList size={14} />
+                                    {copy.bracketsPanel.generate}
+                                </button>
+                            )}
                             <button
                                 type="button"
                                 className="btn btn-secondary"
@@ -3736,6 +3973,7 @@ const Dashboard = () => {
                         )}
                     </div>
                 </section>
+                {canManagePanel && (
                 <section className="panel">
                     <div className="panel-header">
                         <div>
@@ -3765,6 +4003,8 @@ const Dashboard = () => {
                         ))}
                     </div>
                 </section>
+                )}
+                {canManagePanel && (
                 <section className="panel" id="athletes">
                     <div className="panel-header">
                         <div>
@@ -4116,6 +4356,8 @@ const Dashboard = () => {
                         <div className="panel-subtitle">{copy.athletesPanel.noAthleteFound}</div>
                     )}
                 </section>
+                )}
+                {canManagePanel && (
                 <section className="panel" id="automation">
                     <div className="panel-header">
                         <div>
@@ -4225,38 +4467,43 @@ const Dashboard = () => {
                         <span className="shortcut-pill">{copy.automation.shortcutLogs}</span>
                     </div>
                 </section>
+                )}
                 <section className="panel" id="activity">
-                    <div className="panel-header">
-                        <div>
-                            <div className="panel-title">{copy.activity.title}</div>
-                            <div className="panel-subtitle">{copy.activity.subtitle}</div>
-                        </div>
-                        <button type="button" className="btn btn-ghost" onClick={() => setShowLogs(true)}>
-                            <ClipboardList size={14} />
-                            {copy.activity.viewAll}
-                        </button>
-                    </div>
-                    <div className="activity-list">
-                        {recentLogs.map((log) => (
-                            <div key={log.id} className="activity-item">
-                                <span className="activity-time">{new Date(log.timestamp).toLocaleTimeString(locale)}</span>
-                                <span
-                                    className={`activity-tag ${log.type === 'ERROR' ? 'is-error' : log.type === 'AUTH' ? 'is-auth' : ''}`}
-                                >
-                                    {log.type}
-                                </span>
+                    {canManagePanel && (
+                        <>
+                            <div className="panel-header">
                                 <div>
-                                    <strong>{translateLogAction(log.action)}</strong>
-                                    <div className="table-meta">{translateLogDetails(log.details)}</div>
+                                    <div className="panel-title">{copy.activity.title}</div>
+                                    <div className="panel-subtitle">{copy.activity.subtitle}</div>
                                 </div>
+                                <button type="button" className="btn btn-ghost" onClick={() => setShowLogs(true)}>
+                                    <ClipboardList size={14} />
+                                    {copy.activity.viewAll}
+                                </button>
                             </div>
-                        ))}
-                        {recentLogs.length === 0 && (
-                            <div className="activity-item">{copy.activity.noRecent}</div>
-                        )}
-                    </div>
+                            <div className="activity-list">
+                                {recentLogs.map((log) => (
+                                    <div key={log.id} className="activity-item">
+                                        <span className="activity-time">{new Date(log.timestamp).toLocaleTimeString(locale)}</span>
+                                        <span
+                                            className={`activity-tag ${log.type === 'ERROR' ? 'is-error' : log.type === 'AUTH' ? 'is-auth' : ''}`}
+                                        >
+                                            {log.type}
+                                        </span>
+                                        <div>
+                                            <strong>{translateLogAction(log.action)}</strong>
+                                            <div className="table-meta">{translateLogDetails(log.details)}</div>
+                                        </div>
+                                    </div>
+                                ))}
+                                {recentLogs.length === 0 && (
+                                    <div className="activity-item">{copy.activity.noRecent}</div>
+                                )}
+                            </div>
+                        </>
+                    )}
 
-                    <div className="panel-header" style={{ marginTop: '1.6rem' }}>
+                    <div className="panel-header" style={{ marginTop: canManagePanel ? '1.6rem' : 0 }}>
                         <div>
                             <div className="panel-title">{copy.activity.secureSession}</div>
                             <div className="panel-subtitle">{copy.activity.secureSessionSubtitle}</div>
@@ -4266,7 +4513,7 @@ const Dashboard = () => {
                             {copy.activity.endSession}
                         </button>
                     </div>
-                    {isLocalAuth && (
+                    {isLocalAuth && canManagePanel && (
                         <div
                             className="action-grid"
                             style={{ marginTop: '1.2rem', gridTemplateColumns: 'minmax(0, 1fr)' }}
@@ -4274,11 +4521,11 @@ const Dashboard = () => {
                             <div className="action-card">
                                 <strong>{copy.activity.localUsers}</strong>
                                 <span>{copy.activity.localUsersDesc}</span>
-                                {localUsers.length > 0 ? (
+                                {localPanelUsers.length > 0 ? (
                                     <div className="shortcut-list">
-                                        {localUsers.map((user) => (
+                                        {localPanelUsers.map((user) => (
                                             <span key={user.username} className="shortcut-pill">
-                                                {user.name || user.username}
+                                                {user.name || user.username} ({localizeUserRole(user.role)})
                                             </span>
                                         ))}
                                     </div>
@@ -4290,6 +4537,10 @@ const Dashboard = () => {
                                         <ShieldCheck size={14} />
                                         {copy.activity.resetPassword}
                                     </button>
+                                    <button type="button" className="btn btn-ghost" onClick={openUserCreateModal}>
+                                        <UserPlus size={14} />
+                                        {copy.activity.createUser}
+                                    </button>
                                     <span className="tag">{copy.activity.local}</span>
                                 </div>
                             </div>
@@ -4298,34 +4549,61 @@ const Dashboard = () => {
                 </section>
             </div>
             <nav className="mobile-quickbar mobile-only" aria-label={copy.sidebar.title}>
-                <button
-                    type="button"
-                    className="mobile-quickbar__btn"
-                    onClick={() => document.getElementById('overview')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                >
-                    <LayoutDashboard size={15} />
-                    <span>{copy.nav.overview}</span>
-                </button>
-                <button
-                    type="button"
-                    className="mobile-quickbar__btn"
-                    onClick={() => document.getElementById('registrations')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                >
-                    <ClipboardList size={15} />
-                    <span>{copy.nav.registrations}</span>
-                </button>
-                <button
-                    type="button"
-                    className="mobile-quickbar__btn"
-                    onClick={() => document.getElementById('athletes')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                >
-                    <Users size={15} />
-                    <span>{copy.nav.athletes}</span>
-                </button>
-                <button type="button" className="mobile-quickbar__btn mobile-quickbar__btn--primary" onClick={() => setShowAddModal(true)}>
-                    <UserPlus size={15} />
-                    <span>{copy.hero.newAthlete}</span>
-                </button>
+                {canManagePanel ? (
+                    <>
+                        <button
+                            type="button"
+                            className="mobile-quickbar__btn"
+                            onClick={() => document.getElementById('overview')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                        >
+                            <LayoutDashboard size={15} />
+                            <span>{copy.nav.overview}</span>
+                        </button>
+                        <button
+                            type="button"
+                            className="mobile-quickbar__btn"
+                            onClick={() => document.getElementById('registrations')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                        >
+                            <ClipboardList size={15} />
+                            <span>{copy.nav.registrations}</span>
+                        </button>
+                        <button
+                            type="button"
+                            className="mobile-quickbar__btn"
+                            onClick={() => document.getElementById('athletes')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                        >
+                            <Users size={15} />
+                            <span>{copy.nav.athletes}</span>
+                        </button>
+                        <button type="button" className="mobile-quickbar__btn mobile-quickbar__btn--primary" onClick={() => setShowAddModal(true)}>
+                            <UserPlus size={15} />
+                            <span>{copy.hero.newAthlete}</span>
+                        </button>
+                    </>
+                ) : (
+                    <>
+                        <button
+                            type="button"
+                            className="mobile-quickbar__btn"
+                            onClick={() => document.getElementById('brackets')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                        >
+                            <ClipboardList size={15} />
+                            <span>{copy.nav.brackets}</span>
+                        </button>
+                        <button
+                            type="button"
+                            className="mobile-quickbar__btn"
+                            onClick={() => document.getElementById('activity')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                        >
+                            <Activity size={15} />
+                            <span>{copy.nav.activity}</span>
+                        </button>
+                        <button type="button" className="mobile-quickbar__btn mobile-quickbar__btn--primary" onClick={logout}>
+                            <LogOut size={15} />
+                            <span>{copy.activity.endSession}</span>
+                        </button>
+                    </>
+                )}
             </nav>
             <AnimatePresence>
                 {showLogs && (
@@ -4911,6 +5189,113 @@ const Dashboard = () => {
                                         </div>
                                     </form>
                                 )}
+                            </div>
+                        </motion.div>
+                    </>
+                )}
+            </AnimatePresence>
+            <AnimatePresence>
+                {showUserCreateModal && (
+                    <>
+                        <motion.div
+                            className="modal-backdrop"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={closeUserCreateModal}
+                        />
+                        <motion.div
+                            className="modal-card"
+                            initial={{ opacity: 0, y: 12 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 12 }}
+                        >
+                            <div className="modal-panel">
+                                <div className="modal-header">
+                                    <div className="modal-title">{copy.modalUserCreate.title}</div>
+                                    <button type="button" className="btn btn-ghost" onClick={closeUserCreateModal}>
+                                        {copy.common.close}
+                                    </button>
+                                </div>
+                                <form onSubmit={handleUserCreateSubmit}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                        {userCreateError && (
+                                            <div className="login-error" role="alert">
+                                                <AlertCircle size={18} />
+                                                <p>{userCreateError}</p>
+                                            </div>
+                                        )}
+                                        {userCreateSuccess && (
+                                            <div className="login-success" role="status">
+                                                <CheckCircle2 size={18} />
+                                                <p>{userCreateSuccess}</p>
+                                            </div>
+                                        )}
+                                        <div>
+                                            <label className="table-meta">{copy.modalUserCreate.name}</label>
+                                            <input
+                                                className="input"
+                                                type="text"
+                                                minLength={3}
+                                                required
+                                                value={userCreateName}
+                                                onChange={(event) => setUserCreateName(event.target.value)}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="table-meta">{copy.modalUserCreate.username}</label>
+                                            <input
+                                                className="input"
+                                                type="text"
+                                                minLength={3}
+                                                required
+                                                value={userCreateUsername}
+                                                onChange={(event) => setUserCreateUsername(event.target.value)}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="table-meta">{copy.modalUserCreate.role}</label>
+                                            <select
+                                                className="input"
+                                                value={userCreateRole}
+                                                onChange={(event) => setUserCreateRole(event.target.value)}
+                                            >
+                                                <option value="mesario">{copy.activity.roleMesario}</option>
+                                                <option value="admin">{copy.activity.roleAdmin}</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="table-meta">{copy.modalUserCreate.password}</label>
+                                            <input
+                                                className="input"
+                                                type="password"
+                                                minLength={6}
+                                                required
+                                                value={userCreatePassword}
+                                                onChange={(event) => setUserCreatePassword(event.target.value)}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="table-meta">{copy.modalUserCreate.confirmPassword}</label>
+                                            <input
+                                                className="input"
+                                                type="password"
+                                                minLength={6}
+                                                required
+                                                value={userCreateConfirm}
+                                                onChange={(event) => setUserCreateConfirm(event.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="form-actions">
+                                        <button type="button" className="btn btn-ghost" onClick={closeUserCreateModal}>
+                                            {copy.common.cancel}
+                                        </button>
+                                        <button type="submit" className="btn btn-primary" disabled={userCreateLoading}>
+                                            {copy.modalUserCreate.createUser}
+                                        </button>
+                                    </div>
+                                </form>
                             </div>
                         </motion.div>
                     </>

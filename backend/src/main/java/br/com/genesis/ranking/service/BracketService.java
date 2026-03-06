@@ -2,7 +2,9 @@ package br.com.genesis.ranking.service;
 
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
@@ -56,6 +58,18 @@ public class BracketService {
     return toResponse(bracketRepository.save(bracket));
   }
 
+  public BracketResponse updatePodiumOnly(String id, PodiumDto podium, String appliedAtRaw) {
+    Bracket bracket = getOrThrow(id);
+    applyPodium(bracket, podium);
+
+    Instant appliedAt = parseInstant(appliedAtRaw);
+    if (appliedAt != null) {
+      bracket.setAppliedAt(appliedAt);
+    }
+
+    return toResponse(bracketRepository.save(bracket));
+  }
+
   public void delete(String id) {
     Bracket bracket = getOrThrow(id);
     bracketRepository.delete(bracket);
@@ -90,18 +104,7 @@ public class BracketService {
       }
     }
 
-    if (request.getPodium() != null) {
-      BracketPodium podium = bracket.getPodium();
-      if (podium == null) {
-        podium = new BracketPodium();
-        podium.setBracket(bracket);
-      }
-      PodiumDto payload = request.getPodium();
-      podium.setGold(resolveAthlete(payload.getGoldId()));
-      podium.setSilver(resolveAthlete(payload.getSilverId()));
-      podium.setBronze(resolveAthlete(payload.getBronzeId()));
-      bracket.setPodium(podium);
-    }
+    applyPodium(bracket, request.getPodium());
   }
 
   private Event resolveEvent(String eventId) {
@@ -127,6 +130,43 @@ public class BracketService {
     if (value == null) return null;
     String trimmed = value.trim();
     return trimmed.isBlank() ? null : trimmed;
+  }
+
+  private void applyPodium(Bracket bracket, PodiumDto payload) {
+    if (payload == null) {
+      return;
+    }
+
+    Athlete gold = resolveAthlete(payload.getGoldId());
+    Athlete silver = resolveAthlete(payload.getSilverId());
+    Athlete bronze = resolveAthlete(payload.getBronzeId());
+
+    Set<String> allowedAthleteIds = new HashSet<>(bracket.getSeeds().stream()
+        .map((seed) -> seed.getAthlete() != null ? seed.getAthlete().getId() : null)
+        .filter((id) -> id != null && !id.isBlank())
+        .collect(Collectors.toSet()));
+
+    ensureAthleteBelongsToBracket(allowedAthleteIds, gold, "ouro");
+    ensureAthleteBelongsToBracket(allowedAthleteIds, silver, "prata");
+    ensureAthleteBelongsToBracket(allowedAthleteIds, bronze, "bronze");
+
+    BracketPodium podium = bracket.getPodium();
+    if (podium == null) {
+      podium = new BracketPodium();
+      podium.setBracket(bracket);
+    }
+    podium.setGold(gold);
+    podium.setSilver(silver);
+    podium.setBronze(bronze);
+    bracket.setPodium(podium);
+  }
+
+  private void ensureAthleteBelongsToBracket(Set<String> allowedAthleteIds, Athlete athlete, String medal) {
+    if (athlete == null) return;
+    String athleteId = athlete.getId();
+    if (athleteId == null || !allowedAthleteIds.contains(athleteId)) {
+      throw new IllegalArgumentException("Atleta de " + medal + " não pertence a esta chave.");
+    }
   }
 
   public BracketResponse toResponse(Bracket bracket) {
