@@ -1,5 +1,5 @@
-import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+﻿import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useStore } from '../hooks/useStore';
 import {
     Activity,
@@ -10,11 +10,13 @@ import {
     Clock,
     Calendar,
     Download,
+    GripVertical,
     LayoutDashboard,
     LayoutGrid,
     List,
     LogOut,
     Menu,
+    Monitor,
     Newspaper,
     Pencil,
     RotateCcw,
@@ -28,7 +30,7 @@ import {
     Users,
     Zap
 } from 'lucide-react';
-import { generateBracketsPDF, generateRankingPDF } from '../services/pdfService';
+import { generateBracketsPDF, generateRankingPDF, generateSchedulePDF } from '../services/pdfService';
 import { extractTextFromPdfFile, parseAthletesFromText } from '../services/pdfImportService';
 import { buildBracketMatches } from '../services/bracketService';
 import { authService } from '../services/authService';
@@ -41,6 +43,8 @@ import { DEFAULT_EVENT_FEES, DEFAULT_EVENT_PIX_KEY } from '../utils/eventPricing
 import { buildFileSafeName, downloadCsv } from '../services/exportService';
 import { translateBelt, translateCategory, translateCompositeLabel, translateWeight } from '../utils/localeLabels';
 import { REGISTRATION_STATUS, normalizeRegistrationStatus } from '../utils/registrationStatus';
+import { extractWeightOptionsFromFile, extractWeightOptionsFromUrl } from '../services/weightTableOcrService';
+import { evaluatePasswordStrength } from '../utils/passwordStrength';
 
 const ATHLETE_PAGE_SIZE_OPTIONS = [20, 40, 80];
 const MAX_NEWS_IMAGE_UPLOAD_BYTES = 8_000_000;
@@ -66,6 +70,11 @@ const createEventEditFormState = () => ({
     location: '',
     posterUrl: '',
     registrationUrl: '',
+    weightTableGiUrl: '',
+    weightTableNoGiUrl: '',
+    circularUrl: '',
+    weightTableGiOptions: '',
+    weightTableNoGiOptions: '',
     pixKey: DEFAULT_EVENT_PIX_KEY,
     feeUnder15: DEFAULT_EVENT_FEES.under15,
     feeOver15: DEFAULT_EVENT_FEES.over15,
@@ -81,6 +90,52 @@ const createNewsFormState = () => ({
     imageUrl: '',
     publishedAt: ''
 });
+
+const normalizeAdminPath = (pathname) => {
+    const rawPath = (pathname || '').toString().trim();
+    if (!rawPath) return '/admin';
+    const normalized = rawPath.replace(/\/+$/, '');
+    return normalized || '/admin';
+};
+
+const ADMIN_SECTION_ROUTES = {
+    overview: '/admin/visao-geral',
+    events: '/admin/eventos',
+    news: '/admin/noticias',
+    registrations: '/admin/inscricoes',
+    brackets: '/admin/chaveamento',
+    schedule: '/admin/cronograma',
+    athletes: '/admin/atletas',
+    automation: '/admin/automacoes',
+    activity: '/admin/atividade'
+};
+
+const ADMIN_ROUTE_TO_SECTION = {
+    '/admin': 'overview',
+    ...Object.entries(ADMIN_SECTION_ROUTES).reduce((acc, [section, path]) => {
+        acc[normalizeAdminPath(path)] = section;
+        return acc;
+    }, {})
+};
+
+const resolveAdminSectionFromPath = (pathname, canManagePanel) => {
+    const normalizedPath = normalizeAdminPath(pathname);
+    const section = ADMIN_ROUTE_TO_SECTION[normalizedPath];
+    if (!section) {
+        return canManagePanel ? 'overview' : 'brackets';
+    }
+    if (!canManagePanel && section !== 'brackets' && section !== 'schedule' && section !== 'activity') {
+        return 'brackets';
+    }
+    return section;
+};
+
+const resolveAdminRouteFromSection = (section, canManagePanel) => {
+    const normalizedSection = !canManagePanel && section !== 'brackets' && section !== 'schedule' && section !== 'activity'
+        ? 'brackets'
+        : section;
+    return ADMIN_SECTION_ROUTES[normalizedSection] || (canManagePanel ? ADMIN_SECTION_ROUTES.overview : ADMIN_SECTION_ROUTES.brackets);
+};
 
 const readFileAsDataUrl = (file) => new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -223,6 +278,72 @@ const buildAthleteLookupKey = (name, academy) => (
     `${normalizeLookup(name)}|${normalizeLookup(academy)}`
 );
 
+const buildObjectUrlFromDataUrl = (value) => {
+    const dataUrl = (value || '').toString().trim();
+    if (!/^data:/i.test(dataUrl)) return '';
+    const separatorIndex = dataUrl.indexOf(',');
+    if (separatorIndex <= 5) return '';
+
+    const meta = dataUrl.slice(5, separatorIndex);
+    const payload = dataUrl.slice(separatorIndex + 1);
+    const mimeType = (meta.split(';')[0] || 'application/octet-stream').trim() || 'application/octet-stream';
+    const isBase64 = /;base64/i.test(meta);
+
+    try {
+        let blob;
+        if (isBase64) {
+            const binary = atob(payload);
+            const bytes = new Uint8Array(binary.length);
+            for (let index = 0; index < binary.length; index += 1) {
+                bytes[index] = binary.charCodeAt(index);
+            }
+            blob = new Blob([bytes], { type: mimeType });
+        } else {
+            const decoded = decodeURIComponent(payload);
+            blob = new Blob([decoded], { type: mimeType });
+        }
+        return URL.createObjectURL(blob);
+    } catch {
+        return '';
+    }
+};
+
+const openProofInNewTab = ({ fileUrl, fileName }) => {
+    const source = (fileUrl || '').toString().trim();
+    if (!source || typeof window === 'undefined') return false;
+
+    let targetUrl = source;
+    let objectUrlToRevoke = '';
+    if (/^data:/i.test(source)) {
+        objectUrlToRevoke = buildObjectUrlFromDataUrl(source);
+        if (objectUrlToRevoke) {
+            targetUrl = objectUrlToRevoke;
+        }
+    }
+
+    const popup = window.open(targetUrl, '_blank', 'noopener,noreferrer');
+    if (!popup) {
+        const anchor = document.createElement('a');
+        anchor.href = targetUrl;
+        anchor.target = '_blank';
+        anchor.rel = 'noopener noreferrer';
+        if (fileName) {
+            anchor.download = fileName;
+        }
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+    }
+
+    if (objectUrlToRevoke) {
+        window.setTimeout(() => {
+            URL.revokeObjectURL(objectUrlToRevoke);
+        }, 60_000);
+    }
+
+    return true;
+};
+
 const parseRegistrationNotes = (value) => {
     if (!value || typeof value !== 'string') return null;
     try {
@@ -278,6 +399,8 @@ const parseRegistrationRecord = (item, eventMap, copy) => {
         syncError: source.lastError || '',
         syncTraceId: source.lastTraceId || '',
         eventName: source.eventName || eventMap[source.eventId]?.name || copy.common.noEvent,
+        eventDate: source.eventDate || eventMap[source.eventId]?.date || '',
+        eventLocation: source.eventLocation || eventMap[source.eventId]?.location || '',
         paymentReviewNotes: source.paymentReviewNotes || '',
         paymentReviewedBy: source.paymentReviewedBy || '',
         paymentReviewedAt: source.paymentReviewedAt || ''
@@ -293,6 +416,12 @@ const fieldsEqualIfPresent = (left, right) => {
 
 const athleteMatchesRegistrationRecord = (athlete, registration) => {
     if (!athlete || !registration) return false;
+    const registrationAthleteId = normalizeLookup(registration.athleteId || '');
+    const athleteId = normalizeLookup(athlete.id || '');
+    if (registrationAthleteId && athleteId && registrationAthleteId === athleteId) {
+        return true;
+    }
+
     if ((athlete.eventId || '') !== (registration.eventId || '')) return false;
 
     const nameMatch = normalizeLookup(athlete.nome || '') === normalizeLookup(registration.nome || '');
@@ -328,9 +457,58 @@ const buildAthleteRegistrationIdentityKey = (athlete) => (
     })
 );
 
+const reorderIds = (ids, sourceId, targetId) => {
+    const source = (sourceId || '').toString().trim();
+    const target = (targetId || '').toString().trim();
+    if (!source || !target || source === target) return ids;
+
+    const base = Array.isArray(ids) ? [...ids] : [];
+    const fromIndex = base.indexOf(source);
+    const toIndex = base.indexOf(target);
+    if (fromIndex < 0 || toIndex < 0) return base;
+
+    const [moved] = base.splice(fromIndex, 1);
+    base.splice(toIndex, 0, moved);
+    return base;
+};
+
+const parseClockToMinutes = (value) => {
+    const [rawHour = '0', rawMinute = '0'] = (value || '').toString().split(':');
+    const hour = Number(rawHour);
+    const minute = Number(rawMinute);
+    if (!Number.isFinite(hour) || !Number.isFinite(minute)) return 9 * 60;
+    const safeHour = Math.min(23, Math.max(0, Math.floor(hour)));
+    const safeMinute = Math.min(59, Math.max(0, Math.floor(minute)));
+    return (safeHour * 60) + safeMinute;
+};
+
+const formatMinutesToClock = (totalMinutes) => {
+    const safeTotal = Number.isFinite(totalMinutes) ? Math.max(0, Math.floor(totalMinutes)) : 0;
+    const wrapped = safeTotal % (24 * 60);
+    const hours = Math.floor(wrapped / 60).toString().padStart(2, '0');
+    const minutes = (wrapped % 60).toString().padStart(2, '0');
+    return `${hours}:${minutes}`;
+};
+
+const formatDurationLabel = (minutes, isEnglish) => {
+    const safeTotal = Number.isFinite(minutes) ? Math.max(0, Math.floor(minutes)) : 0;
+    const hours = Math.floor(safeTotal / 60);
+    const remainingMinutes = safeTotal % 60;
+    if (hours <= 0) {
+        return isEnglish ? `${remainingMinutes} min` : `${remainingMinutes} min`;
+    }
+    if (remainingMinutes <= 0) {
+        return isEnglish ? `${hours} h` : `${hours} h`;
+    }
+    return isEnglish
+        ? `${hours} h ${remainingMinutes} min`
+        : `${hours} h ${remainingMinutes} min`;
+};
+
 const REGISTRATION_SUPPRESSED_STORAGE_KEY = 'genesis_dashboard_suppressed_registration_keys_v1';
 const INSTAGRAM_LAST_REFRESH_STORAGE_KEY = 'genesis_dashboard_instagram_last_refresh_v1';
 const INSTAGRAM_FEED_STATUS_STORAGE_KEY = 'genesis_dashboard_instagram_feed_status_v1';
+const MANUAL_SCHEDULE_STORAGE_KEY = 'genesis_manual_schedule_v1';
 
 const loadSuppressedRegistrationKeys = () => {
     if (typeof window === 'undefined') return [];
@@ -395,6 +573,88 @@ const loadInstagramFeedStatus = () => {
     }
 };
 
+const createScheduleDraftState = () => ({
+    title: '',
+    type: 'FIGHT',
+    area: 'Area 1',
+    start: '09:00',
+    end: '09:10',
+    notes: ''
+});
+
+const normalizeScheduleType = (value) => {
+    const normalized = (value || '').toString().trim().toUpperCase();
+    if (['FIGHT', 'BREAK', 'CEREMONY', 'OTHER'].includes(normalized)) return normalized;
+    return 'FIGHT';
+};
+
+const normalizeManualScheduleEntry = (entry = {}, index = 0) => {
+    const id = (entry?.id || '').toString().trim() || `manual-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const title = (entry?.title || '').toString().trim();
+    const area = (entry?.area || '').toString().trim();
+    const notes = (entry?.notes || '').toString().trim();
+    const type = normalizeScheduleType(entry?.type);
+    const start = formatMinutesToClock(parseClockToMinutes(entry?.start || '09:00'));
+    let end = formatMinutesToClock(parseClockToMinutes(entry?.end || start));
+    if (parseClockToMinutes(end) < parseClockToMinutes(start)) {
+        end = formatMinutesToClock(parseClockToMinutes(start) + 10);
+    }
+    const order = Number.isFinite(Number(entry?.order)) ? Number(entry.order) : (index + 1);
+
+    return {
+        id,
+        order,
+        title,
+        type,
+        area: area || '',
+        start,
+        end,
+        notes
+    };
+};
+
+const loadManualScheduleByEvent = () => {
+    if (typeof window === 'undefined') return {};
+    try {
+        const raw = window.localStorage.getItem(MANUAL_SCHEDULE_STORAGE_KEY);
+        if (!raw) return {};
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+        return Object.entries(parsed).reduce((acc, [eventId, rows]) => {
+            const normalizedEventId = (eventId || '').toString().trim();
+            if (!normalizedEventId) return acc;
+            const normalizedRows = (Array.isArray(rows) ? rows : [])
+                .map((row, index) => normalizeManualScheduleEntry(row, index))
+                .sort((a, b) => (a.order || 0) - (b.order || 0))
+                .map((row, index) => ({ ...row, order: index + 1 }));
+            if (normalizedRows.length > 0) {
+                acc[normalizedEventId] = normalizedRows;
+            }
+            return acc;
+        }, {});
+    } catch {
+        return {};
+    }
+};
+
+const saveManualScheduleByEvent = (payload) => {
+    if (typeof window === 'undefined') return;
+    try {
+        if (!payload || typeof payload !== 'object') {
+            window.localStorage.removeItem(MANUAL_SCHEDULE_STORAGE_KEY);
+            return;
+        }
+        const hasAny = Object.values(payload).some((rows) => Array.isArray(rows) && rows.length > 0);
+        if (!hasAny) {
+            window.localStorage.removeItem(MANUAL_SCHEDULE_STORAGE_KEY);
+            return;
+        }
+        window.localStorage.setItem(MANUAL_SCHEDULE_STORAGE_KEY, JSON.stringify(payload));
+    } catch {
+        // Ignore localStorage write failures.
+    }
+};
+
 const saveInstagramFeedStatus = (value) => {
     if (typeof window === 'undefined') return;
     const normalized = (value || '').toString().trim().toUpperCase();
@@ -419,6 +679,7 @@ const toAthleteFromRegistration = (registration) => {
     const modalidade = (registration?.modalidade || '').toString().trim().toUpperCase();
 
     return {
+        id: registration?.athleteId || undefined,
         nome: registration?.nome || '',
         academia: registration?.academia || '',
         faixa: registration?.faixa || '',
@@ -473,6 +734,7 @@ const Dashboard = () => {
         brackets,
         generateBrackets,
         setBracketPodium,
+        setBracketSeedOrder,
         applyBracketPodium,
         events,
         news,
@@ -493,8 +755,11 @@ const Dashboard = () => {
         clearEventResults,
         logs
     } = useStore();
-    const { language } = useI18n();
-    const isEnglish = language === 'en-US';
+    const location = useLocation();
+    const navigate = useNavigate();
+    const { uiLanguage, uiVariant } = useI18n();
+    const languageVariant = ['pt', 'en', 'es', 'fr'].includes(uiVariant) ? uiVariant : 'pt';
+    const isEnglish = languageVariant !== 'pt';
     const copy = useMemo(() => (
         isEnglish
             ? {
@@ -505,6 +770,8 @@ const Dashboard = () => {
                     reportFail: 'Failed to export report.',
                     eventUpdated: (name) => `Event updated: ${name || 'event'}.`,
                     eventUpdateFail: 'Failed to update event.',
+                    eventClosed: (name) => `Registration closed: ${name || 'event'}. Moved to past events.`,
+                    eventReopened: (name) => `Registration reopened: ${name || 'event'}.`,
                     removeEventConfirm: (name) => `Delete ${name}? This action cannot be undone.`,
                     eventRemoved: 'Event removed successfully.',
                     eventRemoveFail: 'Failed to remove event.',
@@ -531,6 +798,9 @@ const Dashboard = () => {
                     noBracketForPdf: 'No bracket available for PDF export.',
                     bracketPdfSaved: 'Brackets PDF saved successfully.',
                     bracketPdfFail: 'Failed to save brackets PDF.',
+                    noScheduleForPdf: 'No schedule available for PDF export.',
+                    schedulePdfSaved: 'Schedule PDF saved successfully.',
+                    schedulePdfFail: 'Failed to save schedule PDF.',
                     podiumApplied: 'Podium applied successfully.',
                     podiumApplyFail: 'Could not apply podium.',
                     resetOnlyLocal: 'Password reset is available only in local mode.',
@@ -573,8 +843,15 @@ const Dashboard = () => {
                     registrationSyncFail: 'Failed to sync pending registrations.',
                     registrationStatusUpdated: 'Payment status updated.',
                     registrationStatusFail: 'Failed to update payment status.',
+                    registrationStatusAuthRequired: 'Admin session expired. Please log in again to approve payments.',
+                    registrationStatusForbidden: 'Only administrators can approve or reject payments.',
+                    proofOpenFail: 'Failed to open payment proof.',
                     registrationExportDone: (count) => `${count} registrations exported to spreadsheet.`,
                     registrationExportNoData: 'No registration available to export.',
+                    registrationListingExportDone: (label) => `PDF report generated: ${label}.`,
+                    registrationListingExportFail: 'Failed to generate registration report.',
+                    registrationListingNoData: 'No registration available for this event/report.',
+                    eventResourceMissing: 'This event does not have this file configured yet.',
                     clearReimportLocksConfirm: (count) => `Clear ${count} registration reimport locks?`,
                     reimportLocksCleared: (count) => `${count} reimport locks removed.`,
                     reimportLocksNone: 'No reimport lock to clear.'
@@ -585,6 +862,7 @@ const Dashboard = () => {
                     news: 'News',
                     registrations: 'Registrations',
                     brackets: 'Brackets',
+                    schedule: 'Schedule',
                     athletes: 'Athletes',
                     automation: 'Automation',
                     activity: 'Activity'
@@ -640,6 +918,12 @@ const Dashboard = () => {
                     subtitle: 'Create events and organize athletes by stage.',
                     createEvent: 'Create event',
                     noEvents: 'No event registered.',
+                    openSection: 'Open registrations',
+                    openSectionSubtitle: 'Events currently accepting registrations.',
+                    noOpenEvents: 'No event with open registration.',
+                    closedSection: 'Past / closed registrations',
+                    closedSectionSubtitle: 'Closed events appear only in this section.',
+                    noClosedEvents: 'No closed event yet.',
                     date: 'Date',
                     undefinedDate: 'Date undefined',
                     athletes: 'Athletes',
@@ -648,6 +932,12 @@ const Dashboard = () => {
                     manageAthletes: 'Manage athletes',
                     edit: 'Edit',
                     registration: 'Registration',
+                    closeRegistration: 'Close registrations',
+                    closeRegistrationConfirmTitle: 'Confirm close registrations',
+                    closeRegistrationConfirmDescription: (name) => `Are you sure you want to close registrations for ${name || 'this event'}? Athletes will no longer be able to register until you reopen it.`,
+                    closeRegistrationConfirmAction: 'Yes, close registrations',
+                    reopenRegistration: 'Reopen registrations',
+                    closedRegistration: 'Registrations closed',
                     noPoster: 'No poster',
                     open: 'Open',
                     closed: 'Closed'
@@ -698,7 +988,17 @@ const Dashboard = () => {
                     tableContact: 'Contact',
                     tablePayment: 'Payment',
                     tableNotes: 'Notes',
+                    tablePipeline: 'Pipeline',
                     tableStatus: 'Status',
+                    pipelineRegistered: 'Registered',
+                    pipelineApproved: 'Approved',
+                    pipelineCategory: 'In category',
+                    pipelineBracket: 'In bracket',
+                    flowStatusDone: 'Approved and sent to category and bracket.',
+                    flowStatusCategory: 'Approved and sent to category. Awaiting bracket.',
+                    flowStatusApproved: 'Payment approved. Waiting category/bracket sync.',
+                    flowStatusPaymentError: 'Payment error. Not sent to category/bracket.',
+                    flowStatusPending: 'Waiting payment review.',
                     totalValue: 'Total',
                     pixKey: 'Pix key',
                     receipt: 'Receipt',
@@ -713,6 +1013,16 @@ const Dashboard = () => {
                     confirmPayment: 'Confirm payment',
                     markPaymentError: 'Mark payment error',
                     exportSpreadsheet: 'Export spreadsheet',
+                    updatedAt: 'Updated at',
+                    totalRegistrations: 'registrations',
+                    reportAthletesByAcademyGi: 'Athletes by academy (GI)',
+                    reportAthletesByCategoryGi: 'Athletes by category (GI)',
+                    reportAthletesByAcademyNoGi: 'Athletes by academy (NO-GI)',
+                    reportAthletesByCategoryNoGi: 'Athletes by category (NO-GI)',
+                    reportWeightTableGi: 'Weight table GI',
+                    reportWeightTableNoGi: 'Weight table NO-GI',
+                    reportCircular: 'Event circular',
+                    filterThisEvent: 'Show this event in table',
                     confirmReviewPrompt: 'Optional payment review note:',
                     errorReviewPrompt: 'Describe the payment issue (optional):',
                     reviewedBy: 'Reviewed by',
@@ -728,12 +1038,19 @@ const Dashboard = () => {
                 bracketsPanel: {
                     title: 'Brackets',
                     subtitle: 'Generate brackets by category and apply podium automatically.',
+                    workspaceTitle: 'Bracket workspace',
+                    workspaceSubtitle: 'Approved registrations are synchronized to athlete base and ready for categories and brackets.',
+                    quickFilter: 'Quick academy filter',
+                    allAcademies: 'All academies',
+                    exportApprovedCsv: 'Export approved CSV',
                     selectEvent: 'Select event',
                     selectEventAria: 'Select event for brackets',
                     selectCategoryAria: 'Select bracket category',
                     allCategories: 'All categories',
                     generate: 'Generate brackets',
                     savePdf: 'Save brackets PDF',
+                    exportSchedulePdfTable: 'PDF Table',
+                    exportSchedulePdfTv: 'PDF TV Mode',
                     searchPlaceholder: 'Search bracket by number or category',
                     searchAria: 'Search bracket',
                     brackets: 'brackets',
@@ -751,7 +1068,77 @@ const Dashboard = () => {
                     selectAthlete: 'Select athlete',
                     apply: 'Apply podium',
                     reapply: 'Reapply podium',
-                    noBracketFound: 'No bracket found.'
+                    noBracketFound: 'No bracket found.',
+                    approvedAthletesTitle: 'Approved athletes',
+                    approvedAthletesSubtitle: 'Athletes approved for this event and already linked to the admin flow.',
+                    approvedAthletesEmpty: 'No approved registrations for this event.',
+                    academySummaryTitle: 'Athletes by academy',
+                    academySummarySubtitle: 'Distribution of approved athletes by academy in this event.',
+                    academySummaryEmpty: 'No academy with approved athletes yet.',
+                    statusApproved: 'Approved',
+                    statusInCategory: 'In category',
+                    statusInBracket: 'In bracket',
+                    statusPendingLink: 'Pending link',
+                    statsApproved: 'Approved',
+                    statsInCategory: 'In category',
+                    statsInBracket: 'In bracket',
+                    statsAcademies: 'Academies',
+                    academyCount: (count) => `${count} athlete${count === 1 ? '' : 's'}`,
+                    filteredLabel: (count, total) => `${count} of ${total}`,
+                    scheduleTitle: 'Brackets & Schedule',
+                    scheduleSubtitle: 'Automatic bracket generation, drag-and-drop organization and real-time estimation.',
+                    scheduleAuto: 'Automatic bracket generation',
+                    scheduleDrag: 'Drag and drop to configure brackets',
+                    scheduleRealtime: 'Real-time estimate',
+                    scheduleTv: 'TV mode for schedule',
+                    scheduleStart: 'Start time',
+                    scheduleFightDuration: 'Fight duration (min)',
+                    scheduleTransition: 'Transition (min)',
+                    scheduleAreas: 'Areas',
+                    scheduleTotalFights: 'Estimated fights',
+                    scheduleTotalDuration: 'Estimated total',
+                    scheduleEstimatedEnd: 'Estimated end',
+                    scheduleNoBrackets: 'Generate brackets to view schedule.',
+                    scheduleDragHint: 'Drag cards to reorder schedule.',
+                    scheduleRowRound: (count) => `${count} fight${count === 1 ? '' : 's'}`,
+                    tvModeOpen: 'TV mode',
+                    tvModeClose: 'Close TV mode',
+                    tvModeTitle: 'Live schedule',
+                    tvModeNow: 'Current time',
+                    seedEditorTitle: 'Arrange bracket (drag athletes)',
+                    seedEditorHint: 'Drag athletes to define first-round order.'
+                },
+                schedulePanel: {
+                    title: 'Schedule',
+                    subtitle: 'Manage timeline manually, including pauses and ceremonies.',
+                    selectEvent: 'Select event',
+                    selectEventAria: 'Select event for schedule',
+                    exportSchedulePdfTable: 'PDF Table',
+                    exportSchedulePdfTv: 'PDF TV Mode',
+                    tvModeOpen: 'TV mode',
+                    tvModeClose: 'Close TV mode',
+                    tvModeTitle: 'Live schedule',
+                    tvModeNow: 'Current time',
+                    addItemTitle: 'New timeline item',
+                    itemTitle: 'Title',
+                    itemType: 'Type',
+                    itemArea: 'Area',
+                    itemStart: 'Start',
+                    itemEnd: 'End',
+                    itemNotes: 'Notes (optional)',
+                    addItemAction: 'Add item',
+                    noItems: 'No schedule item for this event yet.',
+                    totalItems: 'Items',
+                    totalFights: 'Fights',
+                    totalDuration: 'Estimated total',
+                    estimatedEnd: 'Estimated end',
+                    moveUp: 'Up',
+                    moveDown: 'Down',
+                    remove: 'Remove',
+                    typeFight: 'Fight',
+                    typeBreak: 'Break',
+                    typeCeremony: 'Ceremony',
+                    typeOther: 'Other'
                 },
                 beltSummary: {
                     title: 'Belt summary',
@@ -830,15 +1217,17 @@ const Dashboard = () => {
                     secureSession: 'Secure session',
                     secureSessionSubtitle: 'Access control with visual confirmation',
                     endSession: 'End session',
-                    localUsers: 'Local users',
-                    localUsersDesc: 'Manage local panel accounts and permissions.',
+                    localUsers: 'Panel users',
+                    localUsersDesc: 'Manage panel accounts and permissions.',
                     noUser: 'No registered user.',
                     resetPassword: 'Reset password',
                     createUser: 'Create user',
                     roleAdmin: 'Admin',
                     roleMesario: 'Table staff',
+                    roleCoach: 'Professor',
                     roleAthlete: 'Athlete',
-                    local: 'Local'
+                    local: 'Local',
+                    api: 'API'
                 },
                 modalLogs: {
                     title: 'System logs'
@@ -857,6 +1246,23 @@ const Dashboard = () => {
                     posterCompressedSize: 'Compressed size',
                     registrationUrl: 'Registration URL',
                     registrationUrlPlaceholder: 'https://...',
+                    weightTableGiUrl: 'GI weight table URL (image or PDF)',
+                    weightTableGiUrlPlaceholder: 'https://.../tabela-gi.jpg',
+                    weightTableNoGiUrl: 'NO-GI weight table URL (image or PDF)',
+                    weightTableNoGiUrlPlaceholder: 'https://.../tabela-no-gi.jpg',
+                    circularUrl: 'Event circular URL (optional)',
+                    circularUrlPlaceholder: 'https://.../circular.pdf',
+                    weightTableGiOptions: 'GI weight options (one per line)',
+                    weightTableGiOptionsPlaceholder: 'Ex: Light up to 76,00',
+                    weightTableNoGiOptions: 'NO-GI weight options (one per line)',
+                    weightTableNoGiOptionsPlaceholder: 'Ex: Medium up to 82,30',
+                    weightTableOcrFromUrl: 'Extract by OCR from URL',
+                    weightTableOcrFromFile: 'Upload file and extract',
+                    weightTableOcrRunning: 'Running OCR...',
+                    weightTableOcrProgress: (value) => `OCR progress: ${value}%`,
+                    weightTableOcrSourceMissing: 'Enter the table URL or upload the file.',
+                    weightTableOcrNoOptions: 'OCR did not detect valid weight options.',
+                    weightTableOcrSuccess: (count) => `OCR completed: ${count} options extracted.`,
                     pixKey: 'Pix key (event owner)',
                     pixKeyPlaceholder: 'CPF / CNPJ / email / phone / random key',
                     feeUnder15: 'Fee up to 15 years (GI/NO-GI)',
@@ -915,7 +1321,7 @@ const Dashboard = () => {
                     updatePassword: 'Update password'
                 },
                 modalUserCreate: {
-                    title: 'Create local user',
+                    title: 'Create panel user',
                     name: 'Name',
                     username: 'Username',
                     role: 'Role',
@@ -932,6 +1338,8 @@ const Dashboard = () => {
                     reportFail: 'Falha ao gerar o relatório.',
                     eventUpdated: (name) => `Evento atualizado: ${name || 'evento'}.`,
                     eventUpdateFail: 'Falha ao atualizar evento.',
+                    eventClosed: (name) => `Inscrições encerradas: ${name || 'evento'}. Evento movido para passados.`,
+                    eventReopened: (name) => `Inscrições reabertas: ${name || 'evento'}.`,
                     removeEventConfirm: (name) => `Deseja excluir o evento ${name}? Esta ação não pode ser desfeita.`,
                     eventRemoved: 'Evento removido com sucesso.',
                     eventRemoveFail: 'Falha ao remover evento.',
@@ -958,6 +1366,9 @@ const Dashboard = () => {
                     noBracketForPdf: 'Nenhuma chave disponível para exportação em PDF.',
                     bracketPdfSaved: 'PDF das chaves salvo com sucesso.',
                     bracketPdfFail: 'Falha ao salvar PDF das chaves.',
+                    noScheduleForPdf: 'Nenhum cronograma disponível para exportação em PDF.',
+                    schedulePdfSaved: 'PDF do cronograma salvo com sucesso.',
+                    schedulePdfFail: 'Falha ao salvar PDF do cronograma.',
                     podiumApplied: 'Pódio aplicado com sucesso.',
                     podiumApplyFail: 'Não foi possível aplicar o pódio.',
                     resetOnlyLocal: 'Redefinição de senha disponível apenas no modo local.',
@@ -1000,8 +1411,15 @@ const Dashboard = () => {
                     registrationSyncFail: 'Falha ao sincronizar inscrições pendentes.',
                     registrationStatusUpdated: 'Status de pagamento atualizado.',
                     registrationStatusFail: 'Falha ao atualizar status de pagamento.',
+                    registrationStatusAuthRequired: 'Sessão administrativa expirada. Faça login novamente para aprovar pagamentos.',
+                    registrationStatusForbidden: 'Somente administradores podem aprovar ou reprovar pagamentos.',
+                    proofOpenFail: 'Falha ao abrir o comprovante de pagamento.',
                     registrationExportDone: (count) => `${count} inscrições exportadas para planilha.`,
                     registrationExportNoData: 'Nenhuma inscrição disponível para exportar.',
+                    registrationListingExportDone: (label) => `Relatório em PDF gerado: ${label}.`,
+                    registrationListingExportFail: 'Falha ao gerar relatório de inscrições.',
+                    registrationListingNoData: 'Nenhuma inscrição disponível para este evento/relatório.',
+                    eventResourceMissing: 'Este evento ainda não possui este arquivo configurado.',
                     clearReimportLocksConfirm: (count) => `Limpar ${count} bloqueios de reimportação de inscrição?`,
                     reimportLocksCleared: (count) => `${count} bloqueios de reimportação removidos.`,
                     reimportLocksNone: 'Nenhum bloqueio de reimportação para limpar.'
@@ -1012,6 +1430,7 @@ const Dashboard = () => {
                     news: 'Notícias',
                     registrations: 'Inscrições',
                     brackets: 'Chaveamento',
+                    schedule: 'Cronograma',
                     athletes: 'Atletas',
                     automation: 'Automações',
                     activity: 'Atividade'
@@ -1067,6 +1486,12 @@ const Dashboard = () => {
                     subtitle: 'Crie eventos e organize atletas por etapa.',
                     createEvent: 'Criar evento',
                     noEvents: 'Nenhum evento cadastrado.',
+                    openSection: 'Inscrições abertas',
+                    openSectionSubtitle: 'Eventos que ainda aceitam inscrições.',
+                    noOpenEvents: 'Nenhum evento com inscrição aberta.',
+                    closedSection: 'Eventos passados / inscrições encerradas',
+                    closedSectionSubtitle: 'Eventos fechados aparecem somente nesta seção.',
+                    noClosedEvents: 'Nenhum evento encerrado ainda.',
                     date: 'Data',
                     undefinedDate: 'Data indefinida',
                     athletes: 'Atletas',
@@ -1075,6 +1500,12 @@ const Dashboard = () => {
                     manageAthletes: 'Gerenciar atletas',
                     edit: 'Editar',
                     registration: 'Inscrição',
+                    closeRegistration: 'Encerrar inscrições',
+                    closeRegistrationConfirmTitle: 'Confirmar encerramento de inscricoes',
+                    closeRegistrationConfirmDescription: (name) => `Tem certeza que deseja encerrar as inscricoes de ${name || 'este evento'}? Os atletas nao poderao se inscrever ate voce reabrir.`,
+                    closeRegistrationConfirmAction: 'Sim, encerrar inscricoes',
+                    reopenRegistration: 'Reabrir inscrições',
+                    closedRegistration: 'Inscrições encerradas',
                     noPoster: 'Sem cartaz',
                     open: 'Aberto',
                     closed: 'Fechado'
@@ -1125,7 +1556,17 @@ const Dashboard = () => {
                     tableContact: 'Contato',
                     tablePayment: 'Pagamento',
                     tableNotes: 'Observações',
+                    tablePipeline: 'Pipeline',
                     tableStatus: 'Status',
+                    pipelineRegistered: 'Inscrito',
+                    pipelineApproved: 'Aprovado',
+                    pipelineCategory: 'Em categoria',
+                    pipelineBracket: 'Em chave',
+                    flowStatusDone: 'Aprovado e enviado para categoria e chaveamento.',
+                    flowStatusCategory: 'Aprovado e enviado para categoria. Aguardando chaveamento.',
+                    flowStatusApproved: 'Pagamento aprovado. Aguardando sincronização para categoria/chaveamento.',
+                    flowStatusPaymentError: 'Pagamento com erro. Não enviado para categoria/chaveamento.',
+                    flowStatusPending: 'Aguardando conferência de pagamento.',
                     totalValue: 'Total',
                     pixKey: 'Chave Pix',
                     receipt: 'Comprovante',
@@ -1140,6 +1581,16 @@ const Dashboard = () => {
                     confirmPayment: 'Confirmar pagamento',
                     markPaymentError: 'Marcar erro no pagamento',
                     exportSpreadsheet: 'Exportar planilha',
+                    updatedAt: 'Atualizado em',
+                    totalRegistrations: 'inscrições',
+                    reportAthletesByAcademyGi: 'Atletas por academia (GI)',
+                    reportAthletesByCategoryGi: 'Atletas por categoria (GI)',
+                    reportAthletesByAcademyNoGi: 'Atletas por academia (NO-GI)',
+                    reportAthletesByCategoryNoGi: 'Atletas por categoria (NO-GI)',
+                    reportWeightTableGi: 'Tabela de peso GI',
+                    reportWeightTableNoGi: 'Tabela de peso NO-GI',
+                    reportCircular: 'Circular do evento',
+                    filterThisEvent: 'Mostrar este evento na tabela',
                     confirmReviewPrompt: 'Observação da conferência (opcional):',
                     errorReviewPrompt: 'Descreva o erro de pagamento (opcional):',
                     reviewedBy: 'Conferido por',
@@ -1155,12 +1606,19 @@ const Dashboard = () => {
                 bracketsPanel: {
                     title: 'Chaveamento',
                     subtitle: 'Gere chaves por categoria e aplique o pódio automaticamente.',
+                    workspaceTitle: 'Área do chaveamento',
+                    workspaceSubtitle: 'Inscrições aprovadas são sincronizadas na base de atletas e ficam prontas para categoria e chave.',
+                    quickFilter: 'Filtro rapido por academia',
+                    allAcademies: 'Todas as academias',
+                    exportApprovedCsv: 'Exportar CSV aprovados',
                     selectEvent: 'Selecionar evento',
                     selectEventAria: 'Selecionar evento para chaveamento',
                     selectCategoryAria: 'Selecionar categoria de chaveamento',
                     allCategories: 'Todas as categorias',
                     generate: 'Gerar chaves',
                     savePdf: 'Salvar PDF das chaves',
+                    exportSchedulePdfTable: 'PDF Tabela',
+                    exportSchedulePdfTv: 'PDF Modo TV',
                     searchPlaceholder: 'Buscar chave por número ou categoria',
                     searchAria: 'Buscar chave',
                     brackets: 'chaves',
@@ -1178,7 +1636,77 @@ const Dashboard = () => {
                     selectAthlete: 'Selecionar atleta',
                     apply: 'Aplicar pódio',
                     reapply: 'Reaplicar pódio',
-                    noBracketFound: 'Nenhuma chave encontrada.'
+                    noBracketFound: 'Nenhuma chave encontrada.',
+                    approvedAthletesTitle: 'Atletas aprovados',
+                    approvedAthletesSubtitle: 'Atletas aprovados neste evento e vinculados ao fluxo administrativo.',
+                    approvedAthletesEmpty: 'Nenhuma inscrição aprovada para este evento.',
+                    academySummaryTitle: 'Atletas por academia',
+                    academySummarySubtitle: 'Distribuição dos atletas aprovados por academia neste evento.',
+                    academySummaryEmpty: 'Nenhuma academia com atletas aprovados ainda.',
+                    statusApproved: 'Aprovado',
+                    statusInCategory: 'Em categoria',
+                    statusInBracket: 'Em chave',
+                    statusPendingLink: 'Aguardando vínculo',
+                    statsApproved: 'Aprovados',
+                    statsInCategory: 'Em categoria',
+                    statsInBracket: 'Em chave',
+                    statsAcademies: 'Academias',
+                    academyCount: (count) => `${count} atleta${count === 1 ? '' : 's'}`,
+                    filteredLabel: (count, total) => `${count} de ${total}`,
+                    scheduleTitle: 'Chaves & Cronograma',
+                    scheduleSubtitle: 'Geracao automatica de chaves, organizacao por arrastar e soltar e estimativa em tempo real.',
+                    scheduleAuto: 'Geracao automatica de chaves',
+                    scheduleDrag: 'Arraste e solte para configurar suas chaves',
+                    scheduleRealtime: 'Estimativa em tempo real',
+                    scheduleTv: 'Modo TV para o cronograma',
+                    scheduleStart: 'Hora inicial',
+                    scheduleFightDuration: 'Duracao da luta (min)',
+                    scheduleTransition: 'Intervalo (min)',
+                    scheduleAreas: 'Areas',
+                    scheduleTotalFights: 'Lutas estimadas',
+                    scheduleTotalDuration: 'Duracao estimada',
+                    scheduleEstimatedEnd: 'Termino previsto',
+                    scheduleNoBrackets: 'Gere chaves para visualizar o cronograma.',
+                    scheduleDragHint: 'Arraste os cards para reordenar o cronograma.',
+                    scheduleRowRound: (count) => `${count} luta${count === 1 ? '' : 's'}`,
+                    tvModeOpen: 'Modo TV',
+                    tvModeClose: 'Fechar modo TV',
+                    tvModeTitle: 'Cronograma ao vivo',
+                    tvModeNow: 'Horario atual',
+                    seedEditorTitle: 'Configurar chave (arraste atletas)',
+                    seedEditorHint: 'Arraste os atletas para definir a ordem da rodada inicial.'
+                },
+                schedulePanel: {
+                    title: 'Cronograma',
+                    subtitle: 'Monte o cronograma manualmente, incluindo pausas e cerimonias.',
+                    selectEvent: 'Selecionar evento',
+                    selectEventAria: 'Selecionar evento para cronograma',
+                    exportSchedulePdfTable: 'PDF Tabela',
+                    exportSchedulePdfTv: 'PDF Modo TV',
+                    tvModeOpen: 'Modo TV',
+                    tvModeClose: 'Fechar modo TV',
+                    tvModeTitle: 'Cronograma ao vivo',
+                    tvModeNow: 'Horario atual',
+                    addItemTitle: 'Novo item da linha do tempo',
+                    itemTitle: 'Titulo',
+                    itemType: 'Tipo',
+                    itemArea: 'Area',
+                    itemStart: 'Inicio',
+                    itemEnd: 'Fim',
+                    itemNotes: 'Observacoes (opcional)',
+                    addItemAction: 'Adicionar item',
+                    noItems: 'Nenhum item de cronograma para este evento.',
+                    totalItems: 'Itens',
+                    totalFights: 'Lutas',
+                    totalDuration: 'Duracao estimada',
+                    estimatedEnd: 'Termino previsto',
+                    moveUp: 'Subir',
+                    moveDown: 'Descer',
+                    remove: 'Remover',
+                    typeFight: 'Luta',
+                    typeBreak: 'Pausa',
+                    typeCeremony: 'Cerimonia',
+                    typeOther: 'Outro'
                 },
                 beltSummary: {
                     title: 'Resumo por faixa',
@@ -1257,15 +1785,17 @@ const Dashboard = () => {
                     secureSession: 'Sessão segura',
                     secureSessionSubtitle: 'Controle de acesso com confirmação visual',
                     endSession: 'Encerrar sessão',
-                    localUsers: 'Usuários locais',
-                    localUsersDesc: 'Gerencie contas locais e permissões do painel.',
+                    localUsers: 'Usuários do painel',
+                    localUsersDesc: 'Gerencie contas e permissões de acesso ao painel.',
                     noUser: 'Nenhum usuário cadastrado.',
                     resetPassword: 'Redefinir senha',
                     createUser: 'Criar usuário',
-                    roleAdmin: 'Administrador',
+                    roleAdmin: 'ADM',
                     roleMesario: 'Mesário',
+                    roleCoach: 'Professor',
                     roleAthlete: 'Atleta',
-                    local: 'Local'
+                    local: 'Local',
+                    api: 'API'
                 },
                 modalLogs: {
                     title: 'Logs do sistema'
@@ -1284,6 +1814,23 @@ const Dashboard = () => {
                     posterCompressedSize: 'Tamanho comprimido',
                     registrationUrl: 'URL de inscrição',
                     registrationUrlPlaceholder: 'https://...',
+                    weightTableGiUrl: 'URL da tabela de peso GI (imagem ou PDF)',
+                    weightTableGiUrlPlaceholder: 'https://.../tabela-gi.jpg',
+                    weightTableNoGiUrl: 'URL da tabela de peso NO-GI (imagem ou PDF)',
+                    weightTableNoGiUrlPlaceholder: 'https://.../tabela-no-gi.jpg',
+                    circularUrl: 'URL da circular do evento (opcional)',
+                    circularUrlPlaceholder: 'https://.../circular.pdf',
+                    weightTableGiOptions: 'Opções de peso GI (uma por linha)',
+                    weightTableGiOptionsPlaceholder: 'Ex: Leve até 76,00',
+                    weightTableNoGiOptions: 'Opções de peso NO-GI (uma por linha)',
+                    weightTableNoGiOptionsPlaceholder: 'Ex: Médio até 82,30',
+                    weightTableOcrFromUrl: 'Extrair com OCR pela URL',
+                    weightTableOcrFromFile: 'Enviar arquivo e extrair',
+                    weightTableOcrRunning: 'Executando OCR...',
+                    weightTableOcrProgress: (value) => `Progresso do OCR: ${value}%`,
+                    weightTableOcrSourceMissing: 'Informe a URL da tabela ou envie o arquivo.',
+                    weightTableOcrNoOptions: 'OCR não detectou opções de peso válidas.',
+                    weightTableOcrSuccess: (count) => `OCR concluído: ${count} opções extraídas.`,
                     pixKey: 'Chave Pix (responsável do campeonato)',
                     pixKeyPlaceholder: 'CPF / CNPJ / email / telefone / chave aleatória',
                     feeUnder15: 'Valor até 15 anos (GI/NO-GI)',
@@ -1342,7 +1889,7 @@ const Dashboard = () => {
                     updatePassword: 'Atualizar senha'
                 },
                 modalUserCreate: {
-                    title: 'Criar usuário local',
+                    title: 'Criar usuário do painel',
                     name: 'Nome',
                     username: 'Usuário',
                     role: 'Papel',
@@ -1352,33 +1899,45 @@ const Dashboard = () => {
                 }
             }
     ), [isEnglish]);
-    const locale = isEnglish ? 'en-US' : 'pt-BR';
+    const locale = useMemo(() => {
+        if (languageVariant === 'pt') return 'pt-BR';
+        if (languageVariant === 'es') return 'es-ES';
+        if (languageVariant === 'fr') return 'fr-FR';
+        return 'en-US';
+    }, [languageVariant]);
     const currentUserRole = (currentUser?.role || '').toString().trim().toLowerCase();
     const isAdminUser = currentUserRole === 'admin';
-    const isMesarioUser = currentUserRole === 'mesario';
     const canManagePanel = isAdminUser;
     const localizeBelt = useCallback(
-        (value, fallback = copy.athletesPanel.belt) => translateBelt(value || fallback, language),
-        [copy.athletesPanel.belt, language]
+        (value, fallback = copy.athletesPanel.belt) => translateBelt(value || fallback, uiLanguage),
+        [copy.athletesPanel.belt, uiLanguage]
     );
     const localizeWeight = useCallback(
-        (value, fallback = copy.athletesPanel.weight) => translateWeight(value || fallback, language),
-        [copy.athletesPanel.weight, language]
+        (value, fallback = copy.athletesPanel.weight) => translateWeight(value || fallback, uiLanguage),
+        [copy.athletesPanel.weight, uiLanguage]
     );
     const localizeCategory = useCallback(
-        (value, fallback = copy.athletesPanel.category) => translateCategory(value || fallback, language),
-        [copy.athletesPanel.category, language]
+        (value, fallback = copy.athletesPanel.category) => translateCategory(value || fallback, uiLanguage),
+        [copy.athletesPanel.category, uiLanguage]
     );
     const localizeComposite = useCallback(
-        (label) => translateCompositeLabel(label, language),
-        [language]
+        (label) => translateCompositeLabel(label, uiLanguage),
+        [uiLanguage]
     );
+    const normalizePanelRole = useCallback((roleValue) => {
+        const normalized = (roleValue || '').toString().trim().toLowerCase();
+        if (normalized === 'admin' || normalized === 'adm') return 'admin';
+        if (normalized === 'coach' || normalized === 'professor') return 'coach';
+        if (normalized === 'mesario' || normalized === 'mesário') return 'mesario';
+        return 'mesario';
+    }, []);
     const localizeUserRole = useCallback((role) => {
         const normalized = (role || '').toString().trim().toLowerCase();
-        if (normalized === 'admin') return copy.activity.roleAdmin;
-        if (normalized === 'mesario') return copy.activity.roleMesario;
+        if (normalized === 'admin' || normalized === 'adm') return copy.activity.roleAdmin;
+        if (normalized === 'mesario' || normalized === 'mesário') return copy.activity.roleMesario;
+        if (normalized === 'coach' || normalized === 'professor') return copy.activity.roleCoach;
         return copy.activity.roleAthlete;
-    }, [copy.activity.roleAdmin, copy.activity.roleMesario, copy.activity.roleAthlete]);
+    }, [copy.activity.roleAdmin, copy.activity.roleMesario, copy.activity.roleCoach, copy.activity.roleAthlete]);
 
     const translateLogAction = useCallback((action) => {
         if (!isEnglish) return action;
@@ -1414,7 +1973,7 @@ const Dashboard = () => {
         const replacements = [
             [/Usuário/gi, 'User'],
             [/Usuário/gi, 'User'],
-            [/UsuÃ¡rio/gi, 'User'],
+            [/Usuário/gi, 'User'],
             [/acessou o sistema/gi, 'accessed the system'],
             [/saiu/gi, 'logged out'],
             [/Evento criado/gi, 'Event created'],
@@ -1445,13 +2004,18 @@ const Dashboard = () => {
     const [showLogs, setShowLogs] = useState(false);
     const [toast, setToast] = useState(null);
     const [navOpen, setNavOpen] = useState(false);
-    const [activeSection, setActiveSection] = useState(isMesarioUser ? 'brackets' : 'overview');
+    const activeSection = useMemo(
+        () => resolveAdminSectionFromPath(location.pathname, canManagePanel),
+        [location.pathname, canManagePanel]
+    );
     const [viewMode, setViewMode] = useState('table');
     const [athletesPage, setAthletesPage] = useState(1);
     const [athletesPageSize, setAthletesPageSize] = useState(ATHLETE_PAGE_SIZE_OPTIONS[0]);
     const [now, setNow] = useState(new Date());
     const importInputRef = useRef(null);
     const newsImageInputRef = useRef(null);
+    const weightTableGiOcrFileRef = useRef(null);
+    const weightTableNoGiOcrFileRef = useRef(null);
     const [importMode, setImportMode] = useState('GI');
     const [importStatus, setImportStatus] = useState('');
     const [importError, setImportError] = useState('');
@@ -1462,10 +2026,21 @@ const Dashboard = () => {
     const [bracketEventId, setBracketEventId] = useState(activeEventId || '');
     const [bracketMode, setBracketMode] = useState('ALL');
     const [bracketSearch, setBracketSearch] = useState('');
+    const [bracketAcademyFilter, setBracketAcademyFilter] = useState('all');
+    const [bracketOrderByEvent, setBracketOrderByEvent] = useState({});
+    const [draggingBracketId, setDraggingBracketId] = useState('');
+    const [dragSeedContext, setDragSeedContext] = useState({ bracketId: '', athleteId: '' });
+    const [scheduleEventId, setScheduleEventId] = useState(activeEventId || '');
+    const [manualScheduleByEvent, setManualScheduleByEvent] = useState(loadManualScheduleByEvent);
+    const [scheduleDraft, setScheduleDraft] = useState(createScheduleDraftState);
+    const [showScheduleTvMode, setShowScheduleTvMode] = useState(false);
     const [showEventEditModal, setShowEventEditModal] = useState(false);
     const [eventEditForm, setEventEditForm] = useState(createEventEditFormState);
     const [eventEditError, setEventEditError] = useState('');
+    const [registrationCloseConfirmEvent, setRegistrationCloseConfirmEvent] = useState(null);
     const [eventPosterStoredSizeBytes, setEventPosterStoredSizeBytes] = useState(0);
+    const [eventWeightOcrMode, setEventWeightOcrMode] = useState('');
+    const [eventWeightOcrProgress, setEventWeightOcrProgress] = useState(0);
     const [newsForm, setNewsForm] = useState(createNewsFormState);
     const [newsImageName, setNewsImageName] = useState('');
     const [newsImageStoredSizeBytes, setNewsImageStoredSizeBytes] = useState(0);
@@ -1502,10 +2077,21 @@ const Dashboard = () => {
     const [userCreateUsername, setUserCreateUsername] = useState('');
     const [userCreatePassword, setUserCreatePassword] = useState('');
     const [userCreateConfirm, setUserCreateConfirm] = useState('');
-    const [userCreateRole, setUserCreateRole] = useState('mesario');
+    const [userCreateRole, setUserCreateRole] = useState('coach');
     const [userCreateError, setUserCreateError] = useState('');
     const [userCreateSuccess, setUserCreateSuccess] = useState('');
     const [userCreateLoading, setUserCreateLoading] = useState(false);
+    const [showUserEditModal, setShowUserEditModal] = useState(false);
+    const [userEditId, setUserEditId] = useState('');
+    const [userEditName, setUserEditName] = useState('');
+    const [userEditUsername, setUserEditUsername] = useState('');
+    const [userEditRole, setUserEditRole] = useState('coach');
+    const [userEditError, setUserEditError] = useState('');
+    const [userEditSuccess, setUserEditSuccess] = useState('');
+    const [userEditLoading, setUserEditLoading] = useState(false);
+    const [userDeleteLoadingId, setUserDeleteLoadingId] = useState('');
+    const [panelUsers, setPanelUsers] = useState([]);
+    const [panelUsersLoading, setPanelUsersLoading] = useState(false);
     const [publicRegistrations, setPublicRegistrations] = useState([]);
     const [registrationSearch, setRegistrationSearch] = useState('');
     const [registrationEventFilter, setRegistrationEventFilter] = useState('all');
@@ -1519,10 +2105,53 @@ const Dashboard = () => {
     const [suppressedRegistrationKeys, setSuppressedRegistrationKeys] = useState(loadSuppressedRegistrationKeys);
     const deferredSearchTerm = useDeferredValue(searchTerm);
     const deferredRegistrationSearch = useDeferredValue(registrationSearch);
-    const suppressedRegistrationKeySet = useMemo(
-        () => new Set(suppressedRegistrationKeys),
-        [suppressedRegistrationKeys]
+    const userResetPasswordStrength = useMemo(
+        () => evaluatePasswordStrength(userResetPassword, locale),
+        [userResetPassword, locale]
     );
+    const userCreatePasswordStrength = useMemo(
+        () => evaluatePasswordStrength(userCreatePassword, locale),
+        [userCreatePassword, locale]
+    );
+    const [confirmDialog, setConfirmDialog] = useState({
+        isOpen: false,
+        title: '',
+        description: '',
+        confirmLabel: '',
+        cancelLabel: '',
+        variant: 'danger'
+    });
+    const confirmResolverRef = useRef(null);
+
+    const closeConfirmDialog = useCallback((confirmed = false) => {
+        const resolver = confirmResolverRef.current;
+        confirmResolverRef.current = null;
+        if (typeof resolver === 'function') {
+            resolver(Boolean(confirmed));
+        }
+        setConfirmDialog({
+            isOpen: false,
+            title: '',
+            description: '',
+            confirmLabel: '',
+            cancelLabel: '',
+            variant: 'danger'
+        });
+    }, []);
+
+    const requestConfirmDialog = useCallback((options = {}) => (
+        new Promise((resolve) => {
+            confirmResolverRef.current = resolve;
+            setConfirmDialog({
+                isOpen: true,
+                title: options.title || (isEnglish ? 'Confirm action' : 'Confirmar acao'),
+                description: options.description || '',
+                confirmLabel: options.confirmLabel || (isEnglish ? 'Confirm' : 'Confirmar'),
+                cancelLabel: options.cancelLabel || copy.common.cancel,
+                variant: options.variant || 'danger'
+            });
+        })
+    ), [isEnglish, copy.common.cancel]);
 
     const showFeedback = useCallback((type, message) => {
         setToast({ type, message });
@@ -1532,6 +2161,41 @@ const Dashboard = () => {
     const refreshSyncDiagnostics = useCallback(() => {
         setSyncDiagnostics(publicRegistrationService.getSyncDiagnostics());
     }, []);
+
+    const loadPanelUsers = useCallback(async () => {
+        if (!canManagePanel) {
+            setPanelUsers([]);
+            return [];
+        }
+
+        setPanelUsersLoading(true);
+        try {
+            const users = authService.listAdminUsers
+                ? await authService.listAdminUsers()
+                : (authService.listUsers ? authService.listUsers() : []);
+            const filteredUsers = (Array.isArray(users) ? users : []).filter((user) => {
+                const role = (user?.role || '').toString().trim().toLowerCase();
+                return role === 'admin' || role === 'adm' || role === 'mesario' || role === 'mesário' || role === 'coach' || role === 'professor';
+            });
+            setPanelUsers(filteredUsers);
+            return filteredUsers;
+        } catch (err) {
+            const message = err?.message || (isEnglish ? 'Failed to load panel users.' : 'Falha ao carregar usuários do painel.');
+            showFeedback('error', message);
+            setPanelUsers([]);
+            return [];
+        } finally {
+            setPanelUsersLoading(false);
+        }
+    }, [canManagePanel, showFeedback, isEnglish]);
+
+    useEffect(() => {
+        if (!canManagePanel) {
+            setPanelUsers([]);
+            return;
+        }
+        loadPanelUsers();
+    }, [canManagePanel, loadPanelUsers]);
 
     useEffect(() => {
         saveSuppressedRegistrationKeys(suppressedRegistrationKeys);
@@ -1544,6 +2208,10 @@ const Dashboard = () => {
     useEffect(() => {
         saveInstagramFeedStatus(instagramFeedStatus);
     }, [instagramFeedStatus]);
+
+    useEffect(() => {
+        saveManualScheduleByEvent(manualScheduleByEvent);
+    }, [manualScheduleByEvent]);
 
     useEffect(() => {
         if (instagramLastUpdatedAt) return undefined;
@@ -1627,6 +2295,8 @@ const Dashboard = () => {
     const handleOpenEditEvent = useCallback((eventItem) => {
         if (!eventItem) return;
         setEventEditError('');
+        setEventWeightOcrMode('');
+        setEventWeightOcrProgress(0);
         const posterUrl = eventItem.posterUrl || '';
         setEventEditForm({
             id: eventItem.id,
@@ -1635,6 +2305,11 @@ const Dashboard = () => {
             location: eventItem.location || '',
             posterUrl,
             registrationUrl: eventItem.registrationUrl || '',
+            weightTableGiUrl: eventItem.weightTableGiUrl || '',
+            weightTableNoGiUrl: eventItem.weightTableNoGiUrl || '',
+            circularUrl: eventItem.circularUrl || '',
+            weightTableGiOptions: eventItem.weightTableGiOptions || '',
+            weightTableNoGiOptions: eventItem.weightTableNoGiOptions || '',
             pixKey: eventItem.pixKey || DEFAULT_EVENT_PIX_KEY,
             feeUnder15: eventItem.feeUnder15 ?? DEFAULT_EVENT_FEES.under15,
             feeOver15: eventItem.feeOver15 ?? DEFAULT_EVENT_FEES.over15,
@@ -1650,8 +2325,14 @@ const Dashboard = () => {
     const handleCloseEditEvent = useCallback(() => {
         setShowEventEditModal(false);
         setEventEditError('');
+        setEventWeightOcrMode('');
+        setEventWeightOcrProgress(0);
         setEventPosterStoredSizeBytes(0);
         setEventEditForm(createEventEditFormState());
+    }, []);
+
+    const closeRegistrationConfirmModal = useCallback(() => {
+        setRegistrationCloseConfirmEvent(null);
     }, []);
 
     const handleUpdateEvent = useCallback((event) => {
@@ -1664,6 +2345,11 @@ const Dashboard = () => {
                 location: eventEditForm.location,
                 posterUrl: eventEditForm.posterUrl,
                 registrationUrl: eventEditForm.registrationUrl,
+                weightTableGiUrl: eventEditForm.weightTableGiUrl,
+                weightTableNoGiUrl: eventEditForm.weightTableNoGiUrl,
+                circularUrl: eventEditForm.circularUrl,
+                weightTableGiOptions: eventEditForm.weightTableGiOptions,
+                weightTableNoGiOptions: eventEditForm.weightTableNoGiOptions,
                 pixKey: eventEditForm.pixKey,
                 feeUnder15: eventEditForm.feeUnder15,
                 feeOver15: eventEditForm.feeOver15,
@@ -1680,6 +2366,49 @@ const Dashboard = () => {
             showFeedback('error', message);
         }
     }, [eventEditForm, updateEvent, showFeedback, handleCloseEditEvent, copy.feedback]);
+
+    const handleToggleEventRegistration = useCallback((eventItem) => {
+        if (!eventItem?.id) return;
+        const isCurrentlyOpen = eventItem.registrationOpen !== false;
+        if (isCurrentlyOpen) {
+            setRegistrationCloseConfirmEvent(eventItem);
+            return;
+        }
+        const nextRegistrationOpen = true;
+        try {
+            const updated = updateEvent(eventItem.id, {
+                registrationOpen: nextRegistrationOpen
+            });
+            showFeedback(
+                'success',
+                nextRegistrationOpen
+                    ? copy.feedback.eventReopened(updated?.name || eventItem?.name)
+                    : copy.feedback.eventClosed(updated?.name || eventItem?.name)
+            );
+        } catch (err) {
+            const message = err?.message || copy.feedback.eventUpdateFail;
+            showFeedback('error', message);
+        }
+    }, [updateEvent, showFeedback, copy.feedback]);
+
+    const handleConfirmCloseEventRegistration = useCallback(() => {
+        const eventItem = registrationCloseConfirmEvent;
+        if (!eventItem?.id) {
+            setRegistrationCloseConfirmEvent(null);
+            return;
+        }
+        try {
+            const updated = updateEvent(eventItem.id, {
+                registrationOpen: false
+            });
+            showFeedback('success', copy.feedback.eventClosed(updated?.name || eventItem?.name));
+        } catch (err) {
+            const message = err?.message || copy.feedback.eventUpdateFail;
+            showFeedback('error', message);
+        } finally {
+            setRegistrationCloseConfirmEvent(null);
+        }
+    }, [registrationCloseConfirmEvent, updateEvent, showFeedback, copy.feedback]);
 
     const handleEventEditPosterUrlChange = useCallback((event) => {
         const value = event.target.value;
@@ -1727,10 +2456,81 @@ const Dashboard = () => {
         }
     }, [copy.feedback, showFeedback]);
 
-    const handleDeleteEvent = useCallback(() => {
+    const handleRunWeightTableOcr = useCallback(async (mode, file = null) => {
+        const normalizedMode = mode === 'NO-GI' ? 'NO-GI' : 'GI';
+        const targetUrl = normalizedMode === 'GI'
+            ? (eventEditForm.weightTableGiUrl || '')
+            : (eventEditForm.weightTableNoGiUrl || '');
+        const optionField = normalizedMode === 'GI' ? 'weightTableGiOptions' : 'weightTableNoGiOptions';
+
+        if (!file && !targetUrl.trim()) {
+            const message = copy.modalEventEdit.weightTableOcrSourceMissing;
+            setEventEditError(message);
+            showFeedback('error', message);
+            return;
+        }
+
+        setEventEditError('');
+        setEventWeightOcrMode(normalizedMode);
+        setEventWeightOcrProgress(0);
+
+        const handleProgress = (state) => {
+            const value = Math.round(Number(state?.progress || 0));
+            if (!Number.isFinite(value)) return;
+            setEventWeightOcrProgress(Math.max(0, Math.min(100, value)));
+        };
+
+        try {
+            const result = file
+                ? await extractWeightOptionsFromFile(file, { onProgress: handleProgress })
+                : await extractWeightOptionsFromUrl(targetUrl, { onProgress: handleProgress });
+            const options = Array.isArray(result?.options) ? result.options.filter(Boolean) : [];
+            if (!options.length) {
+                const message = copy.modalEventEdit.weightTableOcrNoOptions;
+                setEventEditError(message);
+                showFeedback('error', message);
+                return;
+            }
+
+            setEventEditForm((prev) => ({
+                ...prev,
+                [optionField]: options.join('\n')
+            }));
+            setEventWeightOcrProgress(100);
+            showFeedback('success', copy.modalEventEdit.weightTableOcrSuccess(options.length));
+        } catch (err) {
+            const message = err?.message || copy.modalEventEdit.weightTableOcrNoOptions;
+            setEventEditError(message);
+            showFeedback('error', message);
+        } finally {
+            setTimeout(() => {
+                setEventWeightOcrMode('');
+                setEventWeightOcrProgress(0);
+            }, 600);
+        }
+    }, [
+        eventEditForm.weightTableGiUrl,
+        eventEditForm.weightTableNoGiUrl,
+        copy.modalEventEdit,
+        showFeedback
+    ]);
+
+    const handleWeightTableOcrFileChange = useCallback((mode, event) => {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+        if (!file) return;
+        handleRunWeightTableOcr(mode, file);
+    }, [handleRunWeightTableOcr]);
+
+    const handleDeleteEvent = useCallback(async () => {
         if (!eventEditForm.id) return;
         const name = eventEditForm.name || (isEnglish ? 'selected event' : 'evento selecionado');
-        const confirmed = window.confirm(copy.feedback.removeEventConfirm(name));
+        const confirmed = await requestConfirmDialog({
+            title: isEnglish ? 'Delete event' : 'Excluir evento',
+            description: copy.feedback.removeEventConfirm(name),
+            confirmLabel: isEnglish ? 'Delete' : 'Excluir',
+            variant: 'danger'
+        });
         if (!confirmed) return;
         try {
             deleteEvent(eventEditForm.id);
@@ -1741,14 +2541,19 @@ const Dashboard = () => {
             setEventEditError(message);
             showFeedback('error', message);
         }
-    }, [eventEditForm.id, eventEditForm.name, deleteEvent, showFeedback, handleCloseEditEvent, copy.feedback, isEnglish]);
+    }, [eventEditForm.id, eventEditForm.name, deleteEvent, showFeedback, handleCloseEditEvent, copy.feedback, isEnglish, requestConfirmDialog]);
 
     const handleImportRanking = useCallback(() => {
         importInputRef.current?.click();
     }, []);
 
-    const handleClearAthletes = useCallback(() => {
-        const confirmed = window.confirm(copy.feedback.clearAthletesConfirm);
+    const handleClearAthletes = useCallback(async () => {
+        const confirmed = await requestConfirmDialog({
+            title: isEnglish ? 'Clear athletes' : 'Limpar atletas',
+            description: copy.feedback.clearAthletesConfirm,
+            confirmLabel: isEnglish ? 'Clear' : 'Limpar',
+            variant: 'danger'
+        });
         if (confirmed) {
             const keysToSuppress = athletes
                 .map((athlete) => buildAthleteRegistrationIdentityKey(athlete))
@@ -1757,23 +2562,33 @@ const Dashboard = () => {
             clearAthletes();
             showFeedback('success', copy.feedback.allAthletesRemoved);
         }
-    }, [athletes, addSuppressedRegistrationKeys, clearAthletes, showFeedback, copy.feedback]);
+    }, [athletes, addSuppressedRegistrationKeys, clearAthletes, showFeedback, copy.feedback, requestConfirmDialog, isEnglish]);
 
-    const handleClearReimportLocks = useCallback(() => {
+    const handleClearReimportLocks = useCallback(async () => {
         if (!suppressedRegistrationKeys.length) {
             showFeedback('success', copy.feedback.reimportLocksNone);
             return;
         }
-        const confirmed = window.confirm(copy.feedback.clearReimportLocksConfirm(suppressedRegistrationKeys.length));
+        const confirmed = await requestConfirmDialog({
+            title: isEnglish ? 'Clear reimport locks' : 'Limpar bloqueios de reimportacao',
+            description: copy.feedback.clearReimportLocksConfirm(suppressedRegistrationKeys.length),
+            confirmLabel: isEnglish ? 'Clear' : 'Limpar',
+            variant: 'danger'
+        });
         if (!confirmed) return;
         setSuppressedRegistrationKeys([]);
         showFeedback('success', copy.feedback.reimportLocksCleared(suppressedRegistrationKeys.length));
-    }, [suppressedRegistrationKeys, showFeedback, copy.feedback]);
+    }, [suppressedRegistrationKeys, showFeedback, copy.feedback, requestConfirmDialog, isEnglish]);
 
-    const handleRemoveAthlete = useCallback((athlete) => {
+    const handleRemoveAthlete = useCallback(async (athlete) => {
         if (!athlete?.id) return;
         const athleteName = athlete.nome || (isEnglish ? 'selected athlete' : 'atleta selecionado');
-        const confirmed = window.confirm(copy.feedback.removeAthleteConfirm(athleteName));
+        const confirmed = await requestConfirmDialog({
+            title: isEnglish ? 'Remove athlete' : 'Remover atleta',
+            description: copy.feedback.removeAthleteConfirm(athleteName),
+            confirmLabel: isEnglish ? 'Remove' : 'Remover',
+            variant: 'danger'
+        });
         if (!confirmed) return;
 
         try {
@@ -1789,7 +2604,7 @@ const Dashboard = () => {
         } catch (err) {
             showFeedback('error', err?.message || copy.feedback.athleteRemoveFail);
         }
-    }, [addSuppressedRegistrationKeys, removeAthlete, showFeedback, copy.feedback, isEnglish]);
+    }, [addSuppressedRegistrationKeys, removeAthlete, showFeedback, copy.feedback, isEnglish, requestConfirmDialog]);
 
     const handleImportFile = useCallback(async (event) => {
         const file = event.target.files?.[0];
@@ -1864,6 +2679,55 @@ const Dashboard = () => {
         showFeedback('success', copy.feedback.beltSummaryUpdated);
     }, [showFeedback, copy.feedback]);
 
+    const eventMap = useMemo(() => (
+        events.reduce((acc, event) => {
+            acc[event.id] = event;
+            return acc;
+        }, {})
+    ), [events]);
+
+    const athleteMap = useMemo(() => (
+        new Map(athletes.map((athlete) => [athlete.id, athlete]))
+    ), [athletes]);
+
+    const parsedPublicRegistrations = useMemo(() => (
+        publicRegistrations
+            .map((item) => parseRegistrationRecord(item, eventMap, copy))
+            .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+    ), [publicRegistrations, eventMap, copy]);
+
+    const latestRegistrationDecisions = useMemo(() => {
+        const decisionMap = new Map();
+        parsedPublicRegistrations.forEach((item) => {
+            const key = buildRegistrationIdentityKey(item);
+            if (!key) return;
+            const current = decisionMap.get(key);
+            if (!current) {
+                decisionMap.set(key, item);
+                return;
+            }
+            const currentIsDecisive = current.isPaymentConfirmed || current.isPaymentError;
+            const nextIsDecisive = item.isPaymentConfirmed || item.isPaymentError;
+
+            // Never let a new pending row override an already reviewed decision.
+            if (currentIsDecisive && !nextIsDecisive) return;
+            if (!currentIsDecisive && nextIsDecisive) {
+                decisionMap.set(key, item);
+                return;
+            }
+
+            const currentTime = currentIsDecisive
+                ? getRegistrationDecisionTimestamp(current)
+                : new Date(current.createdAt || 0).getTime();
+            const nextTime = nextIsDecisive
+                ? getRegistrationDecisionTimestamp(item)
+                : new Date(item.createdAt || 0).getTime();
+
+            if (nextTime >= currentTime) decisionMap.set(key, item);
+        });
+        return [...decisionMap.values()];
+    }, [parsedPublicRegistrations]);
+
     const filteredBrackets = useMemo(() => {
         const term = bracketSearch.trim().toLowerCase();
         const numberTerm = Number(term);
@@ -1884,6 +2748,476 @@ const Dashboard = () => {
             })
             .sort((a, b) => (a.number || 0) - (b.number || 0));
     }, [brackets, bracketEventId, bracketMode, bracketSearch]);
+
+    const orderedFilteredBrackets = useMemo(() => {
+        if (!filteredBrackets.length) return [];
+        if (!bracketEventId) return filteredBrackets;
+
+        const orderForEvent = Array.isArray(bracketOrderByEvent[bracketEventId])
+            ? bracketOrderByEvent[bracketEventId]
+            : [];
+        const visibleMap = new Map(filteredBrackets.map((bracket) => [bracket.id, bracket]));
+        const ordered = [];
+
+        orderForEvent.forEach((bracketId) => {
+            if (!visibleMap.has(bracketId)) return;
+            ordered.push(visibleMap.get(bracketId));
+            visibleMap.delete(bracketId);
+        });
+
+        const remaining = [...visibleMap.values()].sort((a, b) => (a.number || 0) - (b.number || 0));
+        return [...ordered, ...remaining];
+    }, [filteredBrackets, bracketEventId, bracketOrderByEvent]);
+
+    const scheduleTypeLabel = useCallback((type) => {
+        const normalized = normalizeScheduleType(type);
+        if (normalized === 'BREAK') return copy.schedulePanel.typeBreak;
+        if (normalized === 'CEREMONY') return copy.schedulePanel.typeCeremony;
+        if (normalized === 'OTHER') return copy.schedulePanel.typeOther;
+        return copy.schedulePanel.typeFight;
+    }, [
+        copy.schedulePanel.typeBreak,
+        copy.schedulePanel.typeCeremony,
+        copy.schedulePanel.typeOther,
+        copy.schedulePanel.typeFight
+    ]);
+
+    const manualScheduleRows = useMemo(() => {
+        if (!scheduleEventId) return [];
+        const rows = Array.isArray(manualScheduleByEvent[scheduleEventId])
+            ? manualScheduleByEvent[scheduleEventId]
+            : [];
+        return rows
+            .map((row, index) => normalizeManualScheduleEntry(row, index))
+            .sort((left, right) => (left.order || 0) - (right.order || 0))
+            .map((row, index) => ({ ...row, order: index + 1 }));
+    }, [manualScheduleByEvent, scheduleEventId]);
+
+    const manualScheduleData = useMemo(() => {
+        const rows = manualScheduleRows.map((row, index) => {
+            const startMinute = parseClockToMinutes(row.start || '09:00');
+            let endMinute = parseClockToMinutes(row.end || row.start || '09:00');
+            if (endMinute < startMinute) endMinute = startMinute + 10;
+            const durationMinutes = Math.max(0, endMinute - startMinute);
+            const type = normalizeScheduleType(row.type);
+            const title = (row.title || '').trim() || scheduleTypeLabel(type);
+            return {
+                ...row,
+                id: row.id || `manual-row-${index + 1}`,
+                order: index + 1,
+                type,
+                typeLabel: scheduleTypeLabel(type),
+                title,
+                area: row.area || '',
+                startMinute,
+                endMinute,
+                startLabel: formatMinutesToClock(startMinute),
+                endLabel: formatMinutesToClock(endMinute),
+                durationMinutes
+            };
+        });
+
+        if (!rows.length) {
+            return {
+                rows: [],
+                totalItems: 0,
+                totalFights: 0,
+                totalDurationMinutes: 0,
+                estimatedEndMinute: null,
+                estimatedEndLabel: '--:--',
+                startLabel: '--:--',
+                areaCount: 0,
+                averageFightDurationMinutes: 0
+            };
+        }
+
+        const totalItems = rows.length;
+        const totalFights = rows.filter((row) => row.type === 'FIGHT').length;
+        const totalDurationMinutes = rows.reduce((sum, row) => sum + row.durationMinutes, 0);
+        const earliestStart = rows.reduce((min, row) => Math.min(min, row.startMinute), Number.POSITIVE_INFINITY);
+        const latestEnd = rows.reduce((max, row) => Math.max(max, row.endMinute), Number.NEGATIVE_INFINITY);
+        const areaCount = new Set(
+            rows
+                .map((row) => (row.area || '').toString().trim())
+                .filter(Boolean)
+        ).size;
+        const fightDurations = rows
+            .filter((row) => row.type === 'FIGHT' && row.durationMinutes > 0)
+            .map((row) => row.durationMinutes);
+        const averageFightDurationMinutes = fightDurations.length
+            ? Math.max(1, Math.round(fightDurations.reduce((sum, value) => sum + value, 0) / fightDurations.length))
+            : 5;
+
+        return {
+            rows,
+            totalItems,
+            totalFights,
+            totalDurationMinutes,
+            estimatedEndMinute: latestEnd,
+            estimatedEndLabel: Number.isFinite(latestEnd) ? formatMinutesToClock(latestEnd) : '--:--',
+            startLabel: Number.isFinite(earliestStart) ? formatMinutesToClock(earliestStart) : '--:--',
+            areaCount,
+            averageFightDurationMinutes
+        };
+    }, [manualScheduleRows, scheduleTypeLabel]);
+
+    const bracketWorkspaceData = useMemo(() => {
+        if (!bracketEventId) {
+            return {
+                approvedRows: [],
+                academyRows: [],
+                totals: {
+                    approved: 0,
+                    inCategory: 0,
+                    inBracket: 0,
+                    academies: 0
+                }
+            };
+        }
+
+        const eventSeedSet = new Set();
+        brackets
+            .filter((bracket) => bracket.eventId === bracketEventId)
+            .forEach((bracket) => {
+                (Array.isArray(bracket.seedIds) ? bracket.seedIds : []).forEach((seedId) => {
+                    if (seedId) eventSeedSet.add(seedId);
+                });
+            });
+
+        const approvedRegistrations = latestRegistrationDecisions
+            .filter((registration) => (
+                registration.isPaymentConfirmed
+                && registration.eventId === bracketEventId
+            ))
+            .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+        const academySummaryMap = new Map();
+        let inCategoryCount = 0;
+        let inBracketCount = 0;
+
+        const approvedRows = approvedRegistrations.map((registration) => {
+            let linkedAthlete = null;
+            const linkedAthleteId = (registration?.athleteId || '').toString().trim();
+            if (linkedAthleteId) {
+                linkedAthlete = athleteMap.get(linkedAthleteId) || null;
+            }
+            if (!linkedAthlete) {
+                linkedAthlete = athletes.find((athlete) => athleteMatchesRegistrationRecord(athlete, registration)) || null;
+            }
+
+            const inCategory = Boolean(linkedAthlete && linkedAthlete.eventId === bracketEventId);
+            const inBracket = Boolean(inCategory && linkedAthlete?.id && eventSeedSet.has(linkedAthlete.id));
+            if (inCategory) inCategoryCount += 1;
+            if (inBracket) inBracketCount += 1;
+
+            const academyName = (linkedAthlete?.academia || registration.academia || (isEnglish ? 'No academy' : 'Sem academia')).trim();
+            const academyCurrent = academySummaryMap.get(academyName) || {
+                academy: academyName,
+                total: 0,
+                inCategory: 0,
+                inBracket: 0
+            };
+            academyCurrent.total += 1;
+            if (inCategory) academyCurrent.inCategory += 1;
+            if (inBracket) academyCurrent.inBracket += 1;
+            academySummaryMap.set(academyName, academyCurrent);
+
+            const statusKey = !linkedAthlete
+                ? 'pending'
+                : inBracket
+                    ? 'bracket'
+                    : inCategory
+                        ? 'category'
+                        : 'approved';
+            const statusLabel = statusKey === 'pending'
+                ? copy.bracketsPanel.statusPendingLink
+                : statusKey === 'bracket'
+                    ? copy.bracketsPanel.statusInBracket
+                    : statusKey === 'category'
+                        ? copy.bracketsPanel.statusInCategory
+                        : copy.bracketsPanel.statusApproved;
+
+            const summaryParts = [
+                linkedAthlete?.categoria || registration.categoria,
+                linkedAthlete?.faixa || registration.faixa,
+                linkedAthlete?.peso || registration.peso
+            ].filter(Boolean);
+
+            return {
+                registrationId: registration.id,
+                athleteId: linkedAthlete?.id || '',
+                name: linkedAthlete?.nome || registration.nome || '-',
+                academy: academyName,
+                summary: summaryParts.join(' / '),
+                statusKey,
+                statusLabel
+            };
+        });
+
+        const academyRows = [...academySummaryMap.values()].sort((a, b) => {
+            if (b.total !== a.total) return b.total - a.total;
+            return a.academy.localeCompare(b.academy, locale);
+        });
+
+        return {
+            approvedRows,
+            academyRows,
+            totals: {
+                approved: approvedRows.length,
+                inCategory: inCategoryCount,
+                inBracket: inBracketCount,
+                academies: academyRows.length
+            }
+        };
+    }, [
+        bracketEventId,
+        brackets,
+        latestRegistrationDecisions,
+        athleteMap,
+        athletes,
+        isEnglish,
+        copy.bracketsPanel,
+        locale
+    ]);
+
+    const bracketWorkspaceFilteredRows = useMemo(() => {
+        if (bracketAcademyFilter === 'all') return bracketWorkspaceData.approvedRows;
+        return bracketWorkspaceData.approvedRows.filter((row) => row.academy === bracketAcademyFilter);
+    }, [bracketWorkspaceData.approvedRows, bracketAcademyFilter]);
+
+    useEffect(() => {
+        if (bracketAcademyFilter === 'all') return;
+        const hasAcademy = bracketWorkspaceData.academyRows.some((academy) => academy.academy === bracketAcademyFilter);
+        if (!hasAcademy) setBracketAcademyFilter('all');
+    }, [bracketWorkspaceData.academyRows, bracketAcademyFilter]);
+
+    useEffect(() => {
+        if (!bracketEventId) {
+            setDraggingBracketId('');
+            setDragSeedContext({ bracketId: '', athleteId: '' });
+        }
+    }, [bracketEventId]);
+
+    useEffect(() => {
+        if (!scheduleEventId) {
+            setShowScheduleTvMode(false);
+        }
+    }, [scheduleEventId]);
+
+    const reorderBracketCards = useCallback((sourceBracketId, targetBracketId) => {
+        const sourceId = (sourceBracketId || '').toString().trim();
+        const targetId = (targetBracketId || '').toString().trim();
+        if (!bracketEventId || !sourceId || !targetId || sourceId === targetId) return;
+
+        setBracketOrderByEvent((prev) => {
+            const eventOrder = Array.isArray(prev[bracketEventId]) ? prev[bracketEventId] : [];
+            const visibleIds = orderedFilteredBrackets.map((bracket) => bracket.id);
+            const merged = [
+                ...eventOrder.filter((id) => visibleIds.includes(id)),
+                ...visibleIds.filter((id) => !eventOrder.includes(id))
+            ];
+            const nextOrder = reorderIds(merged, sourceId, targetId);
+            return {
+                ...prev,
+                [bracketEventId]: nextOrder
+            };
+        });
+    }, [bracketEventId, orderedFilteredBrackets]);
+
+    const handleBracketCardDragStart = useCallback((event, bracketId) => {
+        const normalizedId = (bracketId || '').toString().trim();
+        setDraggingBracketId(normalizedId);
+        try {
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', normalizedId);
+        } catch {
+            // Ignore drag data errors.
+        }
+    }, []);
+
+    const handleBracketCardDrop = useCallback((event, targetBracketId) => {
+        event.preventDefault();
+        const draggedByState = (draggingBracketId || '').toString().trim();
+        let draggedByTransfer = '';
+        try {
+            draggedByTransfer = (event.dataTransfer?.getData('text/plain') || '').toString().trim();
+        } catch {
+            draggedByTransfer = '';
+        }
+        const sourceBracketId = draggedByTransfer || draggedByState;
+        reorderBracketCards(sourceBracketId, targetBracketId);
+        setDraggingBracketId('');
+    }, [draggingBracketId, reorderBracketCards]);
+
+    const handleBracketCardDragEnd = useCallback(() => {
+        setDraggingBracketId('');
+    }, []);
+
+    const handleSeedDragStart = useCallback((event, bracketId, athleteId) => {
+        const normalizedBracketId = (bracketId || '').toString().trim();
+        const normalizedAthleteId = (athleteId || '').toString().trim();
+        setDragSeedContext({
+            bracketId: normalizedBracketId,
+            athleteId: normalizedAthleteId
+        });
+        try {
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', normalizedAthleteId);
+        } catch {
+            // Ignore drag data errors.
+        }
+    }, []);
+
+    const handleSeedDragEnd = useCallback(() => {
+        setDragSeedContext({ bracketId: '', athleteId: '' });
+    }, []);
+
+    const handleSeedDrop = useCallback((event, bracket, targetAthleteId) => {
+        event.preventDefault();
+        if (!bracket?.id) return;
+
+        const bracketId = (bracket.id || '').toString().trim();
+        const targetId = (targetAthleteId || '').toString().trim();
+        if (!targetId) return;
+        if (dragSeedContext.bracketId !== bracketId) return;
+
+        const sourceId = (dragSeedContext.athleteId || '').toString().trim();
+        if (!sourceId || sourceId === targetId) return;
+
+        const ordered = (Array.isArray(bracket.seedIds) ? bracket.seedIds : []).filter(Boolean);
+        const fromIndex = ordered.indexOf(sourceId);
+        const toIndex = ordered.indexOf(targetId);
+        if (fromIndex < 0 || toIndex < 0) return;
+
+        const nextOrder = [...ordered];
+        const [moved] = nextOrder.splice(fromIndex, 1);
+        nextOrder.splice(toIndex, 0, moved);
+        setBracketSeedOrder(bracketId, nextOrder);
+        setDragSeedContext({ bracketId: '', athleteId: '' });
+    }, [dragSeedContext, setBracketSeedOrder]);
+
+    const updateManualScheduleRows = useCallback((eventId, updater) => {
+        const normalizedEventId = (eventId || '').toString().trim();
+        if (!normalizedEventId || typeof updater !== 'function') return;
+
+        setManualScheduleByEvent((prev) => {
+            const currentRows = Array.isArray(prev[normalizedEventId]) ? prev[normalizedEventId] : [];
+            const nextRowsRaw = updater(currentRows);
+            const nextRows = (Array.isArray(nextRowsRaw) ? nextRowsRaw : [])
+                .map((row, index) => normalizeManualScheduleEntry(row, index))
+                .sort((left, right) => (left.order || 0) - (right.order || 0))
+                .map((row, index) => ({ ...row, order: index + 1 }));
+
+            if (!nextRows.length) {
+                if (!prev[normalizedEventId]) return prev;
+                const next = { ...prev };
+                delete next[normalizedEventId];
+                return next;
+            }
+
+            return {
+                ...prev,
+                [normalizedEventId]: nextRows
+            };
+        });
+    }, []);
+
+    const handleScheduleDraftField = useCallback((field, value) => {
+        setScheduleDraft((prev) => ({ ...prev, [field]: value }));
+    }, []);
+
+    const handleAddManualScheduleItem = useCallback(() => {
+        if (!scheduleEventId) {
+            showFeedback('error', isEnglish ? 'Select an event first.' : 'Selecione um evento primeiro.');
+            return;
+        }
+
+        const type = normalizeScheduleType(scheduleDraft.type);
+        const title = (scheduleDraft.title || '').toString().trim() || scheduleTypeLabel(type);
+        const area = (scheduleDraft.area || '').toString().trim();
+        const start = formatMinutesToClock(parseClockToMinutes(scheduleDraft.start || '09:00'));
+        const endMinute = Math.max(
+            parseClockToMinutes(scheduleDraft.end || start),
+            parseClockToMinutes(start)
+        );
+        const end = formatMinutesToClock(endMinute);
+        const notes = (scheduleDraft.notes || '').toString().trim();
+
+        updateManualScheduleRows(scheduleEventId, (rows) => {
+            const nextOrder = rows.length + 1;
+            return [
+                ...rows,
+                normalizeManualScheduleEntry({
+                    title,
+                    type,
+                    area,
+                    start,
+                    end,
+                    notes,
+                    order: nextOrder
+                }, nextOrder - 1)
+            ];
+        });
+
+        const nextStart = end;
+        const nextEnd = formatMinutesToClock(parseClockToMinutes(nextStart) + 10);
+        setScheduleDraft((prev) => ({
+            ...createScheduleDraftState(),
+            area: prev.area || 'Area 1',
+            start: nextStart,
+            end: nextEnd
+        }));
+        showFeedback('success', isEnglish ? 'Schedule item added.' : 'Item do cronograma adicionado.');
+    }, [
+        scheduleEventId,
+        scheduleDraft,
+        scheduleTypeLabel,
+        updateManualScheduleRows,
+        showFeedback,
+        isEnglish
+    ]);
+
+    const handleUpdateManualScheduleRow = useCallback((rowId, field, value) => {
+        const normalizedRowId = (rowId || '').toString().trim();
+        if (!scheduleEventId || !normalizedRowId) return;
+
+        updateManualScheduleRows(scheduleEventId, (rows) => (
+            rows.map((row, index) => {
+                if ((row.id || '').toString().trim() !== normalizedRowId) return row;
+                const next = normalizeManualScheduleEntry({
+                    ...row,
+                    [field]: field === 'type' ? normalizeScheduleType(value) : value,
+                    order: index + 1
+                }, index);
+                return next;
+            })
+        ));
+    }, [scheduleEventId, updateManualScheduleRows]);
+
+    const handleMoveManualScheduleRow = useCallback((rowId, direction) => {
+        const normalizedRowId = (rowId || '').toString().trim();
+        if (!scheduleEventId || !normalizedRowId) return;
+
+        updateManualScheduleRows(scheduleEventId, (rows) => {
+            const list = [...rows];
+            const fromIndex = list.findIndex((row) => (row.id || '').toString().trim() === normalizedRowId);
+            if (fromIndex < 0) return list;
+            const toIndex = direction === 'up' ? fromIndex - 1 : fromIndex + 1;
+            if (toIndex < 0 || toIndex >= list.length) return list;
+            const [moved] = list.splice(fromIndex, 1);
+            list.splice(toIndex, 0, moved);
+            return list;
+        });
+    }, [scheduleEventId, updateManualScheduleRows]);
+
+    const handleRemoveManualScheduleRow = useCallback((rowId) => {
+        const normalizedRowId = (rowId || '').toString().trim();
+        if (!scheduleEventId || !normalizedRowId) return;
+
+        updateManualScheduleRows(scheduleEventId, (rows) => (
+            rows.filter((row) => (row.id || '').toString().trim() !== normalizedRowId)
+        ));
+    }, [scheduleEventId, updateManualScheduleRows]);
 
     const handleGenerateBrackets = useCallback(async () => {
         if (!canManagePanel) {
@@ -1913,6 +3247,13 @@ const Dashboard = () => {
             });
             if (result.created > 0) {
                 showFeedback('success', copy.feedback.bracketsGenerated(result.created));
+                setBracketOrderByEvent((prev) => ({
+                    ...prev,
+                    [bracketEventId]: (result.brackets || [])
+                        .slice()
+                        .sort((left, right) => (left.number || 0) - (right.number || 0))
+                        .map((bracket) => bracket.id)
+                }));
                 const eventMeta = events.find((event) => event.id === bracketEventId);
                 const modeLabelMap = {
                     ALL: isEnglish ? 'Overall' : 'Geral',
@@ -1933,10 +3274,10 @@ const Dashboard = () => {
         } catch (err) {
             showFeedback('error', err?.message || copy.feedback.bracketGenerateFail);
         }
-    }, [canManagePanel, bracketEventId, bracketMode, brackets, events, generateBrackets, athletes, showFeedback, copy.feedback, copy.bracketsPanel.event, isEnglish]);
+    }, [canManagePanel, bracketEventId, bracketMode, brackets, events, generateBrackets, athletes, showFeedback, copy.feedback, copy.bracketsPanel.event, isEnglish, setBracketOrderByEvent]);
 
     const handleExportBracketsPdf = useCallback(async () => {
-        if (!filteredBrackets.length) {
+        if (!orderedFilteredBrackets.length) {
             showFeedback('error', copy.feedback.noBracketForPdf);
             return;
         }
@@ -1951,7 +3292,7 @@ const Dashboard = () => {
         };
 
         try {
-            await generateBracketsPDF(filteredBrackets, athletes, {
+            await generateBracketsPDF(orderedFilteredBrackets, athletes, {
                 eventName: eventMeta?.name || copy.bracketsPanel.event,
                 eventDate: eventMeta?.date || '',
                 eventLocation: eventMeta?.location || '',
@@ -1962,7 +3303,7 @@ const Dashboard = () => {
             showFeedback('error', err?.message || copy.feedback.bracketPdfFail);
         }
     }, [
-        filteredBrackets,
+        orderedFilteredBrackets,
         events,
         bracketEventId,
         bracketMode,
@@ -1971,6 +3312,109 @@ const Dashboard = () => {
         copy.feedback,
         copy.bracketsPanel.event,
         isEnglish
+    ]);
+
+    const handleExportSchedulePdf = useCallback(async (layoutMode = 'table') => {
+        if (!manualScheduleData.rows.length) {
+            showFeedback('error', copy.feedback.noScheduleForPdf);
+            return;
+        }
+
+        const eventMeta = events.find((event) => event.id === scheduleEventId);
+
+        const scheduleRows = manualScheduleData.rows.map((row, index) => ({
+            order: index + 1,
+            bracketNumber: row.area || '-',
+            label: row.notes ? `${row.title} - ${row.notes}` : row.title,
+            mode: row.typeLabel,
+            participants: row.type === 'FIGHT' ? 2 : 0,
+            fightCount: row.type === 'FIGHT' ? 1 : 0,
+            startLabel: row.startLabel,
+            endLabel: row.endLabel,
+            durationLabel: formatDurationLabel(row.durationMinutes, isEnglish)
+        }));
+
+        try {
+            const normalizedLayout = (layoutMode || '').toString().trim().toLowerCase();
+            const useTvLayout = normalizedLayout === 'tv';
+            await generateSchedulePDF(scheduleRows, {
+                eventName: eventMeta?.name || copy.bracketsPanel.event,
+                eventDate: eventMeta?.date || '',
+                eventLocation: eventMeta?.location || '',
+                modeLabel: isEnglish ? 'Manual schedule' : 'Cronograma manual',
+                layout: useTvLayout ? 'tv' : 'table',
+                tvMode: useTvLayout,
+                startTime: manualScheduleData.startLabel,
+                fightDurationMinutes: manualScheduleData.averageFightDurationMinutes || 5,
+                transitionMinutes: 0,
+                areaCount: Math.max(1, manualScheduleData.areaCount || 1),
+                totalFights: manualScheduleData.totalFights,
+                totalDurationLabel: formatDurationLabel(manualScheduleData.totalDurationMinutes, isEnglish),
+                estimatedEnd: manualScheduleData.estimatedEndLabel
+            });
+            showFeedback('success', copy.feedback.schedulePdfSaved);
+        } catch (err) {
+            showFeedback('error', err?.message || copy.feedback.schedulePdfFail);
+        }
+    }, [
+        manualScheduleData,
+        events,
+        scheduleEventId,
+        isEnglish,
+        showFeedback,
+        copy.feedback,
+        copy.bracketsPanel.event
+    ]);
+
+    const handleExportApprovedAthletesCsv = useCallback(() => {
+        if (!bracketEventId) {
+            showFeedback('error', isEnglish ? 'Select an event first.' : 'Selecione um evento primeiro.');
+            return;
+        }
+        if (!bracketWorkspaceData.approvedRows.length) {
+            showFeedback('error', isEnglish ? 'No approved athletes for export.' : 'Nao ha atletas aprovados para exportar.');
+            return;
+        }
+
+        const rowsToExport = bracketWorkspaceFilteredRows;
+        if (!rowsToExport.length) {
+            showFeedback('error', isEnglish ? 'No athletes in selected academy filter.' : 'Nao ha atletas no filtro de academia selecionado.');
+            return;
+        }
+
+        const headers = isEnglish
+            ? ['Event', 'Athlete', 'Academy', 'Summary', 'Status']
+            : ['Evento', 'Atleta', 'Academia', 'Resumo', 'Status'];
+        const csvRows = rowsToExport.map((row) => ([
+            eventMap[bracketEventId]?.name || copy.common.noEvent,
+            row.name || '-',
+            row.academy || '-',
+            row.summary || '-',
+            row.statusLabel || '-'
+        ]));
+
+        const eventName = eventMap[bracketEventId]?.name || (isEnglish ? 'event' : 'evento');
+        const academySuffix = bracketAcademyFilter === 'all'
+            ? (isEnglish ? 'all_academies' : 'todas_academias')
+            : buildFileSafeName(bracketAcademyFilter);
+        const filename = `${isEnglish ? 'approved_athletes' : 'atletas_aprovados'}_${buildFileSafeName(eventName)}_${academySuffix}_${new Date().toISOString().slice(0, 10)}`;
+
+        downloadCsv(filename, headers, csvRows);
+        showFeedback(
+            'success',
+            isEnglish
+                ? `CSV exported (${csvRows.length} approved athletes).`
+                : `CSV exportado (${csvRows.length} atletas aprovados).`
+        );
+    }, [
+        bracketEventId,
+        bracketWorkspaceData.approvedRows,
+        bracketWorkspaceFilteredRows,
+        eventMap,
+        copy.common.noEvent,
+        bracketAcademyFilter,
+        isEnglish,
+        showFeedback
     ]);
 
     const handleApplyBracketPodium = useCallback((bracketId) => {
@@ -1982,16 +3426,12 @@ const Dashboard = () => {
         }
     }, [applyBracketPodium, showFeedback, copy.feedback]);
 
-    const openUserResetModal = useCallback(() => {
-        if (authService.isLocalAuth && !authService.isLocalAuth()) {
+    const openUserResetModal = useCallback(async () => {
+        if (authService.supportsPasswordReset && !authService.supportsPasswordReset()) {
             showFeedback('error', copy.feedback.resetOnlyLocal);
             return;
         }
-        const users = (authService.listUsers ? authService.listUsers() : [])
-            .filter((user) => {
-                const role = (user?.role || '').toString().trim().toLowerCase();
-                return role === 'admin' || role === 'mesario';
-            });
+        const users = await loadPanelUsers();
         setUserResetList(users);
         setUserResetUsername(users[0]?.username || '');
         setUserResetPassword('');
@@ -1999,7 +3439,7 @@ const Dashboard = () => {
         setUserResetError('');
         setUserResetSuccess('');
         setShowUserResetModal(true);
-    }, [showFeedback, copy.feedback]);
+    }, [showFeedback, copy.feedback, loadPanelUsers]);
 
     const closeUserResetModal = useCallback(() => {
         setShowUserResetModal(false);
@@ -2014,15 +3454,11 @@ const Dashboard = () => {
             showFeedback('error', copy.feedback.accessDeniedAdmin);
             return;
         }
-        if (authService.isLocalAuth && !authService.isLocalAuth()) {
-            showFeedback('error', copy.feedback.registerOnlyLocal);
-            return;
-        }
         setUserCreateName('');
         setUserCreateUsername('');
         setUserCreatePassword('');
         setUserCreateConfirm('');
-        setUserCreateRole('mesario');
+        setUserCreateRole('coach');
         setUserCreateError('');
         setUserCreateSuccess('');
         setShowUserCreateModal(true);
@@ -2034,10 +3470,177 @@ const Dashboard = () => {
         setUserCreateUsername('');
         setUserCreatePassword('');
         setUserCreateConfirm('');
-        setUserCreateRole('mesario');
+        setUserCreateRole('coach');
         setUserCreateError('');
         setUserCreateSuccess('');
     }, []);
+
+    const openUserEditModal = useCallback((user) => {
+        if (!canManagePanel) {
+            showFeedback('error', copy.feedback.accessDeniedAdmin);
+            return;
+        }
+        const normalizedRole = normalizePanelRole(user?.role);
+        setUserEditId((user?.id || user?.username || '').toString().trim());
+        setUserEditName((user?.name || '').toString());
+        setUserEditUsername((user?.username || '').toString().toLowerCase());
+        setUserEditRole(normalizedRole);
+        setUserEditError('');
+        setUserEditSuccess('');
+        setShowUserEditModal(true);
+    }, [canManagePanel, copy.feedback.accessDeniedAdmin, showFeedback, normalizePanelRole]);
+
+    const closeUserEditModal = useCallback(() => {
+        setShowUserEditModal(false);
+        setUserEditId('');
+        setUserEditName('');
+        setUserEditUsername('');
+        setUserEditRole('coach');
+        setUserEditError('');
+        setUserEditSuccess('');
+    }, []);
+
+    const handleUserEditSubmit = useCallback(async (event) => {
+        event.preventDefault();
+        setUserEditError('');
+        setUserEditSuccess('');
+
+        if (!canManagePanel) {
+            setUserEditError(copy.feedback.accessDeniedAdmin);
+            return;
+        }
+
+        const normalizedName = (userEditName || '').toString().trim();
+        const normalizedUsername = (userEditUsername || '').toString().trim().toLowerCase();
+        const normalizedRole = normalizePanelRole(userEditRole);
+
+        if (!normalizedName || normalizedName.length < 3) {
+            setUserEditError(copy.feedback.minName);
+            return;
+        }
+        if (!normalizedUsername) {
+            setUserEditError(isEnglish ? 'Please provide username.' : 'Informe o usuario.');
+            return;
+        }
+
+        setUserEditLoading(true);
+        try {
+            const updated = authService.updateAdminUser
+                ? await authService.updateAdminUser({
+                    id: userEditId || normalizedUsername,
+                    username: normalizedUsername,
+                    name: normalizedName,
+                    role: normalizedRole
+                })
+                : null;
+
+            const targetUsername = updated?.username || normalizedUsername;
+            const successMessage = isEnglish
+                ? `User updated: ${targetUsername}.`
+                : `Usuario atualizado: ${targetUsername}.`;
+            setUserEditSuccess(successMessage);
+            showFeedback('success', successMessage);
+            addLog({
+                type: 'AUTH',
+                action: 'UPDATE_USER',
+                details: `Usuario ${targetUsername} atualizado para perfil ${normalizedRole}.`
+            });
+            await loadPanelUsers();
+        } catch (err) {
+            const message = err?.message || (isEnglish ? 'Failed to update user.' : 'Falha ao atualizar usuario.');
+            setUserEditError(message);
+            showFeedback('error', message);
+            addLog({
+                type: 'AUTH',
+                action: 'UPDATE_USER_FAILURE',
+                details: `Falha ao atualizar usuario ${userEditUsername}: ${message}`
+            });
+        } finally {
+            setUserEditLoading(false);
+        }
+    }, [
+        canManagePanel,
+        userEditName,
+        userEditUsername,
+        userEditRole,
+        userEditId,
+        isEnglish,
+        copy.feedback.accessDeniedAdmin,
+        copy.feedback.minName,
+        showFeedback,
+        addLog,
+        loadPanelUsers,
+        normalizePanelRole
+    ]);
+
+    const handleDeletePanelUser = useCallback(async (user) => {
+        if (!canManagePanel) {
+            showFeedback('error', copy.feedback.accessDeniedAdmin);
+            return;
+        }
+
+        const username = (user?.username || '').toString().trim().toLowerCase();
+        const currentUsername = (currentUser?.username || '').toString().trim().toLowerCase();
+        if (username && currentUsername && username === currentUsername) {
+            showFeedback('error', isEnglish ? 'You cannot remove your own logged user.' : 'Voce nao pode remover o usuario logado.');
+            return;
+        }
+
+        const confirmMessage = isEnglish
+            ? `Remove user ${user?.name || user?.username}? This action cannot be undone.`
+            : `Excluir o usuario ${user?.name || user?.username}? Esta acao nao pode ser desfeita.`;
+        const confirmed = await requestConfirmDialog({
+            title: isEnglish ? 'Delete panel user' : 'Excluir usuario do painel',
+            description: confirmMessage,
+            confirmLabel: isEnglish ? 'Delete user' : 'Excluir usuario',
+            variant: 'danger'
+        });
+        if (!confirmed) return;
+
+        const targetId = (user?.id || user?.username || '').toString().trim();
+        setUserDeleteLoadingId(targetId);
+        try {
+            if (authService.deleteAdminUser) {
+                await authService.deleteAdminUser({ id: targetId, username: user?.username });
+            }
+            const successMessage = isEnglish
+                ? `User removed: ${user?.username || ''}.`
+                : `Usuario removido: ${user?.username || ''}.`;
+            showFeedback('success', successMessage);
+            addLog({
+                type: 'AUTH',
+                action: 'DELETE_USER',
+                details: `Usuario ${user?.username || ''} removido do painel.`
+            });
+            await loadPanelUsers();
+            setUserResetList((prev) => prev.filter((item) => item.username !== user?.username));
+            if (showUserEditModal && userEditId && targetId === userEditId) {
+                closeUserEditModal();
+            }
+        } catch (err) {
+            const message = err?.message || (isEnglish ? 'Failed to remove user.' : 'Falha ao remover usuario.');
+            showFeedback('error', message);
+            addLog({
+                type: 'AUTH',
+                action: 'DELETE_USER_FAILURE',
+                details: `Falha ao remover usuario ${user?.username || ''}: ${message}`
+            });
+        } finally {
+            setUserDeleteLoadingId('');
+        }
+    }, [
+        canManagePanel,
+        copy.feedback.accessDeniedAdmin,
+        currentUser,
+        isEnglish,
+        showFeedback,
+        addLog,
+        loadPanelUsers,
+        showUserEditModal,
+        userEditId,
+        closeUserEditModal,
+        requestConfirmDialog
+    ]);
 
     const handleUserResetSubmit = useCallback(async (event) => {
         event.preventDefault();
@@ -2051,6 +3654,10 @@ const Dashboard = () => {
 
         if (userResetPassword !== userResetConfirm) {
             setUserResetError(copy.feedback.mismatchPassword);
+            return;
+        }
+        if (!userResetPasswordStrength.isStrong) {
+            setUserResetError(userResetPasswordStrength.message);
             return;
         }
 
@@ -2078,7 +3685,7 @@ const Dashboard = () => {
         } finally {
             setUserResetLoading(false);
         }
-    }, [userResetUsername, userResetPassword, userResetConfirm, showFeedback, addLog, copy.feedback]);
+    }, [userResetUsername, userResetPassword, userResetConfirm, userResetPasswordStrength, showFeedback, addLog, copy.feedback]);
 
     const handleUserCreateSubmit = useCallback(async (event) => {
         event.preventDefault();
@@ -2090,13 +3697,12 @@ const Dashboard = () => {
             return;
         }
 
-        if (authService.isLocalAuth && !authService.isLocalAuth()) {
-            setUserCreateError(copy.feedback.registerOnlyLocal);
-            return;
-        }
-
         if (userCreatePassword !== userCreateConfirm) {
             setUserCreateError(copy.feedback.mismatchPassword);
+            return;
+        }
+        if (!userCreatePasswordStrength.isStrong) {
+            setUserCreateError(userCreatePasswordStrength.message);
             return;
         }
 
@@ -2107,10 +3713,17 @@ const Dashboard = () => {
             return;
         }
 
-        const normalizedRole = ['admin', 'mesario'].includes(userCreateRole) ? userCreateRole : 'mesario';
+        const normalizedRole = normalizePanelRole(userCreateRole);
         setUserCreateLoading(true);
         try {
-            const created = await authService.register({
+            const created = authService.createAdminUser
+                ? await authService.createAdminUser({
+                    name: normalizedName || normalizedUsername,
+                    username: normalizedUsername,
+                    password: userCreatePassword,
+                    role: normalizedRole
+                })
+                : await authService.register({
                 name: normalizedName || normalizedUsername,
                 username: normalizedUsername,
                 password: userCreatePassword,
@@ -2125,17 +3738,13 @@ const Dashboard = () => {
                 details: `Usuário ${createdUsername} cadastrado com perfil ${normalizedRole}.`
             });
 
-            const users = (authService.listUsers ? authService.listUsers() : [])
-                .filter((user) => {
-                    const role = (user?.role || '').toString().trim().toLowerCase();
-                    return role === 'admin' || role === 'mesario';
-                });
+            const users = await loadPanelUsers();
             setUserResetList(users);
             setUserCreateName('');
             setUserCreateUsername('');
             setUserCreatePassword('');
             setUserCreateConfirm('');
-            setUserCreateRole('mesario');
+            setUserCreateRole('coach');
         } catch (err) {
             const message = err?.message || copy.feedback.userCreateFail;
             setUserCreateError(message);
@@ -2151,14 +3760,17 @@ const Dashboard = () => {
     }, [
         canManagePanel,
         userCreatePassword,
+        userCreatePasswordStrength,
         userCreateConfirm,
         userCreateRole,
         userCreateName,
         userCreateUsername,
+        loadPanelUsers,
         showFeedback,
         addLog,
         copy.feedback,
-        isEnglish
+        isEnglish,
+        normalizePanelRole
     ]);
 
     const loadPublicRegistrations = useCallback(async () => {
@@ -2234,21 +3846,23 @@ const Dashboard = () => {
             }
 
             if (normalizedUpdated.isPaymentConfirmed) {
-                setActiveSection('brackets');
-                const section = document.getElementById('brackets');
-                if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                if (normalizedUpdated.eventId) {
+                    setActiveEvent(normalizedUpdated.eventId);
+                    setBracketEventId(normalizedUpdated.eventId);
+                }
+                navigate(resolveAdminRouteFromSection('brackets', canManagePanel));
             }
 
             showFeedback('success', copy.feedback.registrationStatusUpdated);
         } catch (err) {
-            if (err?.code === 'AUTH_REQUIRED') {
-                const message = err?.message || copy.feedback.registrationStatusFail;
-                setRegistrationsError(message);
-                showFeedback('error', message);
-                logout();
-                return;
-            }
-            const message = err?.message || copy.feedback.registrationStatusFail;
+            const isAuthRequired = err?.code === 'AUTH_REQUIRED';
+            const isForbidden = err?.code === 'FORBIDDEN';
+            const fallbackMessage = isAuthRequired
+                ? copy.feedback.registrationStatusAuthRequired
+                : isForbidden
+                    ? copy.feedback.registrationStatusForbidden
+                    : copy.feedback.registrationStatusFail;
+            const message = err?.message || fallbackMessage;
             setRegistrationsError(message);
             showFeedback('error', message);
         } finally {
@@ -2257,10 +3871,12 @@ const Dashboard = () => {
     }, [
         currentUser,
         events,
+        setActiveEvent,
+        navigate,
+        canManagePanel,
         addSuppressedRegistrationKeys,
         removeSuppressedRegistrationKey,
         showFeedback,
-        logout,
         copy
     ]);
 
@@ -2368,7 +3984,7 @@ const Dashboard = () => {
             item.modalidade || '',
             item.notes?.anoNascimento || '',
             item.notes?.idade || '',
-            item.notes?.tipoInscrição || '',
+            item.notes?.['tipoInscrição'] || item.notes?.tipoInscricao || '',
             item.notes?.pesoGiSelecionado || '',
             item.notes?.pesoNoGiSelecionado || '',
             item.notes?.absolutoGi || '',
@@ -2401,17 +4017,29 @@ const Dashboard = () => {
         events
     ]);
 
+    const handleOpenProofFile = useCallback((registration) => {
+        const opened = openProofInNewTab({
+            fileUrl: registration?.proofFileUrl || '',
+            fileName: registration?.proofName || ''
+        });
+        if (!opened) {
+            showFeedback('error', copy.feedback.proofOpenFail);
+        }
+    }, [copy.feedback.proofOpenFail, showFeedback]);
+
     useEffect(() => {
         const timer = setInterval(() => setNow(new Date()), 15000);
         return () => clearInterval(timer);
     }, []);
 
     useEffect(() => {
-        if (!isMesarioUser) return;
-        if (activeSection !== 'brackets' && activeSection !== 'activity') {
-            setActiveSection('brackets');
+        const normalizedPath = normalizeAdminPath(location.pathname);
+        const safeSection = resolveAdminSectionFromPath(normalizedPath, canManagePanel);
+        const expectedPath = resolveAdminRouteFromSection(safeSection, canManagePanel);
+        if (normalizedPath !== expectedPath) {
+            navigate(expectedPath, { replace: true });
         }
-    }, [isMesarioUser, activeSection]);
+    }, [location.pathname, canManagePanel, navigate]);
 
     useEffect(() => {
         const handler = (event) => {
@@ -2456,7 +4084,10 @@ const Dashboard = () => {
         if (activeEventId && !bracketEventId) {
             setBracketEventId(activeEventId);
         }
-    }, [activeEventId, newAthlete.eventId, importEventId, bracketEventId]);
+        if (activeEventId && !scheduleEventId) {
+            setScheduleEventId(activeEventId);
+        }
+    }, [activeEventId, newAthlete.eventId, importEventId, bracketEventId, scheduleEventId]);
 
     useEffect(() => {
         const eventIds = new Set(events.map((event) => event.id));
@@ -2469,25 +4100,17 @@ const Dashboard = () => {
         if (bracketEventId && !eventIds.has(bracketEventId)) {
             setBracketEventId('');
         }
+        if (scheduleEventId && !eventIds.has(scheduleEventId)) {
+            setScheduleEventId('');
+        }
         if (registrationEventFilter !== 'all' && !eventIds.has(registrationEventFilter)) {
             setRegistrationEventFilter('all');
         }
-    }, [events, eventFilter, importEventId, bracketEventId, registrationEventFilter]);
-
-    const eventMap = useMemo(() => (
-        events.reduce((acc, event) => {
-            acc[event.id] = event;
-            return acc;
-        }, {})
-    ), [events]);
+    }, [events, eventFilter, importEventId, bracketEventId, scheduleEventId, registrationEventFilter]);
 
     const activeEvent = useMemo(() => (
         events.find((event) => event.id === activeEventId)
     ), [events, activeEventId]);
-
-    const athleteMap = useMemo(() => (
-        new Map(athletes.map((athlete) => [athlete.id, athlete]))
-    ), [athletes]);
 
     const profileByAthleteKey = useMemo(() => {
         const sortedProfiles = [...memberProfiles]
@@ -2502,16 +4125,6 @@ const Dashboard = () => {
     }, [memberProfiles]);
 
     const isLocalAuth = authService.isLocalAuth ? authService.isLocalAuth() : true;
-    const localUsers = useMemo(
-        () => (isLocalAuth && authService.listUsers ? authService.listUsers() : []),
-        [isLocalAuth]
-    );
-    const localPanelUsers = useMemo(() => (
-        localUsers.filter((user) => {
-            const role = (user?.role || '').toString().trim().toLowerCase();
-            return role === 'admin' || role === 'mesario';
-        })
-    ), [localUsers]);
 
     const filteredAthletes = useMemo(() => {
         const normalizedSearchTerm = deferredSearchTerm.trim().toLowerCase();
@@ -2587,60 +4200,30 @@ const Dashboard = () => {
         })
     ), [locale]);
 
-    const parsedPublicRegistrations = useMemo(() => (
-        publicRegistrations
-            .map((item) => parseRegistrationRecord(item, eventMap, copy))
-            .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
-    ), [publicRegistrations, eventMap, copy]);
-
-    const latestRegistrationDecisions = useMemo(() => {
-        const decisionMap = new Map();
-        parsedPublicRegistrations.forEach((item) => {
-            const key = buildRegistrationIdentityKey(item);
-            if (!key) return;
-            const current = decisionMap.get(key);
-            if (!current) {
-                decisionMap.set(key, item);
-                return;
-            }
-            const currentIsDecisive = current.isPaymentConfirmed || current.isPaymentError;
-            const nextIsDecisive = item.isPaymentConfirmed || item.isPaymentError;
-
-            // Never let a new pending row override an already reviewed decision.
-            if (currentIsDecisive && !nextIsDecisive) return;
-            if (!currentIsDecisive && nextIsDecisive) {
-                decisionMap.set(key, item);
-                return;
-            }
-
-            const currentTime = currentIsDecisive
-                ? getRegistrationDecisionTimestamp(current)
-                : new Date(current.createdAt || 0).getTime();
-            const nextTime = nextIsDecisive
-                ? getRegistrationDecisionTimestamp(item)
-                : new Date(item.createdAt || 0).getTime();
-
-            if (nextTime >= currentTime) decisionMap.set(key, item);
-        });
-        return [...decisionMap.values()];
-    }, [parsedPublicRegistrations]);
-
     const registrationReconcilePlan = useMemo(() => {
         const confirmed = latestRegistrationDecisions.filter((item) => (
             item.isPaymentConfirmed
             && item.eventId
-            && !suppressedRegistrationKeySet.has(buildRegistrationIdentityKey(item))
         ));
 
         const paymentError = latestRegistrationDecisions.filter((item) => (
             item.isPaymentError && item.eventId
         ));
 
-        const toImportAthletes = confirmed
-            .filter((registration) => !athletes.some((athlete) => (
+        const toImportAthletes = [];
+        const requiredByEvent = new Map();
+        confirmed.forEach((registration) => {
+            const matchedAthlete = athletes.find((athlete) => (
                 athleteMatchesRegistrationRecord(athlete, registration)
-            )))
-            .map(toAthleteFromRegistration);
+            ));
+            if (matchedAthlete?.id) {
+                const requiredSet = requiredByEvent.get(registration.eventId) || new Set();
+                requiredSet.add(matchedAthlete.id);
+                requiredByEvent.set(registration.eventId, requiredSet);
+                return;
+            }
+            toImportAthletes.push(toAthleteFromRegistration(registration));
+        });
 
         const blockedByEvent = new Map();
         paymentError.forEach((registration) => {
@@ -2654,11 +4237,20 @@ const Dashboard = () => {
         });
 
         const eventAssignments = [];
-        blockedByEvent.forEach((blockedSet, eventId) => {
+        const eventIds = new Set([
+            ...requiredByEvent.keys(),
+            ...blockedByEvent.keys()
+        ]);
+        eventIds.forEach((eventId) => {
             const currentIds = athletes
                 .filter((athlete) => athlete.eventId === eventId)
                 .map((athlete) => athlete.id);
-            const keepIds = currentIds.filter((id) => !blockedSet.has(id));
+            const keepSet = new Set(currentIds);
+            const blockedSet = blockedByEvent.get(eventId) || new Set();
+            blockedSet.forEach((id) => keepSet.delete(id));
+            const requiredSet = requiredByEvent.get(eventId) || new Set();
+            requiredSet.forEach((id) => keepSet.add(id));
+            const keepIds = [...keepSet];
             const isSameSelection = (
                 currentIds.length === keepIds.length
                 && currentIds.every((id) => keepIds.includes(id))
@@ -2671,7 +4263,7 @@ const Dashboard = () => {
             toImportAthletes,
             eventAssignments
         };
-    }, [latestRegistrationDecisions, suppressedRegistrationKeySet, athletes]);
+    }, [latestRegistrationDecisions, athletes]);
 
     useEffect(() => {
         const { toImportAthletes, eventAssignments } = registrationReconcilePlan;
@@ -2689,7 +4281,6 @@ const Dashboard = () => {
         const confirmed = latestRegistrationDecisions.filter((item) => (
             item.isPaymentConfirmed
             && item.eventId
-            && !suppressedRegistrationKeySet.has(buildRegistrationIdentityKey(item))
         ));
         if (!confirmed.length) return;
 
@@ -2717,7 +4308,7 @@ const Dashboard = () => {
                 // Keep dashboard stable even if one registration has incomplete profile data.
             }
         });
-    }, [latestRegistrationDecisions, memberProfiles, suppressedRegistrationKeySet, addMemberProfile, currentUser]);
+    }, [latestRegistrationDecisions, memberProfiles, addMemberProfile, currentUser]);
 
     const registrationRows = useMemo(() => {
         const term = deferredRegistrationSearch.trim().toLowerCase();
@@ -2753,6 +4344,113 @@ const Dashboard = () => {
         registrationPendingOnly
     ]);
 
+    const registrationGroups = useMemo(() => {
+        const groupsMap = new Map();
+
+        registrationRows.forEach((item) => {
+            const eventId = (item.eventId || '').toString().trim() || '__sem_evento__';
+            const eventMeta = eventMap[item.eventId] || null;
+            const current = groupsMap.get(eventId) || {
+                eventId,
+                eventName: item.eventName || eventMeta?.name || copy.common.noEvent,
+                eventDate: item.eventDate || eventMeta?.date || '',
+                eventLocation: item.eventLocation || eventMeta?.location || '',
+                eventMeta,
+                rows: [],
+                updatedAt: ''
+            };
+
+            current.rows.push(item);
+            if (!current.updatedAt) {
+                current.updatedAt = item.createdAt || '';
+            } else if ((item.createdAt || '') > current.updatedAt) {
+                current.updatedAt = item.createdAt || current.updatedAt;
+            }
+
+            groupsMap.set(eventId, current);
+        });
+
+        const toSortDate = (value) => {
+            const parsed = new Date(value || '');
+            const time = parsed.getTime();
+            return Number.isFinite(time) ? time : 0;
+        };
+
+        return [...groupsMap.values()]
+            .map((group) => ({
+                ...group,
+                rows: group.rows.slice().sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+            }))
+            .sort((a, b) => {
+                const dateDiff = toSortDate(b.eventDate || b.updatedAt) - toSortDate(a.eventDate || a.updatedAt);
+                if (dateDiff !== 0) return dateDiff;
+                return (a.eventName || '').localeCompare(b.eventName || '');
+            });
+    }, [registrationRows, eventMap, copy.common.noEvent]);
+
+    const registrationPipelineById = useMemo(() => {
+        const athleteById = new Map(
+            athletes
+                .filter((athlete) => athlete?.id)
+                .map((athlete) => [athlete.id, athlete])
+        );
+
+        const bracketSeedSetByEvent = new Map();
+        brackets.forEach((bracket) => {
+            const eventId = (bracket?.eventId || '').toString().trim();
+            if (!eventId) return;
+            const seedSet = bracketSeedSetByEvent.get(eventId) || new Set();
+            (Array.isArray(bracket.seedIds) ? bracket.seedIds : []).forEach((seedId) => {
+                if (seedId) seedSet.add(seedId);
+            });
+            bracketSeedSetByEvent.set(eventId, seedSet);
+        });
+
+        const pipelineMap = new Map();
+        registrationRows.forEach((registration) => {
+            let linkedAthlete = null;
+            const linkedAthleteId = (registration?.athleteId || '').toString().trim();
+            if (linkedAthleteId) {
+                linkedAthlete = athleteById.get(linkedAthleteId) || null;
+            }
+            if (!linkedAthlete) {
+                linkedAthlete = athletes.find((athlete) => athleteMatchesRegistrationRecord(athlete, registration)) || null;
+            }
+
+            const inCategory = Boolean(
+                registration?.isPaymentConfirmed
+                && linkedAthlete
+                && linkedAthlete.eventId === registration.eventId
+            );
+
+            const eventSeedSet = bracketSeedSetByEvent.get(registration?.eventId || '');
+            const inBracket = Boolean(
+                inCategory
+                && linkedAthlete?.id
+                && eventSeedSet?.has(linkedAthlete.id)
+            );
+
+            const doneSteps = [
+                true,
+                Boolean(registration?.isPaymentConfirmed),
+                inCategory,
+                inBracket
+            ];
+
+            let currentStepIndex = 0;
+            doneSteps.forEach((isDone, index) => {
+                if (isDone) currentStepIndex = index;
+            });
+
+            pipelineMap.set(registration.id, {
+                doneSteps,
+                currentStepIndex
+            });
+        });
+
+        return pipelineMap;
+    }, [registrationRows, athletes, brackets]);
+
     const pendingSyncCount = useMemo(() => (
         parsedPublicRegistrations.filter((item) => item.isPendingSync).length
     ), [parsedPublicRegistrations]);
@@ -2771,13 +4469,13 @@ const Dashboard = () => {
         const sorted = [...athletes].sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
         if (!term) return sorted;
         return sorted.filter((athlete) => (
-            athlete.nome.toLowerCase().includes(term)
+            (athlete.nome || '').toLowerCase().includes(term)
             || (athlete.academia || '').toLowerCase().includes(term)
         ));
     }, [athletes, assignSearch]);
 
     const totals = useMemo(() => {
-        const totalPoints = athletes.reduce((acc, athlete) => acc + athlete.pontos, 0);
+        const totalPoints = athletes.reduce((acc, athlete) => acc + (Number(athlete?.pontos) || 0), 0);
         // "Ativo" no painel = atleta vinculado a algum campeonato/evento.
         const activeAthletes = athletes.filter((athlete) => Boolean((athlete.eventId || '').toString().trim())).length;
         const averagePoints = athletes.length ? Math.round(totalPoints / athletes.length) : 0;
@@ -2786,7 +4484,7 @@ const Dashboard = () => {
             const key = athlete.academia || copy.modalAssign.noAcademy;
             if (!acc[key]) acc[key] = { count: 0, points: 0 };
             acc[key].count += 1;
-            acc[key].points += athlete.pontos;
+            acc[key].points += Number(athlete?.pontos) || 0;
             return acc;
         }, {});
 
@@ -2801,11 +4499,44 @@ const Dashboard = () => {
     }, [athletes, copy.modalAssign.noAcademy]);
 
     const eventStats = useMemo(() => (
-        events.map((event) => ({
-            ...event,
-            athleteCount: athletes.filter((athlete) => athlete.eventId === event.id).length
-        }))
+        events.map((event) => {
+            const parsedDate = event?.date ? new Date(event.date) : null;
+            const eventTime = parsedDate && !Number.isNaN(parsedDate.getTime())
+                ? parsedDate.getTime()
+                : null;
+            const isPastByDate = eventTime !== null ? eventTime < Date.now() : false;
+            const isRegistrationOpen = event.registrationOpen !== false;
+            const isPastOrClosed = isPastByDate || !isRegistrationOpen;
+            return {
+                ...event,
+                athleteCount: athletes.filter((athlete) => athlete.eventId === event.id).length,
+                isRegistrationOpen,
+                isPastByDate,
+                isPastOrClosed,
+                eventTime
+            };
+        })
     ), [events, athletes]);
+
+    const openEventStats = useMemo(() => (
+        eventStats
+            .filter((event) => !event.isPastOrClosed)
+            .sort((a, b) => {
+                const aTime = Number.isFinite(a.eventTime) ? a.eventTime : Number.MAX_SAFE_INTEGER;
+                const bTime = Number.isFinite(b.eventTime) ? b.eventTime : Number.MAX_SAFE_INTEGER;
+                return aTime - bTime;
+            })
+    ), [eventStats]);
+
+    const closedEventStats = useMemo(() => (
+        eventStats
+            .filter((event) => event.isPastOrClosed)
+            .sort((a, b) => {
+                const aTime = Number.isFinite(a.eventTime) ? a.eventTime : 0;
+                const bTime = Number.isFinite(b.eventTime) ? b.eventTime : 0;
+                return bTime - aTime;
+            })
+    ), [eventStats]);
 
     const beltStats = useMemo(() => {
         const beltMap = athletes.reduce((acc, athlete) => {
@@ -2830,6 +4561,7 @@ const Dashboard = () => {
         if (!canManagePanel) {
             return [
                 { id: 'brackets', label: copy.nav.brackets, icon: ClipboardList },
+                { id: 'schedule', label: copy.nav.schedule, icon: Clock },
                 { id: 'activity', label: copy.nav.activity, icon: Activity }
             ];
         }
@@ -2839,6 +4571,7 @@ const Dashboard = () => {
             { id: 'news', label: copy.nav.news, icon: Newspaper, meta: news.length },
             { id: 'registrations', label: copy.nav.registrations, icon: ClipboardList, meta: publicRegistrations.length },
             { id: 'brackets', label: copy.nav.brackets, icon: ClipboardList },
+            { id: 'schedule', label: copy.nav.schedule, icon: Clock },
             { id: 'athletes', label: copy.nav.athletes, icon: Users, meta: athletes.length },
             { id: 'automation', label: copy.nav.automation, icon: Zap },
             { id: 'activity', label: copy.nav.activity, icon: Activity }
@@ -2853,14 +4586,130 @@ const Dashboard = () => {
         })
     ), [news]);
 
-    const handleNavClick = (id) => {
-        setActiveSection(id);
+    const handleNavClick = useCallback((id) => {
+        navigate(resolveAdminRouteFromSection(id, canManagePanel));
         setNavOpen(false);
-        const section = document.getElementById(id);
-        if (section) {
-            section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-    };
+    }, [navigate, canManagePanel]);
+
+    const handleOpenAssignModal = useCallback((eventItem) => {
+        const selection = {};
+        athletes.forEach((athlete) => {
+            selection[athlete.id] = athlete.eventId === eventItem.id;
+        });
+        setAssignEvent(eventItem);
+        setAssignSelection(selection);
+        setAssignSearch('');
+        setShowAssignModal(true);
+    }, [athletes]);
+
+    const renderAdminEventCard = useCallback((event) => {
+        const isActive = event.id === activeEventId;
+        const dateLabel = formatEventDate(event.date);
+        const isRegistrationOpen = event.registrationOpen !== false;
+        const metaParts = [
+            dateLabel ? `${copy.eventsPanel.date} ${dateLabel}` : copy.eventsPanel.undefinedDate,
+            event.location
+        ].filter(Boolean);
+
+        return (
+            <div key={event.id} className="event-card">
+                <div className="event-card__poster">
+                    {event.posterUrl ? (
+                        <img src={event.posterUrl} alt={event.name || copy.eventsPanel.noPoster} loading="lazy" />
+                    ) : (
+                        <div className="event-card__poster-placeholder">{copy.eventsPanel.noPoster}</div>
+                    )}
+                </div>
+                <div className="event-card__header">
+                    <div>
+                        <div className="event-name">{event.name}</div>
+                        <div className="table-meta">{metaParts.join(' - ')}</div>
+                    </div>
+                    <span className={`tag ${isRegistrationOpen ? 'tag--open' : ''}`}>
+                        {isRegistrationOpen ? copy.eventsPanel.open : copy.eventsPanel.closed}
+                    </span>
+                </div>
+                <div className="event-card__stats">
+                    <div className="event-stat">
+                        <span>{copy.eventsPanel.athletes}</span>
+                        <strong>{event.athleteCount}</strong>
+                    </div>
+                    <div className="event-stat">
+                        <span>{copy.eventsPanel.activeEvent}</span>
+                        <strong>{isActive ? copy.common.active : copy.common.inactive}</strong>
+                    </div>
+                </div>
+                <div className="event-card__footer">
+                    <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={() => setActiveEvent(event.id)}
+                        disabled={isActive}
+                    >
+                        {isActive ? copy.eventsPanel.activeEvent : copy.eventsPanel.activate}
+                    </button>
+                    <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={() => handleOpenAssignModal(event)}
+                    >
+                        {copy.eventsPanel.manageAthletes}
+                    </button>
+                    <button
+                        type="button"
+                        className={`btn ${isRegistrationOpen ? 'btn-danger' : 'btn-secondary'}`}
+                        onClick={() => handleToggleEventRegistration(event)}
+                    >
+                        {isRegistrationOpen ? copy.eventsPanel.closeRegistration : copy.eventsPanel.reopenRegistration}
+                    </button>
+                    <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={() => handleOpenEditEvent(event)}
+                    >
+                        <Pencil size={14} />
+                        {copy.eventsPanel.edit}
+                    </button>
+                    {event.internalRegistration ? (
+                        <Link
+                            className={`btn ${isRegistrationOpen ? 'btn-event btn-event--small' : 'btn-secondary btn-event--small'}`}
+                            to={`/eventos/${event.id}`}
+                            onClick={(clickEvent) => {
+                                if (!isRegistrationOpen) {
+                                    clickEvent.preventDefault();
+                                }
+                            }}
+                            aria-disabled={!isRegistrationOpen}
+                        >
+                            {isRegistrationOpen ? copy.eventsPanel.registration : copy.eventsPanel.closedRegistration}
+                        </Link>
+                    ) : (
+                        <a
+                            className={`btn ${isRegistrationOpen ? 'btn-event btn-event--small' : 'btn-secondary btn-event--small'}`}
+                            href={event.registrationUrl || '#'}
+                            target={event.registrationUrl ? '_blank' : undefined}
+                            rel={event.registrationUrl ? 'noreferrer' : undefined}
+                            onClick={(clickEvent) => {
+                                if (!isRegistrationOpen || !event.registrationUrl) {
+                                    clickEvent.preventDefault();
+                                }
+                            }}
+                            aria-disabled={!isRegistrationOpen || !event.registrationUrl}
+                        >
+                            {isRegistrationOpen ? copy.eventsPanel.registration : copy.eventsPanel.closedRegistration}
+                        </a>
+                    )}
+                </div>
+            </div>
+        );
+    }, [
+        activeEventId,
+        copy,
+        handleOpenAssignModal,
+        handleOpenEditEvent,
+        handleToggleEventRegistration,
+        setActiveEvent
+    ]);
 
     const handleRefreshInstagramFeed = useCallback(async () => {
         setInstagramRefreshing(true);
@@ -2880,14 +4729,13 @@ const Dashboard = () => {
         } catch (err) {
             if (err?.code === 'AUTH_REQUIRED') {
                 showFeedback('error', err?.message || copy.feedback.instagramRefreshFail);
-                logout();
                 return;
             }
             showFeedback('error', err?.message || copy.feedback.instagramRefreshFail);
         } finally {
             setInstagramRefreshing(false);
         }
-    }, [showFeedback, copy.feedback, logout]);
+    }, [showFeedback, copy.feedback]);
 
     const handlePublishNews = useCallback((event) => {
         event.preventDefault();
@@ -2994,8 +4842,13 @@ const Dashboard = () => {
         }
     }, [copy.feedback, showFeedback]);
 
-    const handleDeleteNews = useCallback((item) => {
-        const confirmed = window.confirm(copy.feedback.newsDeleteConfirm(item.title));
+    const handleDeleteNews = useCallback(async (item) => {
+        const confirmed = await requestConfirmDialog({
+            title: isEnglish ? 'Remove news' : 'Remover noticia',
+            description: copy.feedback.newsDeleteConfirm(item.title),
+            confirmLabel: isEnglish ? 'Remove' : 'Remover',
+            variant: 'danger'
+        });
         if (!confirmed) return;
         try {
             deleteNews(item.id);
@@ -3004,7 +4857,7 @@ const Dashboard = () => {
             const message = err?.message || copy.feedback.newsDeleteFail;
             showFeedback('error', message);
         }
-    }, [deleteNews, showFeedback, copy.feedback]);
+    }, [deleteNews, showFeedback, copy.feedback, requestConfirmDialog, isEnglish]);
 
     const handleAddAthlete = (event) => {
         event.preventDefault();
@@ -3065,17 +4918,6 @@ const Dashboard = () => {
         : instagramFeedStatus === 'CACHE'
             ? copy.newsPanel.feedStatusCache
             : '';
-
-    const handleOpenAssignModal = (eventItem) => {
-        const selection = {};
-        athletes.forEach((athlete) => {
-            selection[athlete.id] = athlete.eventId === eventItem.id;
-        });
-        setAssignEvent(eventItem);
-        setAssignSelection(selection);
-        setAssignSearch('');
-        setShowAssignModal(true);
-    };
 
     const handleToggleAssign = (athleteId) => {
         setAssignSelection((prev) => ({ ...prev, [athleteId]: !prev[athleteId] }));
@@ -3182,7 +5024,7 @@ const Dashboard = () => {
                 )}
             </aside>
             <div className="admin-main">
-                {canManagePanel && (
+                {canManagePanel && activeSection === 'overview' && (
                 <section className="admin-hero" id="overview">
                     <div>
                         <div className="meta-pill">
@@ -3240,7 +5082,7 @@ const Dashboard = () => {
                 </section>
                 )}
 
-                {canManagePanel && (
+                {canManagePanel && activeSection === 'overview' && (
                 <section className="stats-grid">
                     <div className="stat-card stat-card--focus">
                         <div className="stat-card__icon">
@@ -3276,7 +5118,7 @@ const Dashboard = () => {
                     </div>
                 </section>
                 )}
-                {canManagePanel && (
+                {canManagePanel && activeSection === 'events' && (
                 <section className="panel" id="events">
                     <div className="panel-header">
                         <div>
@@ -3293,105 +5135,30 @@ const Dashboard = () => {
                     {events.length === 0 ? (
                         <div className="panel-subtitle">{copy.eventsPanel.noEvents}</div>
                     ) : (
-                        <div className="event-grid">
-                            {eventStats.map((event) => {
-                                const isActive = event.id === activeEventId;
-                                const dateLabel = formatEventDate(event.date);
-                                const metaParts = [
-                                    dateLabel ? `${copy.eventsPanel.date} ${dateLabel}` : copy.eventsPanel.undefinedDate,
-                                    event.location
-                                ].filter(Boolean);
-
-                                return (
-                                    <div key={event.id} className="event-card">
-                                        <div className="event-card__poster">
-                                            {event.posterUrl ? (
-                                                <img src={event.posterUrl} alt={event.name || copy.eventsPanel.noPoster} loading="lazy" />
-                                            ) : (
-                                                <div className="event-card__poster-placeholder">{copy.eventsPanel.noPoster}</div>
-                                            )}
-                                        </div>
-                                        <div className="event-card__header">
-                                            <div>
-                                                <div className="event-name">{event.name}</div>
-                                                <div className="table-meta">{metaParts.join(' - ')}</div>
-                                            </div>
-                                            <span className={`tag ${event.registrationOpen ? 'tag--open' : ''}`}>
-                                                {event.registrationOpen ? copy.eventsPanel.open : copy.eventsPanel.closed}
-                                            </span>
-                                        </div>
-                                        <div className="event-card__stats">
-                                            <div className="event-stat">
-                                                <span>{copy.eventsPanel.athletes}</span>
-                                                <strong>{event.athleteCount}</strong>
-                                            </div>
-                                            <div className="event-stat">
-                                                <span>{copy.eventsPanel.activeEvent}</span>
-                                                <strong>{isActive ? copy.common.active : copy.common.inactive}</strong>
-                                            </div>
-                                        </div>
-                                        <div className="event-card__footer">
-                                            <button
-                                                type="button"
-                                                className="btn btn-ghost"
-                                                onClick={() => setActiveEvent(event.id)}
-                                                disabled={isActive}
-                                            >
-                                                {isActive ? copy.eventsPanel.activeEvent : copy.eventsPanel.activate}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className="btn btn-ghost"
-                                                onClick={() => handleOpenAssignModal(event)}
-                                            >
-                                                {copy.eventsPanel.manageAthletes}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className="btn btn-ghost"
-                                                onClick={() => handleOpenEditEvent(event)}
-                                            >
-                                                <Pencil size={14} />
-                                                {copy.eventsPanel.edit}
-                                            </button>
-                                            {event.internalRegistration ? (
-                                                <Link
-                                                    className={`btn ${event.registrationOpen ? 'btn-event btn-event--small' : 'btn-secondary btn-event--small'}`}
-                                                    to={`/eventos/${event.id}`}
-                                                    onClick={(clickEvent) => {
-                                                        if (!event.registrationOpen) {
-                                                            clickEvent.preventDefault();
-                                                        }
-                                                    }}
-                                                    aria-disabled={!event.registrationOpen}
-                                                >
-                                                    {copy.eventsPanel.registration}
-                                                </Link>
-                                            ) : (
-                                                <a
-                                                    className={`btn ${event.registrationOpen ? 'btn-event btn-event--small' : 'btn-secondary btn-event--small'}`}
-                                                    href={event.registrationUrl || '#'}
-                                                    target={event.registrationUrl ? '_blank' : undefined}
-                                                    rel={event.registrationUrl ? 'noreferrer' : undefined}
-                                                    onClick={(clickEvent) => {
-                                                        if (!event.registrationOpen || !event.registrationUrl) {
-                                                            clickEvent.preventDefault();
-                                                        }
-                                                    }}
-                                                    aria-disabled={!event.registrationOpen || !event.registrationUrl}
-                                                >
-                                                    {copy.eventsPanel.registration}
-                                                </a>
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                        <div style={{ display: 'grid', gap: '1.4rem' }}>
+                            <div>
+                                <div className="panel-title" style={{ marginBottom: '0.3rem' }}>{copy.eventsPanel.openSection}</div>
+                                <div className="panel-subtitle" style={{ marginBottom: '0.85rem' }}>{copy.eventsPanel.openSectionSubtitle}</div>
+                                <div className="event-grid">
+                                    {openEventStats.length
+                                        ? openEventStats.map((event) => renderAdminEventCard(event))
+                                        : <div className="panel-subtitle">{copy.eventsPanel.noOpenEvents}</div>}
+                                </div>
+                            </div>
+                            <div>
+                                <div className="panel-title" style={{ marginBottom: '0.3rem' }}>{copy.eventsPanel.closedSection}</div>
+                                <div className="panel-subtitle" style={{ marginBottom: '0.85rem' }}>{copy.eventsPanel.closedSectionSubtitle}</div>
+                                <div className="event-grid">
+                                    {closedEventStats.length
+                                        ? closedEventStats.map((event) => renderAdminEventCard(event))
+                                        : <div className="panel-subtitle">{copy.eventsPanel.noClosedEvents}</div>}
+                                </div>
+                            </div>
                         </div>
                     )}
                 </section>
                 )}
-                {canManagePanel && (
+                {canManagePanel && activeSection === 'news' && (
                 <section className="panel" id="news">
                     <div className="panel-header">
                         <div>
@@ -3560,7 +5327,7 @@ const Dashboard = () => {
                     </div>
                 </section>
                 )}
-                {canManagePanel && (
+                {canManagePanel && activeSection === 'registrations' && (
                 <section className="panel" id="registrations">
                     <div className="panel-header">
                         <div>
@@ -3650,6 +5417,36 @@ const Dashboard = () => {
                             <p>{registrationsError}</p>
                         </div>
                     )}
+                    {registrationGroups.length > 0 && !registrationsLoading && (
+                        <div className="registration-event-groups">
+                            {registrationGroups.map((group) => {
+                                const eventNameForReport = group.eventName || copy.common.noEvent;
+                                const eventDateForReport = group.eventDate || '';
+                                const eventLocationForReport = group.eventLocation || '';
+                                const updatedLabel = group.updatedAt
+                                    ? formatEventDateTime(group.updatedAt)
+                                    : formatEventDateTime(new Date().toISOString());
+
+                                return (
+                                    <article key={group.eventId} className="registration-event-group">
+                                        <div className="registration-event-group__head">
+                                            <div>
+                                                <div className="table-name">{eventNameForReport}</div>
+                                                <div className="table-meta table-meta--tight">
+                                                    {formatEventDate(eventDateForReport) || copy.eventsPanel.undefinedDate}
+                                                    {eventLocationForReport ? ` - ${eventLocationForReport}` : ''}
+                                                </div>
+                                                <div className="table-meta table-meta--tight">
+                                                    {copy.registrationsPanel.updatedAt}: {updatedLabel}
+                                                </div>
+                                            </div>
+                                            <span className="tag">{group.rows.length} {copy.registrationsPanel.totalRegistrations}</span>
+                                        </div>
+                                    </article>
+                                );
+                            })}
+                        </div>
+                    )}
                     {registrationsLoading ? (
                         <div className="panel-subtitle">{copy.registrationsPanel.refresh}...</div>
                     ) : registrationRows.length ? (
@@ -3664,11 +5461,35 @@ const Dashboard = () => {
                                     <th>{copy.registrationsPanel.tableContact}</th>
                                     <th>{copy.registrationsPanel.tablePayment}</th>
                                     <th>{copy.registrationsPanel.tableNotes}</th>
+                                    <th>{copy.registrationsPanel.tablePipeline}</th>
                                     <th>{copy.registrationsPanel.tableStatus}</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {registrationRows.map((item) => (
+                                {registrationRows.map((item) => {
+                                    const pipelineState = registrationPipelineById.get(item.id) || {
+                                        doneSteps: [true, false, false, false],
+                                        currentStepIndex: 0
+                                    };
+                                    const pipelineSteps = [
+                                        copy.registrationsPanel.pipelineRegistered,
+                                        copy.registrationsPanel.pipelineApproved,
+                                        copy.registrationsPanel.pipelineCategory,
+                                        copy.registrationsPanel.pipelineBracket
+                                    ];
+                                    const hasCategory = Boolean(pipelineState.doneSteps?.[2]);
+                                    const hasBracket = Boolean(pipelineState.doneSteps?.[3]);
+                                    const flowIndicator = item.isPaymentError
+                                        ? { label: copy.registrationsPanel.flowStatusPaymentError, tone: 'danger' }
+                                        : item.isPaymentConfirmed
+                                            ? hasCategory && hasBracket
+                                                ? { label: copy.registrationsPanel.flowStatusDone, tone: 'success' }
+                                                : hasCategory
+                                                    ? { label: copy.registrationsPanel.flowStatusCategory, tone: 'info' }
+                                                    : { label: copy.registrationsPanel.flowStatusApproved, tone: 'pending' }
+                                            : { label: copy.registrationsPanel.flowStatusPending, tone: 'pending' };
+
+                                    return (
                                     <tr key={item.id}>
                                         <td className="athlete-photo-cell">
                                             {item.athletePhotoUrl ? (
@@ -3729,25 +5550,41 @@ const Dashboard = () => {
                                                 </div>
                                             )}
                                             {item.proofFileUrl && (
-                                                <a
+                                                <button
+                                                    type="button"
                                                     className="text-link"
-                                                    href={item.proofFileUrl}
-                                                    target="_blank"
-                                                    rel="noreferrer"
+                                                    onClick={() => handleOpenProofFile(item)}
                                                 >
                                                     {copy.registrationsPanel.openReceipt}
-                                                </a>
+                                                </button>
                                             )}
                                         </td>
                                         <td>
                                             <div className="table-meta table-meta--tight">{item.notesText || copy.registrationsPanel.noNotes}</div>
+                                        </td>
+                                        <td className="registration-pipeline-cell">
+                                            <div className="registration-pipeline" role="list" aria-label={copy.registrationsPanel.tablePipeline}>
+                                                {pipelineSteps.map((label, stepIndex) => (
+                                                    <span
+                                                        key={`${item.id}-pipeline-${stepIndex}`}
+                                                        className={`registration-pipeline__step ${pipelineState.doneSteps[stepIndex] ? 'is-done' : ''} ${pipelineState.currentStepIndex === stepIndex ? 'is-current' : ''}`}
+                                                        role="listitem"
+                                                    >
+                                                        {label}
+                                                    </span>
+                                                ))}
+                                            </div>
                                         </td>
                                         <td>
                                             <div className={`points-pill ${item.isPendingSync ? 'points-pill--warning' : item.isPaymentError ? 'points-pill--danger' : ''}`}>
                                                 {item.statusLabel}
                                             </div>
                                             <div className="table-meta table-meta--tight">{formatEventDate(item.createdAt)}</div>
-                                            {!item.isPendingSync && (
+                                            <div className={`registration-flow-indicator registration-flow-indicator--${flowIndicator.tone}`}>
+                                                {flowIndicator.tone === 'success' ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
+                                                <span>{flowIndicator.label}</span>
+                                            </div>
+                                            {!item.isPendingSync && canManagePanel && (
                                                 <div className="registration-status-actions">
                                                     <button
                                                         type="button"
@@ -3790,7 +5627,8 @@ const Dashboard = () => {
                                             )}
                                         </td>
                                     </tr>
-                                ))}
+                                    );
+                                })}
                             </tbody>
                         </table>
                         </div>
@@ -3799,6 +5637,7 @@ const Dashboard = () => {
                     )}
                 </section>
                 )}
+                {activeSection === 'brackets' && (
                 <section className="panel" id="brackets">
                     <div className="panel-header">
                         <div>
@@ -3846,13 +5685,132 @@ const Dashboard = () => {
                                 type="button"
                                 className="btn btn-secondary"
                                 onClick={handleExportBracketsPdf}
-                                disabled={!filteredBrackets.length}
+                                disabled={!orderedFilteredBrackets.length}
                             >
                                 <Download size={14} />
                                 {copy.bracketsPanel.savePdf}
                             </button>
                         </div>
                     </div>
+                    {bracketEventId && (
+                        <div className="bracket-workspace">
+                            <div className="bracket-workspace__header">
+                                <div className="bracket-workspace__title">{copy.bracketsPanel.workspaceTitle}</div>
+                                <div className="panel-subtitle">{copy.bracketsPanel.workspaceSubtitle}</div>
+                                <div className="table-meta">
+                                    {copy.bracketsPanel.event}: {eventMap[bracketEventId]?.name || copy.common.noEvent}
+                                </div>
+                            </div>
+                            <div className="bracket-workspace__stats">
+                                <span className="tag">
+                                    {copy.bracketsPanel.statsApproved}: {bracketWorkspaceData.totals.approved}
+                                </span>
+                                <span className="tag">
+                                    {copy.bracketsPanel.statsInCategory}: {bracketWorkspaceData.totals.inCategory}
+                                </span>
+                                <span className="tag bracket-tag--applied">
+                                    {copy.bracketsPanel.statsInBracket}: {bracketWorkspaceData.totals.inBracket}
+                                </span>
+                                <span className="tag">
+                                    {copy.bracketsPanel.statsAcademies}: {bracketWorkspaceData.totals.academies}
+                                </span>
+                            </div>
+                            <div className="bracket-workspace__controls">
+                                <div className="bracket-workspace__filter-group">
+                                    <span className="bracket-section-title">{copy.bracketsPanel.quickFilter}</span>
+                                    <div className="bracket-workspace__filter-pills">
+                                        <button
+                                            type="button"
+                                            className={`btn btn-ghost bracket-filter-pill ${bracketAcademyFilter === 'all' ? 'is-active' : ''}`}
+                                            onClick={() => setBracketAcademyFilter('all')}
+                                        >
+                                            {copy.bracketsPanel.allAcademies}
+                                        </button>
+                                        {bracketWorkspaceData.academyRows.map((academy) => (
+                                            <button
+                                                key={`workspace-filter-${academy.academy}`}
+                                                type="button"
+                                                className={`btn btn-ghost bracket-filter-pill ${bracketAcademyFilter === academy.academy ? 'is-active' : ''}`}
+                                                onClick={() => setBracketAcademyFilter(academy.academy)}
+                                            >
+                                                {academy.academy}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    onClick={handleExportApprovedAthletesCsv}
+                                    disabled={bracketWorkspaceData.totals.approved === 0}
+                                >
+                                    <Download size={14} />
+                                    {copy.bracketsPanel.exportApprovedCsv}
+                                </button>
+                            </div>
+                            <div className="bracket-workspace__grid">
+                                <article className="bracket-workspace__panel">
+                                    <div className="bracket-workspace__panel-header">
+                                        <div className="bracket-section-title">{copy.bracketsPanel.approvedAthletesTitle}</div>
+                                        <span className="tag">
+                                            {copy.bracketsPanel.filteredLabel(bracketWorkspaceFilteredRows.length, bracketWorkspaceData.totals.approved)}
+                                        </span>
+                                    </div>
+                                    <div className="panel-subtitle">{copy.bracketsPanel.approvedAthletesSubtitle}</div>
+                                    {bracketWorkspaceFilteredRows.length > 0 ? (
+                                        <div className="bracket-workspace__list">
+                                            {bracketWorkspaceFilteredRows.map((item, index) => (
+                                                <div
+                                                    key={item.registrationId || `${item.name}-${item.athleteId || index}`}
+                                                    className="bracket-workspace__item"
+                                                >
+                                                    <div className="bracket-workspace__item-main">
+                                                        <strong>{item.name}</strong>
+                                                        <span>{item.academy}</span>
+                                                        {item.summary && (
+                                                            <span className="bracket-workspace__item-meta">{item.summary}</span>
+                                                        )}
+                                                    </div>
+                                                    <span className={`tag bracket-status bracket-status--${item.statusKey}`}>
+                                                        {item.statusLabel}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="panel-subtitle">{copy.bracketsPanel.approvedAthletesEmpty}</div>
+                                    )}
+                                </article>
+                                <article className="bracket-workspace__panel">
+                                    <div className="bracket-workspace__panel-header">
+                                        <div className="bracket-section-title">{copy.bracketsPanel.academySummaryTitle}</div>
+                                        <span className="tag">{bracketWorkspaceData.totals.academies}</span>
+                                    </div>
+                                    <div className="panel-subtitle">{copy.bracketsPanel.academySummarySubtitle}</div>
+                                    {bracketWorkspaceData.academyRows.length > 0 ? (
+                                        <div className="bracket-workspace__academy-list">
+                                            {bracketWorkspaceData.academyRows.map((academy) => (
+                                                <div key={academy.academy} className="bracket-workspace__academy-row">
+                                                    <div className="bracket-workspace__academy-name">{academy.academy}</div>
+                                                    <div className="bracket-workspace__academy-stats">
+                                                        <span className="tag">{copy.bracketsPanel.academyCount(academy.total)}</span>
+                                                        {academy.inCategory > 0 && (
+                                                            <span className="tag">{copy.bracketsPanel.statusInCategory}: {academy.inCategory}</span>
+                                                        )}
+                                                        {academy.inBracket > 0 && (
+                                                            <span className="tag bracket-tag--applied">{copy.bracketsPanel.statusInBracket}: {academy.inBracket}</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="panel-subtitle">{copy.bracketsPanel.academySummaryEmpty}</div>
+                                    )}
+                                </article>
+                            </div>
+                        </div>
+                    )}
                     <div className="bracket-toolbar">
                         <div className="search-input">
                             <Search size={16} />
@@ -3864,10 +5822,10 @@ const Dashboard = () => {
                                 aria-label={copy.bracketsPanel.searchAria}
                             />
                         </div>
-                        <span className="tag">{filteredBrackets.length} {copy.bracketsPanel.brackets}</span>
+                        <span className="tag">{orderedFilteredBrackets.length} {copy.bracketsPanel.brackets}</span>
                     </div>
                     <div className="bracket-list">
-                        {filteredBrackets.map((bracket) => {
+                        {orderedFilteredBrackets.map((bracket) => {
                             const bracketAthletes = (bracket.seedIds || [])
                                 .map((id) => athleteMap.get(id))
                                 .filter(Boolean);
@@ -3878,7 +5836,15 @@ const Dashboard = () => {
                             const applied = Boolean(bracket.appliedAt);
 
                             return (
-                                <div key={bracket.id} className="bracket-card">
+                                <div
+                                    key={bracket.id}
+                                    className={`bracket-card ${draggingBracketId === bracket.id ? 'is-dragging' : ''}`}
+                                    draggable
+                                    onDragStart={(event) => handleBracketCardDragStart(event, bracket.id)}
+                                    onDragOver={(event) => event.preventDefault()}
+                                    onDrop={(event) => handleBracketCardDrop(event, bracket.id)}
+                                    onDragEnd={handleBracketCardDragEnd}
+                                >
                                     <div className="bracket-card__header">
                                         <div>
                                             <div className="bracket-number">{copy.bracketsPanel.bracket} {bracket.number || '-'}</div>
@@ -3896,19 +5862,53 @@ const Dashboard = () => {
                                         <div className="bracket-matches">
                                             <div className="bracket-section-title">{copy.bracketsPanel.round1}</div>
                                             {matches.map((match, index) => {
-                                                const nameA = match.slotA ? athleteMap.get(match.slotA)?.nome : 'BYE';
-                                                const nameB = match.slotB ? athleteMap.get(match.slotB)?.nome : 'BYE';
+                                                const athleteA = match.slotA ? athleteMap.get(match.slotA) : null;
+                                                const athleteB = match.slotB ? athleteMap.get(match.slotB) : null;
                                                 return (
                                                     <div key={match.id} className="bracket-match">
-                                                        <span className="bracket-seed">{nameA || copy.bracketsPanel.athlete}</span>
+                                                        <span className="bracket-seed">
+                                                            <span className="bracket-seed__name">{athleteA?.nome || 'BYE'}</span>
+                                                            {athleteA?.academia && (
+                                                                <span className="bracket-seed__academy">{athleteA.academia}</span>
+                                                            )}
+                                                        </span>
                                                         <span className="bracket-vs">vs</span>
-                                                        <span className="bracket-seed">{nameB || copy.bracketsPanel.athlete}</span>
+                                                        <span className="bracket-seed">
+                                                            <span className="bracket-seed__name">{athleteB?.nome || 'BYE'}</span>
+                                                            {athleteB?.academia && (
+                                                                <span className="bracket-seed__academy">{athleteB.academia}</span>
+                                                            )}
+                                                        </span>
                                                         <span className="bracket-match__index">#{index + 1}</span>
                                                     </div>
                                                 );
                                             })}
                                             {matches.length === 0 && (
                                                 <div className="panel-subtitle">{copy.bracketsPanel.noAthleteBracket}</div>
+                                            )}
+                                            {bracketAthletes.length > 1 && (
+                                                <div className="bracket-seed-editor">
+                                                    <div className="bracket-section-title">{copy.bracketsPanel.seedEditorTitle}</div>
+                                                    <div className="table-meta">{copy.bracketsPanel.seedEditorHint}</div>
+                                                    <div className="bracket-seed-editor__list">
+                                                        {bracketAthletes.map((athlete, athleteIndex) => (
+                                                            <div
+                                                                key={`${bracket.id}-seed-editor-${athlete.id}`}
+                                                                className={`bracket-seed-editor__item ${dragSeedContext.bracketId === bracket.id && dragSeedContext.athleteId === athlete.id ? 'is-dragging' : ''}`}
+                                                                draggable
+                                                                onDragStart={(event) => handleSeedDragStart(event, bracket.id, athlete.id)}
+                                                                onDragOver={(event) => event.preventDefault()}
+                                                                onDrop={(event) => handleSeedDrop(event, bracket, athlete.id)}
+                                                                onDragEnd={handleSeedDragEnd}
+                                                            >
+                                                                <GripVertical size={14} />
+                                                                <span className="bracket-seed-editor__index">#{athleteIndex + 1}</span>
+                                                                <span className="bracket-seed-editor__name">{athlete.nome}</span>
+                                                                <span className="bracket-seed-editor__academy">{athlete.academia || '-'}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
                                             )}
                                         </div>
                                         <div className="bracket-podium">
@@ -3923,7 +5923,9 @@ const Dashboard = () => {
                                                 >
                                                     <option value="">{copy.bracketsPanel.selectAthlete}</option>
                                                     {bracketAthletes.map((athlete) => (
-                                                        <option key={athlete.id} value={athlete.id}>{athlete.nome}</option>
+                                                        <option key={athlete.id} value={athlete.id}>
+                                                            {athlete.academia ? `${athlete.nome} - ${athlete.academia}` : athlete.nome}
+                                                        </option>
                                                     ))}
                                                 </select>
                                             </label>
@@ -3937,7 +5939,9 @@ const Dashboard = () => {
                                                 >
                                                     <option value="">{copy.bracketsPanel.selectAthlete}</option>
                                                     {bracketAthletes.map((athlete) => (
-                                                        <option key={athlete.id} value={athlete.id}>{athlete.nome}</option>
+                                                        <option key={athlete.id} value={athlete.id}>
+                                                            {athlete.academia ? `${athlete.nome} - ${athlete.academia}` : athlete.nome}
+                                                        </option>
                                                     ))}
                                                 </select>
                                             </label>
@@ -3951,7 +5955,9 @@ const Dashboard = () => {
                                                 >
                                                     <option value="">{copy.bracketsPanel.selectAthlete}</option>
                                                     {bracketAthletes.map((athlete) => (
-                                                        <option key={athlete.id} value={athlete.id}>{athlete.nome}</option>
+                                                        <option key={athlete.id} value={athlete.id}>
+                                                            {athlete.academia ? `${athlete.nome} - ${athlete.academia}` : athlete.nome}
+                                                        </option>
                                                     ))}
                                                 </select>
                                             </label>
@@ -3968,12 +5974,233 @@ const Dashboard = () => {
                                 </div>
                             );
                         })}
-                        {filteredBrackets.length === 0 && (
+                        {orderedFilteredBrackets.length === 0 && (
                             <div className="panel-subtitle">{copy.bracketsPanel.noBracketFound}</div>
                         )}
                     </div>
                 </section>
-                {canManagePanel && (
+                )}
+                {activeSection === 'schedule' && (
+                <section className="panel" id="schedule">
+                    <div className="panel-header">
+                        <div>
+                            <div className="panel-title">{copy.schedulePanel.title}</div>
+                            <div className="panel-subtitle">{copy.schedulePanel.subtitle}</div>
+                        </div>
+                        <div className="panel-actions">
+                            {events.length > 0 && (
+                                <select
+                                    className="input select-compact"
+                                    value={scheduleEventId}
+                                    onChange={(event) => setScheduleEventId(event.target.value)}
+                                    aria-label={copy.schedulePanel.selectEventAria}
+                                >
+                                    <option value="">{copy.schedulePanel.selectEvent}</option>
+                                    {events.map((event) => (
+                                        <option key={`schedule-event-${event.id}`} value={event.id}>{event.name}</option>
+                                    ))}
+                                </select>
+                            )}
+                            <button
+                                type="button"
+                                className="btn btn-secondary"
+                                onClick={() => handleExportSchedulePdf('table')}
+                                disabled={!manualScheduleData.rows.length}
+                            >
+                                <Download size={14} />
+                                {copy.schedulePanel.exportSchedulePdfTable}
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-secondary"
+                                onClick={() => handleExportSchedulePdf('tv')}
+                                disabled={!manualScheduleData.rows.length}
+                            >
+                                <Monitor size={14} />
+                                {copy.schedulePanel.exportSchedulePdfTv}
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-secondary"
+                                onClick={() => setShowScheduleTvMode(true)}
+                                disabled={!manualScheduleData.rows.length}
+                            >
+                                <Monitor size={14} />
+                                {copy.schedulePanel.tvModeOpen}
+                            </button>
+                        </div>
+                    </div>
+                    {!scheduleEventId && (
+                        <div className="panel-subtitle">{copy.schedulePanel.selectEvent}</div>
+                    )}
+                    {scheduleEventId && (
+                        <div className="bracket-schedule">
+                            <div className="bracket-schedule__controls schedule-manual-form">
+                                <label className="bracket-field">
+                                    <span>{copy.schedulePanel.itemTitle}</span>
+                                    <input
+                                        className="input bracket-schedule-input"
+                                        value={scheduleDraft.title}
+                                        onChange={(event) => handleScheduleDraftField('title', event.target.value)}
+                                        placeholder={copy.schedulePanel.addItemTitle}
+                                    />
+                                </label>
+                                <label className="bracket-field">
+                                    <span>{copy.schedulePanel.itemType}</span>
+                                    <select
+                                        className="input bracket-schedule-input"
+                                        value={scheduleDraft.type}
+                                        onChange={(event) => handleScheduleDraftField('type', event.target.value)}
+                                    >
+                                        <option value="FIGHT">{copy.schedulePanel.typeFight}</option>
+                                        <option value="BREAK">{copy.schedulePanel.typeBreak}</option>
+                                        <option value="CEREMONY">{copy.schedulePanel.typeCeremony}</option>
+                                        <option value="OTHER">{copy.schedulePanel.typeOther}</option>
+                                    </select>
+                                </label>
+                                <label className="bracket-field">
+                                    <span>{copy.schedulePanel.itemArea}</span>
+                                    <input
+                                        className="input bracket-schedule-input"
+                                        value={scheduleDraft.area}
+                                        onChange={(event) => handleScheduleDraftField('area', event.target.value)}
+                                        placeholder="Area 1"
+                                    />
+                                </label>
+                                <label className="bracket-field">
+                                    <span>{copy.schedulePanel.itemStart}</span>
+                                    <input
+                                        className="input bracket-schedule-input"
+                                        type="time"
+                                        value={scheduleDraft.start}
+                                        onChange={(event) => handleScheduleDraftField('start', event.target.value)}
+                                    />
+                                </label>
+                                <label className="bracket-field">
+                                    <span>{copy.schedulePanel.itemEnd}</span>
+                                    <input
+                                        className="input bracket-schedule-input"
+                                        type="time"
+                                        value={scheduleDraft.end}
+                                        onChange={(event) => handleScheduleDraftField('end', event.target.value)}
+                                    />
+                                </label>
+                                <label className="bracket-field">
+                                    <span>{copy.schedulePanel.itemNotes}</span>
+                                    <input
+                                        className="input bracket-schedule-input"
+                                        value={scheduleDraft.notes}
+                                        onChange={(event) => handleScheduleDraftField('notes', event.target.value)}
+                                    />
+                                </label>
+                            </div>
+                            <div className="bracket-schedule__header-actions">
+                                <button
+                                    type="button"
+                                    className="btn btn-primary"
+                                    onClick={handleAddManualScheduleItem}
+                                >
+                                    {copy.schedulePanel.addItemAction}
+                                </button>
+                            </div>
+                            <div className="bracket-schedule__stats">
+                                <span className="tag">{copy.schedulePanel.totalItems}: {manualScheduleData.totalItems}</span>
+                                <span className="tag">{copy.schedulePanel.totalFights}: {manualScheduleData.totalFights}</span>
+                                <span className="tag">{copy.schedulePanel.totalDuration}: {formatDurationLabel(manualScheduleData.totalDurationMinutes, isEnglish)}</span>
+                                <span className="tag bracket-tag--applied">{copy.schedulePanel.estimatedEnd}: {manualScheduleData.estimatedEndLabel}</span>
+                            </div>
+                            {manualScheduleData.rows.length > 0 ? (
+                                <div className="schedule-manual-list">
+                                    {manualScheduleData.rows.map((row, index) => (
+                                        <article key={`manual-schedule-${row.id}`} className="schedule-manual-item">
+                                            <div className="schedule-manual-item__header">
+                                                <span className="tag">#{index + 1}</span>
+                                                <span className="tag">{row.typeLabel}</span>
+                                                {row.area && <span className="tag">{row.area}</span>}
+                                                <span className="tag bracket-tag--applied">{row.startLabel} - {row.endLabel}</span>
+                                            </div>
+                                            <div className="schedule-manual-item__grid">
+                                                <input
+                                                    className="input"
+                                                    value={row.title}
+                                                    onChange={(event) => handleUpdateManualScheduleRow(row.id, 'title', event.target.value)}
+                                                    placeholder={copy.schedulePanel.itemTitle}
+                                                />
+                                                <select
+                                                    className="input"
+                                                    value={row.type}
+                                                    onChange={(event) => handleUpdateManualScheduleRow(row.id, 'type', event.target.value)}
+                                                >
+                                                    <option value="FIGHT">{copy.schedulePanel.typeFight}</option>
+                                                    <option value="BREAK">{copy.schedulePanel.typeBreak}</option>
+                                                    <option value="CEREMONY">{copy.schedulePanel.typeCeremony}</option>
+                                                    <option value="OTHER">{copy.schedulePanel.typeOther}</option>
+                                                </select>
+                                                <input
+                                                    className="input"
+                                                    value={row.area}
+                                                    onChange={(event) => handleUpdateManualScheduleRow(row.id, 'area', event.target.value)}
+                                                    placeholder={copy.schedulePanel.itemArea}
+                                                />
+                                                <input
+                                                    className="input"
+                                                    type="time"
+                                                    value={row.startLabel}
+                                                    onChange={(event) => handleUpdateManualScheduleRow(row.id, 'start', event.target.value)}
+                                                />
+                                                <input
+                                                    className="input"
+                                                    type="time"
+                                                    value={row.endLabel}
+                                                    onChange={(event) => handleUpdateManualScheduleRow(row.id, 'end', event.target.value)}
+                                                />
+                                                <input
+                                                    className="input"
+                                                    value={row.notes}
+                                                    onChange={(event) => handleUpdateManualScheduleRow(row.id, 'notes', event.target.value)}
+                                                    placeholder={copy.schedulePanel.itemNotes}
+                                                />
+                                            </div>
+                                            <div className="schedule-manual-item__footer">
+                                                <div className="table-meta">{formatDurationLabel(row.durationMinutes, isEnglish)}</div>
+                                                <div className="schedule-manual-item__actions">
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-ghost"
+                                                        onClick={() => handleMoveManualScheduleRow(row.id, 'up')}
+                                                        disabled={index === 0}
+                                                    >
+                                                        {copy.schedulePanel.moveUp}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-ghost"
+                                                        onClick={() => handleMoveManualScheduleRow(row.id, 'down')}
+                                                        disabled={index === manualScheduleData.rows.length - 1}
+                                                    >
+                                                        {copy.schedulePanel.moveDown}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-ghost"
+                                                        onClick={() => handleRemoveManualScheduleRow(row.id)}
+                                                    >
+                                                        <Trash2 size={14} />
+                                                        {copy.schedulePanel.remove}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </article>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="panel-subtitle">{copy.schedulePanel.noItems}</div>
+                            )}
+                        </div>
+                    )}
+                </section>
+                )}
+                {canManagePanel && activeSection === 'overview' && (
                 <section className="panel">
                     <div className="panel-header">
                         <div>
@@ -4004,7 +6231,7 @@ const Dashboard = () => {
                     </div>
                 </section>
                 )}
-                {canManagePanel && (
+                {canManagePanel && activeSection === 'athletes' && (
                 <section className="panel" id="athletes">
                     <div className="panel-header">
                         <div>
@@ -4357,7 +6584,7 @@ const Dashboard = () => {
                     )}
                 </section>
                 )}
-                {canManagePanel && (
+                {canManagePanel && activeSection === 'automation' && (
                 <section className="panel" id="automation">
                     <div className="panel-header">
                         <div>
@@ -4468,6 +6695,7 @@ const Dashboard = () => {
                     </div>
                 </section>
                 )}
+                {activeSection === 'activity' && (
                 <section className="panel" id="activity">
                     {canManagePanel && (
                         <>
@@ -4513,7 +6741,7 @@ const Dashboard = () => {
                             {copy.activity.endSession}
                         </button>
                     </div>
-                    {isLocalAuth && canManagePanel && (
+                    {canManagePanel && (
                         <div
                             className="action-grid"
                             style={{ marginTop: '1.2rem', gridTemplateColumns: 'minmax(0, 1fr)' }}
@@ -4521,32 +6749,59 @@ const Dashboard = () => {
                             <div className="action-card">
                                 <strong>{copy.activity.localUsers}</strong>
                                 <span>{copy.activity.localUsersDesc}</span>
-                                {localPanelUsers.length > 0 ? (
-                                    <div className="shortcut-list">
-                                        {localPanelUsers.map((user) => (
-                                            <span key={user.username} className="shortcut-pill">
-                                                {user.name || user.username} ({localizeUserRole(user.role)})
-                                            </span>
+                                {panelUsersLoading ? (
+                                    <div className="panel-subtitle">{isEnglish ? 'Loading users...' : 'Carregando usuários...'}</div>
+                                ) : panelUsers.length > 0 ? (
+                                    <div className="panel-users-list">
+                                        {panelUsers.map((user) => (
+                                            <div key={user.id || user.username} className="panel-user-item">
+                                                <div className="panel-user-item__meta">
+                                                    <strong>{user.name || user.username}</strong>
+                                                    <span>{localizeUserRole(user.role)}</span>
+                                                </div>
+                                                <div className="panel-user-item__actions">
+                                                    <button
+                                                        type="button"
+                                                        className="btn-icon"
+                                                        title={isEnglish ? 'Edit user' : 'Editar usuario'}
+                                                        onClick={() => openUserEditModal(user)}
+                                                    >
+                                                        <Pencil size={14} />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="btn-icon btn-icon--danger"
+                                                        title={isEnglish ? 'Delete user' : 'Excluir usuario'}
+                                                        onClick={() => handleDeletePanelUser(user)}
+                                                        disabled={userDeleteLoadingId === (user.id || user.username)}
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                            </div>
                                         ))}
                                     </div>
                                 ) : (
                                     <div className="panel-subtitle">{copy.activity.noUser}</div>
                                 )}
                                 <div className="action-card__footer">
-                                    <button type="button" className="btn btn-ghost" onClick={openUserResetModal}>
-                                        <ShieldCheck size={14} />
-                                        {copy.activity.resetPassword}
-                                    </button>
+                                    {isLocalAuth && (
+                                        <button type="button" className="btn btn-ghost" onClick={openUserResetModal}>
+                                            <ShieldCheck size={14} />
+                                            {copy.activity.resetPassword}
+                                        </button>
+                                    )}
                                     <button type="button" className="btn btn-ghost" onClick={openUserCreateModal}>
                                         <UserPlus size={14} />
                                         {copy.activity.createUser}
                                     </button>
-                                    <span className="tag">{copy.activity.local}</span>
+                                    <span className="tag">{isLocalAuth ? copy.activity.local : copy.activity.api}</span>
                                 </div>
                             </div>
                         </div>
                     )}
                 </section>
+                )}
             </div>
             <nav className="mobile-quickbar mobile-only" aria-label={copy.sidebar.title}>
                 {canManagePanel ? (
@@ -4554,7 +6809,7 @@ const Dashboard = () => {
                         <button
                             type="button"
                             className="mobile-quickbar__btn"
-                            onClick={() => document.getElementById('overview')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                            onClick={() => handleNavClick('overview')}
                         >
                             <LayoutDashboard size={15} />
                             <span>{copy.nav.overview}</span>
@@ -4562,7 +6817,7 @@ const Dashboard = () => {
                         <button
                             type="button"
                             className="mobile-quickbar__btn"
-                            onClick={() => document.getElementById('registrations')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                            onClick={() => handleNavClick('registrations')}
                         >
                             <ClipboardList size={15} />
                             <span>{copy.nav.registrations}</span>
@@ -4570,7 +6825,7 @@ const Dashboard = () => {
                         <button
                             type="button"
                             className="mobile-quickbar__btn"
-                            onClick={() => document.getElementById('athletes')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                            onClick={() => handleNavClick('athletes')}
                         >
                             <Users size={15} />
                             <span>{copy.nav.athletes}</span>
@@ -4585,7 +6840,7 @@ const Dashboard = () => {
                         <button
                             type="button"
                             className="mobile-quickbar__btn"
-                            onClick={() => document.getElementById('brackets')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                            onClick={() => handleNavClick('brackets')}
                         >
                             <ClipboardList size={15} />
                             <span>{copy.nav.brackets}</span>
@@ -4593,7 +6848,15 @@ const Dashboard = () => {
                         <button
                             type="button"
                             className="mobile-quickbar__btn"
-                            onClick={() => document.getElementById('activity')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                            onClick={() => handleNavClick('schedule')}
+                        >
+                            <Clock size={15} />
+                            <span>{copy.nav.schedule}</span>
+                        </button>
+                        <button
+                            type="button"
+                            className="mobile-quickbar__btn"
+                            onClick={() => handleNavClick('activity')}
                         >
                             <Activity size={15} />
                             <span>{copy.nav.activity}</span>
@@ -4605,6 +6868,67 @@ const Dashboard = () => {
                     </>
                 )}
             </nav>
+            <AnimatePresence>
+                {showScheduleTvMode && (
+                    <>
+                        <motion.div
+                            className="modal-backdrop"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setShowScheduleTvMode(false)}
+                        />
+                        <motion.div
+                            className="modal-card"
+                            initial={{ opacity: 0, scale: 0.98 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.98 }}
+                        >
+                            <div className="modal-panel modal-panel--wide bracket-tv-mode">
+                                <div className="modal-header">
+                                    <div>
+                                        <div className="modal-title">{copy.schedulePanel.tvModeTitle}</div>
+                                        <div className="panel-subtitle">
+                                            {eventMap[scheduleEventId]?.name || copy.common.noEvent} · {copy.schedulePanel.tvModeNow}: {now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
+                                        </div>
+                                    </div>
+                                    <button type="button" className="btn btn-ghost" onClick={() => setShowScheduleTvMode(false)}>
+                                        {copy.schedulePanel.tvModeClose}
+                                    </button>
+                                </div>
+                                <div className="bracket-tv-mode__stats">
+                                    <span className="tag">{copy.schedulePanel.totalFights}: {manualScheduleData.totalFights}</span>
+                                    <span className="tag">{copy.schedulePanel.totalDuration}: {formatDurationLabel(manualScheduleData.totalDurationMinutes, isEnglish)}</span>
+                                    <span className="tag bracket-tag--applied">{copy.schedulePanel.estimatedEnd}: {manualScheduleData.estimatedEndLabel}</span>
+                                </div>
+                                <div className="bracket-tv-mode__list">
+                                    {manualScheduleData.rows.map((row) => {
+                                        const currentMinute = (now.getHours() * 60) + now.getMinutes();
+                                        const isLive = Number.isFinite(row.startMinute) && Number.isFinite(row.endMinute)
+                                            && currentMinute >= row.startMinute && currentMinute < row.endMinute;
+                                        const isNext = Number.isFinite(row.startMinute) && currentMinute < row.startMinute;
+                                        return (
+                                            <div
+                                                key={`tv-row-${row.id}`}
+                                                className={`bracket-tv-mode__row ${isLive ? 'is-live' : isNext ? 'is-next' : ''}`}
+                                            >
+                                                <div className="bracket-tv-mode__time">{row.startLabel} - {row.endLabel}</div>
+                                                <div className="bracket-tv-mode__content">
+                                                    <strong>{row.title}</strong>
+                                                    <span>{row.typeLabel} · {row.area || '-'}</span>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                    {manualScheduleData.rows.length === 0 && (
+                                        <div className="panel-subtitle">{copy.schedulePanel.noItems}</div>
+                                    )}
+                                </div>
+                            </div>
+                        </motion.div>
+                    </>
+                )}
+            </AnimatePresence>
             <AnimatePresence>
                 {showLogs && (
                     <>
@@ -4762,6 +7086,124 @@ const Dashboard = () => {
                                                 onChange={(event) => setEventEditForm({ ...eventEditForm, registrationUrl: event.target.value })}
                                                 placeholder={copy.modalEventEdit.registrationUrlPlaceholder}
                                             />
+                                        </div>
+                                        <div className="form-grid">
+                                            <div>
+                                                <label className="table-meta">{copy.modalEventEdit.weightTableGiUrl}</label>
+                                                <input
+                                                    className="input"
+                                                    type="text"
+                                                    value={eventEditForm.weightTableGiUrl}
+                                                    onChange={(event) => setEventEditForm({ ...eventEditForm, weightTableGiUrl: event.target.value })}
+                                                    placeholder={copy.modalEventEdit.weightTableGiUrlPlaceholder}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="table-meta">{copy.modalEventEdit.weightTableNoGiUrl}</label>
+                                                <input
+                                                    className="input"
+                                                    type="text"
+                                                    value={eventEditForm.weightTableNoGiUrl}
+                                                    onChange={(event) => setEventEditForm({ ...eventEditForm, weightTableNoGiUrl: event.target.value })}
+                                                    placeholder={copy.modalEventEdit.weightTableNoGiUrlPlaceholder}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="table-meta">{copy.modalEventEdit.circularUrl}</label>
+                                            <input
+                                                className="input"
+                                                type="text"
+                                                value={eventEditForm.circularUrl}
+                                                onChange={(event) => setEventEditForm({ ...eventEditForm, circularUrl: event.target.value })}
+                                                placeholder={copy.modalEventEdit.circularUrlPlaceholder}
+                                            />
+                                        </div>
+                                        <div className="form-grid">
+                                            <div>
+                                                <label className="table-meta">{copy.modalEventEdit.weightTableGiOptions}</label>
+                                                <div className="event-ocr-actions">
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-secondary btn-sm"
+                                                        onClick={() => handleRunWeightTableOcr('GI')}
+                                                        disabled={Boolean(eventWeightOcrMode)}
+                                                    >
+                                                        {eventWeightOcrMode === 'GI'
+                                                            ? copy.modalEventEdit.weightTableOcrRunning
+                                                            : copy.modalEventEdit.weightTableOcrFromUrl}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-secondary btn-sm"
+                                                        onClick={() => weightTableGiOcrFileRef.current?.click()}
+                                                        disabled={Boolean(eventWeightOcrMode)}
+                                                    >
+                                                        {copy.modalEventEdit.weightTableOcrFromFile}
+                                                    </button>
+                                                    <input
+                                                        ref={weightTableGiOcrFileRef}
+                                                        type="file"
+                                                        accept=".pdf,image/*"
+                                                        style={{ display: 'none' }}
+                                                        onChange={(event) => handleWeightTableOcrFileChange('GI', event)}
+                                                    />
+                                                </div>
+                                                {eventWeightOcrMode === 'GI' && (
+                                                    <div className="table-meta table-meta--tight">
+                                                        {copy.modalEventEdit.weightTableOcrProgress(eventWeightOcrProgress)}
+                                                    </div>
+                                                )}
+                                                <textarea
+                                                    className="input"
+                                                    value={eventEditForm.weightTableGiOptions}
+                                                    onChange={(event) => setEventEditForm({ ...eventEditForm, weightTableGiOptions: event.target.value })}
+                                                    placeholder={copy.modalEventEdit.weightTableGiOptionsPlaceholder}
+                                                    rows={4}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="table-meta">{copy.modalEventEdit.weightTableNoGiOptions}</label>
+                                                <div className="event-ocr-actions">
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-secondary btn-sm"
+                                                        onClick={() => handleRunWeightTableOcr('NO-GI')}
+                                                        disabled={Boolean(eventWeightOcrMode)}
+                                                    >
+                                                        {eventWeightOcrMode === 'NO-GI'
+                                                            ? copy.modalEventEdit.weightTableOcrRunning
+                                                            : copy.modalEventEdit.weightTableOcrFromUrl}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-secondary btn-sm"
+                                                        onClick={() => weightTableNoGiOcrFileRef.current?.click()}
+                                                        disabled={Boolean(eventWeightOcrMode)}
+                                                    >
+                                                        {copy.modalEventEdit.weightTableOcrFromFile}
+                                                    </button>
+                                                    <input
+                                                        ref={weightTableNoGiOcrFileRef}
+                                                        type="file"
+                                                        accept=".pdf,image/*"
+                                                        style={{ display: 'none' }}
+                                                        onChange={(event) => handleWeightTableOcrFileChange('NO-GI', event)}
+                                                    />
+                                                </div>
+                                                {eventWeightOcrMode === 'NO-GI' && (
+                                                    <div className="table-meta table-meta--tight">
+                                                        {copy.modalEventEdit.weightTableOcrProgress(eventWeightOcrProgress)}
+                                                    </div>
+                                                )}
+                                                <textarea
+                                                    className="input"
+                                                    value={eventEditForm.weightTableNoGiOptions}
+                                                    onChange={(event) => setEventEditForm({ ...eventEditForm, weightTableNoGiOptions: event.target.value })}
+                                                    placeholder={copy.modalEventEdit.weightTableNoGiOptionsPlaceholder}
+                                                    rows={4}
+                                                />
+                                            </div>
                                         </div>
                                         <div>
                                             <label className="table-meta">{copy.modalEventEdit.pixKey}</label>
@@ -5163,17 +7605,22 @@ const Dashboard = () => {
                                                 <input
                                                     className="input"
                                                     type="password"
-                                                    minLength={6}
+                                                    minLength={8}
                                                     value={userResetPassword}
                                                     onChange={(event) => setUserResetPassword(event.target.value)}
                                                 />
+                                                {userResetPassword && (
+                                                    <small className={`password-strength password-strength--${userResetPasswordStrength.level}`}>
+                                                        {userResetPasswordStrength.message}
+                                                    </small>
+                                                )}
                                             </div>
                                             <div>
                                                 <label className="table-meta">{copy.modalReset.confirmPassword}</label>
                                                 <input
                                                     className="input"
                                                     type="password"
-                                                    minLength={6}
+                                                    minLength={8}
                                                     value={userResetConfirm}
                                                     onChange={(event) => setUserResetConfirm(event.target.value)}
                                                 />
@@ -5183,7 +7630,11 @@ const Dashboard = () => {
                                             <button type="button" className="btn btn-ghost" onClick={closeUserResetModal}>
                                                 {copy.common.cancel}
                                             </button>
-                                            <button type="submit" className="btn btn-primary" disabled={userResetLoading}>
+                                            <button
+                                                type="submit"
+                                                className="btn btn-primary"
+                                                disabled={userResetLoading || !userResetPasswordStrength.isStrong}
+                                            >
                                                 {copy.modalReset.updatePassword}
                                             </button>
                                         </div>
@@ -5260,8 +7711,9 @@ const Dashboard = () => {
                                                 value={userCreateRole}
                                                 onChange={(event) => setUserCreateRole(event.target.value)}
                                             >
-                                                <option value="mesario">{copy.activity.roleMesario}</option>
+                                                <option value="coach">{copy.activity.roleCoach}</option>
                                                 <option value="admin">{copy.activity.roleAdmin}</option>
+                                                <option value="mesario">{copy.activity.roleMesario}</option>
                                             </select>
                                         </div>
                                         <div>
@@ -5269,18 +7721,23 @@ const Dashboard = () => {
                                             <input
                                                 className="input"
                                                 type="password"
-                                                minLength={6}
+                                                minLength={8}
                                                 required
                                                 value={userCreatePassword}
                                                 onChange={(event) => setUserCreatePassword(event.target.value)}
                                             />
+                                            {userCreatePassword && (
+                                                <small className={`password-strength password-strength--${userCreatePasswordStrength.level}`}>
+                                                    {userCreatePasswordStrength.message}
+                                                </small>
+                                            )}
                                         </div>
                                         <div>
                                             <label className="table-meta">{copy.modalUserCreate.confirmPassword}</label>
                                             <input
                                                 className="input"
                                                 type="password"
-                                                minLength={6}
+                                                minLength={8}
                                                 required
                                                 value={userCreateConfirm}
                                                 onChange={(event) => setUserCreateConfirm(event.target.value)}
@@ -5291,11 +7748,193 @@ const Dashboard = () => {
                                         <button type="button" className="btn btn-ghost" onClick={closeUserCreateModal}>
                                             {copy.common.cancel}
                                         </button>
-                                        <button type="submit" className="btn btn-primary" disabled={userCreateLoading}>
+                                        <button
+                                            type="submit"
+                                            className="btn btn-primary"
+                                            disabled={userCreateLoading || !userCreatePasswordStrength.isStrong}
+                                        >
                                             {copy.modalUserCreate.createUser}
                                         </button>
                                     </div>
                                 </form>
+                            </div>
+                        </motion.div>
+                    </>
+                )}
+            </AnimatePresence>
+            <AnimatePresence>
+                {showUserEditModal && (
+                    <>
+                        <motion.div
+                            className="modal-backdrop"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={closeUserEditModal}
+                        />
+                        <motion.div
+                            className="modal-card"
+                            initial={{ opacity: 0, y: 12 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 12 }}
+                        >
+                            <div className="modal-panel">
+                                <div className="modal-header">
+                                    <div className="modal-title">{isEnglish ? 'Edit panel user' : 'Editar usuario do painel'}</div>
+                                    <button type="button" className="btn btn-ghost" onClick={closeUserEditModal}>
+                                        {copy.common.close}
+                                    </button>
+                                </div>
+                                <form onSubmit={handleUserEditSubmit}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                        {userEditError && (
+                                            <div className="login-error" role="alert">
+                                                <AlertCircle size={18} />
+                                                <p>{userEditError}</p>
+                                            </div>
+                                        )}
+                                        {userEditSuccess && (
+                                            <div className="login-success" role="status">
+                                                <CheckCircle2 size={18} />
+                                                <p>{userEditSuccess}</p>
+                                            </div>
+                                        )}
+                                        <div>
+                                            <label className="table-meta">{isEnglish ? 'Name' : 'Nome'}</label>
+                                            <input
+                                                className="input"
+                                                type="text"
+                                                minLength={3}
+                                                required
+                                                value={userEditName}
+                                                onChange={(event) => setUserEditName(event.target.value)}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="table-meta">{isEnglish ? 'Username' : 'Usuario'}</label>
+                                            <input
+                                                className="input"
+                                                type="text"
+                                                minLength={3}
+                                                required
+                                                value={userEditUsername}
+                                                onChange={(event) => setUserEditUsername(event.target.value)}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="table-meta">{isEnglish ? 'Role' : 'Papel'}</label>
+                                            <select
+                                                className="input"
+                                                value={userEditRole}
+                                                onChange={(event) => setUserEditRole(event.target.value)}
+                                            >
+                                                <option value="coach">{copy.activity.roleCoach}</option>
+                                                <option value="admin">{copy.activity.roleAdmin}</option>
+                                                <option value="mesario">{copy.activity.roleMesario}</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div className="form-actions">
+                                        <button type="button" className="btn btn-ghost" onClick={closeUserEditModal}>
+                                            {copy.common.cancel}
+                                        </button>
+                                        <button type="submit" className="btn btn-primary" disabled={userEditLoading}>
+                                            {isEnglish ? 'Save changes' : 'Salvar alteracoes'}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </motion.div>
+                    </>
+                )}
+            </AnimatePresence>
+            <AnimatePresence>
+                {confirmDialog.isOpen && (
+                    <>
+                        <motion.div
+                            className="modal-backdrop"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => closeConfirmDialog(false)}
+                        />
+                        <motion.div
+                            className="modal-card"
+                            initial={{ opacity: 0, y: 12 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 12 }}
+                        >
+                            <div className="modal-panel">
+                                <div className="modal-header">
+                                    <div className="modal-title">{confirmDialog.title}</div>
+                                    <button type="button" className="btn btn-ghost" onClick={() => closeConfirmDialog(false)}>
+                                        {copy.common.close}
+                                    </button>
+                                </div>
+                                {confirmDialog.description && (
+                                    <p className="panel-subtitle">{confirmDialog.description}</p>
+                                )}
+                                <div className="form-actions">
+                                    <button type="button" className="btn btn-ghost" onClick={() => closeConfirmDialog(false)}>
+                                        {confirmDialog.cancelLabel || copy.common.cancel}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={confirmDialog.variant === 'danger' ? 'btn btn-danger' : 'btn btn-primary'}
+                                        onClick={() => closeConfirmDialog(true)}
+                                    >
+                                        {confirmDialog.confirmLabel || (isEnglish ? 'Confirm' : 'Confirmar')}
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </>
+                )}
+            </AnimatePresence>
+            <AnimatePresence>
+                {registrationCloseConfirmEvent && (
+                    <>
+                        <motion.div
+                            className="modal-backdrop"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={closeRegistrationConfirmModal}
+                        />
+                        <motion.div
+                            className="modal-card"
+                            initial={{ opacity: 0, y: 12 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 12 }}
+                        >
+                            <div className="modal-panel">
+                                <div className="modal-header">
+                                    <div className="modal-title">{copy.eventsPanel.closeRegistrationConfirmTitle}</div>
+                                    <button type="button" className="btn btn-ghost" onClick={closeRegistrationConfirmModal}>
+                                        {copy.common.close}
+                                    </button>
+                                </div>
+                                <p className="panel-subtitle">
+                                    {copy.eventsPanel.closeRegistrationConfirmDescription(
+                                        registrationCloseConfirmEvent?.name
+                                    )}
+                                </p>
+                                <div className="form-actions">
+                                    <button
+                                        type="button"
+                                        className="btn btn-ghost"
+                                        onClick={closeRegistrationConfirmModal}
+                                    >
+                                        {copy.common.cancel}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn btn-danger"
+                                        onClick={handleConfirmCloseEventRegistration}
+                                    >
+                                        {copy.eventsPanel.closeRegistrationConfirmAction}
+                                    </button>
+                                </div>
                             </div>
                         </motion.div>
                     </>
@@ -5306,3 +7945,10 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+
+
+
+
+
+
+

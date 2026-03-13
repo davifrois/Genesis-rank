@@ -84,7 +84,14 @@ const buildAuthRequiredError = (message) => {
   error.code = 'AUTH_REQUIRED';
   return error;
 };
-
+const buildForbiddenError = (message) => {
+  const error = new Error(
+    (message || 'Somente administradores podem atualizar o feed do Instagram.')
+      .toString()
+  );
+  error.code = 'FORBIDDEN';
+  return error;
+};
 export const socialMediaService = {
   fetchInstagramFeed: async (limit = 10, options = {}) => {
     const query = buildInstagramQuery(limit, options);
@@ -140,7 +147,7 @@ export const socialMediaService = {
       }
     );
 
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
       if (authService?.clearApiToken) {
         authService.clearApiToken();
       }
@@ -149,6 +156,14 @@ export const socialMediaService = {
         'Sessão de administrador expirada. Faça login novamente para atualizar o feed do Instagram.'
       );
       throw buildAuthRequiredError(message);
+    }
+
+    if (response.status === 403) {
+      const message = await buildErrorMessage(
+        response,
+        'Somente administradores podem atualizar o feed do Instagram.'
+      );
+      throw buildForbiddenError(message);
     }
 
     if (!response.ok) {
@@ -165,3 +180,4 @@ export const socialMediaService = {
     };
   }
 };
+

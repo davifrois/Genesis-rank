@@ -1,6 +1,9 @@
 package br.com.genesis.ranking.service;
 
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
@@ -26,6 +29,15 @@ public class BootstrapAdmin {
   @Value("${app.bootstrap.admin.role}")
   private String adminRole;
 
+  @Value("${app.bootstrap.seed-default-panel-users:false}")
+  private boolean seedDefaultPanelUsers;
+
+  private static final List<BootstrapUserSeed> DEFAULT_PANEL_USERS = List.of(
+      new BootstrapUserSeed("simone", "simone123", "Simone", "ADMIN"),
+      new BootstrapUserSeed("davifrois", "davifrois324@", "Davifrois", "ADMIN"),
+      new BootstrapUserSeed("mesario1", "mesario123", "Mesario 1", "MESARIO")
+  );
+
   public BootstrapAdmin(UserRepository userRepository, PasswordEncoder passwordEncoder, UserService userService) {
     this.userRepository = userRepository;
     this.passwordEncoder = passwordEncoder;
@@ -34,20 +46,36 @@ public class BootstrapAdmin {
 
   @jakarta.annotation.PostConstruct
   public void ensureAdminUser() {
-    String username = userService.normalizeUsername(adminUsername);
+    ensureUser(adminUsername, adminPassword, adminName, adminRole);
+    if (!seedDefaultPanelUsers) {
+      return;
+    }
+    for (BootstrapUserSeed seed : DEFAULT_PANEL_USERS) {
+      ensureUser(seed.username(), seed.password(), seed.name(), seed.role());
+    }
+  }
+
+  private void ensureUser(String rawUsername, String rawPassword, String rawName, String rawRole) {
+    String username = userService.normalizeUsername(rawUsername);
     if (username.isBlank()) {
       return;
     }
     if (userRepository.existsByUsernameIgnoreCase(username)) {
       return;
     }
+    String safeName = rawName == null || rawName.isBlank() ? username : rawName.trim();
+    String safePassword = rawPassword == null || rawPassword.isBlank() ? "admin123" : rawPassword;
 
     User user = new User();
     user.setUsername(username);
-    user.setName(adminName == null || adminName.isBlank() ? "Admin" : adminName.trim());
-    user.setRole(parseRole(adminRole));
-    user.setPasswordHash(passwordEncoder.encode(adminPassword));
-    userRepository.save(user);
+    user.setName(safeName);
+    user.setRole(parseRole(rawRole));
+    user.setPasswordHash(passwordEncoder.encode(safePassword));
+    try {
+      userRepository.save(user);
+    } catch (DataIntegrityViolationException ex) {
+      // Ignore bootstrap users incompatible with legacy constraints.
+    }
   }
 
   private Role parseRole(String role) {
@@ -57,4 +85,6 @@ public class BootstrapAdmin {
       return Role.ADMIN;
     }
   }
+
+  private record BootstrapUserSeed(String username, String password, String name, String role) {}
 }

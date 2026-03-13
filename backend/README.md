@@ -27,6 +27,10 @@ Os valores abaixo tem defaults no `application.yml`:
 - `MAIL_SMTP_AUTH`, `MAIL_SMTP_STARTTLS` (seguranca SMTP)
 - `REG_CONFIRM_EMAIL_ENABLED` (envio de confirmacao de inscricao)
 - `REG_CONFIRM_EMAIL_FROM`, `REG_CONFIRM_EMAIL_REPLY_TO`, `REG_CONFIRM_EMAIL_SUBJECT_PREFIX`
+- `EVENT_ANNOUNCEMENT_EMAIL_ENABLED` (envio automatico ao criar campeonato)
+- `EVENT_ANNOUNCEMENT_INCLUDE_PLATFORM_ACCOUNTS` (inclui contas da plataforma com e-mail valido)
+- `EVENT_ANNOUNCEMENT_EMAIL_FROM`, `EVENT_ANNOUNCEMENT_EMAIL_REPLY_TO`
+- `EVENT_ANNOUNCEMENT_EMAIL_SUBJECT_PREFIX`, `EVENT_ANNOUNCEMENT_EVENTS_PAGE_URL`
 
 ### Feed Instagram (ultimos posts)
 Para liberar os ultimos posts em `/api/public/social/instagram`, configure:
@@ -52,6 +56,21 @@ set REG_CONFIRM_EMAIL_ENABLED=true
 set REG_CONFIRM_EMAIL_FROM=no-reply@genesisesportes.com.br
 set REG_CONFIRM_EMAIL_REPLY_TO=contato@genesisesportes.com.br
 set REG_CONFIRM_EMAIL_SUBJECT_PREFIX=Genesis Esportes
+```
+
+### E-mail automatico ao criar campeonato
+Quando um admin cria campeonato em `POST /api/events`, o backend envia aviso automatico para:
+- e-mails de atletas ja usados em inscricoes;
+- contas da plataforma (atleta/professor) cujo `username` seja um e-mail valido.
+
+Exemplo:
+```bash
+set EVENT_ANNOUNCEMENT_EMAIL_ENABLED=true
+set EVENT_ANNOUNCEMENT_INCLUDE_PLATFORM_ACCOUNTS=true
+set EVENT_ANNOUNCEMENT_EMAIL_FROM=no-reply@genesisesportes.com.br
+set EVENT_ANNOUNCEMENT_EMAIL_REPLY_TO=contato@genesisesportes.com.br
+set EVENT_ANNOUNCEMENT_EMAIL_SUBJECT_PREFIX=Genesis Esportes
+set EVENT_ANNOUNCEMENT_EVENTS_PAGE_URL=https://genesisesportes.com.br/eventos
 ```
 
 ### Exemplo para MySQL

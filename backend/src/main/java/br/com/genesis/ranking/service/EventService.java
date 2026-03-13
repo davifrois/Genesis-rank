@@ -21,9 +21,14 @@ public class EventService {
   private static final double DEFAULT_FEE_ABSOLUTE = 30.0;
 
   private final EventRepository eventRepository;
+  private final EventAnnouncementEmailService eventAnnouncementEmailService;
 
-  public EventService(EventRepository eventRepository) {
+  public EventService(
+      EventRepository eventRepository,
+      EventAnnouncementEmailService eventAnnouncementEmailService
+  ) {
     this.eventRepository = eventRepository;
+    this.eventAnnouncementEmailService = eventAnnouncementEmailService;
   }
 
   public List<EventResponse> listAll() {
@@ -37,12 +42,26 @@ public class EventService {
   }
 
   public EventResponse create(EventRequest request) {
+    return create(request, true);
+  }
+
+  public EventResponse create(EventRequest request, boolean notifySubscribers) {
     Event event = new Event();
     if (request.getId() != null && !request.getId().isBlank()) {
       event.setId(request.getId().trim());
     }
     apply(event, request);
-    return toResponse(eventRepository.save(event));
+    Event createdEvent = eventRepository.save(event);
+    EventAnnouncementEmailService.AnnouncementReport announcementReport = EventAnnouncementEmailService.AnnouncementReport.skipped();
+    if (notifySubscribers) {
+      announcementReport = eventAnnouncementEmailService.sendNewEventAnnouncement(createdEvent);
+    }
+    EventResponse response = toResponse(createdEvent);
+    response.setAnnouncementAttempted(announcementReport.isAttempted());
+    response.setAnnouncementRecipients(announcementReport.getRecipients());
+    response.setAnnouncementSent(announcementReport.getSent());
+    response.setAnnouncementFailed(announcementReport.getFailed());
+    return response;
   }
 
   public EventResponse update(String id, EventRequest request) {

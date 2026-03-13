@@ -64,19 +64,34 @@ const loadImage = (src) => new Promise((resolve, reject) => {
 
 const logoCache = new Map();
 
+const resolveLogoCandidates = (logoUrl) => {
+    const requested = (logoUrl || DEFAULT_LOGO_URL).toString().trim() || DEFAULT_LOGO_URL;
+    const withoutDotSlash = requested.replace(/^\.\//, '');
+    const leadingSlash = withoutDotSlash.startsWith('/') ? withoutDotSlash : `/${withoutDotSlash}`;
+    return [...new Set([
+        requested,
+        leadingSlash,
+        DEFAULT_LOGO_URL
+    ])];
+};
+
 const loadLogo = async (logoUrl = DEFAULT_LOGO_URL) => {
-    const source = (logoUrl || DEFAULT_LOGO_URL).toString().trim() || DEFAULT_LOGO_URL;
-    if (logoCache.has(source)) {
-        return logoCache.get(source);
+    const candidates = resolveLogoCandidates(logoUrl);
+    for (const source of candidates) {
+        if (logoCache.has(source)) {
+            const cached = logoCache.get(source);
+            if (cached) return cached;
+            continue;
+        }
+        try {
+            const logo = await loadImage(source);
+            logoCache.set(source, logo);
+            return logo;
+        } catch {
+            logoCache.set(source, null);
+        }
     }
-    try {
-        const logo = await loadImage(source);
-        logoCache.set(source, logo);
-        return logo;
-    } catch {
-        logoCache.set(source, null);
-        return null;
-    }
+    return null;
 };
 
 const buildMetaLine = (parts) => (
@@ -112,7 +127,8 @@ const drawBrandHeader = (doc, {
     if (subtitle) {
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(8);
-        doc.text(subtitle, textX, 16, { baseline: 'middle' });
+        const subtitleLines = doc.splitTextToSize(subtitle, pageWidth - textX - 10).slice(0, 2);
+        doc.text(subtitleLines, textX, 14.9, { baseline: 'middle' });
     }
 
     if (metaLine) {
@@ -210,12 +226,13 @@ const drawBracketSide = ({
     nameWidth,
     lineStartX,
     finalX,
-    alignRight
+    alignRight,
+    showAcademy
 }) => {
     const sideRounds = roundCenters.length;
-    const nameFontSize = slotHeight >= 8 ? 7.2 : 6.2;
-    const academyFontSize = Math.max(5, nameFontSize - 1.4);
-    const lineOffset = Math.min(1.6, slotHeight * 0.3);
+    const nameFontSize = Math.max(4.9, Math.min(7.2, slotHeight * 0.45));
+    const academyFontSize = Math.max(4.2, Math.min(6, nameFontSize - 1.3));
+    const lineOffset = showAcademy ? Math.min(1.6, slotHeight * 0.26) : 0;
     doc.setFont('helvetica', 'normal');
 
     seeds.forEach((seed, index) => {
@@ -226,12 +243,12 @@ const drawBracketSide = ({
         doc.setTextColor(...BRAND_TEXT);
         doc.setFontSize(nameFontSize);
         const nameText = fitText(doc, name, nameWidth - 4);
-        doc.text(nameText, nameX, y - lineOffset, {
+        doc.text(nameText, nameX, showAcademy ? y - lineOffset : y, {
             align: alignRight ? 'right' : 'left',
             baseline: 'middle'
         });
 
-        if (academy) {
+        if (showAcademy && academy) {
             doc.setTextColor(...BRAND_MUTED);
             doc.setFontSize(academyFontSize);
             const academyText = fitText(doc, academy, nameWidth - 4);
@@ -280,14 +297,20 @@ export const generateBracketsPDF = async (brackets, athletes, options = {}) => {
         throw new Error('Nenhuma chave encontrada para exportar.');
     }
 
-    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const maxBracketSize = Math.max(
+        2,
+        ...brackets.map((bracket) => nextPowerOfTwo(bracket?.seedIds?.length || 0, 2))
+    );
+    const maxSideSlots = Math.max(1, Math.floor(maxBracketSize / 2));
+    const pdfFormat = maxSideSlots > 8 ? 'a3' : 'a4';
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: pdfFormat });
     const logo = await loadLogo(logoUrl);
     const athletesMap = new Map((athletes || []).map((athlete) => [athlete.id, athlete]));
     const totalPages = brackets.length;
 
     brackets.forEach((bracket, index) => {
         if (index > 0) {
-            doc.addPage('a4', 'landscape');
+            doc.addPage(pdfFormat, 'landscape');
         }
 
         const pageWidth = doc.internal.pageSize.getWidth();
@@ -328,15 +351,32 @@ export const generateBracketsPDF = async (brackets, athletes, options = {}) => {
 
         const topMargin = 44;
         const footerPadding = 4;
-        const footerHeight = 38;
-        const bottomMargin = footerHeight + footerPadding;
         const leftMargin = 11;
         const rightMargin = 11;
         const centerGap = 22;
         const nameWidth = 59;
-        const totalHeight = pageHeight - topMargin - bottomMargin;
         const sideSlots = size / 2;
-        const slotHeight = totalHeight / sideSlots;
+
+        const computeSlotHeight = (footerHeight) => {
+            const totalHeight = pageHeight - topMargin - (footerHeight + footerPadding);
+            return totalHeight / sideSlots;
+        };
+
+        let footerHeight = 38;
+        let slotHeight = computeSlotHeight(footerHeight);
+        if (slotHeight < 10) {
+            footerHeight = 28;
+            slotHeight = computeSlotHeight(footerHeight);
+        }
+        if (slotHeight < 7) {
+            footerHeight = 20;
+            slotHeight = computeSlotHeight(footerHeight);
+        }
+
+        const showAcademy = slotHeight >= 7.4;
+        const showBaiaBoxes = slotHeight >= 8.2;
+        const bottomMargin = footerHeight + footerPadding;
+        const totalHeight = pageHeight - topMargin - bottomMargin;
         const seedY = Array.from({ length: sideSlots }, (_, slotIndex) => (
             topMargin + slotHeight / 2 + slotIndex * slotHeight
         ));
@@ -360,7 +400,7 @@ export const generateBracketsPDF = async (brackets, athletes, options = {}) => {
         const rightCenters = computeRoundCenters(sideSlots, seedY, sideRounds);
 
         doc.setDrawColor(...BRAND_SECONDARY);
-        doc.setLineWidth(0.3);
+        doc.setLineWidth(slotHeight < 6 ? 0.24 : 0.3);
         drawBracketSide({
             doc,
             seeds: leftSeeds,
@@ -372,7 +412,8 @@ export const generateBracketsPDF = async (brackets, athletes, options = {}) => {
             nameWidth,
             lineStartX: leftMargin + nameWidth,
             finalX: centerLeftX,
-            alignRight: false
+            alignRight: false,
+            showAcademy
         });
         drawBracketSide({
             doc,
@@ -385,7 +426,8 @@ export const generateBracketsPDF = async (brackets, athletes, options = {}) => {
             nameWidth,
             lineStartX: pageWidth - rightMargin - nameWidth,
             finalX: centerRightX,
-            alignRight: true
+            alignRight: true,
+            showAcademy
         });
 
         const finalY = topMargin + totalHeight / 2;
@@ -409,27 +451,29 @@ export const generateBracketsPDF = async (brackets, athletes, options = {}) => {
             doc.line(podiumLineStartX, y, podiumLineEndX, y);
         });
 
-        const baiaCount = 10;
-        const baiaBoxWidth = 10;
-        const baiaBoxHeight = 6;
-        const baiaGap = 2;
-        const baiaTotalWidth = baiaCount * baiaBoxWidth + (baiaCount - 1) * baiaGap;
-        const baiaStartX = (pageWidth - baiaTotalWidth) / 2;
-        const baiaY = footerTop + 24;
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(7);
-        doc.setTextColor(...BRAND_TEXT);
-        for (let i = 0; i < baiaCount; i += 1) {
-            const x = baiaStartX + i * (baiaBoxWidth + baiaGap);
-            doc.setDrawColor(...BRAND_LINE);
-            doc.roundedRect(x, baiaY, baiaBoxWidth, baiaBoxHeight, 1, 1);
-            doc.text(String(i + 1), x + baiaBoxWidth / 2, baiaY + baiaBoxHeight / 2 + 1.4, {
-                align: 'center',
-                baseline: 'middle'
-            });
+        if (showBaiaBoxes) {
+            const baiaCount = 10;
+            const baiaBoxWidth = 10;
+            const baiaBoxHeight = 6;
+            const baiaGap = 2;
+            const baiaTotalWidth = baiaCount * baiaBoxWidth + (baiaCount - 1) * baiaGap;
+            const baiaStartX = (pageWidth - baiaTotalWidth) / 2;
+            const baiaY = footerTop + 24;
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(7);
+            doc.setTextColor(...BRAND_TEXT);
+            for (let i = 0; i < baiaCount; i += 1) {
+                const x = baiaStartX + i * (baiaBoxWidth + baiaGap);
+                doc.setDrawColor(...BRAND_LINE);
+                doc.roundedRect(x, baiaY, baiaBoxWidth, baiaBoxHeight, 1, 1);
+                doc.text(String(i + 1), x + baiaBoxWidth / 2, baiaY + baiaBoxHeight / 2 + 1.4, {
+                    align: 'center',
+                    baseline: 'middle'
+                });
+            }
         }
 
-        const signLineY = footerTop + 35;
+        const signLineY = showBaiaBoxes ? footerTop + 35 : footerTop + 17;
         const signWidth = 44;
         doc.setDrawColor(...BRAND_LINE);
         doc.line(leftMargin, signLineY, leftMargin + signWidth, signLineY);
@@ -648,4 +692,546 @@ export const generateEventResultsPDF = async (eventName, podiums, options = {}) 
     });
 
     doc.save(`Boletim_${buildFileSafeName(eventName)}.pdf`);
+};
+
+const normalizeRegistrationMode = (value) => {
+    const raw = (value || '')
+        .toString()
+        .trim()
+        .toUpperCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+    if (raw.includes('NO-GI') || raw.includes('NOGI')) return 'NO-GI';
+    return 'GI';
+};
+
+const normalizeReportRows = (rows = []) => (
+    (Array.isArray(rows) ? rows : [])
+        .map((item) => ({
+            athleteName: (item?.athleteName || item?.nome || '').toString().trim(),
+            academyName: (item?.academyName || item?.academia || '').toString().trim() || 'Sem academia',
+            gender: (item?.gender || item?.genero || '').toString().trim() || '-',
+            belt: (item?.belt || item?.faixa || '').toString().trim() || '-',
+            category: (item?.category || item?.categoria || '').toString().trim() || '-',
+            weight: (item?.weight || item?.peso || '').toString().trim() || '-',
+            mode: normalizeRegistrationMode(item?.mode || item?.modalidade || '')
+        }))
+        .filter((item) => item.athleteName)
+);
+
+const buildDivisionLabel = (row) => (
+    [
+        row.gender || '-',
+        row.belt || '-',
+        row.category || '-',
+        row.weight || '-'
+    ].map((part) => (part || '').toString().trim() || '-').join(' / ')
+);
+
+export const generateRegistrationListingPDF = async (rows = [], options = {}) => {
+    const {
+        eventName = '',
+        eventDate = '',
+        eventLocation = '',
+        mode = 'GI',
+        reportType = 'academy',
+        logoUrl = DEFAULT_LOGO_URL,
+        template = 'brand',
+        updatedAtLabel = 'Atualizado em',
+        updatedAtValue = formatDateTime()
+    } = options;
+
+    const normalizedRows = normalizeReportRows(rows)
+        .filter((item) => item.mode === normalizeRegistrationMode(mode));
+
+    if (!normalizedRows.length) {
+        throw new Error('Nenhum atleta encontrado para gerar o relatório.');
+    }
+
+    const grouped = new Map();
+    if (reportType === 'category') {
+        normalizedRows.forEach((row) => {
+            const key = buildDivisionLabel(row);
+            const group = grouped.get(key) || [];
+            group.push(row);
+            grouped.set(key, group);
+        });
+    } else {
+        normalizedRows.forEach((row) => {
+            const key = row.academyName || 'Sem academia';
+            const group = grouped.get(key) || [];
+            group.push(row);
+            grouped.set(key, group);
+        });
+    }
+
+    const sortedGroups = [...grouped.entries()]
+        .map(([label, entries]) => ({
+            label,
+            entries: entries.slice().sort((a, b) => a.athleteName.localeCompare(b.athleteName))
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label));
+
+    const doc = new jsPDF();
+    const reportTitle = reportType === 'category'
+        ? 'RELACAO DE ATLETAS POR CATEGORIA'
+        : 'RELACAO DE ATLETAS POR ACADEMIA';
+    const modeLabel = normalizeRegistrationMode(mode);
+    const useClassicWhite = (template || '').toString().trim().toLowerCase() === 'classic-white';
+
+    if (useClassicWhite) {
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const eventLabel = eventName || 'Evento';
+        const eventMeta = buildMetaLine([
+            eventDate ? formatDate(eventDate) : '',
+            eventLocation || ''
+        ]);
+        const headerTitle = reportType === 'category'
+            ? 'RELACAO DE ATLETAS POR CATEGORIA'
+            : 'RELACAO DE ATLETAS POR ACADEMIA';
+
+        const drawHeader = () => {
+            doc.setTextColor(22, 30, 46);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(10.5);
+            doc.text(eventLabel, 12, 12);
+
+            if (modeLabel === 'NO-GI') {
+                doc.setTextColor(220, 38, 38);
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(10);
+                doc.text('NO GI', 12, 17);
+            }
+
+            doc.setTextColor(12, 22, 36);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(12.5);
+            doc.text(headerTitle, pageWidth / 2, 15.5, { align: 'center' });
+
+            doc.setTextColor(55, 65, 81);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8);
+            doc.text(`${updatedAtLabel} ${updatedAtValue}`, pageWidth - 12, 11.5, { align: 'right' });
+
+            if (eventMeta) {
+                doc.text(eventMeta, 12, 22);
+            }
+
+            doc.setDrawColor(226, 232, 240);
+            doc.setLineWidth(0.2);
+            doc.line(12, 24.5, pageWidth - 12, 24.5);
+        };
+
+        const ensureSpace = (cursorY, neededHeight = 18) => {
+            if (cursorY <= pageHeight - neededHeight) return cursorY;
+            doc.addPage();
+            drawHeader();
+            return 30;
+        };
+
+        drawHeader();
+        let cursorY = 30;
+
+        sortedGroups.forEach((group) => {
+            cursorY = ensureSpace(cursorY, 20);
+
+            doc.setTextColor(0, 93, 172);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(10);
+            doc.text((group.label || '-').toString().toUpperCase(), 12, cursorY);
+            cursorY += 5;
+
+            doc.setTextColor(31, 41, 55);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8.2);
+            doc.text(`Total de atletas: ${group.entries.length}`, 12, cursorY);
+            cursorY += 1.5;
+
+            const tableBody = group.entries.map((row) => (
+                reportType === 'category'
+                    ? [row.athleteName, row.academyName]
+                    : [row.athleteName, buildDivisionLabel(row)]
+            ));
+
+            runAutoTable(doc, {
+                head: [reportType === 'category' ? ['ATLETA', 'ACADEMIA'] : ['ATLETA', 'DIVISAO']],
+                body: tableBody,
+                startY: cursorY,
+                theme: 'plain',
+                margin: { left: 60, right: 12, top: 30, bottom: 12 },
+                headStyles: {
+                    fillColor: false,
+                    textColor: [17, 24, 39],
+                    fontSize: 8,
+                    fontStyle: 'bold'
+                },
+                bodyStyles: {
+                    textColor: [17, 24, 39],
+                    fontSize: 8
+                },
+                styles: {
+                    cellPadding: 0.7
+                },
+                columnStyles: {
+                    0: { cellWidth: 65 },
+                    1: { cellWidth: 62 }
+                },
+                didDrawPage: drawHeader
+            });
+
+            cursorY = (doc.lastAutoTable?.finalY || cursorY) + 5;
+        });
+
+        const filenameClassic = `Relacao_${reportType === 'category' ? 'categoria' : 'academia'}_${buildFileSafeName(eventName)}_${buildFileSafeName(modeLabel)}.pdf`;
+        doc.save(filenameClassic);
+        return;
+    }
+
+    const logo = await loadLogo(logoUrl);
+
+    let cursorY = 38;
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const ensureSpace = (neededHeight = 22) => {
+        if (cursorY <= pageHeight - neededHeight) return;
+        doc.addPage();
+        cursorY = 38;
+    };
+
+    sortedGroups.forEach((group) => {
+        ensureSpace(26);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(...BRAND_SECONDARY);
+        doc.text(group.label || '-', 12, cursorY);
+        cursorY += 5;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(...BRAND_MUTED);
+        doc.text(`Total de atletas: ${group.entries.length}`, 12, cursorY);
+        cursorY += 3;
+
+        const tableBody = group.entries.map((row) => (
+            reportType === 'category'
+                ? [
+                    row.athleteName,
+                    row.academyName
+                ]
+                : [
+                    row.athleteName,
+                    buildDivisionLabel(row)
+                ]
+        ));
+
+        runAutoTable(doc, {
+            head: [reportType === 'category' ? ['ATLETA', 'ACADEMIA'] : ['ATLETA', 'DIVISAO']],
+            body: tableBody,
+            startY: cursorY,
+            ...createTableTheme({
+                0: { cellWidth: 90 },
+                1: { cellWidth: 86 }
+            }),
+            margin: { left: 12, right: 12, top: 36, bottom: 16 }
+        });
+
+        cursorY = (doc.lastAutoTable?.finalY || cursorY) + 7;
+    });
+
+    const metaLine = buildMetaLine([
+        eventName ? `Evento: ${eventName}` : '',
+        eventDate ? `Data: ${formatDate(eventDate)}` : '',
+        eventLocation ? `Local: ${eventLocation}` : '',
+        `Modalidade: ${modeLabel}`,
+        `Atualizado em: ${formatDateTime()}`
+    ]);
+
+    applyBrandFrameToAllPages(doc, {
+        logo,
+        title: reportTitle,
+        subtitle: eventName || 'Genesis Esportes',
+        metaLine
+    });
+
+    const filename = `Relacao_${reportType === 'category' ? 'categoria' : 'academia'}_${buildFileSafeName(eventName)}_${buildFileSafeName(modeLabel)}.pdf`;
+    doc.save(filename);
+};
+
+export const generateSchedulePDF = async (rows = [], options = {}) => {
+    const {
+        eventName = '',
+        eventDate = '',
+        eventLocation = '',
+        modeLabel = '',
+        layout = 'table',
+        tvMode = false,
+        startTime = '',
+        fightDurationMinutes = 0,
+        transitionMinutes = 0,
+        areaCount = 1,
+        totalFights = 0,
+        totalDurationLabel = '',
+        estimatedEnd = '',
+        logoUrl = DEFAULT_LOGO_URL
+    } = options;
+
+    const normalizedRows = (Array.isArray(rows) ? rows : [])
+        .map((row, index) => ({
+            order: Number.isFinite(Number(row?.order)) ? Number(row.order) : index + 1,
+            bracketNumber: row?.bracketNumber ?? '-',
+            label: (row?.label || '-').toString(),
+            mode: (row?.mode || '-').toString(),
+            participants: Number.isFinite(Number(row?.participants)) ? Number(row.participants) : 0,
+            fights: Number.isFinite(Number(row?.fightCount)) ? Number(row.fightCount) : 0,
+            start: (row?.startLabel || '--:--').toString(),
+            end: (row?.endLabel || '--:--').toString(),
+            duration: (row?.durationLabel || '-').toString()
+        }))
+        .sort((a, b) => a.order - b.order);
+
+    if (!normalizedRows.length) {
+        throw new Error('Nenhum dado de cronograma disponivel para exportacao.');
+    }
+
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const logo = await loadLogo(logoUrl);
+    const generatedAt = formatDateTime();
+
+    const metaLine = buildMetaLine([
+        eventName ? `Evento: ${eventName}` : '',
+        eventDate ? `Data: ${formatDate(eventDate)}` : '',
+        eventLocation ? `Local: ${eventLocation}` : '',
+        modeLabel ? `Modalidade: ${modeLabel}` : '',
+        startTime ? `Inicio: ${startTime}` : '',
+        estimatedEnd ? `Termino previsto: ${estimatedEnd}` : '',
+        `Areas: ${Math.max(1, Number(areaCount) || 1)}`,
+        `Duracao luta: ${Math.max(1, Number(fightDurationMinutes) || 1)} min`,
+        `Intervalo: ${Math.max(0, Number(transitionMinutes) || 0)} min`,
+        `Lutas estimadas: ${Math.max(0, Number(totalFights) || 0)}`,
+        totalDurationLabel ? `Duracao total: ${totalDurationLabel}` : '',
+        `Gerado em: ${generatedAt}`
+    ]);
+
+    const isTvLayout = tvMode || ['tv', 'wall', 'presentation'].includes((layout || '').toString().trim().toLowerCase());
+
+    if (isTvLayout) {
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const left = 10;
+        const right = 10;
+        const top = 36;
+        const bottom = 16;
+        const sectionGap = 5;
+        const cardGapX = 5;
+        const cardGapY = 4.2;
+        const columnCount = 2;
+        const cardWidth = (pageWidth - left - right - (cardGapX * (columnCount - 1))) / columnCount;
+        const statGap = 4;
+        const statCount = 5;
+        const statWidth = (pageWidth - left - right - (statGap * (statCount - 1))) / statCount;
+        const safeAreaCount = Math.max(1, Number(areaCount) || 1);
+        const safeFightDuration = Math.max(1, Number(fightDurationMinutes) || 1);
+        const safeTransition = Math.max(0, Number(transitionMinutes) || 0);
+        const safeTotalFights = Math.max(0, Number(totalFights) || 0);
+        const availableBottom = pageHeight - bottom;
+
+        const drawBox = (x, y, width, height, fillColor = null, strokeColor = BRAND_LINE) => {
+            if (fillColor) {
+                doc.setFillColor(...fillColor);
+            }
+            doc.setDrawColor(...strokeColor);
+            if (typeof doc.roundedRect === 'function') {
+                doc.roundedRect(x, y, width, height, 2.5, 2.5, fillColor ? 'FD' : 'S');
+            } else {
+                doc.rect(x, y, width, height, fillColor ? 'FD' : 'S');
+            }
+        };
+
+        const drawOverview = (continuation = false) => {
+            let cursor = top;
+
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...BRAND_PRIMARY);
+            doc.setFontSize(16);
+            doc.text(continuation ? 'CRONOGRAMA OFICIAL - CONTINUACAO' : 'CRONOGRAMA OFICIAL - MODO TV', left, cursor);
+            cursor += 6;
+
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(...BRAND_MUTED);
+            doc.setFontSize(9);
+            const eventInfo = buildMetaLine([
+                eventName ? `Evento: ${eventName}` : '',
+                modeLabel ? `Modalidade: ${modeLabel}` : '',
+                eventDate ? `Data: ${formatDate(eventDate)}` : '',
+                eventLocation ? `Local: ${eventLocation}` : ''
+            ]);
+            doc.text(eventInfo || 'Genesis Esportes', left, cursor);
+            cursor += 5.2;
+
+            const stats = [
+                { label: 'Inicio', value: startTime || '--:--' },
+                { label: 'Termino previsto', value: estimatedEnd || '--:--' },
+                { label: 'Areas ativas', value: `${safeAreaCount}` },
+                { label: 'Lutas estimadas', value: `${safeTotalFights}` },
+                { label: 'Ritmo medio', value: `${safeFightDuration}+${safeTransition} min` }
+            ];
+
+            stats.forEach((item, index) => {
+                const x = left + (index * (statWidth + statGap));
+                const y = cursor;
+                drawBox(x, y, statWidth, 16, [246, 250, 255], BRAND_LINE);
+
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(...BRAND_SECONDARY);
+                doc.setFontSize(7.4);
+                doc.text((item.label || '').toUpperCase(), x + 2.6, y + 5.3);
+
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(...BRAND_TEXT);
+                doc.setFontSize(12.6);
+                doc.text(item.value || '-', x + 2.6, y + 12.4);
+            });
+
+            cursor += 16 + sectionGap;
+
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...BRAND_TEXT);
+            doc.setFontSize(10.5);
+            doc.text('SEQUENCIA DE LUTAS (TELAO / IMPRESSAO DE PAREDE)', left, cursor);
+            cursor += 4.6;
+
+            doc.setDrawColor(...BRAND_LINE);
+            doc.setLineWidth(0.28);
+            doc.line(left, cursor, pageWidth - right, cursor);
+            cursor += 3.6;
+            return cursor;
+        };
+
+        const buildCardHeight = (row) => {
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(11.8);
+            const titleLines = doc.splitTextToSize(row.label || '-', cardWidth - 10).slice(0, 3);
+            const titleHeight = Math.max(1, titleLines.length) * 4.45;
+            return 21 + titleHeight + 10;
+        };
+
+        const drawScheduleCard = (row, x, y, width, height) => {
+            drawBox(x, y, width, height, [250, 253, 255], BRAND_LINE);
+            doc.setFillColor(...BRAND_PRIMARY);
+            doc.rect(x, y, width, 8, 'F');
+
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(8.4);
+            doc.text(`ORDEM ${row.order}  |  CHAVE ${row.bracketNumber}`, x + 2.8, y + 5.2);
+            doc.text(`${row.start} - ${row.end}`, x + width - 2.8, y + 5.2, { align: 'right' });
+
+            const modeMeta = `${row.mode} | ${row.participants} atletas | ${row.fights} lutas`;
+            const titleTop = y + 13.3;
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...BRAND_TEXT);
+            doc.setFontSize(11.8);
+            const titleLines = doc.splitTextToSize(row.label || '-', width - 10).slice(0, 3);
+            doc.text(titleLines, x + 3, titleTop);
+
+            const titleHeight = Math.max(1, titleLines.length) * 4.45;
+            const metaY = titleTop + titleHeight + 1.8;
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(...BRAND_MUTED);
+            doc.setFontSize(8.7);
+            doc.text(modeMeta, x + 3, metaY);
+
+            const badgeWidth = 34;
+            const badgeHeight = 5.6;
+            const badgeX = x + width - badgeWidth - 3;
+            const badgeY = y + height - badgeHeight - 2.4;
+            drawBox(badgeX, badgeY, badgeWidth, badgeHeight, BRAND_ACCENT, [216, 156, 43]);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(8);
+            doc.text(row.duration || '-', badgeX + badgeWidth / 2, badgeY + 3.85, { align: 'center' });
+        };
+
+        let cursorY = drawOverview(false);
+        let pointer = 0;
+
+        while (pointer < normalizedRows.length) {
+            const rowItems = normalizedRows.slice(pointer, pointer + columnCount);
+            const rowHeight = Math.max(...rowItems.map(buildCardHeight));
+
+            if (cursorY + rowHeight > availableBottom) {
+                doc.addPage();
+                cursorY = drawOverview(true);
+            }
+
+            rowItems.forEach((item, index) => {
+                const x = left + (index * (cardWidth + cardGapX));
+                drawScheduleCard(item, x, cursorY, cardWidth, rowHeight);
+            });
+
+            cursorY += rowHeight + cardGapY;
+            pointer += columnCount;
+        }
+
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(7.4);
+        doc.setTextColor(...BRAND_MUTED);
+        doc.text(
+            `Gerado em ${generatedAt} | Formato visual para telao, chamada e impressao em parede.`,
+            left,
+            pageHeight - 13.2
+        );
+    } else {
+        const tableBody = normalizedRows.map((row) => ([
+            row.order,
+            row.bracketNumber,
+            row.label,
+            row.mode,
+            row.participants,
+            row.fights,
+            row.start,
+            row.end,
+            row.duration
+        ]));
+
+        runAutoTable(doc, {
+            head: [[
+                'ORDEM',
+                'CHAVE',
+                'CATEGORIA',
+                'MODO',
+                'ATLETAS',
+                'LUTAS',
+                'INICIO',
+                'FIM',
+                'DURACAO'
+            ]],
+            body: tableBody,
+            startY: 38,
+            ...createTableTheme({
+                0: { halign: 'center', cellWidth: 16, fontStyle: 'bold' },
+                1: { halign: 'center', cellWidth: 18, fontStyle: 'bold' },
+                2: { cellWidth: 82 },
+                3: { halign: 'center', cellWidth: 20, fontStyle: 'bold' },
+                4: { halign: 'center', cellWidth: 22 },
+                5: { halign: 'center', cellWidth: 18 },
+                6: { halign: 'center', cellWidth: 20, fontStyle: 'bold' },
+                7: { halign: 'center', cellWidth: 20, fontStyle: 'bold' },
+                8: { halign: 'center', cellWidth: 24, fontStyle: 'bold', textColor: BRAND_SECONDARY }
+            }),
+            margin: { left: 10, right: 10, top: 36, bottom: 16 }
+        });
+    }
+
+    applyBrandFrameToAllPages(doc, {
+        logo,
+        title: isTvLayout ? 'CRONOGRAMA OFICIAL - MODO TV' : 'CRONOGRAMA OFICIAL',
+        subtitle: eventName || 'Genesis Esportes',
+        metaLine
+    });
+
+    const fileName = isTvLayout
+        ? `Cronograma_ModoTV_${buildFileSafeName(eventName)}_${buildFileSafeName(modeLabel || 'geral')}.pdf`
+        : `Cronograma_${buildFileSafeName(eventName)}_${buildFileSafeName(modeLabel || 'geral')}.pdf`;
+    doc.save(fileName);
 };

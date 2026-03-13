@@ -1,10 +1,13 @@
 import React, { useDeferredValue, useEffect, useMemo, useState } from 'react';
-import { Medal, Search } from 'lucide-react';
+import { Medal, Search, Trophy } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { useStore } from '../hooks/useStore';
 import { useI18n } from '../hooks/useI18n';
 import { buildScoreBreakdown } from '../services/scoringService';
 import { buildFileSafeName, downloadCsv } from '../services/exportService';
+import { countryCodeFromAthlete, countryLabelFromCode, flagFromCountryCode } from '../utils/countryFlags';
+
+const SEGMENT_IDS = ['kids', 'adults', 'academies', 'masters'];
 
 const normalizeGroupPart = (value) => (
   (value || '').toString().trim().toLowerCase().replace(/\s+/g, ' ')
@@ -29,17 +32,93 @@ const parseLimitParam = (value, fallback) => {
   return parsed;
 };
 
+const parseSegmentParam = (value) => {
+  const normalized = (value || '').toString().trim().toLowerCase();
+  return SEGMENT_IDS.includes(normalized) ? normalized : 'academies';
+};
+
+const detectDivision = (athlete) => {
+  const category = normalizeSearchTerm(athlete?.categoria || '');
+  if (!category) return 'adults';
+  if (/(master|senior|seni[oô]r|veteran|veterano)/.test(category)) return 'masters';
+  if (/(kids|infantil|juvenil|mirim|pre mirim|pré mirim)/.test(category)) return 'kids';
+  return 'adults';
+};
+
+const detectMode = (athlete) => (
+  athlete?.isNoGi ? 'NO-GI' : 'GI'
+);
+
+const pickMostFrequentCode = (hits) => {
+  const entries = Object.entries(hits || {});
+  if (!entries.length) return 'BR';
+  entries.sort((a, b) => b[1] - a[1]);
+  return entries[0][0] || 'BR';
+};
+
+const buildTeamRanking = (athletes) => {
+  const teams = new Map();
+
+  athletes.forEach((athlete) => {
+    const academy = (athlete?.academia || 'Sem academia').toString().trim() || 'Sem academia';
+    const key = normalizeGroupPart(academy);
+    const stats = teams.get(key) || {
+      key,
+      academy,
+      campeao: 0,
+      vice: 0,
+      terceiro: 0,
+      wins: 0,
+      pontos: 0,
+      atletas: 0,
+      countryHits: {}
+    };
+
+    const history = Array.isArray(athlete?.historico) ? athlete.historico : [];
+    const breakdown = buildScoreBreakdown(history);
+
+    stats.campeao += breakdown.podium1;
+    stats.vice += breakdown.podium2;
+    stats.terceiro += breakdown.podium3;
+    stats.wins += breakdown.wins;
+    stats.pontos += Number(athlete?.pontos) || 0;
+    stats.atletas += 1;
+
+    const countryCode = countryCodeFromAthlete(athlete);
+    stats.countryHits[countryCode] = (stats.countryHits[countryCode] || 0) + 1;
+
+    teams.set(key, stats);
+  });
+
+  return Array.from(teams.values())
+    .sort((a, b) => {
+      if (b.pontos !== a.pontos) return b.pontos - a.pontos;
+      if (b.campeao !== a.campeao) return b.campeao - a.campeao;
+      if (b.wins !== a.wins) return b.wins - a.wins;
+      if (b.atletas !== a.atletas) return b.atletas - a.atletas;
+      return a.academy.localeCompare(b.academy);
+    })
+    .map((team, index) => ({
+      ...team,
+      rank: index + 1,
+      countryCode: pickMostFrequentCode(team.countryHits)
+    }));
+};
+
 const TeamRanking = () => {
   const { athletes, events, activeEventId } = useStore();
-  const { language } = useI18n();
-  const isEnglish = language === 'en-US';
+  const { uiLanguage } = useI18n();
+  const isEnglish = uiLanguage === 'en-US';
+  const isSpanish = uiLanguage === 'es-ES';
+  const isFrench = uiLanguage === 'fr-FR';
+
   const copy = isEnglish
     ? {
         noEvent: 'No event',
         allEvents: 'All events',
         event: 'Event',
         selectEvent: 'Select event',
-        searchTeam: 'Search team',
+        searchTeam: 'Search academy',
         show: 'Show',
         top25: 'Top 25',
         top50: 'Top 50',
@@ -48,65 +127,164 @@ const TeamRanking = () => {
         exportCsv: 'Export CSV',
         teams: 'Teams',
         athletes: 'Athletes',
-        results: 'Results',
-        teamTitle: 'Team ranking',
-        teamSubtitle: 'Points and medal totals by academy.',
-        top3: 'Top 3',
-        firstPlace: '1st place',
-        secondPlace: '2nd place',
-        thirdPlace: '3rd place',
-        emptyTeams: 'No team found.',
-        champion: 'Champion',
-        vice: 'Runner-up',
-        third: 'Third',
+        panels: 'Panels',
+        season: 'Season',
+        updatedNow: 'Updated now',
+        noData: 'No ranking data for this selection.',
+        seeAll: 'See all',
+        collapse: 'Collapse',
         points: 'Points',
-        placement: 'Placement',
+        wins: 'Wins',
+        gold: 'Gold',
+        silver: 'Silver',
+        bronze: 'Bronze',
         athletesLabel: 'athletes',
-        gold: 'gold',
-        silver: 'silver',
-        bronze: 'bronze',
-        placeSuffix: 'place'
+        segments: {
+          kids: 'Kids Ranking',
+          adults: 'Adults Ranking',
+          academies: 'Academies Ranking',
+          masters: 'Masters Ranking'
+        },
+        cards: {
+          kids: 'Best Academy Kids',
+          adults: 'Best Academy Adults',
+          masters: 'Best Academy Masters',
+          gi: 'GI',
+          nogi: 'NO-GI'
+        }
       }
-    : {
-        noEvent: 'Sem evento',
-        allEvents: 'Todos os eventos',
-        event: 'Evento',
-        selectEvent: 'Selecionar evento',
-        searchTeam: 'Buscar equipe ou academia',
-        show: 'Mostrar',
-        top25: 'Top 25',
-        top50: 'Top 50',
-        top100: 'Top 100',
-        all: 'Todos',
-        exportCsv: 'Exportar CSV',
-        teams: 'Equipes',
-        athletes: 'Atletas',
-        results: 'Resultados',
-        teamTitle: 'Classificação por equipe',
-        teamSubtitle: 'Soma de pontos e medalhas por academia.',
-        top3: 'Top 3',
-        firstPlace: '1º lugar',
-        secondPlace: '2º lugar',
-        thirdPlace: '3º lugar',
-        emptyTeams: 'Nenhuma equipe encontrada.',
-        champion: 'Campeão',
-        vice: 'Vice',
-        third: 'Terceiro',
-        points: 'Pontos',
-        placement: 'Colocação',
-        athletesLabel: 'atletas',
-        gold: 'ouro',
-        silver: 'prata',
-        bronze: 'bronze',
-        placeSuffix: 'lugar'
-      };
+    : isSpanish
+      ? {
+          noEvent: 'Sin evento',
+          allEvents: 'Todos los eventos',
+          event: 'Evento',
+          selectEvent: 'Seleccionar evento',
+          searchTeam: 'Buscar academia',
+          show: 'Mostrar',
+          top25: 'Top 25',
+          top50: 'Top 50',
+          top100: 'Top 100',
+          all: 'Todos',
+          exportCsv: 'Exportar CSV',
+          teams: 'Equipos',
+          athletes: 'Atletas',
+          panels: 'Paneles',
+          season: 'Temporada',
+          updatedNow: 'Actualizado ahora',
+          noData: 'No hay datos de ranking para este filtro.',
+          seeAll: 'Ver todo',
+          collapse: 'Ocultar',
+          points: 'Puntos',
+          wins: 'Victorias',
+          gold: 'Oro',
+          silver: 'Plata',
+          bronze: 'Bronce',
+          athletesLabel: 'atletas',
+          segments: {
+            kids: 'Ranking Kids',
+            adults: 'Ranking Adulto',
+            academies: 'Ranking de Academias',
+            masters: 'Ranking Master'
+          },
+          cards: {
+            kids: 'Mejor Academia Kids',
+            adults: 'Mejor Academia Adulto',
+            masters: 'Mejor Academia Master',
+            gi: 'GI',
+            nogi: 'NO-GI'
+          }
+        }
+      : isFrench
+        ? {
+            noEvent: 'Sans evenement',
+            allEvents: 'Tous les evenements',
+            event: 'Evenement',
+            selectEvent: "Selectionner l'evenement",
+            searchTeam: 'Rechercher academie',
+            show: 'Afficher',
+            top25: 'Top 25',
+            top50: 'Top 50',
+            top100: 'Top 100',
+            all: 'Tous',
+            exportCsv: 'Exporter CSV',
+            teams: 'Equipes',
+            athletes: 'Athletes',
+            panels: 'Panneaux',
+            season: 'Saison',
+            updatedNow: 'Mis a jour maintenant',
+            noData: 'Aucune donnee de classement pour ce filtre.',
+            seeAll: 'Voir tout',
+            collapse: 'Reduire',
+            points: 'Points',
+            wins: 'Victoires',
+            gold: 'Or',
+            silver: 'Argent',
+            bronze: 'Bronze',
+            athletesLabel: 'athletes',
+            segments: {
+              kids: 'Classement Kids',
+              adults: 'Classement Adulte',
+              academies: 'Classement Academies',
+              masters: 'Classement Masters'
+            },
+            cards: {
+              kids: 'Meilleure Academie Kids',
+              adults: 'Meilleure Academie Adulte',
+              masters: 'Meilleure Academie Master',
+              gi: 'GI',
+              nogi: 'NO-GI'
+            }
+          }
+        : {
+            noEvent: 'Sem evento',
+            allEvents: 'Todos os eventos',
+            event: 'Evento',
+            selectEvent: 'Selecionar evento',
+            searchTeam: 'Buscar academia',
+            show: 'Mostrar',
+            top25: 'Top 25',
+            top50: 'Top 50',
+            top100: 'Top 100',
+            all: 'Todos',
+            exportCsv: 'Exportar CSV',
+            teams: 'Equipes',
+            athletes: 'Atletas',
+            panels: 'Paineis',
+            season: 'Temporada',
+            updatedNow: 'Atualizado agora',
+            noData: 'Nenhum dado de ranking para este filtro.',
+            seeAll: 'Ver todos',
+            collapse: 'Recolher',
+            points: 'Pontos',
+            wins: 'Vitorias',
+            gold: 'Ouro',
+            silver: 'Prata',
+            bronze: 'Bronze',
+            athletesLabel: 'atletas',
+            segments: {
+              kids: 'Ranking Kids',
+              adults: 'Ranking Adulto',
+              academies: 'Ranking Academias',
+              masters: 'Ranking Masters'
+            },
+            cards: {
+              kids: 'Melhor Academia Kids',
+              adults: 'Melhor Academia Adulto',
+              masters: 'Melhor Academia Master',
+              gi: 'GI',
+              nogi: 'NO-GI'
+            }
+          };
+
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedEventId, setSelectedEventId] = useState(() => (
     searchParams.get('event') || activeEventId || 'all'
   ));
   const [searchTerm, setSearchTerm] = useState(() => normalizeQueryParam(searchParams.get('q')));
-  const deferredSearch = useDeferredValue(searchTerm);
   const [tableLimit, setTableLimit] = useState(() => parseLimitParam(searchParams.get('limit'), 50));
+  const [segment, setSegment] = useState(() => parseSegmentParam(searchParams.get('segment')));
+  const [expandedPanels, setExpandedPanels] = useState(() => new Set());
+  const deferredSearch = useDeferredValue(searchTerm);
 
   useEffect(() => {
     const hasSelectedEvent = events.some((event) => event.id === selectedEventId);
@@ -121,6 +299,7 @@ const TeamRanking = () => {
     const paramEvent = searchParams.get('event');
     const paramQuery = normalizeQueryParam(searchParams.get('q'));
     const paramLimit = parseLimitParam(searchParams.get('limit'), tableLimit);
+    const paramSegment = parseSegmentParam(searchParams.get('segment'));
 
     if (paramEvent && paramEvent !== selectedEventId) {
       setSelectedEventId(paramEvent);
@@ -130,6 +309,9 @@ const TeamRanking = () => {
     }
     if (paramLimit !== tableLimit) {
       setTableLimit(paramLimit);
+    }
+    if (paramSegment !== segment) {
+      setSegment(paramSegment);
     }
   }, [searchParamsKey]);
 
@@ -168,10 +350,20 @@ const TeamRanking = () => {
       changed = true;
     }
 
+    if (segment !== 'academies') {
+      if (params.get('segment') !== segment) {
+        params.set('segment', segment);
+        changed = true;
+      }
+    } else if (params.has('segment')) {
+      params.delete('segment');
+      changed = true;
+    }
+
     if (changed) {
       setSearchParams(params, { replace: true });
     }
-  }, [selectedEventId, searchTerm, tableLimit, searchParams, setSearchParams]);
+  }, [selectedEventId, searchTerm, tableLimit, segment, searchParams, setSearchParams]);
 
   const selectedEvent = useMemo(() => (
     events.find((event) => event.id === selectedEventId)
@@ -185,122 +377,114 @@ const TeamRanking = () => {
     })
   ), [athletes, selectedEventId]);
 
-  const teamRanking = useMemo(() => {
-    const teams = new Map();
-
-    eventFilteredAthletes.forEach((athlete) => {
-      const academy = (athlete.academia || 'Sem academia').toString().trim() || 'Sem academia';
-      const key = normalizeGroupPart(academy);
-      const stats = teams.get(key) || {
-        key,
-        academy,
-        campeao: 0,
-        vice: 0,
-        terceiro: 0,
-        pontos: 0,
-        atletas: 0
-      };
-
-      const history = Array.isArray(athlete.historico) ? athlete.historico : [];
-      const breakdown = buildScoreBreakdown(history);
-      stats.campeao += breakdown.podium1;
-      stats.vice += breakdown.podium2;
-      stats.terceiro += breakdown.podium3;
-      stats.pontos += Number(athlete.pontos) || 0;
-      stats.atletas += 1;
-
-      teams.set(key, stats);
-    });
-
-    return Array.from(teams.values())
-      .sort((a, b) => {
-        if (b.pontos !== a.pontos) return b.pontos - a.pontos;
-        if (b.campeao !== a.campeao) return b.campeao - a.campeao;
-        if (b.vice !== a.vice) return b.vice - a.vice;
-        if (b.terceiro !== a.terceiro) return b.terceiro - a.terceiro;
-        return a.academy.localeCompare(b.academy);
-      })
-      .map((team, index) => ({ ...team, rank: index + 1 }));
-  }, [eventFilteredAthletes]);
-
   const normalizedSearch = useMemo(() => normalizeSearchTerm(deferredSearch), [deferredSearch]);
 
-  const teamSearchIndex = useMemo(() => {
-    const map = new Map();
-    teamRanking.forEach((team) => {
-      map.set(team.key, normalizeSearchTerm(team.academy));
-    });
-    return map;
-  }, [teamRanking]);
+  const panelTemplates = useMemo(() => {
+    if (segment === 'kids') {
+      return [
+        { key: 'kids-gi', division: 'kids', mode: 'GI' },
+        { key: 'kids-nogi', division: 'kids', mode: 'NO-GI' }
+      ];
+    }
+    if (segment === 'adults') {
+      return [
+        { key: 'adults-gi', division: 'adults', mode: 'GI' },
+        { key: 'adults-nogi', division: 'adults', mode: 'NO-GI' }
+      ];
+    }
+    if (segment === 'masters') {
+      return [
+        { key: 'masters-gi', division: 'masters', mode: 'GI' },
+        { key: 'masters-nogi', division: 'masters', mode: 'NO-GI' }
+      ];
+    }
+    return [
+      { key: 'kids-gi', division: 'kids', mode: 'GI' },
+      { key: 'kids-nogi', division: 'kids', mode: 'NO-GI' },
+      { key: 'adults-gi', division: 'adults', mode: 'GI' },
+      { key: 'adults-nogi', division: 'adults', mode: 'NO-GI' }
+    ];
+  }, [segment]);
 
-  const filteredTeams = useMemo(() => {
-    if (!normalizedSearch) return teamRanking;
-    return teamRanking.filter((team) => (
-      (teamSearchIndex.get(team.key) || '').includes(normalizedSearch)
-    ));
-  }, [teamRanking, normalizedSearch, teamSearchIndex]);
+  const panelData = useMemo(() => (
+    panelTemplates.map((template) => {
+      const scopedAthletes = eventFilteredAthletes.filter((athlete) => (
+        detectDivision(athlete) === template.division
+        && detectMode(athlete) === template.mode
+      ));
+      const rankedTeams = buildTeamRanking(scopedAthletes);
+      const searchedTeams = normalizedSearch
+        ? rankedTeams.filter((team) => normalizeSearchTerm(team.academy).includes(normalizedSearch))
+        : rankedTeams;
+      const limitedTeams = tableLimit > 0 ? searchedTeams.slice(0, tableLimit) : searchedTeams;
 
-  const isSearching = normalizedSearch.length > 0;
+      const cardBaseTitle = copy.cards[template.division] || copy.cards.adults;
+      const modeLabel = template.mode === 'GI' ? copy.cards.gi : copy.cards.nogi;
+      return {
+        ...template,
+        title: `${cardBaseTitle} ${modeLabel}`,
+        teams: limitedTeams
+      };
+    })
+  ), [panelTemplates, eventFilteredAthletes, normalizedSearch, tableLimit, copy.cards]);
 
-  const visibleTeams = useMemo(() => {
-    if (!tableLimit || tableLimit <= 0) return filteredTeams;
-    return filteredTeams.slice(0, tableLimit);
-  }, [filteredTeams, tableLimit]);
-
-  const topTeams = isSearching ? [] : teamRanking.slice(0, 3);
-  const totalTeams = teamRanking.length;
+  const totalTeams = useMemo(() => (
+    buildTeamRanking(eventFilteredAthletes).length
+  ), [eventFilteredAthletes]);
   const totalAthletes = eventFilteredAthletes.length;
   const eventLabel = selectedEvent?.name || (selectedEventId === 'none' ? copy.noEvent : copy.allEvents);
+  const seasonLabel = `${copy.season} ${new Date().getFullYear()}`;
+
+  useEffect(() => {
+    setExpandedPanels(new Set());
+  }, [segment, selectedEventId, normalizedSearch]);
+
+  const togglePanel = (panelKey) => {
+    setExpandedPanels((prev) => {
+      const next = new Set(prev);
+      if (next.has(panelKey)) {
+        next.delete(panelKey);
+      } else {
+        next.add(panelKey);
+      }
+      return next;
+    });
+  };
 
   const handleExportCsv = () => {
     const headers = isEnglish
-      ? ['POS', 'TEAM', 'POINTS', 'CHAMPION', 'RUNNER_UP', 'THIRD', 'ATHLETES']
-      : ['POS', 'EQUIPE', 'PONTOS', 'CAMPEAO', 'VICE', 'TERCEIRO', 'ATLETAS'];
-    const rows = filteredTeams.map((team) => ([
-      team.rank,
-      team.academy,
-      team.pontos,
-      team.campeao,
-      team.vice,
-      team.terceiro,
-      team.atletas
-    ]));
-    const fileName = `ranking_equipes_${buildFileSafeName(eventLabel)}`;
+      ? ['PANEL', 'POS', 'TEAM', 'COUNTRY', 'POINTS', 'WINS', 'GOLD', 'SILVER', 'BRONZE', 'ATHLETES']
+      : isSpanish
+        ? ['PANEL', 'POS', 'EQUIPO', 'PAIS', 'PUNTOS', 'VICTORIAS', 'ORO', 'PLATA', 'BRONCE', 'ATLETAS']
+        : isFrench
+          ? ['PANNEAU', 'POS', 'EQUIPE', 'PAYS', 'POINTS', 'VICTOIRES', 'OR', 'ARGENT', 'BRONZE', 'ATHLETES']
+          : ['PAINEL', 'POS', 'EQUIPE', 'PAIS', 'PONTOS', 'VITORIAS', 'OURO', 'PRATA', 'BRONZE', 'ATLETAS'];
+
+    const rows = panelData.flatMap((panel) => (
+      panel.teams.map((team) => ([
+        panel.title,
+        team.rank,
+        team.academy,
+        countryLabelFromCode(team.countryCode, uiLanguage) || team.countryCode,
+        team.pontos,
+        team.wins,
+        team.campeao,
+        team.vice,
+        team.terceiro,
+        team.atletas
+      ]))
+    ));
+
+    const fileName = `ranking_equipes_${buildFileSafeName(segment)}_${buildFileSafeName(eventLabel)}`;
     downloadCsv(fileName, headers, rows);
   };
 
-  const formatPlace = (rank) => {
-    if (!isEnglish) return `${rank} ${copy.placeSuffix}`;
-    const mod10 = rank % 10;
-    const mod100 = rank % 100;
-    if (mod10 === 1 && mod100 !== 11) return `${rank}st ${copy.placeSuffix}`;
-    if (mod10 === 2 && mod100 !== 12) return `${rank}nd ${copy.placeSuffix}`;
-    if (mod10 === 3 && mod100 !== 13) return `${rank}rd ${copy.placeSuffix}`;
-    return `${rank}th ${copy.placeSuffix}`;
-  };
-  const renderPodiumLabel = (index) => {
-    if (index === 0) return copy.firstPlace;
-    if (index === 1) return copy.secondPlace;
-    return copy.thirdPlace;
-  };
-
-  const renderMedal = (index) => {
-    const medalClass = index === 0
-      ? 'team-medal--gold'
-      : index === 1
-        ? 'team-medal--silver'
-        : 'team-medal--bronze';
-    return <Medal className={`team-medal__icon ${medalClass}`} size={16} />;
-  };
-
   return (
-    <div className="ranking-minimal">
+    <div className="ranking-minimal team-ranking-premium">
       <div className="rank-controls">
         <div>
           <div className="rank-controls__label">{copy.event}</div>
-          <div className="rank-controls__value">
-            {selectedEvent?.name || (selectedEventId === 'none' ? copy.noEvent : copy.allEvents)}
-          </div>
+          <div className="rank-controls__value">{eventLabel}</div>
         </div>
         <select
           className="input select-compact"
@@ -356,97 +540,101 @@ const TeamRanking = () => {
           <strong>{totalAthletes}</strong>
         </div>
         <div className="rank-stat">
-          <span>{copy.results}</span>
-          <strong>{filteredTeams.length}</strong>
+          <span>{copy.panels}</span>
+          <strong>{panelTemplates.length}</strong>
         </div>
       </div>
 
-      <div className="rank-team">
-        <div className="rank-team__header">
-          <div>
-            <div className="rank-team__title">{copy.teamTitle}</div>
-            <div className="rank-team__subtitle">{copy.teamSubtitle}</div>
-          </div>
-          {!isSearching && <span className="tag">{copy.top3}</span>}
-        </div>
+      <div className="team-ranking-segments">
+        {SEGMENT_IDS.map((segmentId) => (
+          <button
+            key={segmentId}
+            type="button"
+            className={`team-ranking-segment ${segmentId === segment ? 'is-active' : ''}`}
+            onClick={() => setSegment(segmentId)}
+          >
+            {copy.segments[segmentId]}
+          </button>
+        ))}
+      </div>
 
-        {topTeams.length > 0 ? (
-          <div className="podium-grid">
-            {topTeams.map((team, index) => (
-              <div
-                key={team.key}
-                className={`podium-card podium-card--${index === 0 ? 'ouro' : index === 1 ? 'prata' : 'bronze'}`}
-              >
-                <div className="podium-card__info">
-                  <span className="podium-place">
-                    {renderMedal(index)}
-                    {renderPodiumLabel(index)}
-                  </span>
-                  <strong>{team.academy}</strong>
-                  <p>
-                    {team.campeao} {copy.gold} / {team.vice} {copy.silver} / {team.terceiro} {copy.bronze}
-                  </p>
+      <div className="team-ranking-panels">
+        {panelData.map((panel) => {
+          const expanded = expandedPanels.has(panel.key);
+          const hasMore = panel.teams.length > 3;
+          const visibleTeams = expanded ? panel.teams : panel.teams.slice(0, 3);
+          return (
+            <section key={panel.key} className="team-ranking-panel">
+              <header className="team-ranking-panel__header">
+                <div>
+                  <h3>{panel.title}</h3>
+                  <p>{copy.updatedNow}</p>
                 </div>
-                <div className="podium-card__score">
-                  <div>{team.pontos}</div>
-                  <span>{copy.points}</span>
-                </div>
+                <span className="team-ranking-panel__season">{seasonLabel}</span>
+              </header>
+
+              <div className="team-ranking-panel__body">
+                {visibleTeams.length === 0 ? (
+                  <div className="rank-empty">{copy.noData}</div>
+                ) : (
+                  visibleTeams.map((team) => {
+                    const countryLabel = countryLabelFromCode(team.countryCode, uiLanguage) || team.countryCode;
+                    return (
+                      <article key={`${panel.key}-${team.key}`} className="team-ranking-row">
+                        <div className="team-ranking-row__left">
+                          <div className="team-ranking-row__rank">{team.rank}</div>
+                          <div className="team-ranking-row__identity">
+                            <strong>{team.academy}</strong>
+                            <span>
+                              <span className="team-ranking-row__flag" aria-hidden="true">{flagFromCountryCode(team.countryCode)}</span>
+                              {countryLabel}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="team-ranking-row__metrics">
+                          <div className="team-ranking-metric is-points">
+                            <strong>{team.pontos}</strong>
+                            <span>{copy.points}</span>
+                          </div>
+                          <div className="team-ranking-metric is-wins">
+                            <strong>{team.wins}</strong>
+                            <span>{copy.wins}</span>
+                          </div>
+                          <div className="team-ranking-metric is-medals">
+                            <strong>{team.campeao + team.vice + team.terceiro}</strong>
+                            <span>{copy.gold + '/' + copy.silver + '/' + copy.bronze}</span>
+                          </div>
+                          <div className="team-ranking-medals">
+                            <span><Medal size={12} /> {team.campeao}</span>
+                            <span><Medal size={12} /> {team.vice}</span>
+                            <span><Medal size={12} /> {team.terceiro}</span>
+                            <span><Trophy size={12} /> {team.atletas} {copy.athletesLabel}</span>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })
+                )}
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="rank-empty">{copy.emptyTeams}</div>
-        )}
 
-        {filteredTeams.length > 0 && (
-          <table className="data-table team-table">
-            <thead>
-              <tr>
-                <th>{copy.teams}</th>
-                <th>
-                  <span className="team-medal team-medal--gold">
-                    <Medal size={14} />
-                    {copy.champion}
-                  </span>
-                </th>
-                <th>
-                  <span className="team-medal team-medal--silver">
-                    <Medal size={14} />
-                    {copy.vice}
-                  </span>
-                </th>
-                <th>
-                  <span className="team-medal team-medal--bronze">
-                    <Medal size={14} />
-                    {copy.third}
-                  </span>
-                </th>
-                <th>{copy.points}</th>
-                <th>{copy.placement}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibleTeams.map((team) => (
-                <tr key={team.key} className={`team-row ${team.rank <= 3 ? 'is-top' : ''}`}>
-                  <td>
-                    <div className="table-name">{team.academy}</div>
-                    <div className="table-meta">{team.atletas} {copy.athletesLabel}</div>
-                  </td>
-                  <td>{team.campeao}</td>
-                  <td>{team.vice}</td>
-                  <td>{team.terceiro}</td>
-                  <td>
-                    <span className="points-pill">{team.pontos}</span>
-                  </td>
-                  <td>{formatPlace(team.rank)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              {hasMore && (
+                <button
+                  type="button"
+                  className="team-ranking-panel__toggle"
+                  onClick={() => togglePanel(panel.key)}
+                >
+                  {expanded ? copy.collapse : copy.seeAll}
+                </button>
+              )}
+            </section>
+          );
+        })}
       </div>
     </div>
   );
 };
 
 export default TeamRanking;
+
+

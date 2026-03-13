@@ -68,7 +68,7 @@ const removeByKey = (value, key) => {
 };
 
 const News = () => {
-  const { language, locale } = useI18n();
+  const { locale, uiVariant } = useI18n();
   const { news } = useStore();
   const [instagramPosts, setInstagramPosts] = useState(() => loadCachedInstagramPosts());
   const [socialLoading, setSocialLoading] = useState(true);
@@ -94,62 +94,117 @@ const News = () => {
     startX: 0,
     startScrollLeft: 0
   });
-  const isEnglish = language === 'en-US';
-  const copy = isEnglish
-    ? {
-        kicker: 'News',
-        title: 'Updates and official announcements.',
-        description:
-          'Institutional content for athletes, academies and organizers. Keep everyone informed about ranking and events.',
-        fallbackDate: 'Date TBD',
-        emptyNews: 'No news published yet. Create one in admin panel.',
-        socialKicker: 'Social media',
-        socialTitle: 'Latest posts from Genesis Instagram',
-        socialOpenProfile: 'Open Instagram profile',
-        socialOpenPost: 'Open post',
-        socialSource: 'Instagram',
-        socialCaptionFallback: 'Genesis Esportes update',
-        socialImageUnavailable: 'Unable to load image',
-        socialRetryMedia: 'Retry',
-        socialRetryingMedia: 'Retrying...',
-        socialRetryTimeout: 'Could not load image.',
-        socialLoading: 'Loading latest Instagram posts...',
-        socialEmpty: 'No Instagram posts available yet.',
-        socialError: 'Instagram feed unavailable right now.',
-        socialPrev: 'Previous posts',
-        socialNext: 'Next posts',
-        openFullNewsHint: 'Double-click to read full news',
-        openFullNewsHintMobile: 'Tap to read full news',
-        openFullNews: 'Open full news',
-        closeModal: 'Close'
-      }
-    : {
-        kicker: 'Notícias',
-        title: 'Atualizações e comunicados oficiais.',
-        description:
-          'Conteúdo institucional para atletas, academias e organizadores. Informações oficiais sobre ranking, eventos e sistema.',
-        fallbackDate: 'Data a confirmar',
-        emptyNews: 'Nenhuma notícia publicada até o momento. Publique uma no painel administrativo.',
-        socialKicker: 'Mídias sociais',
-        socialTitle: 'Últimas publicações do Instagram da Genesis Esportes',
-        socialOpenProfile: 'Abrir perfil no Instagram',
-        socialOpenPost: 'Abrir post',
-        socialSource: 'Instagram',
-        socialCaptionFallback: 'Atualização da Genesis Esportes',
-        socialImageUnavailable: 'Imagem indisponível',
-        socialRetryMedia: 'Tentar novamente',
-        socialRetryingMedia: 'Tentando...',
-        socialRetryTimeout: 'Não foi possível carregar a imagem.',
-        socialLoading: 'Carregando as últimas publicações do Instagram...',
-        socialEmpty: 'Nenhuma publicação do Instagram disponível no momento.',
-        socialError: 'Feed do Instagram indisponível no momento.',
-        socialPrev: 'Posts anteriores',
-        socialNext: 'Próximos posts',
-        openFullNewsHint: 'Clique duas vezes para ler a notícia completa',
-        openFullNewsHintMobile: 'Toque para ler a notícia completa',
-        openFullNews: 'Abrir notícia completa',
-        closeModal: 'Fechar'
-      };
+  const copyByLanguage = {
+    pt: {
+      kicker: 'Noticias',
+      title: 'Atualizacoes e comunicados oficiais.',
+      description:
+        'Conteudo institucional para atletas, academias e organizadores. Informacoes oficiais sobre ranking, eventos e sistema.',
+      fallbackDate: 'Data a confirmar',
+      emptyNews: 'Nenhuma noticia publicada ate o momento. Publique uma no painel administrativo.',
+      socialKicker: 'Midias sociais',
+      socialTitle: 'Ultimas publicacoes do Instagram da Genesis Esporte',
+      socialOpenProfile: 'Abrir perfil no Instagram',
+      socialOpenPost: 'Abrir post',
+      socialSource: 'Instagram',
+      socialCaptionFallback: 'Atualizacao da Genesis Esporte',
+      socialImageUnavailable: 'Imagem indisponivel',
+      socialRetryMedia: 'Tentar novamente',
+      socialRetryingMedia: 'Tentando...',
+      socialRetryTimeout: 'Nao foi possivel carregar a imagem.',
+      socialLoading: 'Carregando as ultimas publicacoes do Instagram...',
+      socialEmpty: 'Nenhuma publicacao do Instagram disponivel no momento.',
+      socialError: 'Feed do Instagram indisponivel no momento.',
+      socialPrev: 'Posts anteriores',
+      socialNext: 'Proximos posts',
+      openFullNewsHint: 'Clique duas vezes para ler a noticia completa',
+      openFullNewsHintMobile: 'Toque para ler a noticia completa',
+      openFullNews: 'Abrir noticia completa',
+      closeModal: 'Fechar'
+    },
+    en: {
+      kicker: 'News',
+      title: 'Updates and official announcements.',
+      description:
+        'Institutional content for athletes, academies and organizers. Keep everyone informed about ranking and events.',
+      fallbackDate: 'Date TBD',
+      emptyNews: 'No news published yet. Create one in admin panel.',
+      socialKicker: 'Social media',
+      socialTitle: 'Latest posts from Genesis Instagram',
+      socialOpenProfile: 'Open Instagram profile',
+      socialOpenPost: 'Open post',
+      socialSource: 'Instagram',
+      socialCaptionFallback: 'Genesis Esportes update',
+      socialImageUnavailable: 'Unable to load image',
+      socialRetryMedia: 'Retry',
+      socialRetryingMedia: 'Retrying...',
+      socialRetryTimeout: 'Could not load image.',
+      socialLoading: 'Loading latest Instagram posts...',
+      socialEmpty: 'No Instagram posts available yet.',
+      socialError: 'Instagram feed unavailable right now.',
+      socialPrev: 'Previous posts',
+      socialNext: 'Next posts',
+      openFullNewsHint: 'Double-click to read full news',
+      openFullNewsHintMobile: 'Tap to read full news',
+      openFullNews: 'Open full news',
+      closeModal: 'Close'
+    },
+    es: {
+      kicker: 'Noticias',
+      title: 'Actualizaciones y comunicados oficiales.',
+      description:
+        'Contenido institucional para atletas, academias y organizadores. Informacion oficial sobre ranking, eventos y sistema.',
+      fallbackDate: 'Fecha por confirmar',
+      emptyNews: 'Todavia no hay noticias publicadas. Cree una en el panel administrativo.',
+      socialKicker: 'Redes sociales',
+      socialTitle: 'Ultimas publicaciones de Instagram de Genesis Esporte',
+      socialOpenProfile: 'Abrir perfil en Instagram',
+      socialOpenPost: 'Abrir publicacion',
+      socialSource: 'Instagram',
+      socialCaptionFallback: 'Actualizacion de Genesis Esporte',
+      socialImageUnavailable: 'Imagen no disponible',
+      socialRetryMedia: 'Reintentar',
+      socialRetryingMedia: 'Reintentando...',
+      socialRetryTimeout: 'No se pudo cargar la imagen.',
+      socialLoading: 'Cargando las ultimas publicaciones de Instagram...',
+      socialEmpty: 'No hay publicaciones de Instagram disponibles por ahora.',
+      socialError: 'El feed de Instagram no esta disponible en este momento.',
+      socialPrev: 'Publicaciones anteriores',
+      socialNext: 'Siguientes publicaciones',
+      openFullNewsHint: 'Doble clic para abrir la noticia completa',
+      openFullNewsHintMobile: 'Toque para abrir la noticia completa',
+      openFullNews: 'Abrir noticia completa',
+      closeModal: 'Cerrar'
+    },
+    fr: {
+      kicker: 'Actualites',
+      title: 'Mises a jour et annonces officielles.',
+      description:
+        'Contenu institutionnel pour athletes, academies et organisateurs. Informations officielles sur le classement, les evenements et le systeme.',
+      fallbackDate: 'Date a confirmer',
+      emptyNews: 'Aucune actualite publiee pour le moment. Publiez-en une dans le panneau admin.',
+      socialKicker: 'Reseaux sociaux',
+      socialTitle: 'Dernieres publications Instagram de Genesis Esporte',
+      socialOpenProfile: 'Ouvrir le profil Instagram',
+      socialOpenPost: 'Ouvrir la publication',
+      socialSource: 'Instagram',
+      socialCaptionFallback: 'Mise a jour Genesis Esporte',
+      socialImageUnavailable: 'Image indisponible',
+      socialRetryMedia: 'Reessayer',
+      socialRetryingMedia: 'Nouvelle tentative...',
+      socialRetryTimeout: 'Impossible de charger l image.',
+      socialLoading: 'Chargement des dernieres publications Instagram...',
+      socialEmpty: 'Aucune publication Instagram disponible pour le moment.',
+      socialError: 'Le flux Instagram est indisponible pour le moment.',
+      socialPrev: 'Publications precedentes',
+      socialNext: 'Publications suivantes',
+      openFullNewsHint: 'Double-cliquez pour lire l actualite complete',
+      openFullNewsHintMobile: 'Touchez pour lire l actualite complete',
+      openFullNews: 'Ouvrir l actualite complete',
+      closeModal: 'Fermer'
+    }
+  };
+  const copy = copyByLanguage[uiVariant] || copyByLanguage.pt;
 
   React.useEffect(() => {
     if (typeof window === 'undefined') return undefined;

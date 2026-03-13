@@ -1,10 +1,12 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+﻿import React, { createContext, useContext, useEffect, useState } from 'react';
 import { calculateTotalPoints, rankAthletes } from '../services/scoringService';
 import { authService } from '../services/authService';
+import { eventAdminService } from '../services/eventAdminService';
 import { publicRegistrationService } from '../services/publicRegistrationService';
 import { buildCategoryDescriptor, matchesBracketMode } from '../services/categoryService';
 import { nextPowerOfTwo, shuffleList } from '../services/bracketService';
 import { normalizeEventFees, resolveEventPixKey } from '../utils/eventPricing';
+import { formatBrazilPhone } from '../utils/phone';
 
 const STORAGE_KEY = 'genesis_ranking_data';
 const STORAGE_BACKUP_KEY = 'genesis_ranking_data_backup_v1';
@@ -160,9 +162,18 @@ const normalizeUser = (user) => {
         ...user,
         username: normalizeTextTrimmed(user.username || ''),
         name: normalizeTextTrimmed(user.name || ''),
-        role: user.role
+        role: normalizeTextTrimmed(user.role || '').toLowerCase()
     };
 };
+
+const normalizeMultilineText = (value) => (
+    normalizeText(value || '')
+        .replace(/\r\n/g, '\n')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .join('\n')
+);
 
 const initialData = {
     schemaVersion: STORAGE_VERSION,
@@ -375,6 +386,19 @@ const normalizeEvent = (event) => {
     const id = normalizeId(event.id || event.eventId || fallbackIdSource);
     if (!id && !normalizedName) return null;
     const registrationUrl = normalizeOptionalUrl(event.registrationUrl || event.registrationLink || '');
+    const weightTableGiUrl = normalizeOptionalUrl(
+        event.weightTableGiUrl || event.weightTableGiImageUrl || event.tabelaPesoGiUrl || ''
+    );
+    const weightTableNoGiUrl = normalizeOptionalUrl(
+        event.weightTableNoGiUrl || event.weightTableNoGiImageUrl || event.tabelaPesoNoGiUrl || ''
+    );
+    const circularUrl = normalizeOptionalUrl(event.circularUrl || event.circularImageUrl || event.circularPdfUrl || '');
+    const weightTableGiOptions = normalizeMultilineText(
+        event.weightTableGiOptions || event.weightOptionsGi || event.tabelaPesoGiOpcoes || ''
+    );
+    const weightTableNoGiOptions = normalizeMultilineText(
+        event.weightTableNoGiOptions || event.weightOptionsNoGi || event.tabelaPesoNoGiOpcoes || ''
+    );
     const fees = normalizeEventFees(event);
     const pixKey = resolveEventPixKey(event);
     const registrationOpen = normalizeBoolean(
@@ -393,6 +417,11 @@ const normalizeEvent = (event) => {
         location: normalizedLocation,
         posterUrl: normalizeOptionalUrl(event.posterUrl || event.imageUrl || ''),
         registrationUrl,
+        weightTableGiUrl,
+        weightTableNoGiUrl,
+        circularUrl,
+        weightTableGiOptions,
+        weightTableNoGiOptions,
         pixKey,
         feeUnder15: fees.under15,
         feeOver15: fees.over15,
@@ -546,7 +575,13 @@ const normalizeAcademy = (academy) => {
         city: normalizeTextTrimmed(academy.city || academy.cidade || ''),
         state: normalizeTextTrimmed(academy.state || academy.estado || ''),
         ownerName: normalizeTextTrimmed(academy.ownerName || academy.responsavel || ''),
-        contactPhone: normalizeTextTrimmed(academy.contactPhone || academy.telefone || ''),
+        ownerUsername: normalizeTextTrimmed(
+            academy.ownerUsername
+            || academy.responsavelUsuario
+            || academy.ownerUser
+            || ''
+        ).toLowerCase(),
+        contactPhone: formatBrazilPhone(academy.contactPhone || academy.telefone || ''),
         contactEmail: normalizeTextTrimmed(academy.contactEmail || academy.email || ''),
         logoUrl: normalizeOptionalUrl(academy.logoUrl || academy.fotoUrl || academy.imageUrl || ''),
         createdAt: normalizeTextTrimmed(academy.createdAt || '') || new Date().toISOString()
@@ -597,8 +632,8 @@ const normalizeMemberProfile = (profile) => {
             profile.accountUsername || profile.loginUsername || profile.username || ''
         ).toLowerCase(),
         email: normalizeTextTrimmed(profile.email || ''),
-        phone: normalizeTextTrimmed(profile.phone || profile.telefone || ''),
-        createdByUsername: normalizeTextTrimmed(profile.createdByUsername || profile.usuario || ''),
+        phone: formatBrazilPhone(profile.phone || profile.telefone || ''),
+        createdByUsername: normalizeTextTrimmed(profile.createdByUsername || profile.usuario || '').toLowerCase(),
         createdByName: normalizeTextTrimmed(profile.createdByName || profile.usuarioNome || ''),
         academyId: normalizeId(profile.academyId || ''),
         academyName: normalizeTextTrimmed(profile.academyName || profile.academia || profile.academy || ''),
@@ -607,6 +642,7 @@ const normalizeMemberProfile = (profile) => {
         belt: normalizeTextTrimmed(profile.belt || profile.faixa || ''),
         weight: normalizeTextTrimmed(profile.weight || profile.peso || ''),
         photoUrl: normalizeOptionalUrl(profile.photoUrl || profile.fotoUrl || profile.avatarUrl || profile.photo || ''),
+        coverUrl: normalizeOptionalUrl(profile.coverUrl || profile.capaUrl || profile.cover || ''),
         createdAt: normalizeTextTrimmed(profile.createdAt || '') || new Date().toISOString()
     };
 };
@@ -616,6 +652,113 @@ const resolveBracketMode = (athlete) => {
         return athlete.isNoGi ? 'ABS-NO-GI' : 'ABS-GI';
     }
     return athlete.isNoGi ? 'NO-GI' : 'GI';
+};
+
+const resolveAcademyBucketKey = (athlete, fallbackIndex = 0) => {
+    const academyKey = normalizeKeyPart(athlete?.academia || '');
+    if (academyKey) return academyKey;
+    return `__solo__${normalizeId(athlete?.id) || fallbackIndex}`;
+};
+
+const buildSideSeedOrder = (entries = []) => {
+    const buckets = new Map();
+    (Array.isArray(entries) ? entries : []).forEach((athlete, index) => {
+        const bucketKey = resolveAcademyBucketKey(athlete, index);
+        const list = buckets.get(bucketKey) || [];
+        list.push(athlete);
+        buckets.set(bucketKey, list);
+    });
+
+    const seeded = [];
+    while (buckets.size > 0) {
+        const orderedKeys = [...buckets.keys()].sort((leftKey, rightKey) => {
+            const leftSize = (buckets.get(leftKey) || []).length;
+            const rightSize = (buckets.get(rightKey) || []).length;
+            return rightSize - leftSize;
+        });
+
+        const firstKey = orderedKeys[0];
+        const firstList = buckets.get(firstKey) || [];
+        const firstAthlete = firstList.shift();
+        if (firstAthlete) seeded.push(firstAthlete);
+        if (firstList.length === 0) buckets.delete(firstKey);
+
+        const secondKey = orderedKeys.find((key) => key !== firstKey && (buckets.get(key) || []).length > 0);
+        if (!secondKey) continue;
+        const secondList = buckets.get(secondKey) || [];
+        const secondAthlete = secondList.shift();
+        if (secondAthlete) seeded.push(secondAthlete);
+        if (secondList.length === 0) buckets.delete(secondKey);
+    }
+
+    return seeded;
+};
+
+const buildAcademyAwareSeeds = (entries = []) => {
+    const list = Array.isArray(entries) ? entries.filter(Boolean) : [];
+    if (list.length <= 2) return list.map((athlete) => athlete.id);
+
+    const byAcademy = new Map();
+    list.forEach((athlete, index) => {
+        const academyKey = resolveAcademyBucketKey(athlete, index);
+        const group = byAcademy.get(academyKey) || [];
+        group.push(athlete);
+        byAcademy.set(academyKey, group);
+    });
+
+    const grouped = [...byAcademy.entries()]
+        .map(([academyKey, athletes]) => ({
+            academyKey,
+            athletes: shuffleList(athletes)
+        }))
+        .sort((a, b) => b.athletes.length - a.athletes.length);
+
+    const maxSideSize = Math.ceil(list.length / 2);
+    const left = [];
+    const right = [];
+    const leftAcademyCount = new Map();
+    const rightAcademyCount = new Map();
+
+    const pushToSide = (target, academyCounter, academyKey, athlete) => {
+        target.push(athlete);
+        academyCounter.set(academyKey, (academyCounter.get(academyKey) || 0) + 1);
+    };
+
+    grouped.forEach((group) => {
+        group.athletes.forEach((athlete) => {
+            const academyKey = group.academyKey;
+            const leftCount = leftAcademyCount.get(academyKey) || 0;
+            const rightCount = rightAcademyCount.get(academyKey) || 0;
+
+            if (left.length >= maxSideSize) {
+                pushToSide(right, rightAcademyCount, academyKey, athlete);
+                return;
+            }
+            if (right.length >= maxSideSize) {
+                pushToSide(left, leftAcademyCount, academyKey, athlete);
+                return;
+            }
+
+            if (leftCount < rightCount) {
+                pushToSide(left, leftAcademyCount, academyKey, athlete);
+                return;
+            }
+            if (rightCount < leftCount) {
+                pushToSide(right, rightAcademyCount, academyKey, athlete);
+                return;
+            }
+
+            if (left.length <= right.length) {
+                pushToSide(left, leftAcademyCount, academyKey, athlete);
+            } else {
+                pushToSide(right, rightAcademyCount, academyKey, athlete);
+            }
+        });
+    });
+
+    const leftSeeds = buildSideSeedOrder(left);
+    const rightSeeds = buildSideSeedOrder(right);
+    return [...leftSeeds, ...rightSeeds].map((athlete) => athlete.id);
 };
 
 const buildBracketPayloads = (athletes, eventId, mode, startingNumber) => {
@@ -637,7 +780,7 @@ const buildBracketPayloads = (athletes, eventId, mode, startingNumber) => {
     const ordered = [...groups.values()].sort((a, b) => a.label.localeCompare(b.label));
     let nextNumber = startingNumber;
     const brackets = ordered.map((group) => {
-        const seedIds = shuffleList(group.entries.map((athlete) => athlete.id));
+        const seedIds = buildAcademyAwareSeeds(group.entries);
         return {
             id: `${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
             number: nextNumber++,
@@ -990,33 +1133,93 @@ const useStoreState = () => {
     };
 
     const addAcademy = (payload = {}) => {
+        const currentRole = normalizeTextTrimmed(data.currentUser?.role || '').toLowerCase();
+        const currentUsername = normalizeTextTrimmed(data.currentUser?.username || '').toLowerCase();
+        const requestedId = normalizeId(payload.id || '');
+        const existingById = requestedId
+            ? data.academies.find((academy) => academy.id === requestedId)
+            : null;
+
+        const payloadOwnerUsername = normalizeTextTrimmed(payload.ownerUsername || '').toLowerCase();
+        const existingByOwner = !existingById && payloadOwnerUsername
+            ? data.academies.find((academy) => (
+                normalizeTextTrimmed(academy.ownerUsername || '').toLowerCase() === payloadOwnerUsername
+            ))
+            : null;
+
+        const targetAcademy = existingById || existingByOwner || null;
+        const targetOwnerUsername = normalizeTextTrimmed(targetAcademy?.ownerUsername || '').toLowerCase();
+
+        if (currentRole === 'coach' && currentUsername && targetAcademy) {
+            if (targetOwnerUsername && targetOwnerUsername !== currentUsername) {
+                addLog({
+                    type: 'ERROR',
+                    action: 'ADD_ACADEMY',
+                    details: `Professor tentou editar academia de outro dono: ${targetAcademy.name || targetAcademy.id}`
+                });
+                throw new Error('Professor pode editar apenas a propria academia.');
+            }
+        }
+
         const normalized = normalizeAcademy({
             ...payload,
-            id: payload.id || `academy-${Date.now()}`,
-            createdAt: payload.createdAt || new Date().toISOString()
+            id: targetAcademy?.id || payload.id || `academy-${Date.now()}`,
+            ownerUsername: currentRole === 'coach' && currentUsername
+                ? currentUsername
+                : (payloadOwnerUsername || targetOwnerUsername || ''),
+            createdAt: targetAcademy?.createdAt || payload.createdAt || new Date().toISOString()
         });
 
         if (!normalized) {
-            addLog({ type: 'ERROR', action: 'ADD_ACADEMY', details: 'Dados inválidos para academia.' });
+            addLog({ type: 'ERROR', action: 'ADD_ACADEMY', details: 'Dados invalidos para academia.' });
             throw new Error('Informe o nome da academia.');
         }
 
-        const exists = data.academies.find((academy) => normalizeKeyPart(academy.name) === normalizeKeyPart(normalized.name));
-        if (exists) {
+        const duplicate = data.academies.find((academy) => (
+            academy.id !== targetAcademy?.id
+            && normalizeKeyPart(academy.name) === normalizeKeyPart(normalized.name)
+        ));
+        if (duplicate) {
             addLog({ type: 'ERROR', action: 'ADD_ACADEMY', details: `Academia duplicada: ${normalized.name}` });
-            throw new Error('Já existe uma academia com este nome.');
+            throw new Error('Ja existe uma academia com este nome.');
         }
 
-        setData((prev) => ({
-            ...prev,
-            academies: [...prev.academies, normalized]
-                .map(normalizeAcademy)
-                .filter(Boolean)
-                .sort((a, b) => a.name.localeCompare(b.name))
-        }));
+        const targetId = targetAcademy?.id || normalized.id;
 
-        addLog({ type: 'INFO', action: 'ADD_ACADEMY', details: `Academia cadastrada: ${normalized.name}` });
-        return normalized;
+        setData((prev) => {
+            const hasTarget = prev.academies.some((academy) => academy.id === targetId);
+            const nextAcademies = hasTarget
+                ? prev.academies.map((academy) => (
+                    academy.id === targetId
+                        ? {
+                            ...academy,
+                            ...normalized,
+                            id: targetId,
+                            createdAt: academy.createdAt || normalized.createdAt
+                        }
+                        : academy
+                ))
+                : [...prev.academies, { ...normalized, id: targetId }];
+
+            return {
+                ...prev,
+                academies: nextAcademies
+                    .map(normalizeAcademy)
+                    .filter(Boolean)
+                    .sort((a, b) => a.name.localeCompare(b.name))
+            };
+        });
+
+        addLog({
+            type: 'INFO',
+            action: 'ADD_ACADEMY',
+            details: `${targetAcademy ? 'Academia atualizada' : 'Academia cadastrada'}: ${normalized.name}`
+        });
+
+        return {
+            ...normalized,
+            id: targetId
+        };
     };
 
     const deleteAcademy = (academyId) => {
@@ -1067,11 +1270,37 @@ const useStoreState = () => {
             : data.academies.find((item) => normalizeKeyPart(item.name) === normalizeKeyPart(normalized.academyName || ''));
         const academyId = academy?.id || normalized.academyId || '';
         const academyName = academy?.name || normalized.academyName || 'Sem academia';
+        const currentRole = normalizeTextTrimmed(data.currentUser?.role || '').toLowerCase();
+        const currentUsername = normalizeTextTrimmed(data.currentUser?.username || '').toLowerCase();
+
+        if (currentRole === 'coach' && currentUsername) {
+            if (!academyId) {
+                addLog({ type: 'ERROR', action: 'ADD_MEMBER', details: 'Professor tentou salvar aluno sem academia.' });
+                throw new Error('Selecione uma academia valida para vincular o aluno.');
+            }
+
+            const academyRecord = data.academies.find((item) => item.id === academyId);
+            const ownerUsername = normalizeTextTrimmed(academyRecord?.ownerUsername || '').toLowerCase();
+            const ownsAcademy = ownerUsername === currentUsername;
+            const orphanAcademy = !ownerUsername;
+            if (!ownsAcademy && !orphanAcademy) {
+                addLog({
+                    type: 'ERROR',
+                    action: 'ADD_MEMBER',
+                    details: `Professor tentou vincular aluno fora da propria academia: ${academyName}`
+                });
+                throw new Error('Professor pode cadastrar alunos apenas da propria academia.');
+            }
+        }
 
         const profileToSave = {
             ...normalized,
             academyId,
-            academyName
+            academyName,
+            createdByUsername: currentRole === 'coach' && currentUsername
+                ? currentUsername
+                : normalizeTextTrimmed(normalized.createdByUsername || '').toLowerCase(),
+            createdByName: normalizeTextTrimmed(normalized.createdByName || data.currentUser?.name || '')
         };
 
         const duplicate = data.memberProfiles.find((profile) => (
@@ -1143,6 +1372,24 @@ const useStoreState = () => {
             throw new Error('Perfil não encontrado.');
         }
 
+        const currentRole = normalizeTextTrimmed(data.currentUser?.role || '').toLowerCase();
+        const currentUsername = normalizeTextTrimmed(data.currentUser?.username || '').toLowerCase();
+        if (currentRole === 'coach' && currentUsername) {
+            const ownsAcademy = data.academies.some((academy) => (
+                academy.id === existing.academyId
+                && normalizeTextTrimmed(academy.ownerUsername || '').toLowerCase() === currentUsername
+            ));
+            const createdByCoach = normalizeTextTrimmed(existing.createdByUsername || '').toLowerCase() === currentUsername;
+            if (!ownsAcademy && !createdByCoach) {
+                addLog({
+                    type: 'ERROR',
+                    action: 'DELETE_MEMBER',
+                    details: `Professor sem permissao para remover perfil ${existing.fullName}`
+                });
+                throw new Error('Professor pode remover apenas alunos da propria academia.');
+            }
+        }
+
         setData((prev) => ({
             ...prev,
             memberProfiles: prev.memberProfiles.filter((item) => item.id !== id)
@@ -1204,27 +1451,32 @@ const useStoreState = () => {
         addLog({ type: 'WARN', action: 'DELETE_NEWS', details: `Notícia removida: ${title}` });
     };
 
-    const addEvent = (event) => {
+    const addEvent = async (event) => {
         const name = normalizeTextTrimmed(event?.name || '');
         if (!name) {
-            addLog({ type: 'ERROR', action: 'ADD_EVENT', details: 'Nome do evento não informado.' });
+            addLog({ type: 'ERROR', action: 'ADD_EVENT', details: 'Nome do evento nao informado.' });
             throw new Error('Informe o nome do evento.');
         }
         const exists = data.events.find((item) => normalizeKeyPart(item.name) === normalizeKeyPart(name));
         if (exists) {
             addLog({ type: 'ERROR', action: 'ADD_EVENT', details: `Evento duplicado: ${name}` });
-            throw new Error('Já existe um evento com este nome.');
+            throw new Error('Ja existe um evento com este nome.');
         }
         const fees = normalizeEventFees(event);
         const pixKey = resolveEventPixKey(event);
 
-        const newEvent = {
+        const localEventDraft = {
             id: Date.now().toString(),
             name,
             date: typeof event?.date === 'string' ? event.date.trim() : event?.date || '',
             location: normalizeTextTrimmed(event?.location || ''),
             posterUrl: normalizeOptionalUrl(event?.posterUrl || event?.imageUrl || ''),
             registrationUrl: normalizeOptionalUrl(event?.registrationUrl || event?.registrationLink || ''),
+            weightTableGiUrl: normalizeOptionalUrl(event?.weightTableGiUrl || ''),
+            weightTableNoGiUrl: normalizeOptionalUrl(event?.weightTableNoGiUrl || ''),
+            circularUrl: normalizeOptionalUrl(event?.circularUrl || ''),
+            weightTableGiOptions: normalizeMultilineText(event?.weightTableGiOptions || ''),
+            weightTableNoGiOptions: normalizeMultilineText(event?.weightTableNoGiOptions || ''),
             pixKey,
             feeUnder15: fees.under15,
             feeOver15: fees.over15,
@@ -1235,13 +1487,71 @@ const useStoreState = () => {
             createdAt: new Date().toISOString()
         };
 
-        setData(prev => ({
-            ...prev,
-            events: [...prev.events, newEvent],
-            activeEventId: newEvent.id
-        }));
-        addLog({ type: 'INFO', action: 'ADD_EVENT', details: `Evento criado: ${name}` });
-        return newEvent;
+        let savedEvent = localEventDraft;
+        const hasApiToken = Boolean(
+            authService?.getApiToken
+            && authService.getApiToken()?.toString().trim()
+        );
+
+        if (hasApiToken) {
+            try {
+                const remoteResult = await eventAdminService.createEvent(localEventDraft);
+                if (remoteResult?.data) {
+                    const mergedRemoteEvent = normalizeEvent({
+                        ...localEventDraft,
+                        ...remoteResult.data,
+                        createdAt: localEventDraft.createdAt
+                    });
+                    if (mergedRemoteEvent) {
+                        savedEvent = {
+                            ...mergedRemoteEvent,
+                            // Preserve local rich assets when backend returns null/empty.
+                            posterUrl: mergedRemoteEvent.posterUrl || localEventDraft.posterUrl,
+                            registrationUrl: mergedRemoteEvent.registrationUrl || localEventDraft.registrationUrl,
+                            weightTableGiUrl: mergedRemoteEvent.weightTableGiUrl || localEventDraft.weightTableGiUrl,
+                            weightTableNoGiUrl: mergedRemoteEvent.weightTableNoGiUrl || localEventDraft.weightTableNoGiUrl,
+                            circularUrl: mergedRemoteEvent.circularUrl || localEventDraft.circularUrl,
+                            weightTableGiOptions: mergedRemoteEvent.weightTableGiOptions || localEventDraft.weightTableGiOptions,
+                            weightTableNoGiOptions: mergedRemoteEvent.weightTableNoGiOptions || localEventDraft.weightTableNoGiOptions
+                        };
+                    }
+                }
+            } catch (error) {
+                const message = error?.message || 'Falha ao criar campeonato no servidor.';
+                addLog({ type: 'ERROR', action: 'ADD_EVENT', details: message });
+                throw new Error(message);
+            }
+        }
+
+        setData(prev => {
+            const existingIndex = prev.events.findIndex((item) => (
+                item.id === savedEvent.id
+                || normalizeKeyPart(item.name) === normalizeKeyPart(savedEvent.name)
+            ));
+
+            if (existingIndex >= 0) {
+                const nextEvents = [...prev.events];
+                nextEvents[existingIndex] = {
+                    ...nextEvents[existingIndex],
+                    ...savedEvent
+                };
+                return {
+                    ...prev,
+                    events: nextEvents,
+                    activeEventId: savedEvent.id
+                };
+            }
+
+            return {
+                ...prev,
+                events: [...prev.events, savedEvent],
+                activeEventId: savedEvent.id
+            };
+        });
+
+        const sourceLabel = hasApiToken ? ' (sincronizado no backend)' : ' (modo local)';
+        addLog({ type: 'INFO', action: 'ADD_EVENT', details: `Evento criado: ${name}${sourceLabel}` });
+        return savedEvent;
     };
 
     const updateEvent = (eventId, updates = {}) => {
@@ -1287,6 +1597,11 @@ const useStoreState = () => {
             location: normalizeTextTrimmed(updates?.location ?? current.location ?? ''),
             posterUrl: normalizeOptionalUrl(updates?.posterUrl ?? current.posterUrl ?? ''),
             registrationUrl: normalizeOptionalUrl(updates?.registrationUrl ?? current.registrationUrl ?? ''),
+            weightTableGiUrl: normalizeOptionalUrl(updates?.weightTableGiUrl ?? current.weightTableGiUrl ?? ''),
+            weightTableNoGiUrl: normalizeOptionalUrl(updates?.weightTableNoGiUrl ?? current.weightTableNoGiUrl ?? ''),
+            circularUrl: normalizeOptionalUrl(updates?.circularUrl ?? current.circularUrl ?? ''),
+            weightTableGiOptions: normalizeMultilineText(updates?.weightTableGiOptions ?? current.weightTableGiOptions ?? ''),
+            weightTableNoGiOptions: normalizeMultilineText(updates?.weightTableNoGiOptions ?? current.weightTableNoGiOptions ?? ''),
             pixKey,
             feeUnder15: fees.under15,
             feeOver15: fees.over15,
@@ -1620,6 +1935,46 @@ const useStoreState = () => {
         }));
     };
 
+    const setBracketSeedOrder = (bracketId, orderedSeedIds = []) => {
+        const normalizedBracketId = normalizeId(bracketId);
+        if (!normalizedBracketId) return;
+
+        const ordered = normalizeArray(orderedSeedIds)
+            .map(normalizeId)
+            .filter(Boolean);
+
+        setData((prev) => ({
+            ...prev,
+            brackets: prev.brackets.map((bracket) => {
+                if (normalizeId(bracket.id) !== normalizedBracketId) return bracket;
+                const currentSeeds = normalizeArray(bracket.seedIds).map(normalizeId).filter(Boolean);
+                if (!currentSeeds.length) return bracket;
+
+                const currentSet = new Set(currentSeeds);
+                const nextSeeds = [
+                    ...ordered.filter((seedId) => currentSet.has(seedId)),
+                    ...currentSeeds.filter((seedId) => !ordered.includes(seedId))
+                ];
+
+                if (nextSeeds.length === currentSeeds.length
+                    && nextSeeds.every((seedId, index) => seedId === currentSeeds[index])) {
+                    return bracket;
+                }
+
+                return {
+                    ...bracket,
+                    seedIds: nextSeeds
+                };
+            })
+        }));
+
+        addLog({
+            type: 'INFO',
+            action: 'REORDER_BRACKET',
+            details: `Ordem de atletas atualizada na chave ${normalizedBracketId}.`
+        });
+    };
+
     const applyBracketPodium = (bracketId) => {
         const bracket = data.brackets.find((item) => item.id === bracketId);
         if (!bracket) {
@@ -1816,6 +2171,7 @@ const useStoreState = () => {
         resetAthletePoints,
         generateBrackets,
         setBracketPodium,
+        setBracketSeedOrder,
         applyBracketPodium,
         clearAthletes,
         importAthletes,
@@ -1837,4 +2193,8 @@ export const useStore = () => {
     }
     return context;
 };
+
+
+
+
 

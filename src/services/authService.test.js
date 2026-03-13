@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+﻿import { describe, it, expect, beforeEach } from 'vitest';
 import { authService } from './authService';
 
 describe('authService', () => {
@@ -9,7 +9,7 @@ describe('authService', () => {
     });
 
     it('should throw error if username is missing', async () => {
-        await expect(authService.login('', 'pass')).rejects.toThrow('Por favor, informe o nome de usuário.');
+        await expect(authService.login('', 'pass')).rejects.toThrow('Por favor, informe o nome de usuario.');
     });
 
     it('should throw error if password is missing', async () => {
@@ -17,7 +17,7 @@ describe('authService', () => {
     });
 
     it('should throw error for invalid user', async () => {
-        await expect(authService.login('wrongUser', 'pass')).rejects.toThrow('Usuário não encontrado.');
+        await expect(authService.login('wrongUser', 'pass')).rejects.toThrow('Usuario nao encontrado.');
     });
 
     it('should throw error for invalid password', async () => {
@@ -32,8 +32,9 @@ describe('authService', () => {
     });
 
     it('should reset password for an existing user', async () => {
-        await authService.resetPassword('simone', 'novaSenha123');
-        const user = await authService.login('simone', 'novaSenha123');
+        await authService.resetPassword('simone', 'NovaSenha@123');
+        const user = await authService.login('simone', 'NovaSenha@123');
         expect(user).toHaveProperty('username', 'simone');
     });
 });
+

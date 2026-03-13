@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import br.com.genesis.ranking.dto.UserCreateRequest;
 import br.com.genesis.ranking.dto.UserResponse;
+import br.com.genesis.ranking.dto.UserUpdateRequest;
 import br.com.genesis.ranking.model.User;
 import br.com.genesis.ranking.model.enums.Role;
 import br.com.genesis.ranking.repository.UserRepository;
@@ -48,6 +49,47 @@ public class UserService {
         .collect(Collectors.toList());
   }
 
+  public UserResponse updateUser(String id, UserUpdateRequest request) {
+    User user = userRepository.findById(id)
+        .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado."));
+
+    String username = normalizeUsername(request.getUsername());
+    if (username.isBlank()) {
+      throw new IllegalArgumentException("Informe um usuário válido.");
+    }
+    if (userRepository.existsByUsernameIgnoreCaseAndIdNot(username, user.getId())) {
+      throw new IllegalArgumentException("Usuário já cadastrado.");
+    }
+
+    String name = request.getName() == null ? "" : request.getName().trim();
+    if (name.isBlank()) {
+      throw new IllegalArgumentException("Informe o nome do usuário.");
+    }
+
+    Role nextRole = parseRole(request.getRole());
+    if (user.getRole() == Role.ADMIN && nextRole != Role.ADMIN && userRepository.countByRole(Role.ADMIN) <= 1) {
+      throw new IllegalArgumentException("Não é possível remover o último administrador do sistema.");
+    }
+
+    user.setUsername(username);
+    user.setName(name);
+    user.setRole(nextRole);
+
+    User saved = userRepository.save(user);
+    return toResponse(saved);
+  }
+
+  public void deleteUser(String id) {
+    User user = userRepository.findById(id)
+        .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado."));
+
+    if (user.getRole() == Role.ADMIN && userRepository.countByRole(Role.ADMIN) <= 1) {
+      throw new IllegalArgumentException("Não é possível excluir o último administrador do sistema.");
+    }
+
+    userRepository.delete(user);
+  }
+
   public UserResponse toResponse(User user) {
     UserResponse response = new UserResponse();
     response.setId(user.getId());
@@ -66,7 +108,7 @@ public class UserService {
     return switch (normalized) {
       case "ADMIN", "ADMINISTRADOR" -> Role.ADMIN;
       case "MESARIO", "MESA", "STAFF" -> Role.MESARIO;
-      case "COACH" -> Role.COACH;
+      case "COACH", "PROFESSOR", "PROF", "TREINADOR" -> Role.COACH;
       case "ATHLETE", "ATLETA" -> Role.ATHLETE;
       default -> Role.ATHLETE;
     };

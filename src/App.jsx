@@ -22,10 +22,13 @@ import Athletes from './pages/Athletes';
 import Dashboard from './pages/Dashboard';
 import Events from './pages/Events';
 import EventDetails from './pages/EventDetails';
+import EventReports from './pages/EventReports';
 import Home from './pages/Home';
 import Membership from './pages/Membership';
 import MyAccount from './pages/MyAccount';
 import News from './pages/News';
+import Organizers from './pages/Organizers';
+import PublicProfile from './pages/PublicProfile';
 import Regulations from './pages/Regulations';
 import Ranking from './pages/Ranking';
 import TeamRanking from './pages/TeamRanking';
@@ -37,6 +40,7 @@ import { DEFAULT_EVENT_FEES, DEFAULT_EVENT_PIX_KEY } from './utils/eventPricing'
 import './index.css';
 
 const MAX_EVENT_POSTER_UPLOAD_BYTES = 8_000_000;
+const MAX_EVENT_ASSET_UPLOAD_BYTES = 1_500_000;
 const TARGET_EVENT_POSTER_STORED_BYTES = 420_000;
 const MAX_EVENT_POSTER_STORED_BYTES = 1_000_000;
 const EVENT_POSTER_MAX_WIDTH = 1400;
@@ -52,6 +56,11 @@ const createEventFormState = () => ({
   location: '',
   posterUrl: '',
   registrationUrl: '',
+  weightTableGiUrl: '',
+  weightTableNoGiUrl: '',
+  circularUrl: '',
+  weightTableGiOptions: '',
+  weightTableNoGiOptions: '',
   pixKey: DEFAULT_EVENT_PIX_KEY,
   feeUnder15: DEFAULT_EVENT_FEES.under15,
   feeOver15: DEFAULT_EVENT_FEES.over15,
@@ -62,6 +71,7 @@ const createEventFormState = () => ({
 });
 
 const isDataImageUrl = (value) => /^data:image\//i.test((value || '').toString().trim());
+const isDataPdfUrl = (value) => /^data:application\/pdf/i.test((value || '').toString().trim());
 
 const estimateDataUrlBytes = (dataUrl) => {
   const value = (dataUrl || '').toString();
@@ -174,15 +184,22 @@ const AppLayout = () => {
   const [logoReady, setLogoReady] = useState(true);
   const [eventForm, setEventForm] = useState(createEventFormState);
   const [eventError, setEventError] = useState('');
+  const [eventSuccess, setEventSuccess] = useState('');
   const [showLogin, setShowLogin] = useState(false);
   const currentUserRole = (currentUser?.role || '').toString().trim().toLowerCase();
+  const isCoachUser = currentUserRole === 'coach' || currentUserRole === 'professor';
   const canAccessAdmin = currentUserRole === 'admin';
   const canAccessDashboard = canAccessAdmin || currentUserRole === 'mesario';
-  const isAdminRoute = location.pathname === '/admin';
+  const isAdminRoute = location.pathname.startsWith('/admin');
   const isHomeRoute = location.pathname === '/';
-  const { language, setLanguage, currentLanguage, languages } = useI18n();
-  const isEnglish = language === 'en-US';
+  const { language, setLanguage, currentLanguage, languages, uiLanguage } = useI18n();
+  const isEnglish = uiLanguage === 'en-US';
+  const isSpanish = uiLanguage === 'es-ES';
+  const isFrench = uiLanguage === 'fr-FR';
   const [eventPosterStoredSizeBytes, setEventPosterStoredSizeBytes] = useState(0);
+  const [eventWeightTableGiStoredSizeBytes, setEventWeightTableGiStoredSizeBytes] = useState(0);
+  const [eventWeightTableNoGiStoredSizeBytes, setEventWeightTableNoGiStoredSizeBytes] = useState(0);
+  const [eventCircularStoredSizeBytes, setEventCircularStoredSizeBytes] = useState(0);
 
   const copy = useMemo(() => (
     isEnglish
@@ -224,7 +241,7 @@ const AppLayout = () => {
           },
           membershipMenu: {
             member: 'Member Area',
-            registerAcademy: 'Academy Area'
+            registerAcademy: 'Academy and Coach'
           },
           newsMenu: {
             blog: 'Blog & News',
@@ -239,6 +256,7 @@ const AppLayout = () => {
           },
           accountMenu: {
             myAccount: 'My account',
+            academy: 'Academy',
             settings: 'Settings',
             manageProfiles: 'Manage profiles',
             logout: 'Log out',
@@ -256,17 +274,6 @@ const AppLayout = () => {
             mapLabel: 'Parque Turista - Contagem / MG',
             mapAddress: 'Rua Pains, 139',
             viewMap: 'View on map',
-            menu: 'Site menu',
-            home: 'Home',
-            institutional: 'About',
-            events: 'Events',
-            ranking: 'Ranking',
-            rankingTeams: 'Team Ranking',
-            athletes: 'Athletes',
-            membership: 'Membership',
-            regulations: 'Regulations',
-            news: 'News',
-            adminPanel: 'Admin panel',
             rights: 'All rights reserved.'
           },
           eventModal: {
@@ -288,6 +295,23 @@ const AppLayout = () => {
             posterReadFail: 'Failed to process selected poster image.',
             registrationUrl: 'Registration URL (optional)',
             registrationUrlPlaceholder: 'https://...',
+            weightTableGiUrl: 'GI weight table URL (image/PDF)',
+            weightTableGiUrlPlaceholder: 'https://.../weight-gi.jpg',
+            weightTableNoGiUrl: 'NO-GI weight table URL (image/PDF)',
+            weightTableNoGiUrlPlaceholder: 'https://.../weight-no-gi.jpg',
+            circularUrl: 'Event circular URL (optional)',
+            circularUrlPlaceholder: 'https://.../circular.pdf',
+            weightTableGiFile: 'Upload GI table file (image/PDF)',
+            weightTableNoGiFile: 'Upload NO-GI table file (image/PDF)',
+            circularFile: 'Upload event circular file (image/PDF)',
+            assetStoredSize: 'Stored size',
+            assetTypeInvalid: 'Select an image or PDF file.',
+            assetUploadTooLarge: 'File too large. Maximum upload size is 1.5 MB.',
+            assetReadFail: 'Failed to process selected file.',
+            weightTableGiOptions: 'GI weight options (one per line)',
+            weightTableGiOptionsPlaceholder: 'Ex: Light up to 76,00',
+            weightTableNoGiOptions: 'NO-GI weight options (one per line)',
+            weightTableNoGiOptionsPlaceholder: 'Ex: Middle up to 82,30',
             pixKey: 'Pix key (event owner)',
             pixKeyPlaceholder: 'CPF / CNPJ / email / phone / random key',
             feeUnder15: 'Fee up to 15 years (GI/NO-GI)',
@@ -301,126 +325,379 @@ const AppLayout = () => {
             error: 'Failed to create event.'
           }
         }
-      : {
-          utilityLinks: {
-            about: 'Sobre',
-            organizers: 'Organizadores',
-            support: 'Suporte'
-          },
-          supportMenu: {
-            whatsapp: 'WhatsApp',
-            email: 'Enviar e-mail'
-          },
-          utility: {
-            partnerBrands: 'Marcas parceiras',
-            account: 'Conta',
-            language: 'Idioma'
-          },
-          nav: {
-            events: 'Eventos',
-            rankings: 'Rankings',
-            athletes: 'Atletas',
-            membership: 'Filiação',
-            news: 'Notícias',
-            regulations: 'Regulamento'
-          },
-          eventsMenu: {
-            upcoming: 'Próximos eventos',
-            calendar: 'Calendário de eventos 2026',
-            past: 'Eventos passados'
-          },
-          rankingMenu: {
-            overall: 'Ranking geral',
-            gi: 'Ranking GI',
-            noGi: 'Ranking NO-GI',
-            teams: 'Ranking equipes',
-            registeredEvents: 'Campeonatos cadastrados',
-            emptyEvents: 'Nenhum campeonato cadastrado'
-          },
-          membershipMenu: {
-            member: 'Área do membro',
-            registerAcademy: 'Área da academia'
-          },
-          newsMenu: {
-            blog: 'Blog e notícias',
-            videos: 'Biblioteca de vídeos',
-            magazine: 'Revista Jiu-Jitsu World',
-            social: 'Mídias sociais'
-          },
-          regulationsMenu: {
-            rankingRules: 'Regras do ranking',
-            pointsSystem: 'Sistema de pontos',
-            eventLevels: 'Níveis de evento'
-          },
-          accountMenu: {
-            myAccount: 'Minha conta',
-            settings: 'Configurações',
-            manageProfiles: 'Gerenciar perfis',
-            logout: 'Sair',
-            login: 'Entrar',
-            register: 'Cadastrar'
-          },
-          footer: {
-            description:
-              'A Genesis Esportes organiza eventos de Jiu-Jitsu e monitora rankings com transparência e excelência operacional. Fundada em 2017, com sede em Belo Horizonte.',
-            followUs: 'Siga-nos',
-            contact: 'Contato',
-            phone: 'Telefone / WhatsApp',
-            email: 'E-mail',
-            location: 'Localização',
-            mapLabel: 'Parque Turista - Contagem / MG',
-            mapAddress: 'Rua Pains, 139',
-            viewMap: 'Ver no mapa',
-            menu: 'Menu do site',
-            home: 'Início',
-            institutional: 'Institucional',
-            events: 'Eventos',
-            ranking: 'Ranking',
-            rankingTeams: 'Ranking Equipes',
-            athletes: 'Atletas',
-            membership: 'Filiação',
-            regulations: 'Regulamento',
-            news: 'Notícias',
-            adminPanel: 'Painel administrativo',
-            rights: 'Todos os direitos reservados.'
-          },
-          eventModal: {
-            title: 'Criar evento',
-            close: 'Fechar',
-            name: 'Nome do evento',
-            namePlaceholder: 'Ex: Etapa 1 - Regional',
-            date: 'Data',
-            location: 'Local',
-            locationPlaceholder: 'Ex: Arena Central',
-            posterUrl: 'URL da imagem do cartaz (opcional)',
-            posterUrlPlaceholder: 'https://.../cartaz.jpg',
-            posterFile: 'Ou envie a imagem do cartaz',
-            posterCompressionHint: 'O cartaz enviado é comprimido automaticamente.',
-            posterCompressedSize: 'Tamanho comprimido',
-            posterTypeInvalid: 'Selecione um arquivo de imagem válido para o cartaz.',
-            posterUploadTooLarge: 'Arquivo do cartaz muito grande. Tamanho máximo de envio: 8 MB.',
-            posterTooLargeAfterCompression: 'O cartaz permaneceu grande após a compressão. Escolha um arquivo menor.',
-            posterReadFail: 'Falha ao processar a imagem do cartaz.',
-            registrationUrl: 'URL de inscrição (opcional)',
-            registrationUrlPlaceholder: 'https://...',
-            pixKey: 'Chave Pix (responsável pelo campeonato)',
-            pixKeyPlaceholder: 'CPF / CNPJ / e-mail / telefone / chave aleatória',
-            feeUnder15: 'Valor até 15 anos (GI/NO-GI)',
-            feeOver15: 'Valor acima de 15 anos (GI/NO-GI)',
-            feeCombo: 'Valor Combo GI + NO-GI',
-            feeAbsolute: 'Valor Absoluto GI / NO-GI',
-            registrationOpen: 'Inscrições abertas no momento',
-            internalRegistration: 'Inscrição dentro da nossa plataforma',
-            cancel: 'Cancelar',
-            save: 'Salvar evento',
-            error: 'Falha ao criar evento.'
+      : isSpanish
+        ? {
+            utilityLinks: {
+              about: 'Sobre nosotros',
+              organizers: 'Organizadores',
+              support: 'Soporte'
+            },
+            supportMenu: {
+              whatsapp: 'WhatsApp',
+              email: 'Enviar correo'
+            },
+            utility: {
+              partnerBrands: 'Marcas asociadas',
+              account: 'Cuenta',
+              language: 'Idioma'
+            },
+            nav: {
+              events: 'Eventos',
+              rankings: 'Rankings',
+              athletes: 'Atletas',
+              membership: 'Filiacion',
+              news: 'Noticias',
+              regulations: 'Reglamento'
+            },
+            eventsMenu: {
+              upcoming: 'Proximos eventos',
+              calendar: 'Calendario de eventos 2026',
+              past: 'Eventos pasados'
+            },
+            rankingMenu: {
+              overall: 'Ranking general',
+              gi: 'Ranking GI',
+              noGi: 'Ranking NO-GI',
+              teams: 'Ranking de equipos',
+              registeredEvents: 'Campeonatos registrados',
+              emptyEvents: 'No hay campeonato registrado'
+            },
+            membershipMenu: {
+              member: 'Area del miembro',
+              registerAcademy: 'Academia y profesor'
+            },
+            newsMenu: {
+              blog: 'Blog y noticias',
+              videos: 'Biblioteca de videos',
+              magazine: 'Revista Jiu-Jitsu World',
+              social: 'Redes sociales'
+            },
+            regulationsMenu: {
+              rankingRules: 'Reglas del ranking',
+              pointsSystem: 'Sistema de puntos',
+              eventLevels: 'Niveles del evento'
+            },
+            accountMenu: {
+              myAccount: 'Mi cuenta',
+              academy: 'Academia',
+              settings: 'Configuracion',
+              manageProfiles: 'Gestionar perfiles',
+              logout: 'Salir',
+              login: 'Iniciar sesion',
+              register: 'Crear cuenta'
+            },
+            footer: {
+              description:
+                'Genesis Esportes organiza eventos de Jiu-Jitsu y monitorea rankings con transparencia y excelencia operativa. Fundada en 2017 en Belo Horizonte.',
+              followUs: 'Siguenos',
+              contact: 'Contacto',
+              phone: 'Telefono / WhatsApp',
+              email: 'Correo',
+              location: 'Ubicacion',
+              mapLabel: 'Parque Turista - Contagem / MG',
+              mapAddress: 'Rua Pains, 139',
+              viewMap: 'Ver en el mapa',
+              rights: 'Todos los derechos reservados.'
+            },
+            eventModal: {
+              title: 'Crear evento',
+              close: 'Cerrar',
+              name: 'Nombre del evento',
+              namePlaceholder: 'Ej: Etapa 1 - Regional',
+              date: 'Fecha',
+              location: 'Lugar',
+              locationPlaceholder: 'Ej: Arena Central',
+              posterUrl: 'URL de imagen del cartel (opcional)',
+              posterUrlPlaceholder: 'https://.../cartel.jpg',
+              posterFile: 'O subir imagen del cartel',
+              posterCompressionHint: 'El cartel subido se comprime automaticamente.',
+              posterCompressedSize: 'Tamano comprimido',
+              posterTypeInvalid: 'Seleccione un archivo de imagen valido para el cartel.',
+              posterUploadTooLarge: 'Archivo del cartel muy grande. Tamano maximo de carga: 8 MB.',
+              posterTooLargeAfterCompression: 'El cartel sigue grande tras la compresion. Elija un archivo mas ligero.',
+              posterReadFail: 'Error al procesar la imagen del cartel seleccionada.',
+              registrationUrl: 'URL de inscripcion (opcional)',
+              registrationUrlPlaceholder: 'https://...',
+              weightTableGiUrl: 'URL de tabla de peso GI (imagen/PDF)',
+              weightTableGiUrlPlaceholder: 'https://.../tabla-gi.jpg',
+              weightTableNoGiUrl: 'URL de tabla de peso NO-GI (imagen/PDF)',
+              weightTableNoGiUrlPlaceholder: 'https://.../tabla-no-gi.jpg',
+              circularUrl: 'URL de circular del evento (opcional)',
+              circularUrlPlaceholder: 'https://.../circular.pdf',
+              weightTableGiFile: 'Subir archivo tabla GI (imagen/PDF)',
+              weightTableNoGiFile: 'Subir archivo tabla NO-GI (imagen/PDF)',
+              circularFile: 'Subir archivo circular del evento (imagen/PDF)',
+              assetStoredSize: 'Tamano almacenado',
+              assetTypeInvalid: 'Seleccione un archivo de imagen o PDF.',
+              assetUploadTooLarge: 'Archivo demasiado grande. Tamano maximo: 1,5 MB.',
+              assetReadFail: 'No se pudo procesar el archivo seleccionado.',
+              weightTableGiOptions: 'Opciones de peso GI (una por linea)',
+              weightTableGiOptionsPlaceholder: 'Ej: Leve hasta 76,00',
+              weightTableNoGiOptions: 'Opciones de peso NO-GI (una por linea)',
+              weightTableNoGiOptionsPlaceholder: 'Ej: Medio hasta 82,30',
+              pixKey: 'Clave Pix (responsable del evento)',
+              pixKeyPlaceholder: 'CPF / CNPJ / correo / telefono / clave aleatoria',
+              feeUnder15: 'Valor hasta 15 anos (GI/NO-GI)',
+              feeOver15: 'Valor mayor de 15 anos (GI/NO-GI)',
+              feeCombo: 'Valor Combo GI + NO-GI',
+              feeAbsolute: 'Valor Absoluto GI / NO-GI',
+              registrationOpen: 'Inscripciones abiertas ahora',
+              internalRegistration: 'Inscripcion en nuestra plataforma',
+              cancel: 'Cancelar',
+              save: 'Guardar evento',
+              error: 'No se pudo crear el evento.'
+            }
           }
-        }
-  ), [isEnglish]);
+        : isFrench
+          ? {
+              utilityLinks: {
+                about: 'A propos',
+                organizers: 'Organisateurs',
+                support: 'Support'
+              },
+              supportMenu: {
+                whatsapp: 'WhatsApp',
+                email: 'Envoyer un e-mail'
+              },
+              utility: {
+                partnerBrands: 'Marques partenaires',
+                account: 'Compte',
+                language: 'Langue'
+              },
+              nav: {
+                events: 'Evenements',
+                rankings: 'Rankings',
+                athletes: 'Athletes',
+                membership: 'Affiliation',
+                news: 'Actualites',
+                regulations: 'Reglement'
+              },
+              eventsMenu: {
+                upcoming: 'Prochains evenements',
+                calendar: 'Calendrier des evenements 2026',
+                past: 'Evenements passes'
+              },
+              rankingMenu: {
+                overall: 'Classement general',
+                gi: 'Classement GI',
+                noGi: 'Classement NO-GI',
+                teams: 'Classement equipes',
+                registeredEvents: 'Championnats enregistres',
+                emptyEvents: 'Aucun championnat enregistre'
+              },
+              membershipMenu: {
+                member: 'Espace membre',
+                registerAcademy: 'Academie et professeur'
+              },
+              newsMenu: {
+                blog: 'Blog et actualites',
+                videos: 'Bibliotheque de videos',
+                magazine: 'Magazine Jiu-Jitsu World',
+                social: 'Reseaux sociaux'
+              },
+              regulationsMenu: {
+                rankingRules: 'Regles du classement',
+                pointsSystem: 'Systeme de points',
+                eventLevels: "Niveaux d'evenement"
+              },
+              accountMenu: {
+                myAccount: 'Mon compte',
+                academy: 'Academie',
+                settings: 'Parametres',
+                manageProfiles: 'Gerer les profils',
+                logout: 'Se deconnecter',
+                login: 'Se connecter',
+                register: "S'inscrire"
+              },
+              footer: {
+                description:
+                  'Genesis Esportes organise des evenements de Jiu-Jitsu et suit les classements avec transparence et excellence operationnelle. Fondee en 2017 a Belo Horizonte.',
+                followUs: 'Suivez-nous',
+                contact: 'Contact',
+                phone: 'Telephone / WhatsApp',
+                email: 'E-mail',
+                location: 'Localisation',
+                mapLabel: 'Parque Turista - Contagem / MG',
+                mapAddress: 'Rua Pains, 139',
+                viewMap: 'Voir sur la carte',
+                rights: 'Tous droits reserves.'
+              },
+              eventModal: {
+                title: 'Creer un evenement',
+                close: 'Fermer',
+                name: "Nom de l'evenement",
+                namePlaceholder: 'Ex: Etape 1 - Regionale',
+                date: 'Date',
+                location: 'Lieu',
+                locationPlaceholder: 'Ex: Arena Central',
+                posterUrl: 'URL de limage de laffiche (optionnel)',
+                posterUrlPlaceholder: 'https://.../affiche.jpg',
+                posterFile: "Ou telecharger limage de laffiche",
+                posterCompressionHint: 'Laffiche envoyee est compressee automatiquement.',
+                posterCompressedSize: 'Taille compressee',
+                posterTypeInvalid: "Selectionnez un fichier image valide pour laffiche.",
+                posterUploadTooLarge: 'Fichier daffiche trop volumineux. Taille maximale: 8 MB.',
+                posterTooLargeAfterCompression: 'Laffiche reste volumineuse apres compression. Choisissez un fichier plus leger.',
+                posterReadFail: "Echec du traitement de limage de laffiche selectionnee.",
+                registrationUrl: "URL d'inscription (optionnel)",
+                registrationUrlPlaceholder: 'https://...',
+                weightTableGiUrl: 'URL table de poids GI (image/PDF)',
+                weightTableGiUrlPlaceholder: 'https://.../table-gi.jpg',
+                weightTableNoGiUrl: 'URL table de poids NO-GI (image/PDF)',
+                weightTableNoGiUrlPlaceholder: 'https://.../table-no-gi.jpg',
+                circularUrl: "URL de la circulaire de l evenement (optionnel)",
+                circularUrlPlaceholder: 'https://.../circulaire.pdf',
+                weightTableGiFile: 'Telecharger fichier table GI (image/PDF)',
+                weightTableNoGiFile: 'Telecharger fichier table NO-GI (image/PDF)',
+                circularFile: 'Telecharger fichier circulaire evenement (image/PDF)',
+                assetStoredSize: 'Taille stockee',
+                assetTypeInvalid: 'Selectionnez un fichier image ou PDF.',
+                assetUploadTooLarge: 'Fichier trop volumineux. Taille maximale: 1,5 MB.',
+                assetReadFail: 'Echec du traitement du fichier selectionne.',
+                weightTableGiOptions: 'Options de poids GI (une par ligne)',
+                weightTableGiOptionsPlaceholder: 'Ex: Leve jusqua 76,00',
+                weightTableNoGiOptions: 'Options de poids NO-GI (une par ligne)',
+                weightTableNoGiOptionsPlaceholder: 'Ex: Moyen jusqua 82,30',
+                pixKey: 'Cle Pix (responsable de levevement)',
+                pixKeyPlaceholder: 'CPF / CNPJ / e-mail / telephone / cle aleatoire',
+                feeUnder15: 'Tarif jusqua 15 ans (GI/NO-GI)',
+                feeOver15: 'Tarif plus de 15 ans (GI/NO-GI)',
+                feeCombo: 'Tarif Combo GI + NO-GI',
+                feeAbsolute: 'Tarif Absolu GI / NO-GI',
+                registrationOpen: 'Inscriptions ouvertes maintenant',
+                internalRegistration: 'Inscription sur notre plateforme',
+                cancel: 'Annuler',
+                save: "Enregistrer l'evenement",
+                error: "Echec de creation de levenement."
+              }
+            }
+          : {
+              utilityLinks: {
+                about: 'Sobre',
+                organizers: 'Organizadores',
+                support: 'Suporte'
+              },
+              supportMenu: {
+                whatsapp: 'WhatsApp',
+                email: 'Enviar e-mail'
+              },
+              utility: {
+                partnerBrands: 'Marcas parceiras',
+                account: 'Conta',
+                language: 'Idioma'
+              },
+              nav: {
+                events: 'Eventos',
+                rankings: 'Rankings',
+                athletes: 'Atletas',
+                membership: 'Filiacao',
+                news: 'Noticias',
+                regulations: 'Regulamento'
+              },
+              eventsMenu: {
+                upcoming: 'Proximos eventos',
+                calendar: 'Calendario de eventos 2026',
+                past: 'Eventos passados'
+              },
+              rankingMenu: {
+                overall: 'Ranking geral',
+                gi: 'Ranking GI',
+                noGi: 'Ranking NO-GI',
+                teams: 'Ranking equipes',
+                registeredEvents: 'Campeonatos cadastrados',
+                emptyEvents: 'Nenhum campeonato cadastrado'
+              },
+              membershipMenu: {
+                member: 'Area do membro',
+                registerAcademy: 'Academia e professor'
+              },
+              newsMenu: {
+                blog: 'Blog e noticias',
+                videos: 'Biblioteca de videos',
+                magazine: 'Revista Jiu-Jitsu World',
+                social: 'Midias sociais'
+              },
+              regulationsMenu: {
+                rankingRules: 'Regras do ranking',
+                pointsSystem: 'Sistema de pontos',
+                eventLevels: 'Niveis de evento'
+              },
+              accountMenu: {
+                myAccount: 'Minha conta',
+                academy: 'Academia',
+                settings: 'Configuracoes',
+                manageProfiles: 'Gerenciar perfis',
+                logout: 'Sair',
+                login: 'Entrar',
+                register: 'Cadastrar'
+              },
+              footer: {
+                description:
+                  'A Genesis Esportes organiza eventos de Jiu-Jitsu e monitora rankings com transparencia e excelencia operacional. Fundada em 2017, com sede em Belo Horizonte.',
+                followUs: 'Siga-nos',
+                contact: 'Contato',
+                phone: 'Telefone / WhatsApp',
+                email: 'E-mail',
+                location: 'Localizacao',
+                mapLabel: 'Parque Turista - Contagem / MG',
+                mapAddress: 'Rua Pains, 139',
+                viewMap: 'Ver no mapa',
+                rights: 'Todos os direitos reservados.'
+              },
+              eventModal: {
+                title: 'Criar evento',
+                close: 'Fechar',
+                name: 'Nome do evento',
+                namePlaceholder: 'Ex: Etapa 1 - Regional',
+                date: 'Data',
+                location: 'Local',
+                locationPlaceholder: 'Ex: Arena Central',
+                posterUrl: 'URL da imagem do cartaz (opcional)',
+                posterUrlPlaceholder: 'https://.../cartaz.jpg',
+                posterFile: 'Ou envie a imagem do cartaz',
+                posterCompressionHint: 'O cartaz enviado e comprimido automaticamente.',
+                posterCompressedSize: 'Tamanho comprimido',
+                posterTypeInvalid: 'Selecione um arquivo de imagem valido para o cartaz.',
+                posterUploadTooLarge: 'Arquivo do cartaz muito grande. Tamanho maximo de envio: 8 MB.',
+                posterTooLargeAfterCompression: 'O cartaz permaneceu grande apos a compressao. Escolha um arquivo menor.',
+                posterReadFail: 'Falha ao processar a imagem do cartaz.',
+                registrationUrl: 'URL de inscricao (opcional)',
+                registrationUrlPlaceholder: 'https://...',
+                weightTableGiUrl: 'URL da tabela de peso GI (imagem/PDF)',
+                weightTableGiUrlPlaceholder: 'https://.../tabela-gi.jpg',
+                weightTableNoGiUrl: 'URL da tabela de peso NO-GI (imagem/PDF)',
+                weightTableNoGiUrlPlaceholder: 'https://.../tabela-no-gi.jpg',
+                circularUrl: 'URL da circular do evento (opcional)',
+                circularUrlPlaceholder: 'https://.../circular.pdf',
+                weightTableGiFile: 'Enviar arquivo da tabela GI (imagem/PDF)',
+                weightTableNoGiFile: 'Enviar arquivo da tabela NO-GI (imagem/PDF)',
+                circularFile: 'Enviar arquivo da circular do evento (imagem/PDF)',
+                assetStoredSize: 'Tamanho armazenado',
+                assetTypeInvalid: 'Selecione um arquivo de imagem ou PDF.',
+                assetUploadTooLarge: 'Arquivo muito grande. Tamanho maximo: 1,5 MB.',
+                assetReadFail: 'Falha ao processar o arquivo selecionado.',
+                weightTableGiOptions: 'Opcoes de peso GI (uma por linha)',
+                weightTableGiOptionsPlaceholder: 'Ex: Leve ate 76,00',
+                weightTableNoGiOptions: 'Opcoes de peso NO-GI (uma por linha)',
+                weightTableNoGiOptionsPlaceholder: 'Ex: Medio ate 82,30',
+                pixKey: 'Chave Pix (responsavel pelo campeonato)',
+                pixKeyPlaceholder: 'CPF / CNPJ / e-mail / telefone / chave aleatoria',
+                feeUnder15: 'Valor ate 15 anos (GI/NO-GI)',
+                feeOver15: 'Valor acima de 15 anos (GI/NO-GI)',
+                feeCombo: 'Valor Combo GI + NO-GI',
+                feeAbsolute: 'Valor Absoluto GI / NO-GI',
+                registrationOpen: 'Inscricoes abertas no momento',
+                internalRegistration: 'Inscricao dentro da nossa plataforma',
+                cancel: 'Cancelar',
+                save: 'Salvar evento',
+                error: 'Falha ao criar evento.'
+              }
+            }
+  ), [isEnglish, isSpanish, isFrench]);
 
   const utilityLinks = useMemo(() => ([
     { label: copy.utilityLinks.about, path: '/institucional' },
-    { label: copy.utilityLinks.organizers, path: '/eventos' }
+    { label: copy.utilityLinks.organizers, path: '/organizadores' }
   ]), [copy.utilityLinks.about, copy.utilityLinks.organizers]);
 
   const supportItems = useMemo(() => ([
@@ -501,22 +778,78 @@ const AppLayout = () => {
 
   const handleCloseEventModal = () => {
     setEventError('');
+    setEventSuccess('');
     setEventForm(createEventFormState());
     setEventPosterStoredSizeBytes(0);
+    setEventWeightTableGiStoredSizeBytes(0);
+    setEventWeightTableNoGiStoredSizeBytes(0);
+    setEventCircularStoredSizeBytes(0);
     closeEventModal();
   };
 
-  const handleCreateEvent = (event) => {
+  const handleCreateEvent = async (event) => {
     event.preventDefault();
     setEventError('');
+    setEventSuccess('');
 
     try {
-      addEvent(eventForm);
+      const savedEvent = await addEvent(eventForm);
+      const announcementAttempted = savedEvent?.announcementAttempted === true;
+      const announcementRecipients = Number(savedEvent?.announcementRecipients || 0);
+      const announcementSent = Number(savedEvent?.announcementSent || 0);
+      const announcementFailed = Number(savedEvent?.announcementFailed || 0);
+
+      if (announcementAttempted) {
+        if (isEnglish) {
+          setEventSuccess(`Event created and ${announcementSent} emails sent / ${announcementFailed} failures.`);
+        } else if (isSpanish) {
+          setEventSuccess(`Evento creado y ${announcementSent} correos enviados / ${announcementFailed} fallos.`);
+        } else if (isFrench) {
+          setEventSuccess(`Evenement cree et ${announcementSent} e-mails envoyes / ${announcementFailed} echecs.`);
+        } else {
+          setEventSuccess(`Evento criado e ${announcementSent} e-mails enviados / ${announcementFailed} falhas.`);
+        }
+      } else if (savedEvent && savedEvent.announcementAttempted === false) {
+        if (isEnglish) {
+          setEventSuccess(
+            announcementRecipients > 0
+              ? 'Event created, but announcement email was not sent.'
+              : 'Event created. No announcement email sent (no valid recipients or SMTP not configured).'
+          );
+        } else if (isSpanish) {
+          setEventSuccess(
+            announcementRecipients > 0
+              ? 'Evento creado, pero no se envio el aviso por correo.'
+              : 'Evento creado. Aviso por correo no enviado (sin destinatarios validos o SMTP no configurado).'
+          );
+        } else if (isFrench) {
+          setEventSuccess(
+            announcementRecipients > 0
+              ? "Evenement cree, mais l'annonce e-mail n'a pas ete envoyee."
+              : "Evenement cree. Aucun e-mail d'annonce envoye (pas de destinataires valides ou SMTP non configure)."
+          );
+        } else {
+          setEventSuccess(
+            announcementRecipients > 0
+              ? 'Evento criado, mas o aviso por e-mail nao foi enviado.'
+              : 'Evento criado. Aviso por e-mail nao enviado (sem destinatarios validos ou SMTP nao configurado).'
+          );
+        }
+      } else {
+        if (isEnglish) setEventSuccess('Event created successfully.');
+        else if (isSpanish) setEventSuccess('Evento creado con exito.');
+        else if (isFrench) setEventSuccess('Evenement cree avec succes.');
+        else setEventSuccess('Evento criado com sucesso.');
+      }
+
       setEventForm(createEventFormState());
       setEventPosterStoredSizeBytes(0);
-      closeEventModal();
+      setEventWeightTableGiStoredSizeBytes(0);
+      setEventWeightTableNoGiStoredSizeBytes(0);
+      setEventCircularStoredSizeBytes(0);
     } catch (err) {
       setEventError(err?.message || copy.eventModal.error);
+      setEventSuccess('');
     }
   };
 
@@ -524,6 +857,13 @@ const AppLayout = () => {
     const value = event.target.value;
     setEventForm((prev) => ({ ...prev, posterUrl: value }));
     setEventPosterStoredSizeBytes(isDataImageUrl(value) ? estimateDataUrlBytes(value) : 0);
+  };
+
+  const createEventAssetUrlChangeHandler = (field, setSizeState) => (event) => {
+    const value = event.target.value;
+    setEventForm((prev) => ({ ...prev, [field]: value }));
+    const storedBytes = (isDataImageUrl(value) || isDataPdfUrl(value)) ? estimateDataUrlBytes(value) : 0;
+    setSizeState(storedBytes);
   };
 
   const handleEventPosterFileChange = async (event) => {
@@ -558,9 +898,73 @@ const AppLayout = () => {
     }
   };
 
+  const createEventAssetFileChangeHandler = (field, setSizeState) => async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const mimeType = (file.type || '').toLowerCase();
+    const fileName = (file.name || '').toLowerCase();
+    const isPdf = mimeType === 'application/pdf' || fileName.endsWith('.pdf');
+    const isImage = /^image\//i.test(mimeType) || /\.(png|jpe?g|webp|gif|bmp|svg)$/i.test(fileName);
+
+    if (!isImage && !isPdf) {
+      setEventError(copy.eventModal.assetTypeInvalid || copy.eventModal.error);
+      event.target.value = '';
+      return;
+    }
+
+    if (file.size > MAX_EVENT_ASSET_UPLOAD_BYTES) {
+      setEventError(copy.eventModal.assetUploadTooLarge || copy.eventModal.error);
+      event.target.value = '';
+      return;
+    }
+
+    try {
+      let dataUrl = '';
+      let bytes = 0;
+
+      if (isImage) {
+        const compressed = await compressEventPosterFile(file);
+        if (!compressed?.dataUrl || compressed.bytes > MAX_EVENT_POSTER_STORED_BYTES) {
+          setEventError(copy.eventModal.assetUploadTooLarge || copy.eventModal.error);
+          event.target.value = '';
+          return;
+        }
+        dataUrl = compressed.dataUrl;
+        bytes = compressed.bytes || 0;
+      } else {
+        dataUrl = await readFileAsDataUrl(file);
+        bytes = estimateDataUrlBytes(dataUrl);
+        if (bytes > MAX_EVENT_ASSET_UPLOAD_BYTES) {
+          setEventError(copy.eventModal.assetUploadTooLarge || copy.eventModal.error);
+          event.target.value = '';
+          return;
+        }
+      }
+
+      setEventForm((prev) => ({ ...prev, [field]: dataUrl }));
+      setSizeState(bytes);
+      setEventError('');
+    } catch {
+      setEventError(copy.eventModal.assetReadFail || copy.eventModal.error);
+    } finally {
+      event.target.value = '';
+    }
+  };
+
+  const handleWeightTableGiUrlChange = createEventAssetUrlChangeHandler('weightTableGiUrl', setEventWeightTableGiStoredSizeBytes);
+  const handleWeightTableNoGiUrlChange = createEventAssetUrlChangeHandler('weightTableNoGiUrl', setEventWeightTableNoGiStoredSizeBytes);
+  const handleCircularUrlChange = createEventAssetUrlChangeHandler('circularUrl', setEventCircularStoredSizeBytes);
+  const handleWeightTableGiFileChange = createEventAssetFileChangeHandler('weightTableGiUrl', setEventWeightTableGiStoredSizeBytes);
+  const handleWeightTableNoGiFileChange = createEventAssetFileChangeHandler('weightTableNoGiUrl', setEventWeightTableNoGiStoredSizeBytes);
+  const handleCircularFileChange = createEventAssetFileChangeHandler('circularUrl', setEventCircularStoredSizeBytes);
+
   const accountItems = currentUser
     ? [
         { label: copy.accountMenu.myAccount, path: '/minha-conta', icon: User },
+        ...(isCoachUser
+          ? [{ label: copy.accountMenu.academy, path: '/academia', icon: Users }]
+          : []),
         ...(canAccessDashboard
           ? [{ label: copy.accountMenu.manageProfiles, path: '/admin', icon: Users }]
           : []),
@@ -568,7 +972,7 @@ const AppLayout = () => {
       ]
     : [
         { label: copy.accountMenu.login, onClick: () => setShowLogin(true), icon: LogIn },
-        { label: copy.accountMenu.register, path: '/filiacao?tab=member', icon: User }
+        { label: copy.accountMenu.register, path: '/filiacao', icon: User }
       ];
 
   const renderAccountItem = (item) => {
@@ -720,7 +1124,10 @@ const AppLayout = () => {
                       onClick={() => setLanguage(item.id)}
                     >
                       <span className="utility-flag" aria-hidden="true">{item.flag}</span>
-                      <span>{item.label}</span>
+                      <span className="utility-language-labels">
+                        <span>{item.label}</span>
+                        <small>{item.country}</small>
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -771,17 +1178,21 @@ const AppLayout = () => {
               <Routes location={location}>
                 <Route path="/" element={<Home />} />
                 <Route
-                  path="/admin"
+                  path="/admin/*"
                   element={canAccessDashboard ? <Dashboard /> : <Navigate to="/ranking" replace />}
                 />
                 <Route path="/institucional" element={<About />} />
+                <Route path="/organizadores" element={<Organizers />} />
                 <Route path="/eventos" element={<Events />} />
                 <Route path="/eventos/:eventId" element={<EventDetails />} />
+                <Route path="/eventos/:eventId/relatorios" element={<EventReports />} />
                 <Route path="/eventos/:eventId/inscricao" element={<EventRegistration />} />
+                <Route path="/perfil-publico" element={<PublicProfile />} />
                 <Route path="/ranking" element={<Ranking />} />
                 <Route path="/ranking-equipes" element={<TeamRanking />} />
                 <Route path="/atletas" element={<Athletes />} />
                 <Route path="/filiacao" element={<Membership />} />
+                <Route path="/academia" element={<Membership />} />
                 <Route path="/minha-conta" element={<MyAccount />} />
                 <Route path="/regulamento" element={<Regulations />} />
                 <Route path="/noticias" element={<News />} />
@@ -868,21 +1279,6 @@ const AppLayout = () => {
             </div>
           </div>
 
-          <div className="footer-column footer-column--menu">
-            <div className="footer-title">{copy.footer.menu}</div>
-            <nav className="footer-menu footer-menu--distributed">
-              <Link to="/">{copy.footer.home}</Link>
-              <Link to="/institucional">{copy.footer.institutional}</Link>
-              <Link to="/eventos">{copy.footer.events}</Link>
-              <Link to="/ranking">{copy.footer.ranking}</Link>
-              <Link to="/ranking-equipes">{copy.footer.rankingTeams}</Link>
-              <Link to="/atletas">{copy.footer.athletes}</Link>
-              <Link to="/filiacao">{copy.footer.membership}</Link>
-              <Link to="/regulamento">{copy.footer.regulations}</Link>
-              <Link to="/noticias">{copy.footer.news}</Link>
-              {canAccessDashboard && <Link to="/admin">{copy.footer.adminPanel}</Link>}
-            </nav>
-          </div>
         </div>
 
         <div className="footer-bottom">
@@ -916,12 +1312,12 @@ const AppLayout = () => {
               onClick={handleCloseEventModal}
             />
             <motion.div
-              className="modal-card"
+              className="modal-card modal-card--event"
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 12 }}
             >
-              <div className="modal-panel">
+              <div className="modal-panel modal-panel--event">
                 <div className="modal-header">
                   <div className="modal-title">{copy.eventModal.title}</div>
                   <button type="button" className="btn btn-ghost" onClick={handleCloseEventModal}>
@@ -932,6 +1328,11 @@ const AppLayout = () => {
                   <div className="login-error" role="alert">
                     <AlertCircle size={18} />
                     <p>{eventError}</p>
+                  </div>
+                )}
+                {eventSuccess && (
+                  <div className="profile-success" role="status">
+                    <p>{eventSuccess}</p>
                   </div>
                 )}
                 <form onSubmit={handleCreateEvent}>
@@ -1017,6 +1418,96 @@ const AppLayout = () => {
                         onChange={(event) => setEventForm({ ...eventForm, registrationUrl: event.target.value })}
                         placeholder={copy.eventModal.registrationUrlPlaceholder}
                       />
+                    </div>
+                    <div className="form-grid">
+                      <div>
+                        <label className="table-meta">{copy.eventModal.weightTableGiUrl}</label>
+                        <input
+                          className="input"
+                          type="text"
+                          value={eventForm.weightTableGiUrl}
+                          onChange={handleWeightTableGiUrlChange}
+                          placeholder={copy.eventModal.weightTableGiUrlPlaceholder}
+                        />
+                        <label className="table-meta table-meta--tight">{copy.eventModal.weightTableGiFile}</label>
+                        <input
+                          className="input"
+                          type="file"
+                          accept="image/*,application/pdf"
+                          onChange={handleWeightTableGiFileChange}
+                        />
+                        {eventWeightTableGiStoredSizeBytes > 0 && (
+                          <div className="table-meta table-meta--tight">
+                            {copy.eventModal.assetStoredSize}: {formatBytes(eventWeightTableGiStoredSizeBytes)}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <label className="table-meta">{copy.eventModal.weightTableNoGiUrl}</label>
+                        <input
+                          className="input"
+                          type="text"
+                          value={eventForm.weightTableNoGiUrl}
+                          onChange={handleWeightTableNoGiUrlChange}
+                          placeholder={copy.eventModal.weightTableNoGiUrlPlaceholder}
+                        />
+                        <label className="table-meta table-meta--tight">{copy.eventModal.weightTableNoGiFile}</label>
+                        <input
+                          className="input"
+                          type="file"
+                          accept="image/*,application/pdf"
+                          onChange={handleWeightTableNoGiFileChange}
+                        />
+                        {eventWeightTableNoGiStoredSizeBytes > 0 && (
+                          <div className="table-meta table-meta--tight">
+                            {copy.eventModal.assetStoredSize}: {formatBytes(eventWeightTableNoGiStoredSizeBytes)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="table-meta">{copy.eventModal.circularUrl}</label>
+                      <input
+                        className="input"
+                        type="text"
+                        value={eventForm.circularUrl}
+                        onChange={handleCircularUrlChange}
+                        placeholder={copy.eventModal.circularUrlPlaceholder}
+                      />
+                      <label className="table-meta table-meta--tight">{copy.eventModal.circularFile}</label>
+                      <input
+                        className="input"
+                        type="file"
+                        accept="image/*,application/pdf"
+                        onChange={handleCircularFileChange}
+                      />
+                      {eventCircularStoredSizeBytes > 0 && (
+                        <div className="table-meta table-meta--tight">
+                          {copy.eventModal.assetStoredSize}: {formatBytes(eventCircularStoredSizeBytes)}
+                        </div>
+                      )}
+                    </div>
+                    <div className="form-grid">
+                      <div>
+                        <label className="table-meta">{copy.eventModal.weightTableGiOptions}</label>
+                        <textarea
+                          className="input"
+                          value={eventForm.weightTableGiOptions}
+                          onChange={(event) => setEventForm({ ...eventForm, weightTableGiOptions: event.target.value })}
+                          placeholder={copy.eventModal.weightTableGiOptionsPlaceholder}
+                          rows={4}
+                        />
+                      </div>
+                      <div>
+                        <label className="table-meta">{copy.eventModal.weightTableNoGiOptions}</label>
+                        <textarea
+                          className="input"
+                          value={eventForm.weightTableNoGiOptions}
+                          onChange={(event) => setEventForm({ ...eventForm, weightTableNoGiOptions: event.target.value })}
+                          placeholder={copy.eventModal.weightTableNoGiOptionsPlaceholder}
+                          rows={4}
+                        />
+                      </div>
                     </div>
                     <div>
                       <label className="table-meta">{copy.eventModal.pixKey}</label>
@@ -1123,3 +1614,4 @@ function App() {
 }
 
 export default App;
+

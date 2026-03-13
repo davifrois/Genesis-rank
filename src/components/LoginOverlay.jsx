@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Lock, User, ShieldCheck, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
 import { useStore } from '../hooks/useStore';
 import { useI18n } from '../hooks/useI18n';
 import { authService } from '../services/authService';
+import { evaluatePasswordStrength } from '../utils/passwordStrength';
 
 const LoginOverlay = ({ onClose, onSuccess, redirectTo = '' }) => {
     const { login, addLog } = useStore();
-    const { language } = useI18n();
+    const { uiLanguage } = useI18n();
     const navigate = useNavigate();
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
@@ -26,7 +27,17 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '' }) => {
     const [resetConfirm, setResetConfirm] = useState('');
     const supportsLocalReset = authService.isLocalAuth ? authService.isLocalAuth() : true;
     const canClose = typeof onClose === 'function';
-    const isEnglish = language === 'en-US';
+    const isEnglish = uiLanguage === 'en-US';
+    const isSpanish = uiLanguage === 'es-ES';
+    const isFrench = uiLanguage === 'fr-FR';
+    const registerPasswordStrength = useMemo(
+        () => evaluatePasswordStrength(registerPassword, uiLanguage),
+        [registerPassword, uiLanguage]
+    );
+    const resetPasswordStrength = useMemo(
+        () => evaluatePasswordStrength(resetPassword, uiLanguage),
+        [resetPassword, uiLanguage]
+    );
     const copy = isEnglish
         ? {
             loadingReset: 'Updating password...',
@@ -50,7 +61,7 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '' }) => {
             },
             reset: {
                 title: 'New password',
-                placeholder: 'Minimum 6 characters',
+                placeholder: 'Minimum 8 characters with uppercase, lowercase, number, and symbol',
                 confirm: 'Confirm password',
                 confirmPlaceholder: 'Repeat the new password',
                 button: 'Update password',
@@ -62,54 +73,138 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '' }) => {
                 user: 'Username',
                 userPlaceholder: 'Ex: davifrois',
                 password: 'Password',
-                passwordPlaceholder: 'Minimum 6 characters',
+                passwordPlaceholder: 'Minimum 8 characters with uppercase, lowercase, number, and symbol',
                 confirm: 'Confirm password',
                 confirmPlaceholder: 'Repeat password',
                 button: 'Create account',
                 back: 'Back to login'
             }
         }
-        : {
-            loadingReset: 'Atualizando senha...',
-            loadingAuth: 'Validando credenciais...',
-            title: 'Área do Organizador',
-            subtitle: 'Acesso à administração Genesis',
-            close: 'Fechar',
-            resetUnavailable: 'Redefinição de senha indisponível neste modo.',
-            registerUnavailable: 'Cadastro indisponível neste modo.',
-            mismatch: 'As senhas não conferem.',
-            resetSuccess: 'Senha atualizada. Faça login com a nova senha.',
-            registerSuccess: 'Conta criada. Faça login para continuar.',
-            form: {
-                user: 'Usuário',
-                userPlaceholder: 'Ex: simone',
-                password: 'Senha de acesso',
-                passwordPlaceholder: '********',
-                loginButton: 'Autenticar organizador',
-                forgot: 'Esqueci minha senha',
-                create: 'Criar conta'
-            },
-            reset: {
-                title: 'Nova senha',
-                placeholder: 'Mínimo de 6 caracteres',
-                confirm: 'Confirmar senha',
-                confirmPlaceholder: 'Repita a nova senha',
-                button: 'Atualizar senha',
-                back: 'Voltar ao login'
-            },
-            register: {
-                name: 'Nome completo',
-                namePlaceholder: 'Ex: Davi Frois',
-                user: 'Usuário',
-                userPlaceholder: 'Ex: davifrois',
-                password: 'Senha',
-                passwordPlaceholder: 'Mínimo de 6 caracteres',
-                confirm: 'Confirmar senha',
-                confirmPlaceholder: 'Repita a senha',
-                button: 'Criar conta',
-                back: 'Voltar ao login'
+        : isSpanish
+            ? {
+                loadingReset: 'Actualizando contrasena...',
+                loadingAuth: 'Validando credenciales...',
+                title: 'Area del Organizador',
+                subtitle: 'Acceso a la administracion Genesis',
+                close: 'Cerrar',
+                resetUnavailable: 'La recuperacion de contrasena no esta disponible en este modo.',
+                registerUnavailable: 'El registro no esta disponible en este modo.',
+                mismatch: 'Las contrasenas no coinciden.',
+                resetSuccess: 'Contrasena actualizada. Inicia sesion con la nueva contrasena.',
+                registerSuccess: 'Cuenta creada. Inicia sesion para continuar.',
+                form: {
+                    user: 'Usuario',
+                    userPlaceholder: 'Ej: simone',
+                    password: 'Contrasena',
+                    passwordPlaceholder: '********',
+                    loginButton: 'Autenticar organizador',
+                    forgot: 'Olvide mi contrasena',
+                    create: 'Crear cuenta'
+                },
+                reset: {
+                    title: 'Nueva contrasena',
+                    placeholder: 'Minimo 8 caracteres con mayuscula, minuscula, numero y simbolo',
+                    confirm: 'Confirmar contrasena',
+                    confirmPlaceholder: 'Repite la nueva contrasena',
+                    button: 'Actualizar contrasena',
+                    back: 'Volver al login'
+                },
+                register: {
+                    name: 'Nombre completo',
+                    namePlaceholder: 'Ej: Davi Frois',
+                    user: 'Usuario',
+                    userPlaceholder: 'Ej: davifrois',
+                    password: 'Contrasena',
+                    passwordPlaceholder: 'Minimo 8 caracteres con mayuscula, minuscula, numero y simbolo',
+                    confirm: 'Confirmar contrasena',
+                    confirmPlaceholder: 'Repite la contrasena',
+                    button: 'Crear cuenta',
+                    back: 'Volver al login'
+                }
             }
-        };
+            : isFrench
+                ? {
+                    loadingReset: 'Mise a jour du mot de passe...',
+                    loadingAuth: 'Validation des identifiants...',
+                    title: 'Espace Organisateur',
+                    subtitle: "Acces a l'administration Genesis",
+                    close: 'Fermer',
+                    resetUnavailable: 'La reinitialisation du mot de passe nest pas disponible dans ce mode.',
+                    registerUnavailable: "Linscription nest pas disponible dans ce mode.",
+                    mismatch: 'Les mots de passe ne correspondent pas.',
+                    resetSuccess: 'Mot de passe mis a jour. Connectez-vous avec le nouveau mot de passe.',
+                    registerSuccess: 'Compte cree. Connectez-vous pour continuer.',
+                    form: {
+                        user: 'Utilisateur',
+                        userPlaceholder: 'Ex: simone',
+                        password: 'Mot de passe',
+                        passwordPlaceholder: '********',
+                        loginButton: 'Authentifier organisateur',
+                        forgot: 'Mot de passe oublie',
+                        create: 'Creer un compte'
+                    },
+                    reset: {
+                        title: 'Nouveau mot de passe',
+                        placeholder: 'Minimum 8 caracteres avec majuscule, minuscule, chiffre et symbole',
+                        confirm: 'Confirmer mot de passe',
+                        confirmPlaceholder: 'Repetez le nouveau mot de passe',
+                        button: 'Mettre a jour',
+                        back: 'Retour au login'
+                    },
+                    register: {
+                        name: 'Nom complet',
+                        namePlaceholder: 'Ex: Davi Frois',
+                        user: 'Utilisateur',
+                        userPlaceholder: 'Ex: davifrois',
+                        password: 'Mot de passe',
+                        passwordPlaceholder: 'Minimum 8 caracteres avec majuscule, minuscule, chiffre et symbole',
+                        confirm: 'Confirmer mot de passe',
+                        confirmPlaceholder: 'Repetez le mot de passe',
+                        button: 'Creer un compte',
+                        back: 'Retour au login'
+                    }
+                }
+                : {
+                    loadingReset: 'Atualizando senha...',
+                    loadingAuth: 'Validando credenciais...',
+                    title: 'Area do Organizador',
+                    subtitle: 'Acesso a administracao Genesis',
+                    close: 'Fechar',
+                    resetUnavailable: 'Redefinicao de senha indisponivel neste modo.',
+                    registerUnavailable: 'Cadastro indisponivel neste modo.',
+                    mismatch: 'As senhas nao conferem.',
+                    resetSuccess: 'Senha atualizada. Faca login com a nova senha.',
+                    registerSuccess: 'Conta criada. Faca login para continuar.',
+                    form: {
+                        user: 'Usuario',
+                        userPlaceholder: 'Ex: simone',
+                        password: 'Senha de acesso',
+                        passwordPlaceholder: '********',
+                        loginButton: 'Autenticar organizador',
+                        forgot: 'Esqueci minha senha',
+                        create: 'Criar conta'
+                    },
+                    reset: {
+                        title: 'Nova senha',
+                        placeholder: 'Minimo de 8 caracteres com maiuscula, minuscula, numero e simbolo',
+                        confirm: 'Confirmar senha',
+                        confirmPlaceholder: 'Repita a nova senha',
+                        button: 'Atualizar senha',
+                        back: 'Voltar ao login'
+                    },
+                    register: {
+                        name: 'Nome completo',
+                        namePlaceholder: 'Ex: Davi Frois',
+                        user: 'Usuario',
+                        userPlaceholder: 'Ex: davifrois',
+                        password: 'Senha',
+                        passwordPlaceholder: 'Minimo de 8 caracteres com maiuscula, minuscula, numero e simbolo',
+                        confirm: 'Confirmar senha',
+                        confirmPlaceholder: 'Repita a senha',
+                        button: 'Criar conta',
+                        back: 'Voltar ao login'
+                    }
+                };
 
     const handleLogin = async (event) => {
         event.preventDefault();
@@ -154,6 +249,11 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '' }) => {
             setIsLoading(false);
             return;
         }
+        if (!resetPasswordStrength.isStrong) {
+            setError(resetPasswordStrength.message);
+            setIsLoading(false);
+            return;
+        }
 
         try {
             const user = await authService.resetPassword(resetUsername, resetPassword);
@@ -181,6 +281,11 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '' }) => {
 
         if (registerPassword !== registerConfirm) {
             setError(copy.mismatch);
+            setIsLoading(false);
+            return;
+        }
+        if (!registerPasswordStrength.isStrong) {
+            setError(registerPasswordStrength.message);
             setIsLoading(false);
             return;
         }
@@ -340,12 +445,18 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '' }) => {
                                 <Lock size={16} />
                                 <input
                                     type="password"
+                                    minLength={8}
                                     value={resetPassword}
                                     onChange={(event) => setResetPassword(event.target.value)}
                                     placeholder={copy.reset.placeholder}
                                     required
                                 />
                             </div>
+                            {resetPassword && (
+                                <small className={`password-strength password-strength--${resetPasswordStrength.level}`}>
+                                    {resetPasswordStrength.message}
+                                </small>
+                            )}
                         </label>
                         <label>
                             {copy.reset.confirm}
@@ -353,6 +464,7 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '' }) => {
                                 <Lock size={16} />
                                 <input
                                     type="password"
+                                    minLength={8}
                                     value={resetConfirm}
                                     onChange={(event) => setResetConfirm(event.target.value)}
                                     placeholder={copy.reset.confirmPlaceholder}
@@ -361,7 +473,11 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '' }) => {
                             </div>
                         </label>
 
-                        <button className="btn btn-primary login-submit" type="submit" disabled={isLoading}>
+                        <button
+                            className="btn btn-primary login-submit"
+                            type="submit"
+                            disabled={isLoading || !resetPasswordStrength.isStrong}
+                        >
                             {copy.reset.button}
                         </button>
                         <div className="login-helper">
@@ -404,12 +520,18 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '' }) => {
                                 <Lock size={16} />
                                 <input
                                     type="password"
+                                    minLength={8}
                                     value={registerPassword}
                                     onChange={(event) => setRegisterPassword(event.target.value)}
                                     placeholder={copy.register.passwordPlaceholder}
                                     required
                                 />
                             </div>
+                            {registerPassword && (
+                                <small className={`password-strength password-strength--${registerPasswordStrength.level}`}>
+                                    {registerPasswordStrength.message}
+                                </small>
+                            )}
                         </label>
                         <label>
                             {copy.register.confirm}
@@ -417,6 +539,7 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '' }) => {
                                 <Lock size={16} />
                                 <input
                                     type="password"
+                                    minLength={8}
                                     value={registerConfirm}
                                     onChange={(event) => setRegisterConfirm(event.target.value)}
                                     placeholder={copy.register.confirmPlaceholder}
@@ -425,7 +548,11 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '' }) => {
                             </div>
                         </label>
 
-                        <button className="btn btn-primary login-submit" type="submit" disabled={isLoading}>
+                        <button
+                            className="btn btn-primary login-submit"
+                            type="submit"
+                            disabled={isLoading || !registerPasswordStrength.isStrong}
+                        >
                             {copy.register.button}
                         </button>
                         <div className="login-helper">
@@ -486,3 +613,4 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '' }) => {
 };
 
 export default LoginOverlay;
+

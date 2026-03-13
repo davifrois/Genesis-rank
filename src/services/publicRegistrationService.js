@@ -163,6 +163,15 @@ const buildAuthRequiredError = (message) => {
   return error;
 };
 
+const buildForbiddenError = (message) => {
+  const error = new Error(
+    (message || 'Apenas administradores podem confirmar ou reprovar pagamentos.')
+      .toString()
+  );
+  error.code = 'FORBIDDEN';
+  return error;
+};
+
 const parseErrorMessage = async (response, fallback = 'Falha ao enviar inscrição.') => {
   const payload = await parseJsonSafe(response);
   const traceId = resolveErrorTraceId(payload, response);
@@ -543,7 +552,14 @@ export const publicRegistrationService = {
       throw new Error('Status de pagamento inválido.');
     }
 
-    const token = normalizeAuthToken();
+    let token = normalizeAuthToken();
+    if (!token && authService?.ensureApiAdminToken) {
+      try {
+        token = await authService.ensureApiAdminToken();
+      } catch {
+        token = '';
+      }
+    }
     if (!token) {
       throw buildAuthRequiredError(
         'Faça login como administrador para confirmar o pagamento da inscrição.'
@@ -560,7 +576,7 @@ export const publicRegistrationService = {
         body: JSON.stringify({ status: normalizedStatus, reviewNotes, reviewedBy })
       });
 
-      if (response.status === 401 || response.status === 403) {
+      if (response.status === 401) {
         if (authService?.clearApiToken) {
           authService.clearApiToken();
         }
@@ -571,13 +587,21 @@ export const publicRegistrationService = {
         throw buildAuthRequiredError(parsed?.message);
       }
 
+      if (response.status === 403) {
+        const parsed = await parseErrorMessage(
+          response,
+          'Apenas administradores podem confirmar ou reprovar pagamentos.'
+        );
+        throw buildForbiddenError(parsed?.message);
+      }
+
       if (!response.ok) {
         throw await buildHttpError(response, 'Falha ao atualizar pagamento.');
       }
 
       return response.json();
     } catch (error) {
-      if (error?.code === 'AUTH_REQUIRED') {
+      if (error?.code === 'AUTH_REQUIRED' || error?.code === 'FORBIDDEN') {
         throw error;
       }
       if (isNetworkError(error) || isUnavailableHttpError(error)) {
@@ -600,3 +624,4 @@ export const publicRegistrationService = {
     updatedAt: ''
   })
 };
+

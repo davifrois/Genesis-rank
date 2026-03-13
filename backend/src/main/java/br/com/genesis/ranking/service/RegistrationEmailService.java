@@ -36,22 +36,8 @@ public class RegistrationEmailService {
   }
 
   public void sendPaymentConfirmedEmail(EventRegistration registration) {
-    if (!enabled || registration == null) {
-      return;
-    }
-
-    String email = clean(registration.getEmail());
-    if (!isValidEmail(email)) {
-      return;
-    }
-
-    if (mailSender instanceof JavaMailSenderImpl senderImpl) {
-      String host = clean(senderImpl.getHost());
-      if (host.isBlank()) {
-        log.info("SMTP nao configurado. E-mail de confirmacao nao enviado para {}", email);
-        return;
-      }
-    }
+    String email = resolveRecipientEmail(registration);
+    if (email == null) return;
 
     Event event = registration.getEvent();
     String eventName = event != null ? clean(event.getName()) : "";
@@ -84,11 +70,74 @@ public class RegistrationEmailService {
     body.append("Em caso de duvidas, responda este e-mail ou entre em contato com a organizacao.\n\n");
     body.append("Genesis Esportes");
 
+    sendMail(email, subject, body.toString(), "confirmacao");
+  }
+
+  public void sendRegistrationReceivedEmail(EventRegistration registration) {
+    String email = resolveRecipientEmail(registration);
+    if (email == null) return;
+
+    Event event = registration.getEvent();
+    String eventName = event != null ? clean(event.getName()) : "";
+    String eventDate = event != null && event.getDate() != null ? event.getDate().toString() : "";
+    String eventLocation = event != null ? clean(event.getLocation()) : "";
+    String athleteName = clean(registration.getNome());
+
+    String subjectBase = "Inscricao recebida com sucesso";
+    String subject = subjectPrefix.isBlank()
+        ? subjectBase
+        : String.format("[%s] %s", subjectPrefix, subjectBase);
+
+    StringBuilder body = new StringBuilder();
+    body.append("Ola");
+    if (!athleteName.isBlank()) {
+      body.append(" ").append(athleteName);
+    }
+    body.append(",\n\n");
+    body.append("Sua inscricao foi feita com sucesso e registrada no sistema Genesis Esportes.\n\n");
+    if (!eventName.isBlank()) {
+      body.append("Evento: ").append(eventName).append("\n");
+    }
+    if (!eventDate.isBlank()) {
+      body.append("Data: ").append(eventDate).append("\n");
+    }
+    if (!eventLocation.isBlank()) {
+      body.append("Local: ").append(eventLocation).append("\n");
+    }
+    body.append("Status do pagamento: Aguardando confirmacao\n\n");
+    body.append("Assim que o pagamento for conferido pela equipe, voce recebera nova confirmacao.\n\n");
+    body.append("Genesis Esportes");
+
+    sendMail(email, subject, body.toString(), "recebimento");
+  }
+
+  private String resolveRecipientEmail(EventRegistration registration) {
+    if (!enabled || registration == null) {
+      return null;
+    }
+
+    String email = clean(registration.getEmail());
+    if (!isValidEmail(email)) {
+      return null;
+    }
+
+    if (mailSender instanceof JavaMailSenderImpl senderImpl) {
+      String host = clean(senderImpl.getHost());
+      if (host.isBlank()) {
+        log.info("SMTP nao configurado. E-mail nao enviado para {}", email);
+        return null;
+      }
+    }
+
+    return email;
+  }
+
+  private void sendMail(String email, String subject, String body, String context) {
     try {
       SimpleMailMessage message = new SimpleMailMessage();
       message.setTo(email);
       message.setSubject(subject);
-      message.setText(body.toString());
+      message.setText(body);
       if (!fromAddress.isBlank()) {
         message.setFrom(fromAddress);
       }
@@ -97,7 +146,7 @@ public class RegistrationEmailService {
       }
       mailSender.send(message);
     } catch (Exception ex) {
-      log.warn("Falha ao enviar e-mail de confirmacao para {}: {}", email, ex.getMessage());
+      log.warn("Falha ao enviar e-mail de {} para {}: {}", context, email, ex.getMessage());
     }
   }
 

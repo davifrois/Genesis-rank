@@ -21,65 +21,126 @@ const formatDate = (value, locale, fallback) => {
   });
 };
 
+const encodeLocation = (value) => encodeURIComponent((value || '').toString().trim());
+
 const Events = () => {
   const { events } = useStore();
-  const { language, locale } = useI18n();
-  const isEnglish = language === 'en-US';
-  const copy = isEnglish
-    ? {
-        fallbackDate: 'Date TBD',
-        eventFallback: 'Official event',
-        locationFallback: 'Location TBD',
-        autoUpdate: 'This event updates the ranking automatically.',
-        accessEvent: 'Access event',
-        openRegistration: 'Open registration',
-        closedRegistration: 'Registration closed',
-        registrationSection: 'Registrations',
-        registrationTitle: 'Open registrations',
-        noOpen: 'No event with open registration yet.',
-        kicker: 'Events',
-        title: 'Each event generates points and moves the ranking.',
-        description:
-          'Upcoming, past and planned events. All cards keep the same size to improve visualization.',
-        agenda: 'Schedule',
-        upcomingTitle: 'Upcoming events',
-        upcomingStatus: 'Upcoming',
-        noUpcoming: 'No future event registered.',
-        history: 'History',
-        pastTitle: 'Past events',
-        pastStatus: 'Finished',
-        noPast: 'Past events appear here automatically.',
-        planning: 'Planning',
-        noDateTitle: 'Events without date',
-        noDateStatus: 'Planned'
-      }
-    : {
-        fallbackDate: 'Data a confirmar',
-        eventFallback: 'Evento oficial',
-        locationFallback: 'Local a definir',
-        autoUpdate: 'Este evento atualiza o ranking automaticamente.',
-        accessEvent: 'Acessar evento',
-        openRegistration: 'Inscrições abertas',
-        closedRegistration: 'Inscrições fechadas',
-        registrationSection: 'Inscrições',
-        registrationTitle: 'Inscrições abertas',
-        noOpen: 'Nenhum evento com inscrição aberta no momento.',
-        kicker: 'Eventos',
-        title: 'Cada evento gera pontos e movimenta o ranking.',
-        description:
-          'Eventos próximos, encerrados e em planejamento. Todos os cards seguem o mesmo padrão para facilitar a visualização.',
-        agenda: 'Agenda',
-        upcomingTitle: 'Próximos eventos',
-        upcomingStatus: 'Em breve',
-        noUpcoming: 'Nenhum evento futuro cadastrado.',
-        history: 'Histórico',
-        pastTitle: 'Eventos passados',
-        pastStatus: 'Encerrado',
-        noPast: 'Os eventos passados aparecem aqui automaticamente.',
-        planning: 'Planejamento',
-        noDateTitle: 'Eventos sem data definida',
-        noDateStatus: 'Planejado'
-      };
+  const { locale, uiVariant } = useI18n();
+  const copyByLanguage = {
+    pt: {
+      fallbackDate: 'Data a confirmar',
+      eventFallback: 'Evento oficial',
+      locationFallback: 'Local a definir',
+      autoUpdate: 'Este evento atualiza o ranking automaticamente.',
+      openMap: 'Abrir no mapa',
+      accessEvent: 'Acessar evento',
+      openRegistration: 'Inscricoes abertas',
+      closedRegistration: 'Inscricoes fechadas',
+      registrationSection: 'Inscricoes',
+      registrationTitle: 'Inscricoes abertas',
+      noOpen: 'Nenhum evento com inscricao aberta no momento.',
+      kicker: 'Eventos',
+      title: 'Cada evento gera pontos e movimenta o ranking.',
+      description:
+        'Eventos proximos, encerrados e em planejamento. Todos os cards seguem o mesmo padrao para facilitar a visualizacao.',
+      agenda: 'Agenda',
+      upcomingTitle: 'Proximos eventos',
+      upcomingStatus: 'Em breve',
+      noUpcoming: 'Nenhum evento futuro cadastrado.',
+      history: 'Historico',
+      pastTitle: 'Eventos passados e inscrições encerradas',
+      pastStatus: 'Passado / Encerrado',
+      noPast: 'Os eventos passados aparecem aqui automaticamente.',
+      planning: 'Planejamento',
+      noDateTitle: 'Eventos sem data definida',
+      noDateStatus: 'Planejado'
+    },
+    en: {
+      fallbackDate: 'Date TBD',
+      eventFallback: 'Official event',
+      locationFallback: 'Location TBD',
+      autoUpdate: 'This event updates the ranking automatically.',
+      openMap: 'Open map',
+      accessEvent: 'Access event',
+      openRegistration: 'Open registration',
+      closedRegistration: 'Registration closed',
+      registrationSection: 'Registrations',
+      registrationTitle: 'Open registrations',
+      noOpen: 'No event with open registration yet.',
+      kicker: 'Events',
+      title: 'Each event generates points and moves the ranking.',
+      description:
+        'Upcoming, past and planned events. All cards keep the same size to improve visualization.',
+      agenda: 'Schedule',
+      upcomingTitle: 'Upcoming events',
+      upcomingStatus: 'Upcoming',
+      noUpcoming: 'No future event registered.',
+      history: 'History',
+      pastTitle: 'Past events and closed registrations',
+      pastStatus: 'Past / Closed',
+      noPast: 'Past events appear here automatically.',
+      planning: 'Planning',
+      noDateTitle: 'Events without date',
+      noDateStatus: 'Planned'
+    },
+    es: {
+      fallbackDate: 'Fecha por confirmar',
+      eventFallback: 'Evento oficial',
+      locationFallback: 'Lugar por definir',
+      autoUpdate: 'Este evento actualiza el ranking automaticamente.',
+      openMap: 'Abrir en mapa',
+      accessEvent: 'Acceder al evento',
+      openRegistration: 'Inscripciones abiertas',
+      closedRegistration: 'Inscripciones cerradas',
+      registrationSection: 'Inscripciones',
+      registrationTitle: 'Inscripciones abiertas',
+      noOpen: 'No hay eventos con inscripcion abierta por ahora.',
+      kicker: 'Eventos',
+      title: 'Cada evento suma puntos y mueve el ranking.',
+      description:
+        'Eventos proximos, finalizados y planificados. Todas las tarjetas mantienen el mismo tamano para mejorar la visualizacion.',
+      agenda: 'Agenda',
+      upcomingTitle: 'Proximos eventos',
+      upcomingStatus: 'Proximo',
+      noUpcoming: 'No hay eventos futuros registrados.',
+      history: 'Historial',
+      pastTitle: 'Eventos finalizados e inscripciones cerradas',
+      pastStatus: 'Finalizado / Cerrado',
+      noPast: 'Los eventos finalizados apareceran aqui automaticamente.',
+      planning: 'Planificacion',
+      noDateTitle: 'Eventos sin fecha definida',
+      noDateStatus: 'Planificado'
+    },
+    fr: {
+      fallbackDate: 'Date a confirmer',
+      eventFallback: 'Evenement officiel',
+      locationFallback: 'Lieu a definir',
+      autoUpdate: 'Cet evenement met a jour le classement automatiquement.',
+      openMap: 'Ouvrir sur la carte',
+      accessEvent: 'Aceder a l evenement',
+      openRegistration: 'Inscriptions ouvertes',
+      closedRegistration: 'Inscriptions fermees',
+      registrationSection: 'Inscriptions',
+      registrationTitle: 'Inscriptions ouvertes',
+      noOpen: 'Aucun evenement avec inscription ouverte pour le moment.',
+      kicker: 'Evenements',
+      title: 'Chaque evenement attribue des points et fait evoluer le classement.',
+      description:
+        'Evenements a venir, termines et planifies. Toutes les cartes gardent la meme taille pour une meilleure lisibilite.',
+      agenda: 'Agenda',
+      upcomingTitle: 'Prochains evenements',
+      upcomingStatus: 'A venir',
+      noUpcoming: 'Aucun evenement futur enregistre.',
+      history: 'Historique',
+      pastTitle: 'Evenements passes et inscriptions fermees',
+      pastStatus: 'Passe / Ferme',
+      noPast: 'Les evenements passes apparaissent ici automatiquement.',
+      planning: 'Planification',
+      noDateTitle: 'Evenements sans date',
+      noDateStatus: 'Planifie'
+    }
+  };
+  const copy = copyByLanguage[uiVariant] || copyByLanguage.pt;
 
   const { openEvents, upcomingEvents, pastEvents, undatedEvents } = useMemo(() => {
     const now = new Date().getTime();
@@ -92,8 +153,14 @@ const Events = () => {
       const parsedDate = parseDate(event.date);
       const prepared = { ...event, parsedDate };
 
-      if (event.registrationOpen) {
+      const isRegistrationOpen = event.registrationOpen !== false;
+      if (isRegistrationOpen) {
         open.push(prepared);
+      }
+
+      if (!isRegistrationOpen) {
+        past.push(prepared);
+        return;
       }
 
       if (!parsedDate) {
@@ -132,65 +199,85 @@ const Events = () => {
     };
   }, [events]);
 
-  const renderEventCard = (event, statusLabel) => (
-    <article className="public-event-card public-event-card--uniform" key={event.id}>
-      <div className="public-event-card__poster">
-        {event.posterUrl ? (
-          <img src={event.posterUrl} alt={event.name || copy.eventFallback} loading="lazy" />
-        ) : (
-          <div className="public-event-card__poster-fallback">
-            <span>{event.name || copy.eventFallback}</span>
+  const renderEventCard = (event, statusLabel) => {
+    const locationText = (event.location || '').toString().trim();
+    const hasLocation = Boolean(locationText);
+    const mapUrl = hasLocation
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeLocation(locationText)}`
+      : '';
+
+    return (
+      <article className="public-event-card public-event-card--uniform" key={event.id}>
+        <div className="public-event-card__poster">
+          {event.posterUrl ? (
+            <img src={event.posterUrl} alt={event.name || copy.eventFallback} loading="lazy" />
+          ) : (
+            <div className="public-event-card__poster-fallback">
+              <span>{event.name || copy.eventFallback}</span>
+            </div>
+          )}
+        </div>
+        <div className="public-event-card__header">
+          <div>
+            <div className="event-name">{event.name || copy.eventFallback}</div>
+            <div className="list-meta">
+              <MapPin size={14} />
+              {locationText || copy.locationFallback}
+            </div>
           </div>
-        )}
-      </div>
-      <div className="public-event-card__header">
-        <div>
-          <div className="event-name">{event.name || copy.eventFallback}</div>
-          <div className="list-meta">
-            <MapPin size={14} />
-            {event.location || copy.locationFallback}
+          <span className="tag">{statusLabel}</span>
+        </div>
+        <div className="public-event-card__date">
+          <Calendar size={16} />
+          {formatDate(event.parsedDate || event.date, locale, copy.fallbackDate)}
+        </div>
+        <div className="public-event-card__footer">
+          <span>{copy.autoUpdate}</span>
+          <div className="public-event-card__actions">
+            {hasLocation && (
+              <a
+                className="btn btn-secondary btn-event--small"
+                href={mapUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {copy.openMap}
+              </a>
+            )}
+            {event.internalRegistration ? (
+              <Link
+                className={`btn ${event.registrationOpen ? 'btn-event' : 'btn-secondary btn-event--small'}`}
+                to={`/eventos/${event.id}`}
+                onClick={(clickEvent) => {
+                  if (!event.registrationOpen) {
+                    clickEvent.preventDefault();
+                  }
+                }}
+                aria-disabled={!event.registrationOpen}
+              >
+                {event.registrationOpen ? copy.accessEvent : copy.closedRegistration}
+              </Link>
+            ) : (
+              <a
+                className={`btn ${event.registrationOpen ? 'btn-event' : 'btn-secondary btn-event--small'}`}
+                href={event.registrationUrl || '#'}
+                target={event.registrationUrl ? '_blank' : undefined}
+                rel={event.registrationUrl ? 'noreferrer' : undefined}
+                onClick={(clickEvent) => {
+                  if (!event.registrationOpen || !event.registrationUrl) {
+                    clickEvent.preventDefault();
+                  }
+                }}
+                aria-disabled={!event.registrationOpen || !event.registrationUrl}
+              >
+                {event.registrationOpen ? copy.accessEvent : copy.closedRegistration}
+              </a>
+            )}
           </div>
         </div>
-        <span className="tag">{statusLabel}</span>
-      </div>
-      <div className="public-event-card__date">
-        <Calendar size={16} />
-        {formatDate(event.parsedDate || event.date, locale, copy.fallbackDate)}
-      </div>
-      <div className="public-event-card__footer">
-        <span>{copy.autoUpdate}</span>
-        {event.internalRegistration ? (
-          <Link
-            className={`btn ${event.registrationOpen ? 'btn-event' : 'btn-secondary btn-event--small'}`}
-            to={`/eventos/${event.id}`}
-            onClick={(clickEvent) => {
-              if (!event.registrationOpen) {
-                clickEvent.preventDefault();
-              }
-            }}
-            aria-disabled={!event.registrationOpen}
-          >
-            {event.registrationOpen ? copy.accessEvent : copy.closedRegistration}
-          </Link>
-        ) : (
-          <a
-            className={`btn ${event.registrationOpen ? 'btn-event' : 'btn-secondary btn-event--small'}`}
-            href={event.registrationUrl || '#'}
-            target={event.registrationUrl ? '_blank' : undefined}
-            rel={event.registrationUrl ? 'noreferrer' : undefined}
-            onClick={(clickEvent) => {
-              if (!event.registrationOpen || !event.registrationUrl) {
-                clickEvent.preventDefault();
-              }
-            }}
-            aria-disabled={!event.registrationOpen || !event.registrationUrl}
-          >
-            {event.registrationOpen ? copy.accessEvent : copy.closedRegistration}
-          </a>
-        )}
-      </div>
-    </article>
-  );
+      </article>
+    );
+  };
 
   return (
     <div className="public-page">

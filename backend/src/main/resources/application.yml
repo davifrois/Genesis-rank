@@ -56,3 +56,15 @@ app:
     from: ${REG_CONFIRM_EMAIL_FROM:no-reply@genesisesportes.com.br}
     reply-to: ${REG_CONFIRM_EMAIL_REPLY_TO:contato@genesisesportes.com.br}
     subject-prefix: ${REG_CONFIRM_EMAIL_SUBJECT_PREFIX:Genesis Esportes}
+  event-announcement-email:
+    enabled: ${EVENT_ANNOUNCEMENT_EMAIL_ENABLED:true}
+    include-platform-accounts: ${EVENT_ANNOUNCEMENT_INCLUDE_PLATFORM_ACCOUNTS:true}
+    from: ${EVENT_ANNOUNCEMENT_EMAIL_FROM:no-reply@genesisesportes.com.br}
+    reply-to: ${EVENT_ANNOUNCEMENT_EMAIL_REPLY_TO:contato@genesisesportes.com.br}
+    subject-prefix: ${EVENT_ANNOUNCEMENT_EMAIL_SUBJECT_PREFIX:Genesis Esportes}
+    events-page-url: ${EVENT_ANNOUNCEMENT_EVENTS_PAGE_URL:https://genesisesportes.com.br/eventos}
+  coach-athlete-email:
+    enabled: ${COACH_ATHLETE_EMAIL_ENABLED:true}
+    from: ${COACH_ATHLETE_EMAIL_FROM:no-reply@genesisesportes.com.br}
+    reply-to: ${COACH_ATHLETE_EMAIL_REPLY_TO:contato@genesisesportes.com.br}
+    subject-prefix: ${COACH_ATHLETE_EMAIL_SUBJECT_PREFIX:Genesis Esportes}

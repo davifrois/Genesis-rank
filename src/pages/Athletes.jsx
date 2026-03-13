@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { useStore } from '../hooks/useStore';
 import { useI18n } from '../hooks/useI18n';
 import { rankAthletes } from '../services/scoringService';
@@ -19,51 +20,103 @@ const sortOptions = (values) => values.filter(Boolean).sort((a, b) => a.localeCo
 
 const Athletes = () => {
   const { athletes } = useStore();
-  const { language } = useI18n();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [beltFilter, setBeltFilter] = useState('all');
-  const [weightFilter, setWeightFilter] = useState('all');
-  const [categoryFilter, setCategoryFilter] = useState('all');
-  const isEnglish = language === 'en-US';
-  const copy = isEnglish
-    ? {
-        kicker: 'Athletes',
-        title: 'Individual profiles with history and points.',
-        description:
-          'Search athletes by belt, weight or category. Each profile accumulates points and ranking automatically.',
-        searchPlaceholder: 'Search athlete, academy or category',
-        allBelts: 'All belts',
-        allWeights: 'All weights',
-        allCategories: 'All categories',
-        activeRanking: 'Active ranking',
-        foundAthletes: 'athletes found',
-        athleteFallback: 'Athlete',
-        academyFallback: 'No academy',
-        pointsSuffix: 'pts',
-        beltFallback: 'Belt',
-        weightFallback: 'Weight',
-        categoryFallback: 'Category',
-        emptyState: 'No athlete found with this filter combination.'
-      }
-    : {
-        kicker: 'Atletas',
-        title: 'Perfis individuais com histórico e pontuação.',
-        description:
-          'Pesquise atletas por faixa, peso ou categoria. Cada perfil acumula pontos e classificação automaticamente.',
-        searchPlaceholder: 'Buscar por atleta, academia ou categoria',
-        allBelts: 'Todas as faixas',
-        allWeights: 'Todos os pesos',
-        allCategories: 'Todas as categorias',
-        activeRanking: 'Ranking ativo',
-        foundAthletes: 'atletas encontrados',
-        athleteFallback: 'Atleta',
-        academyFallback: 'Sem academia',
-        pointsSuffix: 'pts',
-        beltFallback: 'Faixa',
-        weightFallback: 'Peso',
-        categoryFallback: 'Categoria',
-        emptyState: 'Nenhum atleta encontrado com essa combinação de filtros.'
-      };
+  const { uiLanguage, uiVariant } = useI18n();
+  const [searchParams] = useSearchParams();
+  const [searchTerm, setSearchTerm] = useState(() => (searchParams.get('q') || searchParams.get('atleta') || '').toString());
+  const [beltFilter, setBeltFilter] = useState(() => (searchParams.get('faixa') || 'all').toString());
+  const [weightFilter, setWeightFilter] = useState(() => (searchParams.get('peso') || 'all').toString());
+  const [categoryFilter, setCategoryFilter] = useState(() => (searchParams.get('categoria') || 'all').toString());
+  const copyByLanguage = {
+    pt: {
+      kicker: 'Atletas',
+      title: 'Perfis individuais com historico e pontuacao.',
+      description:
+        'Pesquise atletas por faixa, peso ou categoria. Cada perfil acumula pontos e classificacao automaticamente.',
+      searchPlaceholder: 'Buscar por atleta, academia ou categoria',
+      allBelts: 'Todas as faixas',
+      allWeights: 'Todos os pesos',
+      allCategories: 'Todas as categorias',
+      activeRanking: 'Ranking ativo',
+      foundAthletes: 'atletas encontrados',
+      athleteFallback: 'Atleta',
+      academyFallback: 'Sem academia',
+      pointsSuffix: 'pts',
+      beltFallback: 'Faixa',
+      weightFallback: 'Peso',
+      categoryFallback: 'Categoria',
+      emptyState: 'Nenhum atleta encontrado com essa combinacao de filtros.'
+    },
+    en: {
+      kicker: 'Athletes',
+      title: 'Individual profiles with history and points.',
+      description:
+        'Search athletes by belt, weight or category. Each profile accumulates points and ranking automatically.',
+      searchPlaceholder: 'Search athlete, academy or category',
+      allBelts: 'All belts',
+      allWeights: 'All weights',
+      allCategories: 'All categories',
+      activeRanking: 'Active ranking',
+      foundAthletes: 'athletes found',
+      athleteFallback: 'Athlete',
+      academyFallback: 'No academy',
+      pointsSuffix: 'pts',
+      beltFallback: 'Belt',
+      weightFallback: 'Weight',
+      categoryFallback: 'Category',
+      emptyState: 'No athlete found with this filter combination.'
+    },
+    es: {
+      kicker: 'Atletas',
+      title: 'Perfiles individuales con historial y puntuacion.',
+      description:
+        'Busque atletas por cinturon, peso o categoria. Cada perfil acumula puntos y posicion automaticamente.',
+      searchPlaceholder: 'Buscar atleta, academia o categoria',
+      allBelts: 'Todos los cinturones',
+      allWeights: 'Todos los pesos',
+      allCategories: 'Todas las categorias',
+      activeRanking: 'Ranking activo',
+      foundAthletes: 'atletas encontrados',
+      athleteFallback: 'Atleta',
+      academyFallback: 'Sin academia',
+      pointsSuffix: 'pts',
+      beltFallback: 'Cinturon',
+      weightFallback: 'Peso',
+      categoryFallback: 'Categoria',
+      emptyState: 'No se encontro ningun atleta con esta combinacion de filtros.'
+    },
+    fr: {
+      kicker: 'Athletes',
+      title: 'Profils individuels avec historique et points.',
+      description:
+        'Recherchez les athletes par ceinture, poids ou categorie. Chaque profil accumule des points automatiquement.',
+      searchPlaceholder: 'Rechercher athlete, academie ou categorie',
+      allBelts: 'Toutes les ceintures',
+      allWeights: 'Tous les poids',
+      allCategories: 'Toutes les categories',
+      activeRanking: 'Classement actif',
+      foundAthletes: 'athletes trouves',
+      athleteFallback: 'Athlete',
+      academyFallback: 'Sans academie',
+      pointsSuffix: 'pts',
+      beltFallback: 'Ceinture',
+      weightFallback: 'Poids',
+      categoryFallback: 'Categorie',
+      emptyState: 'Aucun athlete trouve avec cette combinaison de filtres.'
+    }
+  };
+  const copy = copyByLanguage[uiVariant] || copyByLanguage.pt;
+
+  useEffect(() => {
+    const queryAthlete = (searchParams.get('q') || searchParams.get('atleta') || '').toString();
+    const queryBelt = (searchParams.get('faixa') || '').toString();
+    const queryWeight = (searchParams.get('peso') || '').toString();
+    const queryCategory = (searchParams.get('categoria') || '').toString();
+
+    if (queryAthlete && queryAthlete !== searchTerm) setSearchTerm(queryAthlete);
+    if (queryBelt && queryBelt !== beltFilter) setBeltFilter(queryBelt);
+    if (queryWeight && queryWeight !== weightFilter) setWeightFilter(queryWeight);
+    if (queryCategory && queryCategory !== categoryFilter) setCategoryFilter(queryCategory);
+  }, [beltFilter, categoryFilter, searchParams, searchTerm, weightFilter]);
 
   const filterOptions = useMemo(() => {
     const belts = new Set();
@@ -128,19 +181,19 @@ const Athletes = () => {
           <select className="input" value={beltFilter} onChange={(event) => setBeltFilter(event.target.value)}>
             <option value="all">{copy.allBelts}</option>
             {filterOptions.belts.map((belt) => (
-              <option key={belt} value={belt}>{translateBelt(belt, language)}</option>
+              <option key={belt} value={belt}>{translateBelt(belt, uiLanguage)}</option>
             ))}
           </select>
           <select className="input" value={weightFilter} onChange={(event) => setWeightFilter(event.target.value)}>
             <option value="all">{copy.allWeights}</option>
             {filterOptions.weights.map((weight) => (
-              <option key={weight} value={weight}>{translateWeight(weight, language)}</option>
+              <option key={weight} value={weight}>{translateWeight(weight, uiLanguage)}</option>
             ))}
           </select>
           <select className="input" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
             <option value="all">{copy.allCategories}</option>
             {filterOptions.categories.map((category) => (
-              <option key={category} value={category}>{translateCategory(category, language)}</option>
+              <option key={category} value={category}>{translateCategory(category, uiLanguage)}</option>
             ))}
           </select>
         </div>
@@ -166,9 +219,9 @@ const Athletes = () => {
                   <span className="points-pill">{athlete.pontos} {copy.pointsSuffix}</span>
                 </div>
                 <div className="public-athlete-meta">
-                  <span className="tag">{translateBelt(athlete.faixa || copy.beltFallback, language)}</span>
-                  <span className="tag">{translateWeight(athlete.peso || copy.weightFallback, language)}</span>
-                  <span className="tag">{translateCategory(athlete.categoria || copy.categoryFallback, language)}</span>
+                  <span className="tag">{translateBelt(athlete.faixa || copy.beltFallback, uiLanguage)}</span>
+                  <span className="tag">{translateWeight(athlete.peso || copy.weightFallback, uiLanguage)}</span>
+                  <span className="tag">{translateCategory(athlete.categoria || copy.categoryFallback, uiLanguage)}</span>
                 </div>
               </div>
             ))

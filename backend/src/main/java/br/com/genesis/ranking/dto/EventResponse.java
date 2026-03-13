@@ -14,6 +14,10 @@ public class EventResponse {
   private Double feeAbsolute;
   private boolean registrationOpen;
   private boolean internalRegistration;
+  private Integer announcementRecipients;
+  private Integer announcementSent;
+  private Integer announcementFailed;
+  private Boolean announcementAttempted;
 
   public String getId() {
     return id;
@@ -117,5 +121,37 @@ public class EventResponse {
 
   public void setInternalRegistration(boolean internalRegistration) {
     this.internalRegistration = internalRegistration;
+  }
+
+  public Integer getAnnouncementRecipients() {
+    return announcementRecipients;
+  }
+
+  public void setAnnouncementRecipients(Integer announcementRecipients) {
+    this.announcementRecipients = announcementRecipients;
+  }
+
+  public Integer getAnnouncementSent() {
+    return announcementSent;
+  }
+
+  public void setAnnouncementSent(Integer announcementSent) {
+    this.announcementSent = announcementSent;
+  }
+
+  public Integer getAnnouncementFailed() {
+    return announcementFailed;
+  }
+
+  public void setAnnouncementFailed(Integer announcementFailed) {
+    this.announcementFailed = announcementFailed;
+  }
+
+  public Boolean getAnnouncementAttempted() {
+    return announcementAttempted;
+  }
+
+  public void setAnnouncementAttempted(Boolean announcementAttempted) {
+    this.announcementAttempted = announcementAttempted;
   }
 }

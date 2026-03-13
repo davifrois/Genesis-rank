@@ -83,7 +83,7 @@ public class ImportService {
       if (eventRequest.getId() != null && eventRepository.existsById(eventRequest.getId())) {
         eventService.update(eventRequest.getId(), eventRequest);
       } else {
-        eventService.create(eventRequest);
+        eventService.create(eventRequest, false);
       }
       eventCount += 1;
     }

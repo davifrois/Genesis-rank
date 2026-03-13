@@ -8,6 +8,7 @@ import { buildCategoryDescriptor } from '../services/categoryService';
 import { generateFilteredRankingPDF } from '../services/pdfService';
 import { buildFileSafeName, downloadCsv } from '../services/exportService';
 import { translateBelt, translateCompositeLabel, translateWeight } from '../utils/localeLabels';
+import { countryCodeFromAthlete, countryLabelFromAthlete, flagFromCountryCode } from '../utils/countryFlags';
 
 const DEFAULT_GROUP_LIMIT = 8;
 const GROUP_PAGE_SIZE = 10;
@@ -82,99 +83,6 @@ const resolveTab = (value) => (TAB_OPTIONS.includes(value) ? value : 'GI');
 
 const normalizeQueryParam = (value) => (value ? value.toString().trim() : '');
 
-const COUNTRY_TO_CODE = {
-    brasil: 'BR',
-    brazil: 'BR',
-    usa: 'US',
-    'united states': 'US',
-    'estados unidos': 'US',
-    portugal: 'PT',
-    argentina: 'AR',
-    mexico: 'MX',
-    chile: 'CL',
-    colombia: 'CO',
-    peru: 'PE',
-    uruguay: 'UY',
-    paraguay: 'PY',
-    bolivia: 'BO',
-    venezuela: 'VE',
-    spain: 'ES',
-    espanha: 'ES',
-    france: 'FR',
-    franca: 'FR',
-    italy: 'IT',
-    italia: 'IT',
-    germany: 'DE',
-    alemanha: 'DE',
-    russia: 'RU',
-    uae: 'AE',
-    'united arab emirates': 'AE',
-    'emirados arabes unidos': 'AE',
-    japan: 'JP',
-    japao: 'JP'
-};
-
-const COUNTRY_LABEL_BY_CODE = {
-    BR: { pt: 'Brasil', en: 'Brazil' },
-    US: { pt: 'Estados Unidos', en: 'United States' },
-    PT: { pt: 'Portugal', en: 'Portugal' },
-    AR: { pt: 'Argentina', en: 'Argentina' },
-    MX: { pt: 'México', en: 'Mexico' },
-    CL: { pt: 'Chile', en: 'Chile' },
-    CO: { pt: 'Colômbia', en: 'Colombia' },
-    PE: { pt: 'Peru', en: 'Peru' },
-    UY: { pt: 'Uruguai', en: 'Uruguay' },
-    PY: { pt: 'Paraguai', en: 'Paraguay' },
-    BO: { pt: 'Bolívia', en: 'Bolivia' },
-    VE: { pt: 'Venezuela', en: 'Venezuela' },
-    ES: { pt: 'Espanha', en: 'Spain' },
-    FR: { pt: 'França', en: 'France' },
-    IT: { pt: 'Itália', en: 'Italy' },
-    DE: { pt: 'Alemanha', en: 'Germany' },
-    RU: { pt: 'Rússia', en: 'Russia' },
-    AE: { pt: 'Emirados Árabes Unidos', en: 'United Arab Emirates' },
-    JP: { pt: 'Japão', en: 'Japan' }
-};
-
-const countryCodeFromAthlete = (athlete) => {
-    const raw = (
-        athlete?.countryCode
-        || athlete?.paisCode
-        || athlete?.country
-        || athlete?.pais
-        || athlete?.nacionalidade
-        || ''
-    ).toString().trim();
-    if (!raw) return 'BR';
-    const upper = raw.toUpperCase();
-    if (/^[A-Z]{2}$/.test(upper)) return upper;
-    const normalized = normalizeSearchTerm(raw);
-    return COUNTRY_TO_CODE[normalized] || 'BR';
-};
-
-const flagFromCode = (code) => {
-    const safe = (code || 'BR').toUpperCase();
-    if (!/^[A-Z]{2}$/.test(safe)) return '🏳️';
-    const chars = [...safe].map((char) => String.fromCodePoint(127397 + char.charCodeAt(0)));
-    return chars.join('');
-};
-
-const countryLabelFromAthlete = (athlete, isEnglish = false) => {
-    const raw = (
-        athlete?.country
-        || athlete?.pais
-        || athlete?.nacionalidade
-        || ''
-    ).toString().trim();
-    const code = countryCodeFromAthlete(athlete);
-    const fallbackByCode = COUNTRY_LABEL_BY_CODE[code]?.[isEnglish ? 'en' : 'pt'] || code;
-
-    if (!raw) return fallbackByCode;
-    if (/^[A-Za-z]{2}$/.test(raw)) return fallbackByCode;
-
-    return raw;
-};
-
 const photoUrlFromAthlete = (athlete) => (
     athlete?.photoUrl
     || athlete?.fotoUrl
@@ -183,10 +91,48 @@ const photoUrlFromAthlete = (athlete) => (
     || ''
 );
 
+const buildTeamRanking = (athletes) => {
+    const teams = new Map();
+
+    (Array.isArray(athletes) ? athletes : []).forEach((athlete) => {
+        const academy = (athlete?.academia || 'Sem academia').toString().trim() || 'Sem academia';
+        const key = normalizeSearchTerm(academy);
+        const current = teams.get(key) || {
+            key,
+            academy,
+            points: 0,
+            wins: 0,
+            podiums: 0,
+            athletes: 0
+        };
+
+        const history = Array.isArray(athlete?.historico) ? athlete.historico : [];
+        const breakdown = buildScoreBreakdown(history);
+        current.points += Number(athlete?.pontos) || 0;
+        current.wins += Number(breakdown?.wins || 0);
+        current.podiums += Number(breakdown?.podium1 || 0) + Number(breakdown?.podium2 || 0) + Number(breakdown?.podium3 || 0);
+        current.athletes += 1;
+
+        teams.set(key, current);
+    });
+
+    return [...teams.values()]
+        .sort((a, b) => {
+            if (b.points !== a.points) return b.points - a.points;
+            if (b.wins !== a.wins) return b.wins - a.wins;
+            if (b.podiums !== a.podiums) return b.podiums - a.podiums;
+            if (b.athletes !== a.athletes) return b.athletes - a.athletes;
+            return a.academy.localeCompare(b.academy);
+        })
+        .map((team, index) => ({ ...team, rank: index + 1 }));
+};
+
 const Ranking = () => {
     const { athletes, events, activeEventId, memberProfiles, currentUser } = useStore();
-    const { language } = useI18n();
-    const isEnglish = language === 'en-US';
+    const { uiLanguage } = useI18n();
+    const isEnglish = uiLanguage === 'en-US';
+    const isSpanish = uiLanguage === 'es-ES';
+    const isFrench = uiLanguage === 'fr-FR';
     const isAdmin = currentUser?.role === 'admin';
     const [searchParams, setSearchParams] = useSearchParams();
     const [activeTab, setActiveTab] = useState(() => resolveTab(searchParams.get('tab')));
@@ -197,6 +143,7 @@ const Ranking = () => {
     const deferredSearch = useDeferredValue(searchTerm);
     const [compactView, setCompactView] = useState(() => searchParams.get('compact') !== '0');
     const [competitionMode, setCompetitionMode] = useState(() => searchParams.get('comp') === '1');
+    const [showFullList, setShowFullList] = useState(() => searchParams.get('list') === '1');
     const [expandedGroups, setExpandedGroups] = useState(() => new Set());
     const [groupLimit, setGroupLimit] = useState(GROUP_PAGE_SIZE);
     const [winnersLimit, setWinnersLimit] = useState(WINNERS_PAGE_SIZE);
@@ -244,65 +191,213 @@ const Ranking = () => {
             collapse: 'Collapse',
             showMoreResults: 'Show more results',
             showMoreCategories: 'Show more categories',
+            showFullList: 'Show full list',
+            hideFullList: 'Hide full list',
             noAthleteInEvent: 'No athlete linked to this event.',
             noAthleteInCategory: 'No athlete found in this category.',
             noWinner: 'No winner found.',
             podiumHighlight: 'Podium highlight',
             placeFirst: '1st',
             placeSecond: '2nd',
-            placeThird: '3rd'
+            placeThird: '3rd',
+            flagLabel: 'Flag',
+            boardsSectionTitle: 'Ranking boards',
+            boardsSectionSubtitle: 'Top athletes by category/belt and top teams in one visual block.',
+            boardsAthleteTitle: 'Athletes by category and belt',
+            boardsTeamsTitle: 'Teams',
+            boardsTeamsOverallTitle: 'Teams - Overall ranking',
+            boardsTopLabel: 'Top 3',
+            boardsNoData: 'No data available in this board.',
+            boardsAthletesSuffix: 'athletes'
         }
-        : {
-            tabs: {
-                GI: 'Categoria de Peso GI (COM Pano)',
-                'NO-GI': 'Categoria de Peso NO-GI (SEM Pano)',
-                'ABS-GI': 'Absoluto GI (COM Pano)',
-                'ABS-NO-GI': 'Absoluto NO-GI (SEM Pano)',
-                GERAL: 'GERAL'
-            },
-            noDate: 'Data a confirmar',
-            rankingTitle: 'Ranking oficial',
-            rankingDescription: 'Acompanhe os resultados por evento em tempo real, com categorias claras, pontuação visível e filtros rápidos.',
-            correction: 'Solicitar correção',
-            allEvents: 'Todos os eventos',
-            noEvent: 'Sem evento',
-            noTournament: 'Nenhum campeonato cadastrado ainda.',
-            eventRanking: 'Ranking do evento',
-            eventFallback: 'Evento',
-            exportPdf: 'Exportar PDF',
-            exportCsv: 'Exportar CSV',
-            eventLabel: 'Evento',
-            selectEventAria: 'Selecionar evento',
-            searchPlaceholder: 'Buscar atleta, academia ou categoria',
-            searchAria: 'Buscar atleta',
-            clearSearch: 'Limpar busca',
-            competitionMode: 'Modo competição',
-            showAll: 'Mostrar tudo',
-            compactMode: 'Modo compacto',
-            athletes: 'Atletas',
-            categories: 'Categorias',
-            results: 'Resultados',
-            overallRanking: 'Ranking geral',
-            updatedNow: 'Atualizado agora',
-            points: 'Pontos',
-            wins: 'Vitórias',
-            podiums: 'Pódios',
-            victories: 'Vitórias',
-            beltFallback: 'Faixa',
-            weightFallback: 'Peso',
-            hiddenAthletes: 'atletas ocultos',
-            seeAll: 'Ver todos',
-            collapse: 'Recolher',
-            showMoreResults: 'Mostrar mais resultados',
-            showMoreCategories: 'Mostrar mais categorias',
-            noAthleteInEvent: 'Nenhum atleta vinculado a este evento.',
-            noAthleteInCategory: 'Nenhum atleta encontrado nesta categoria.',
-            noWinner: 'Nenhum vencedor encontrado.',
-            podiumHighlight: 'Pódio em destaque',
-            placeFirst: '1º',
-            placeSecond: '2º',
-            placeThird: '3º'
-        };
+        : isSpanish
+            ? {
+                tabs: {
+                    GI: 'Categoria de peso GI (con kimono)',
+                    'NO-GI': 'Categoria de peso NO-GI (sin kimono)',
+                    'ABS-GI': 'Absoluto GI (con kimono)',
+                    'ABS-NO-GI': 'Absoluto NO-GI (sin kimono)',
+                    GERAL: 'GENERAL'
+                },
+                noDate: 'Fecha por confirmar',
+                rankingTitle: 'Ranking oficial',
+                rankingDescription: 'Sigue los resultados por evento en tiempo real, con categorias claras, puntos visibles y filtros rapidos.',
+                correction: 'Solicitar correccion',
+                allEvents: 'Todos los eventos',
+                noEvent: 'Sin evento',
+                noTournament: 'Aun no hay campeonatos registrados.',
+                eventRanking: 'Ranking del evento',
+                eventFallback: 'Evento',
+                exportPdf: 'Exportar PDF',
+                exportCsv: 'Exportar CSV',
+                eventLabel: 'Evento',
+                selectEventAria: 'Seleccionar evento',
+                searchPlaceholder: 'Buscar atleta, academia o categoria',
+                searchAria: 'Buscar atleta',
+                clearSearch: 'Limpiar busqueda',
+                competitionMode: 'Modo competicion',
+                showAll: 'Mostrar todo',
+                compactMode: 'Modo compacto',
+                athletes: 'Atletas',
+                categories: 'Categorias',
+                results: 'Resultados',
+                overallRanking: 'Ranking general',
+                updatedNow: 'Actualizado ahora',
+                points: 'Puntos',
+                wins: 'Victorias',
+                podiums: 'Podios',
+                victories: 'Victorias',
+                beltFallback: 'Cinturon',
+                weightFallback: 'Peso',
+                hiddenAthletes: 'atletas ocultos',
+                seeAll: 'Ver todo',
+                collapse: 'Ocultar',
+                showMoreResults: 'Mostrar mas resultados',
+                showMoreCategories: 'Mostrar mas categorias',
+                showFullList: 'Mostrar lista completa',
+                hideFullList: 'Ocultar lista completa',
+                noAthleteInEvent: 'No hay atletas vinculados a este evento.',
+                noAthleteInCategory: 'No se encontraron atletas en esta categoria.',
+                noWinner: 'No se encontro ganador.',
+                podiumHighlight: 'Podio destacado',
+                placeFirst: '1ro',
+                placeSecond: '2do',
+                placeThird: '3ro',
+                flagLabel: 'Bandera',
+                boardsSectionTitle: 'Paneles de ranking',
+                boardsSectionSubtitle: 'Top de atletas por categoria/cinturon y top de equipos en un solo bloque.',
+                boardsAthleteTitle: 'Atletas por categoria y cinturon',
+                boardsTeamsTitle: 'Equipos',
+                boardsTeamsOverallTitle: 'Equipos - Clasificacion general',
+                boardsTopLabel: 'Top 3',
+                boardsNoData: 'No hay datos en este panel.',
+                boardsAthletesSuffix: 'atletas'
+            }
+            : isFrench
+                ? {
+                    tabs: {
+                        GI: 'Categorie de poids GI (avec kimono)',
+                        'NO-GI': 'Categorie de poids NO-GI (sans kimono)',
+                        'ABS-GI': 'Absolu GI (avec kimono)',
+                        'ABS-NO-GI': 'Absolu NO-GI (sans kimono)',
+                        GERAL: 'GENERAL'
+                    },
+                    noDate: 'Date a confirmer',
+                    rankingTitle: 'Classement officiel',
+                    rankingDescription: 'Suivez les resultats par evenement en temps reel, avec des categories claires, des points visibles et des filtres rapides.',
+                    correction: 'Demander une correction',
+                    allEvents: 'Tous les evenements',
+                    noEvent: 'Sans evenement',
+                    noTournament: 'Aucun championnat enregistre pour le moment.',
+                    eventRanking: "Classement de l'evenement",
+                    eventFallback: 'Evenement',
+                    exportPdf: 'Exporter PDF',
+                    exportCsv: 'Exporter CSV',
+                    eventLabel: 'Evenement',
+                    selectEventAria: "Selectionner l'evenement",
+                    searchPlaceholder: 'Rechercher athlete, academie ou categorie',
+                    searchAria: 'Rechercher athlete',
+                    clearSearch: 'Effacer la recherche',
+                    competitionMode: 'Mode competition',
+                    showAll: 'Tout afficher',
+                    compactMode: 'Mode compact',
+                    athletes: 'Athletes',
+                    categories: 'Categories',
+                    results: 'Resultats',
+                    overallRanking: 'Classement general',
+                    updatedNow: 'Mis a jour maintenant',
+                    points: 'Points',
+                    wins: 'Victoires',
+                    podiums: 'Podiums',
+                    victories: 'Victoires',
+                    beltFallback: 'Ceinture',
+                    weightFallback: 'Poids',
+                    hiddenAthletes: 'athletes masques',
+                    seeAll: 'Voir tout',
+                    collapse: 'Reduire',
+                    showMoreResults: 'Afficher plus de resultats',
+                    showMoreCategories: 'Afficher plus de categories',
+                    showFullList: 'Afficher la liste complete',
+                    hideFullList: 'Masquer la liste complete',
+                    noAthleteInEvent: "Aucun athlete lie a cet evenement.",
+                    noAthleteInCategory: 'Aucun athlete trouve dans cette categorie.',
+                    noWinner: 'Aucun gagnant trouve.',
+                    podiumHighlight: 'Podium en vedette',
+                    placeFirst: '1er',
+                    placeSecond: '2e',
+                    placeThird: '3e',
+                    flagLabel: 'Drapeau',
+                    boardsSectionTitle: 'Panneaux de classement',
+                    boardsSectionSubtitle: 'Top athletes par categorie/ceinture et top equipes dans un seul bloc.',
+                    boardsAthleteTitle: 'Athletes par categorie et ceinture',
+                    boardsTeamsTitle: 'Equipes',
+                    boardsTeamsOverallTitle: 'Equipes - Classement general',
+                    boardsTopLabel: 'Top 3',
+                    boardsNoData: 'Aucune donnee dans ce panneau.',
+                    boardsAthletesSuffix: 'athletes'
+                }
+                : {
+                    tabs: {
+                        GI: 'Categoria de Peso GI (COM Pano)',
+                        'NO-GI': 'Categoria de Peso NO-GI (SEM Pano)',
+                        'ABS-GI': 'Absoluto GI (COM Pano)',
+                        'ABS-NO-GI': 'Absoluto NO-GI (SEM Pano)',
+                        GERAL: 'GERAL'
+                    },
+                    noDate: 'Data a confirmar',
+                    rankingTitle: 'Ranking oficial',
+                    rankingDescription: 'Acompanhe os resultados por evento em tempo real, com categorias claras, pontuacao visivel e filtros rapidos.',
+                    correction: 'Solicitar correcao',
+                    allEvents: 'Todos os eventos',
+                    noEvent: 'Sem evento',
+                    noTournament: 'Nenhum campeonato cadastrado ainda.',
+                    eventRanking: 'Ranking do evento',
+                    eventFallback: 'Evento',
+                    exportPdf: 'Exportar PDF',
+                    exportCsv: 'Exportar CSV',
+                    eventLabel: 'Evento',
+                    selectEventAria: 'Selecionar evento',
+                    searchPlaceholder: 'Buscar atleta, academia ou categoria',
+                    searchAria: 'Buscar atleta',
+                    clearSearch: 'Limpar busca',
+                    competitionMode: 'Modo competicao',
+                    showAll: 'Mostrar tudo',
+                    compactMode: 'Modo compacto',
+                    athletes: 'Atletas',
+                    categories: 'Categorias',
+                    results: 'Resultados',
+                    overallRanking: 'Ranking geral',
+                    updatedNow: 'Atualizado agora',
+                    points: 'Pontos',
+                    wins: 'Vitorias',
+                    podiums: 'Podios',
+                    victories: 'Vitorias',
+                    beltFallback: 'Faixa',
+                    weightFallback: 'Peso',
+                    hiddenAthletes: 'atletas ocultos',
+                    seeAll: 'Ver todos',
+                    collapse: 'Recolher',
+                    showMoreResults: 'Mostrar mais resultados',
+                    showMoreCategories: 'Mostrar mais categorias',
+                    showFullList: 'Mostrar lista completa',
+                    hideFullList: 'Ocultar lista completa',
+                    noAthleteInEvent: 'Nenhum atleta vinculado a este evento.',
+                    noAthleteInCategory: 'Nenhum atleta encontrado nesta categoria.',
+                    noWinner: 'Nenhum vencedor encontrado.',
+                    podiumHighlight: 'Podio em destaque',
+                    placeFirst: '1o',
+                    placeSecond: '2o',
+                    placeThird: '3o',
+                    flagLabel: 'Bandeira',
+                    boardsSectionTitle: 'Quadros de ranking',
+                    boardsSectionSubtitle: 'Top atletas por categoria/faixa e top equipes em um bloco visual unico.',
+                    boardsAthleteTitle: 'Atletas por categoria e faixa',
+                    boardsTeamsTitle: 'Equipes',
+                    boardsTeamsOverallTitle: 'Equipes - Classificacao Geral',
+                    boardsTopLabel: 'Top 3',
+                    boardsNoData: 'Sem dados para este quadro.',
+                    boardsAthletesSuffix: 'atletas'
+                };
 
     const isEventMode = selectedEventId !== 'all' && selectedEventId !== 'none';
 
@@ -321,6 +416,7 @@ const Ranking = () => {
         const paramQuery = normalizeQueryParam(searchParams.get('q'));
         const paramCompact = searchParams.get('compact');
         const paramCompetition = searchParams.get('comp');
+        const paramList = searchParams.get('list');
 
         if (paramTab && paramTab !== activeTab) {
             setActiveTab(paramTab);
@@ -342,6 +438,10 @@ const Ranking = () => {
             if (nextCompetitionMode !== competitionMode) {
                 setCompetitionMode(nextCompetitionMode);
             }
+        }
+        const nextShowFullList = paramList === '1';
+        if (nextShowFullList !== showFullList) {
+            setShowFullList(nextShowFullList);
         }
     }, [searchParamsKey]);
 
@@ -395,10 +495,20 @@ const Ranking = () => {
             changed = true;
         }
 
+        if (showFullList) {
+            if (params.get('list') !== '1') {
+                params.set('list', '1');
+                changed = true;
+            }
+        } else if (params.has('list')) {
+            params.delete('list');
+            changed = true;
+        }
+
         if (changed) {
             setSearchParams(params, { replace: true });
         }
-    }, [activeTab, selectedEventId, searchTerm, compactView, competitionMode, searchParams, setSearchParams]);
+    }, [activeTab, selectedEventId, searchTerm, compactView, competitionMode, showFullList, searchParams, setSearchParams]);
 
     const selectedEvent = useMemo(() => (
         events.find((event) => event.id === selectedEventId)
@@ -620,15 +730,97 @@ const Ranking = () => {
         return athlete.isNoGi ? 'NO-GI' : 'GI';
     };
 
-    const translateGroupLabel = (label) => translateCompositeLabel(label, language);
-    const translateAthleteBelt = (belt) => translateBelt(belt || copy.beltFallback, language);
-    const translateAthleteWeight = (weight) => translateWeight(weight || copy.weightFallback, language);
+    const translateGroupLabel = (label) => translateCompositeLabel(label, uiLanguage);
+    const translateAthleteBelt = (belt) => translateBelt(belt || copy.beltFallback, uiLanguage);
+    const translateAthleteWeight = (weight) => translateWeight(weight || copy.weightFallback, uiLanguage);
+    const boardFallbackTitles = useMemo(() => ([
+        copy.tabs.GI,
+        copy.tabs['NO-GI'],
+        copy.tabs['ABS-GI'],
+        copy.tabs['ABS-NO-GI']
+    ]), [copy.tabs]);
+
+    const isGeneralCategoryBoards = activeTab === 'GERAL';
+    const boardAthleteTopLimit = isGeneralCategoryBoards ? 5 : 3;
+    const boardAthleteTopLabel = `Top ${boardAthleteTopLimit}`;
+
+    const boardAthletePanels = useMemo(() => {
+        const sorted = [...searchedGroups].sort((a, b) => {
+            if (isGeneralCategoryBoards) {
+                return a.label.localeCompare(b.label);
+            }
+            if (b.entries.length !== a.entries.length) return b.entries.length - a.entries.length;
+            return a.label.localeCompare(b.label);
+        });
+        const panelLimit = isGeneralCategoryBoards ? sorted.length : 4;
+        const panels = sorted.slice(0, panelLimit).map((group) => ({
+            key: `ath-${group.key || group.label}`,
+            title: translateGroupLabel(group.label),
+            subtitle: `${group.entries.length} ${copy.boardsAthletesSuffix}`,
+            entries: group.entries.slice(0, boardAthleteTopLimit)
+        }));
+
+        if (!isGeneralCategoryBoards) {
+            const usedTitles = new Set(panels.map((panel) => normalizeSearchTerm(panel.title)));
+            boardFallbackTitles.forEach((title, index) => {
+                if (panels.length >= 4) return;
+                const normalizedTitle = normalizeSearchTerm(title);
+                if (usedTitles.has(normalizedTitle)) return;
+                panels.push({
+                    key: `ath-fallback-${index}`,
+                    title,
+                    subtitle: `0 ${copy.boardsAthletesSuffix}`,
+                    entries: []
+                });
+                usedTitles.add(normalizedTitle);
+            });
+        }
+
+        return panels;
+    }, [
+        searchedGroups,
+        copy.boardsAthletesSuffix,
+        boardFallbackTitles,
+        translateGroupLabel,
+        boardAthleteTopLimit,
+        isGeneralCategoryBoards
+    ]);
+
+    const boardTeamTopLimit = isGeneralCategoryBoards ? 5 : 3;
+    const boardTeamTopLabel = `Top ${boardTeamTopLimit}`;
+
+    const boardTeamPanels = useMemo(() => {
+        const baseAthletes = [...eventFilteredAthletes];
+        const filteredBySearch = normalizedSearch
+            ? baseAthletes.filter((athlete) => (
+                normalizeSearchTerm([
+                    athlete?.nome,
+                    athlete?.academia,
+                    athlete?.faixa,
+                    athlete?.peso,
+                    athlete?.categoria,
+                    athlete?.genero
+                ].filter(Boolean).join(' ')).includes(normalizedSearch)
+            ))
+            : baseAthletes;
+        const overallTeams = buildTeamRanking(filteredBySearch).slice(0, boardTeamTopLimit);
+
+        return [
+            { key: 'team-overall', title: copy.boardsTeamsOverallTitle || `${copy.boardsTeamsTitle} (GI + NO-GI)`, entries: overallTeams }
+        ];
+    }, [eventFilteredAthletes, normalizedSearch, copy.boardsTeamsTitle, copy.boardsTeamsOverallTitle, boardTeamTopLimit]);
+
+    const hasBoardData = boardAthletePanels.length > 0 || boardTeamPanels.length > 0;
 
     const handleExportCsv = () => {
         if (activeTab === 'GERAL' && !isEventMode) {
             const headers = isEnglish
                 ? ['POS', 'ATHLETE', 'CATEGORY', 'ACADEMY', 'MODE', 'PTS']
-                : ['POS', 'ATLETA', 'CATEGORIA', 'ACADEMIA', 'MODALIDADE', 'PTS'];
+                : isSpanish
+                    ? ['POS', 'ATLETA', 'CATEGORIA', 'ACADEMIA', 'MODALIDAD', 'PTS']
+                    : isFrench
+                        ? ['POS', 'ATHLETE', 'CATEGORIE', 'ACADEMIE', 'MODE', 'PTS']
+                        : ['POS', 'ATLETA', 'CATEGORIA', 'ACADEMIA', 'MODALIDADE', 'PTS'];
             const rows = filteredWinners.map((item, index) => ([
                 index + 1,
                 item.athlete?.nome || '',
@@ -644,7 +836,11 @@ const Ranking = () => {
 
         const headers = isEnglish
             ? ['CATEGORY', 'POS', 'ATHLETE', 'ACADEMY', 'BELT', 'WEIGHT', 'MODE', 'PTS']
-            : ['CATEGORIA', 'POS', 'ATLETA', 'ACADEMIA', 'FAIXA', 'PESO', 'MODALIDADE', 'PTS'];
+            : isSpanish
+                ? ['CATEGORIA', 'POS', 'ATLETA', 'ACADEMIA', 'CINTURON', 'PESO', 'MODALIDAD', 'PTS']
+                : isFrench
+                    ? ['CATEGORIE', 'POS', 'ATHLETE', 'ACADEMIE', 'CEINTURE', 'POIDS', 'MODE', 'PTS']
+                    : ['CATEGORIA', 'POS', 'ATLETA', 'ACADEMIA', 'FAIXA', 'PESO', 'MODALIDADE', 'PTS'];
         const rows = searchedGroups.flatMap((group) => (
             group.entries.map((athlete, index) => ([
                 translateGroupLabel(group.label),
@@ -692,7 +888,7 @@ const Ranking = () => {
     };
 
     return (
-        <div className={`ranking-minimal ranking-ajp ranking-clean ${isEventMode ? 'ranking-event-mode' : ''}`}>
+        <div className={`ranking-minimal ranking-ajp ranking-clean ranking-reference-v2 ${isEventMode ? 'ranking-event-mode' : ''}`}>
             <div className="rank-page-head">
                 <div>
                     <span className="rank-page-head__kicker">{copy.overallRanking}</span>
@@ -701,7 +897,7 @@ const Ranking = () => {
                 </div>
             </div>
 
-            <div className="rank-event-picker">
+            <div className="rank-event-picker rank-v2-event-picker">
                 <label htmlFor="ranking-event-select">{copy.eventLabel}</label>
                 <div className="rank-event-picker__control">
                     <span className="rank-event-picker__icon" aria-hidden="true">
@@ -723,7 +919,7 @@ const Ranking = () => {
                 </div>
             </div>
 
-            <div className="rank-toolbar">
+            <div className="rank-toolbar rank-v2-toolbar">
                 <div className="rank-search rank-search--inline">
                     <Search size={16} />
                     <input
@@ -774,7 +970,7 @@ const Ranking = () => {
                 </div>
             </div>
 
-            <div className="rank-stats-bar">
+            <div className="rank-stats-bar rank-v2-stats">
                 <div className="rank-stat">
                     <span>{copy.athletes}</span>
                     <strong>{totalAthletes}</strong>
@@ -789,7 +985,7 @@ const Ranking = () => {
                 </div>
             </div>
 
-            <div className="tab-container minimal-tabs">
+            <div className="tab-container minimal-tabs rank-v2-tabs">
                 {tabs.map((tab) => (
                     <button
                         key={tab.id}
@@ -801,7 +997,97 @@ const Ranking = () => {
                 ))}
             </div>
 
-            <div className="ajp-grid">
+            {hasBoardData && (
+                <section className="rank-boards-wrap">
+                    <header className="rank-boards-head">
+                        <div className="rank-boards-head__title">{copy.boardsSectionTitle}</div>
+                        <div className="rank-boards-head__subtitle">{copy.boardsSectionSubtitle}</div>
+                    </header>
+                    <div className="rank-boards">
+                        {boardAthletePanels.map((panel) => (
+                            <article key={panel.key} className="rank-board">
+                                <div className="rank-board__header">
+                                    <div>
+                                        <h3>{panel.title}</h3>
+                                        <p>{panel.subtitle}</p>
+                                    </div>
+                                    <span>{boardAthleteTopLabel}</span>
+                                </div>
+                                <div className="rank-board__list">
+                                    {panel.entries.length === 0 ? (
+                                        <div className="rank-empty">{copy.boardsNoData}</div>
+                                    ) : (
+                                        panel.entries.map((athlete, index) => {
+                                            const metrics = athleteMetrics.get(athlete.id) || {
+                                                wins: 0,
+                                                podiumTotal: 0
+                                            };
+                                            return (
+                                                <div key={`${panel.key}-${athlete.id}`} className="rank-board__row">
+                                                    <div className="rank-board__rank">{index + 1}</div>
+                                                    <div className="rank-board__identity">
+                                                        <strong>{athlete.nome}</strong>
+                                                        <span>{athlete.academia || '-'}</span>
+                                                    </div>
+                                                    <div className="rank-board__metrics">
+                                                        <span>{athlete.pontos} {copy.points}</span>
+                                                        <span>{metrics.wins} {copy.wins}</span>
+                                                        <span>{translateAthleteBelt(athlete.faixa)} / {translateAthleteWeight(athlete.peso)}</span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            </article>
+                        ))}
+
+                        {boardTeamPanels.map((panel) => (
+                            <article key={panel.key} className="rank-board rank-board--team">
+                                <div className="rank-board__header">
+                                    <div>
+                                        <h3>{panel.title}</h3>
+                                        <p>{eventLabel}</p>
+                                    </div>
+                                    <span>{boardTeamTopLabel}</span>
+                                </div>
+                                <div className="rank-board__list">
+                                    {panel.entries.length === 0 ? (
+                                        <div className="rank-empty">{copy.boardsNoData}</div>
+                                    ) : (
+                                        panel.entries.map((team) => (
+                                            <div key={`${panel.key}-${team.key}`} className="rank-board__row">
+                                                <div className="rank-board__rank">{team.rank}</div>
+                                                <div className="rank-board__identity">
+                                                    <strong>{team.academy}</strong>
+                                                    <span>{team.athletes} {copy.boardsAthletesSuffix}</span>
+                                                </div>
+                                                <div className="rank-board__metrics">
+                                                    <span>{team.points} {copy.points}</span>
+                                                    <span>{team.wins} {copy.wins}</span>
+                                                    <span>{team.podiums} {copy.podiums}</span>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </article>
+                        ))}
+                    </div>
+                </section>
+            )}
+
+            <div className="rank-list-toggle">
+                <button
+                    type="button"
+                    className={`btn btn-secondary ${showFullList ? 'is-active' : ''}`}
+                    onClick={() => setShowFullList((prev) => !prev)}
+                >
+                    {showFullList ? copy.hideFullList : copy.showFullList}
+                </button>
+            </div>
+
+            <div className={`ajp-grid ${showFullList ? '' : 'is-hidden'}`}>
                 {showGeneralWinners ? (
                     <section className="ajp-card ajp-card--full">
                         <div className="ajp-card__header">
@@ -831,7 +1117,7 @@ const Ranking = () => {
                                 const athlete = item.athlete;
                                 const photoUrl = resolvePhotoUrl(athlete);
                                 const countryCode = countryCodeFromAthlete(athlete);
-                                const countryLabel = countryLabelFromAthlete(athlete, isEnglish);
+                                const countryLabel = countryLabelFromAthlete(athlete, uiLanguage);
                                 const podiumClass = competitionMode && index < 3 ? ` is-podium is-podium-${index + 1}` : '';
                                 const metrics = athleteMetrics.get(athlete.id) || {
                                     wins: 0,
@@ -857,7 +1143,7 @@ const Ranking = () => {
                                             <div className="ajp-name">{athlete.nome}</div>
                                             <div className="ajp-sub">
                                                 <span className="ajp-country">
-                                                    <span className="ajp-flag" aria-label={`${isEnglish ? 'Flag' : 'Bandeira'} ${countryLabel}`}>{flagFromCode(countryCode)}</span>
+                                                    <span className="ajp-flag" aria-label={`${copy.flagLabel} ${countryLabel}`}>{flagFromCountryCode(countryCode)}</span>
                                                     {countryLabel}
                                                 </span>
                                                 <span>{athlete.academia}</span>
@@ -920,7 +1206,7 @@ const Ranking = () => {
                                     {group.entries.map((athlete, index) => {
                                         const photoUrl = resolvePhotoUrl(athlete);
                                         const countryCode = countryCodeFromAthlete(athlete);
-                                        const countryLabel = countryLabelFromAthlete(athlete, isEnglish);
+                                        const countryLabel = countryLabelFromAthlete(athlete, uiLanguage);
                                         const podiumClass = competitionMode && index < 3 ? ` is-podium is-podium-${index + 1}` : '';
                                         const metrics = athleteMetrics.get(athlete.id) || {
                                             wins: 0,
@@ -946,7 +1232,7 @@ const Ranking = () => {
                                                     <div className="ajp-name">{athlete.nome}</div>
                                                     <div className="ajp-sub">
                                                         <span className="ajp-country">
-                                                            <span className="ajp-flag" aria-label={`${isEnglish ? 'Flag' : 'Bandeira'} ${countryLabel}`}>{flagFromCode(countryCode)}</span>
+                                                            <span className="ajp-flag" aria-label={`${copy.flagLabel} ${countryLabel}`}>{flagFromCountryCode(countryCode)}</span>
                                                             {countryLabel}
                                                         </span>
                                                         <span>{athlete.academia}</span>
@@ -1005,7 +1291,7 @@ const Ranking = () => {
                 )}
             </div>
 
-            {activeTab === 'GERAL' && filteredWinners.length > winnersLimit && (
+            {showFullList && activeTab === 'GERAL' && filteredWinners.length > winnersLimit && (
                 <div className="rank-more">
                     <button
                         type="button"
@@ -1017,7 +1303,7 @@ const Ranking = () => {
                 </div>
             )}
 
-            {activeTab !== 'GERAL' && visibleGroups.length > groupLimit && !isEventMode && (
+            {showFullList && activeTab !== 'GERAL' && visibleGroups.length > groupLimit && !isEventMode && (
                 <div className="rank-more">
                     <button
                         type="button"
@@ -1029,13 +1315,15 @@ const Ranking = () => {
                 </div>
             )}
 
-            {showGeneralWinners
+            {showFullList && (showGeneralWinners
                 ? filteredWinners.length === 0 && <div className="rank-empty">{copy.noWinner}</div>
                 : !isEventMode && searchedGroups.length === 0 && (
                     <div className="rank-empty">{copy.noAthleteInCategory}</div>
-                )}
+                ))}
         </div>
     );
 };
 
 export default Ranking;
+
+

@@ -86,6 +86,7 @@ public class PublicRegistrationService {
 
     try {
       EventRegistration saved = registrationRepository.save(registration);
+      registrationEmailService.sendRegistrationReceivedEmail(saved);
       return toResponse(saved, null);
     } catch (DataIntegrityViolationException ex) {
       if (!clientRequestId.isBlank()) {
