@@ -1,8 +1,10 @@
 import React, { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, ExternalLink, ImageOff, Newspaper, PlayCircle, RefreshCcw } from 'lucide-react';
 import { useI18n } from '../hooks/useI18n';
 import { useStore } from '../hooks/useStore';
 import { socialMediaService } from '../services/socialMediaService';
+import { buildProfileShareCode } from '../utils/profileShare';
 
 const INSTAGRAM_FEED_CACHE_KEY = 'genesis_public_instagram_feed_v1';
 const INSTAGRAM_FEED_CACHE_LIMIT = 10;
@@ -30,6 +32,27 @@ const truncateText = (value, maxLength = 180) => {
   if (!text) return '';
   if (text.length <= maxLength) return text;
   return `${text.slice(0, maxLength).trim()}...`;
+};
+
+const normalizeText = (value) => (value || '').toString().trim().toLowerCase();
+
+const getNewsTag = (item, index = 0) => {
+  const source = normalizeText(`${item?.category || ''} ${item?.title || ''} ${item?.summary || ''}`);
+  if (source.includes('ranking') || source.includes('pontua')) {
+    return { label: 'RANKING', className: 'tag-rank' };
+  }
+  if (source.includes('inscri') || source.includes('temporada') || source.includes('comunicado') || source.includes('regra')) {
+    return { label: 'COMUNICADO', className: 'tag-info' };
+  }
+  if (index === 0 || source.includes('cobertura') || source.includes('campeonato') || source.includes('luta')) {
+    return { label: 'COBERTURA', className: 'tag-live' };
+  }
+  return { label: 'NOTICIA', className: 'tag-info' };
+};
+
+const getReadMinutes = (item) => {
+  const words = `${item?.title || ''} ${item?.summary || ''} ${item?.body || ''}`.trim().split(/\s+/).filter(Boolean).length;
+  return Math.max(2, Math.ceil(words / 180));
 };
 
 const normalizeInstagramPosts = (value, limit = INSTAGRAM_FEED_CACHE_LIMIT) => {
@@ -69,7 +92,12 @@ const removeByKey = (value, key) => {
 
 const News = () => {
   const { locale, uiVariant } = useI18n();
-  const { news } = useStore();
+  const {
+    news,
+    athletes = [],
+    memberProfiles = [],
+    events = []
+  } = useStore();
   const [instagramPosts, setInstagramPosts] = useState(() => loadCachedInstagramPosts());
   const [socialLoading, setSocialLoading] = useState(true);
   const [socialError, setSocialError] = useState('');
@@ -96,30 +124,30 @@ const News = () => {
   });
   const copyByLanguage = {
     pt: {
-      kicker: 'Noticias',
-      title: 'Atualizacoes e comunicados oficiais.',
+      kicker: 'Notícias',
+      title: 'Atualizações e comunicados oficiais.',
       description:
-        'Conteudo institucional para atletas, academias e organizadores. Informacoes oficiais sobre ranking, eventos e sistema.',
+        'Conteúdo institucional para atletas, academias e organizadores. Informações oficiais sobre ranking, eventos e sistema.',
       fallbackDate: 'Data a confirmar',
-      emptyNews: 'Nenhuma noticia publicada ate o momento. Publique uma no painel administrativo.',
-      socialKicker: 'Midias sociais',
-      socialTitle: 'Ultimas publicacoes do Instagram da Genesis Esporte',
+      emptyNews: 'Nenhuma notícia publicada até o momento. Publique uma no painel administrativo.',
+      socialKicker: 'Mídias sociais',
+      socialTitle: 'Últimas publicações do Instagram da Genesis Esporte',
       socialOpenProfile: 'Abrir perfil no Instagram',
       socialOpenPost: 'Abrir post',
       socialSource: 'Instagram',
-      socialCaptionFallback: 'Atualizacao da Genesis Esporte',
-      socialImageUnavailable: 'Imagem indisponivel',
+      socialCaptionFallback: 'Atualização da Genesis Esporte',
+      socialImageUnavailable: 'Imagem indisponível',
       socialRetryMedia: 'Tentar novamente',
       socialRetryingMedia: 'Tentando...',
-      socialRetryTimeout: 'Nao foi possivel carregar a imagem.',
-      socialLoading: 'Carregando as ultimas publicacoes do Instagram...',
-      socialEmpty: 'Nenhuma publicacao do Instagram disponivel no momento.',
-      socialError: 'Feed do Instagram indisponivel no momento.',
+      socialRetryTimeout: 'Não foi possível carregar a imagem.',
+      socialLoading: 'Carregando as últimas publicações do Instagram...',
+      socialEmpty: 'Nenhuma publicação do Instagram disponível no momento.',
+      socialError: 'Feed do Instagram indisponível no momento.',
       socialPrev: 'Posts anteriores',
-      socialNext: 'Proximos posts',
-      openFullNewsHint: 'Clique duas vezes para ler a noticia completa',
-      openFullNewsHintMobile: 'Toque para ler a noticia completa',
-      openFullNews: 'Abrir noticia completa',
+      socialNext: 'Próximos posts',
+      openFullNewsHint: 'Clique duas vezes para ler a notícia completa',
+      openFullNewsHintMobile: 'Toque para ler a notícia completa',
+      openFullNews: 'Abrir notícia completa',
       closeModal: 'Fechar'
     },
     en: {
@@ -290,6 +318,89 @@ const News = () => {
       })
       .slice(0, 10)
   ), [instagramPosts]);
+
+  const athleteMentionTargets = useMemo(() => {
+    const map = new Map();
+
+    memberProfiles.forEach((profile) => {
+      const name = (profile?.fullName || profile?.name || '').toString().trim();
+      if (!name || name.length < 5) return;
+      const code = buildProfileShareCode({
+        profileId: profile.id,
+        fullName: profile.fullName,
+        academyName: profile.academyName,
+        birthDate: profile.birthDate
+      });
+      map.set(normalizeText(name), {
+        name,
+        to: `/perfil-publico?codigo=${encodeURIComponent(code)}`
+      });
+    });
+
+    athletes.forEach((athlete) => {
+      const name = (athlete?.nome || athlete?.name || athlete?.fullName || '').toString().trim();
+      const id = athlete?.id || athlete?.profileId;
+      if (!name || name.length < 5 || !id || map.has(normalizeText(name))) return;
+      map.set(normalizeText(name), {
+        name,
+        to: `/perfil/${encodeURIComponent(id)}`
+      });
+    });
+
+    return [...map.values()].sort((left, right) => right.name.length - left.name.length);
+  }, [athletes, memberProfiles]);
+
+  const getMentionedFutureEvent = React.useCallback((item) => {
+    const text = normalizeText(`${item?.title || ''} ${item?.summary || ''} ${item?.body || ''}`);
+    if (!text) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return events.find((event) => {
+      const eventName = normalizeText(event?.name || event?.title || '');
+      if (!eventName || !text.includes(eventName)) return false;
+      const date = parseDate(event?.date || event?.startDate);
+      return !date || date >= today;
+    }) || null;
+  }, [events]);
+
+  const renderSmartNewsText = React.useCallback((value) => {
+    const text = (value || '').toString();
+    if (!text || !athleteMentionTargets.length) return text;
+
+    const parts = [];
+    let cursor = 0;
+    const lowerText = normalizeText(text);
+
+    while (cursor < text.length) {
+      let nextMatch = null;
+      athleteMentionTargets.forEach((target) => {
+        const index = lowerText.indexOf(normalizeText(target.name), cursor);
+        if (index === -1) return;
+        if (!nextMatch || index < nextMatch.index || (index === nextMatch.index && target.name.length > nextMatch.target.name.length)) {
+          nextMatch = { index, target };
+        }
+      });
+
+      if (!nextMatch) {
+        parts.push(text.slice(cursor));
+        break;
+      }
+
+      if (nextMatch.index > cursor) {
+        parts.push(text.slice(cursor, nextMatch.index));
+      }
+
+      const matchedText = text.slice(nextMatch.index, nextMatch.index + nextMatch.target.name.length);
+      parts.push(
+        <Link className="news-smart-link" to={nextMatch.target.to} key={`${nextMatch.target.to}-${nextMatch.index}`}>
+          {matchedText}
+        </Link>
+      );
+      cursor = nextMatch.index + nextMatch.target.name.length;
+    }
+
+    return parts;
+  }, [athleteMentionTargets]);
 
   const openFullNews = React.useCallback((item) => {
     if (!item || typeof item !== 'object') return;
@@ -495,63 +606,106 @@ const News = () => {
     };
   }, [isSocialDragging, endSocialDrag]);
 
+  const featuredNews = items[0] || null;
+  const secondaryNews = items.slice(1);
+  const selectedMentionedEvent = selectedNews ? getMentionedFutureEvent(selectedNews) : null;
+
   return (
-    <div className="public-page">
-      <section className="public-header">
-        <div>
+    <div className="public-page news-page">
+      <section className="news-portal-container">
+        <div className="news-header">
           <span className="section-kicker">{copy.kicker}</span>
-          <h1>{copy.title}</h1>
+          <h2>Genesis Newsroom</h2>
           <p>{copy.description}</p>
         </div>
-      </section>
 
-      <section className="public-section">
-        <div className="news-grid">
-          {items.length ? (
-            items.map((item) => (
-              <article
-                className="news-card news-card--interactive"
-                key={item.id}
-                role="button"
-                tabIndex={0}
-                aria-label={copy.openFullNews}
-                onClick={() => {
-                  if (isMobileNewsOpenMode) {
-                    openFullNews(item);
-                  }
-                }}
-                onDoubleClick={() => openFullNews(item)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    openFullNews(item);
-                  }
-                }}
-              >
-                <div className={`news-card__cover ${item.imageUrl ? '' : 'news-card__cover--fallback'}`.trim()}>
-                  {item.imageUrl ? (
-                    <img src={item.imageUrl} alt={item.title} loading="lazy" />
-                  ) : (
-                    <div className="news-card__cover-fallback" aria-hidden="true">
-                      <Newspaper className="news-card__cover-fallback-icon" />
-                      <span>{copy.kicker}</span>
+        {items.length ? (
+          <div className="news-main-grid">
+            {featuredNews && (() => {
+              const tag = getNewsTag(featuredNews, 0);
+              return (
+                <article
+                  className="news-card news-card--interactive featured-news"
+                  key={featuredNews.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={copy.openFullNews}
+                  onClick={() => openFullNews(featuredNews)}
+                  onDoubleClick={() => openFullNews(featuredNews)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      openFullNews(featuredNews);
+                    }
+                  }}
+                >
+                  <div className={`news-image-wrapper ${featuredNews.imageUrl ? '' : 'news-image-wrapper--fallback'}`.trim()}>
+                    {featuredNews.imageUrl ? (
+                      <img src={featuredNews.imageUrl} alt={featuredNews.title} loading="lazy" />
+                    ) : (
+                      <div className="news-card__cover-fallback" aria-hidden="true">
+                        <Newspaper className="news-card__cover-fallback-icon" />
+                        <span>{copy.kicker}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="news-content-overlay">
+                    <span className={`news-tag ${tag.className}`}>{tag.label}</span>
+                    <h3>{featuredNews.title}</h3>
+                    <p>{featuredNews.summary}</p>
+                    <div className="news-meta">
+                      {formatDate(featuredNews.publishedAt || featuredNews.createdAt, locale, copy.fallbackDate)}
+                      {' '}• {getReadMinutes(featuredNews)} min de leitura
                     </div>
-                  )}
-                </div>
-                <div className="news-card__meta">
-                  {formatDate(item.publishedAt || item.createdAt, locale, copy.fallbackDate)}
-                </div>
-                <h3>{item.title}</h3>
-                <p>{item.summary}</p>
-                <span className="news-card__hint">
-                  {isMobileNewsOpenMode ? copy.openFullNewsHintMobile : copy.openFullNewsHint}
-                </span>
-              </article>
-            ))
-          ) : (
-            <div className="empty-state">{copy.emptyNews}</div>
-          )}
-        </div>
+                  </div>
+                </article>
+              );
+            })()}
+
+            {secondaryNews.map((item, index) => {
+              const tag = getNewsTag(item, index + 1);
+              return (
+                <article
+                  className="news-card news-card--interactive standard-news"
+                  key={item.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={copy.openFullNews}
+                  onClick={() => openFullNews(item)}
+                  onDoubleClick={() => openFullNews(item)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      openFullNews(item);
+                    }
+                  }}
+                >
+                  <div className={`news-image-wrapper ${item.imageUrl ? '' : 'news-image-wrapper--fallback'}`.trim()}>
+                    {item.imageUrl ? (
+                      <img src={item.imageUrl} alt={item.title} loading="lazy" />
+                    ) : (
+                      <div className="news-card__cover-fallback" aria-hidden="true">
+                        <Newspaper className="news-card__cover-fallback-icon" />
+                        <span>{copy.kicker}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="news-content">
+                    <span className={`news-tag ${tag.className}`}>{tag.label}</span>
+                    <h4>{item.title}</h4>
+                    <p>{truncateText(item.summary, 132)}</p>
+                    <div className="news-meta">
+                      {formatDate(item.publishedAt || item.createdAt, locale, copy.fallbackDate)}
+                      {' '}• {getReadMinutes(item)} min de leitura
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="empty-state">{copy.emptyNews}</div>
+        )}
       </section>
 
       {selectedNews && (
@@ -573,7 +727,21 @@ const News = () => {
               <div className="news-card__meta">
                 {formatDate(selectedNews.publishedAt || selectedNews.createdAt, locale, copy.fallbackDate)}
               </div>
-              <p className="news-read-modal__summary">{selectedNews.summary || ''}</p>
+              <div className={`news-read-modal__body ${selectedMentionedEvent ? 'has-event-widget' : ''}`}>
+                <p className="news-read-modal__summary">
+                  {renderSmartNewsText(selectedNews.body || selectedNews.summary || '')}
+                </p>
+                {selectedMentionedEvent && (
+                  <aside className="news-event-widget">
+                    <span>Inscricoes abertas</span>
+                    <strong>{selectedMentionedEvent.name || selectedMentionedEvent.title}</strong>
+                    <p>{formatDate(selectedMentionedEvent.date || selectedMentionedEvent.startDate, locale, copy.fallbackDate)}</p>
+                    <Link className="btn btn-primary" to={`/eventos/${selectedMentionedEvent.id}/inscricao`}>
+                      Garantir vaga
+                    </Link>
+                  </aside>
+                )}
+              </div>
             </article>
           </div>
         </>

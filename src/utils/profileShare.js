@@ -57,12 +57,32 @@ export const buildProfileShareCode = ({ profileId = '', fullName = '', academyNa
   return `GEN-${(compact || 'ATLETA').slice(-10)}`;
 };
 
-export const resolveProfileAthleteRows = ({ athletes = [], profileName = '', academyName = '' } = {}) => {
+export const resolveProfileAthleteRows = ({
+  athletes = [],
+  profileName = '',
+  academyName = '',
+  profileId = '',
+  athleteRecordId = ''
+} = {}) => {
   const targetName = normalizeLookup(profileName);
   const targetNameCompact = compactLookup(profileName);
   const targetAcademy = normalizeLookup(academyName);
+  const profileIds = new Set([profileId, athleteRecordId]
+    .map((value) => (value || '').toString().trim())
+    .filter(Boolean));
 
   return (Array.isArray(athletes) ? athletes : []).filter((athlete) => {
+    const athleteIds = [
+      athlete?.id,
+      athlete?.profileId,
+      athlete?.memberProfileId,
+      athlete?.sourceAthleteId,
+      athlete?.linkedSourceAthleteId
+    ]
+      .map((value) => (value || '').toString().trim())
+      .filter(Boolean);
+    if (profileIds.size > 0 && athleteIds.some((id) => profileIds.has(id))) return true;
+
     const athleteName = normalizeLookup(athlete?.nome || '');
     if (!athleteName) return false;
 
@@ -106,7 +126,9 @@ export const buildPublicProfileSnapshot = ({
   const matchedAthletes = resolveProfileAthleteRows({
     athletes,
     profileName,
-    academyName
+    academyName,
+    profileId: profile?.id || '',
+    athleteRecordId: profile?.athleteRecordId || ''
   });
 
   const eventMap = new Map(
@@ -148,7 +170,8 @@ export const buildPublicProfileSnapshot = ({
           modalitySet: new Set(modality ? [modality] : []),
           isAbsolute: athlete?.isAbsolute === true,
           points: Number(athlete?.pontos || 0),
-          podiumPlace: podiumPlace || 0
+          podiumPlace: podiumPlace || 0,
+          status: athlete?.status || 'PENDING'
         });
         return acc;
       }
@@ -187,7 +210,8 @@ export const buildPublicProfileSnapshot = ({
         modality,
         isAbsolute: row.isAbsolute,
         points: row.points,
-        podiumPlace: row.podiumPlace
+        podiumPlace: row.podiumPlace,
+        status: row.status
       };
     })
     .sort((a, b) => {

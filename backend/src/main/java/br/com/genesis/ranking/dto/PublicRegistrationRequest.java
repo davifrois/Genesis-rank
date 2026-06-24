@@ -14,6 +14,8 @@ public class PublicRegistrationRequest {
   @NotBlank(message = "Nome completo é obrigatório.")
   private String nome;
 
+  private String profileId;
+  private String athleteId;
   private String email;
   private String phone;
   private String academia;
@@ -70,6 +72,22 @@ public class PublicRegistrationRequest {
 
   public void setNome(String nome) {
     this.nome = nome;
+  }
+
+  public String getProfileId() {
+    return profileId;
+  }
+
+  public void setProfileId(String profileId) {
+    this.profileId = profileId;
+  }
+
+  public String getAthleteId() {
+    return athleteId;
+  }
+
+  public void setAthleteId(String athleteId) {
+    this.athleteId = athleteId;
   }
 
   public String getEmail() {

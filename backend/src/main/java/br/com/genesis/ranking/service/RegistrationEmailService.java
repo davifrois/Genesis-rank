@@ -106,6 +106,14 @@ public class RegistrationEmailService {
     }
     body.append("Status do pagamento: Aguardando confirmacao\n\n");
     body.append("Assim que o pagamento for conferido pela equipe, voce recebera nova confirmacao.\n\n");
+    
+    if (registration.getPixCopyPaste() != null && !registration.getPixCopyPaste().isBlank()) {
+        body.append("=== DADOS PARA PAGAMENTO PIX ===\n");
+        body.append("Copie e cole o código abaixo no aplicativo do seu banco:\n\n");
+        body.append(registration.getPixCopyPaste()).append("\n\n");
+        body.append("================================\n\n");
+    }
+
     body.append("Genesis Esportes");
 
     sendMail(email, subject, body.toString(), "recebimento");

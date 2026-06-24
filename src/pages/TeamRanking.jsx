@@ -3,15 +3,11 @@ import { Medal, Search, Trophy } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { useStore } from '../hooks/useStore';
 import { useI18n } from '../hooks/useI18n';
-import { buildScoreBreakdown } from '../services/scoringService';
+import { buildTeamRanking } from '../services/teamRankingService';
 import { buildFileSafeName, downloadCsv } from '../services/exportService';
-import { countryCodeFromAthlete, countryLabelFromCode, flagFromCountryCode } from '../utils/countryFlags';
+import { countryLabelFromCode, flagFromCountryCode } from '../utils/countryFlags';
 
 const SEGMENT_IDS = ['kids', 'adults', 'academies', 'masters'];
-
-const normalizeGroupPart = (value) => (
-  (value || '').toString().trim().toLowerCase().replace(/\s+/g, ' ')
-);
 
 const normalizeSearchTerm = (value) => {
   if (!value) return '';
@@ -48,62 +44,6 @@ const detectDivision = (athlete) => {
 const detectMode = (athlete) => (
   athlete?.isNoGi ? 'NO-GI' : 'GI'
 );
-
-const pickMostFrequentCode = (hits) => {
-  const entries = Object.entries(hits || {});
-  if (!entries.length) return 'BR';
-  entries.sort((a, b) => b[1] - a[1]);
-  return entries[0][0] || 'BR';
-};
-
-const buildTeamRanking = (athletes) => {
-  const teams = new Map();
-
-  athletes.forEach((athlete) => {
-    const academy = (athlete?.academia || 'Sem academia').toString().trim() || 'Sem academia';
-    const key = normalizeGroupPart(academy);
-    const stats = teams.get(key) || {
-      key,
-      academy,
-      campeao: 0,
-      vice: 0,
-      terceiro: 0,
-      wins: 0,
-      pontos: 0,
-      atletas: 0,
-      countryHits: {}
-    };
-
-    const history = Array.isArray(athlete?.historico) ? athlete.historico : [];
-    const breakdown = buildScoreBreakdown(history);
-
-    stats.campeao += breakdown.podium1;
-    stats.vice += breakdown.podium2;
-    stats.terceiro += breakdown.podium3;
-    stats.wins += breakdown.wins;
-    stats.pontos += Number(athlete?.pontos) || 0;
-    stats.atletas += 1;
-
-    const countryCode = countryCodeFromAthlete(athlete);
-    stats.countryHits[countryCode] = (stats.countryHits[countryCode] || 0) + 1;
-
-    teams.set(key, stats);
-  });
-
-  return Array.from(teams.values())
-    .sort((a, b) => {
-      if (b.pontos !== a.pontos) return b.pontos - a.pontos;
-      if (b.campeao !== a.campeao) return b.campeao - a.campeao;
-      if (b.wins !== a.wins) return b.wins - a.wins;
-      if (b.atletas !== a.atletas) return b.atletas - a.atletas;
-      return a.academy.localeCompare(b.academy);
-    })
-    .map((team, index) => ({
-      ...team,
-      rank: index + 1,
-      countryCode: pickMostFrequentCode(team.countryHits)
-    }));
-};
 
 const TeamRanking = () => {
   const { athletes, events, activeEventId } = useStore();

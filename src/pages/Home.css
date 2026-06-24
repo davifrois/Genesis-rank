@@ -1,0 +1,393 @@
+/* Layout Imersivo Full Screen - Home Elite */
+.home-elite {
+    width: 100%;
+    background: #020202;
+    color: #fff;
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+/* Container Full Width limitador sutil */
+.home-elite .container {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+
+/* Nova Seção Hero - Capacitamos */
+.hero-capacitamos {
+    position: relative;
+    padding: 18rem 0 12rem;
+    background-size: cover;
+    background-position: center;
+    min-height: 85vh;
+    display: flex;
+    align-items: center;
+}
+
+.hero-capacitamos::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 100%);
+    z-index: 1;
+}
+
+.hero-capacitamos .container {
+    position: relative;
+    z-index: 2;
+    max-width: 900px;
+}
+
+.hero-capacitamos h1 {
+    font-size: clamp(2.2rem, 4vw, 3.2rem);
+    font-weight: 600;
+    line-height: 1.25;
+    color: #ffffff;
+    margin-bottom: 2.5rem;
+    max-width: 800px;
+}
+
+.hero-capacitamos__actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.btn-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.9rem 2rem;
+    border-radius: 9999px;
+    font-size: 1.05rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-pill--primary {
+    background-color: #2563eb;
+    color: #ffffff;
+}
+
+.btn-pill--primary:hover {
+    background-color: #1d4ed8;
+}
+
+.btn-pill--secondary {
+    background-color: rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+    backdrop-filter: blur(8px);
+}
+
+.btn-pill--secondary:hover {
+    background-color: rgba(255, 255, 255, 0.25);
+}
+
+/* Eventos Estilo Smoothcomp */
+.eventos-impacto {
+    padding: 4rem 0;
+}
+
+.eventos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 2rem;
+    margin-top: 3rem;
+}
+
+.evento-card {
+    background: rgba(20, 20, 25, 0.7);
+    border: 1px solid rgba(0, 102, 255, 0.1);
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5), inset 0 0 10px rgba(0, 102, 255, 0.05);
+    border-radius: 12px;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    height: 480px;
+    position: relative;
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+}
+
+.evento-card:hover {
+    border-color: #0066FF;
+    transform: translateY(-8px);
+    box-shadow: 0 10px 40px rgba(0, 102, 255, 0.15);
+}
+
+.evento-card__poster {
+    height: 70%;
+    width: 100%;
+    position: relative;
+    overflow: hidden;
+}
+
+.evento-card__poster img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.5s ease;
+}
+
+.evento-card:hover .evento-card__poster img {
+    transform: scale(1.05);
+}
+
+.evento-card__badge {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    background: rgba(0, 0, 0, 0.8);
+    border: 1px solid #0066FF;
+    color: #fff;
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 0 10px rgba(0, 102, 255, 0.3);
+}
+
+.evento-card__data {
+    height: 30%;
+    padding: 1.2rem;
+    background: rgba(10, 12, 16, 0.85);
+    backdrop-filter: blur(10px);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    z-index: 2;
+    border-top: 1px solid rgba(255,255,255,0.05);
+}
+
+.evento-card__title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #fff;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.evento-card__date {
+    color: #94a3b8;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.evento-card__status {
+    color: #10b981;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Hover Ações */
+.evento-card__actions {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 8, 20, 0.85);
+    backdrop-filter: blur(5px);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 3;
+}
+
+.evento-card:hover .evento-card__actions {
+    opacity: 1;
+}
+
+.evento-card__btn {
+    width: 80%;
+    padding: 0.8rem;
+    text-align: center;
+    border-radius: 6px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 0.9rem;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.evento-card__btn--primary {
+    background: #0066FF;
+    color: #fff;
+    border: 1px solid #4D94FF;
+}
+
+.evento-card__btn--primary:hover {
+    background: #0052cc;
+    box-shadow: 0 0 15px rgba(0, 102, 255, 0.5);
+}
+
+.evento-card__btn--secondary {
+    background: transparent;
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.evento-card__btn--secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+
+/* Ecossistema Cyber */
+.ecosystem-cyber {
+    padding: 5rem 0;
+}
+
+.ecosystem-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2rem;
+    margin-top: 3rem;
+}
+
+.eco-card {
+    background: rgba(15, 20, 30, 0.4);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    padding: 2rem;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    position: relative;
+    overflow: hidden;
+}
+
+.eco-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0, 102, 255, 0.5), transparent);
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.eco-card:hover {
+    transform: translateY(-10px);
+    border-color: rgba(0, 102, 255, 0.3);
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4), inset 0 0 20px rgba(0, 102, 255, 0.1);
+}
+
+.eco-card:hover::before {
+    opacity: 1;
+}
+
+.icon-3d {
+    width: 60px; 
+    height: 60px;
+    margin-bottom: 1.5rem;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(135deg, #001f4d 0%, #0066FF 100%);
+    border-radius: 14px;
+    box-shadow: 
+        0 10px 20px rgba(0, 0, 0, 0.5),
+        inset 2px 2px 5px rgba(255, 255, 255, 0.4),
+        inset -2px -2px 5px rgba(0, 0, 0, 0.5);
+    color: #fff;
+    transform: perspective(100px) rotateX(5deg);
+}
+
+.eco-card h3 {
+    font-size: 1.3rem;
+    color: #fff;
+    margin-bottom: 1rem;
+    font-weight: 700;
+}
+
+.eco-card p {
+    color: #94a3b8;
+    font-size: 1rem;
+    line-height: 1.6;
+}
+
+/* Testemunho Social */
+.social-proof {
+    padding: 6rem 0;
+    background: linear-gradient(0deg, rgba(0,0,0,0.8) 0%, transparent 100%);
+}
+
+.testimonial-box {
+    display: flex;
+    align-items: center;
+    gap: 3rem;
+    background: rgba(15, 20, 30, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 3rem;
+    backdrop-filter: blur(10px);
+}
+
+.testimonial-img {
+    width: 400px;
+    height: 300px;
+    border-radius: 12px;
+    object-fit: cover;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+    border: 1px solid rgba(255,255,255,0.05);
+}
+
+.testimonial-content {
+    flex: 1;
+}
+
+.testimonial-content blockquote {
+    font-size: 1.5rem;
+    font-style: italic;
+    color: #e2e8f0;
+    line-height: 1.5;
+    margin: 0 0 1.5rem;
+    border-left: 4px solid #0066FF;
+    padding-left: 1.5rem;
+}
+
+.testimonial-author {
+    font-weight: 700;
+    color: #0066FF;
+    font-size: 1.1rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* Responsivo */
+@media (max-width: 1024px) {
+    .ecosystem-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .testimonial-box {
+        flex-direction: column;
+        padding: 2rem;
+    }
+    .testimonial-img {
+        width: 100%;
+        height: auto;
+    }
+}
+
+@media (max-width: 768px) {
+    .ecosystem-grid {
+        grid-template-columns: 1fr;
+    }
+    .eventos-grid {
+        grid-template-columns: 1fr;
+    }
+}

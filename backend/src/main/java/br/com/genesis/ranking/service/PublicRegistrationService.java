@@ -16,6 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import br.com.genesis.ranking.dto.PublicRegistrationRequest;
 import br.com.genesis.ranking.dto.PublicRegistrationResponse;
+import br.com.genesis.ranking.dto.RegistrationDetailsUpdateRequest;
+import br.com.genesis.ranking.dto.RegistrationPaymentStatusRequest;
 import br.com.genesis.ranking.dto.RegistrationPaymentStatusRequest;
 import br.com.genesis.ranking.model.Athlete;
 import br.com.genesis.ranking.model.Event;
@@ -65,12 +67,31 @@ public class PublicRegistrationService {
     }
 
     Event event = resolveEvent(eventId, request);
-    if (!event.isRegistrationOpen()) {
+    if (event != null && !event.getRegistrationOpen()) {
       throw new IllegalArgumentException("Inscrições fechadas para este evento.");
+    }
+
+    String profileId = clean(request.getProfileId());
+    String sourceAthleteId = clean(request.getAthleteId());
+    String nome = required(request.getNome(), "Nome completo obrigatório.");
+    String email = clean(request.getEmail());
+    String academia = clean(request.getAcademia());
+    Optional<EventRegistration> duplicateInSameEvent = findDuplicateRegistration(
+        event.getId(),
+        profileId,
+        sourceAthleteId,
+        nome,
+        email,
+        academia
+    );
+    if (duplicateInSameEvent.isPresent()) {
+      throw new IllegalArgumentException("Este atleta ja esta inscrito neste campeonato.");
     }
 
     EventRegistration registration = new EventRegistration();
     registration.setEvent(event);
+    registration.setProfileId(profileId);
+    registration.setSourceAthleteId(sourceAthleteId);
     registration.setNome(required(request.getNome(), "Nome completo é obrigatório."));
     registration.setEmail(clean(request.getEmail()));
     registration.setPhone(clean(request.getPhone()));
@@ -152,6 +173,93 @@ public class PublicRegistrationService {
       }
     }
     return toResponse(saved, athleteId);
+  }
+
+  public PublicRegistrationResponse updateRegistrationDetails(
+      String registrationId,
+      RegistrationDetailsUpdateRequest request
+  ) {
+    String normalizedRegistrationId = clean(registrationId);
+    if (normalizedRegistrationId.isBlank()) {
+      throw new IllegalArgumentException("Inscrição não encontrada.");
+    }
+
+    EventRegistration registration = registrationRepository.findById(normalizedRegistrationId)
+        .orElseThrow(() -> new IllegalArgumentException("Inscrição não encontrada."));
+
+    registration.setCategoria(required(request.getCategoria(), "Categoria é obrigatória."));
+    registration.setFaixa(required(request.getFaixa(), "Faixa é obrigatória."));
+    registration.setPeso(required(request.getPeso(), "Peso é obrigatório."));
+    
+    if (request.getGenero() != null) {
+        registration.setGenero(clean(request.getGenero()));
+    }
+    if (request.getModalidade() != null) {
+        registration.setModalidade(normalizeMode(request.getModalidade()));
+    }
+
+    EventRegistration saved = registrationRepository.save(registration);
+    
+    // Updates the athlete if it is already approved and sent to bracket
+    String athleteId = null;
+    RegistrationPaymentStatus status = RegistrationPaymentStatus.fromStored(saved.getStatus());
+    if (RegistrationPaymentStatus.PAYMENT_CONFIRMED.equals(status)) {
+        athleteId = resolveAthleteId(saved, new HashMap<>());
+        if (athleteId != null) {
+            Athlete athlete = athleteRepository.findById(athleteId).orElse(null);
+            if (athlete != null) {
+                athlete.setCategoria(saved.getCategoria());
+                athlete.setFaixa(saved.getFaixa());
+                athlete.setPeso(saved.getPeso());
+                if (request.getGenero() != null) {
+                    athlete.setGenero(saved.getGenero());
+                }
+                if (request.getModalidade() != null) {
+                    athlete.setNoGi("NO-GI".equalsIgnoreCase(normalizeMode(request.getModalidade())));
+                }
+                if (request.getIsAbsolute() != null) {
+                    athlete.setAbsolute(request.getIsAbsolute());
+                }
+                athleteRepository.save(athlete);
+            }
+        }
+    }
+    
+    return toResponse(saved, athleteId);
+  }
+
+  public EventRegistration approveRegistration(String registrationId, String transactionId) {
+    String normalizedRegistrationId = clean(registrationId);
+    if (normalizedRegistrationId.isBlank()) {
+      return null;
+    }
+
+    Optional<EventRegistration> optionalReg = registrationRepository.findById(normalizedRegistrationId);
+    if (optionalReg.isEmpty()) {
+      return null;
+    }
+
+    EventRegistration registration = optionalReg.get();
+    RegistrationPaymentStatus previousStatus = RegistrationPaymentStatus.fromStored(registration.getStatus());
+    
+    // Se já estiver confirmado, apenas atualiza a transação
+    if (RegistrationPaymentStatus.PAYMENT_CONFIRMED.equals(previousStatus)) {
+        registration.setPaymentTransactionId(transactionId);
+        return registrationRepository.save(registration);
+    }
+
+    registration.setStatus(RegistrationPaymentStatus.PAYMENT_CONFIRMED.name());
+    registration.setPaymentTransactionId(transactionId);
+    registration.setPaymentReviewNotes("Aprovado via Webhook");
+    registration.setPaymentReviewedBy("SISTEMA");
+    registration.setPaymentReviewedAt(Instant.now());
+
+    EventRegistration saved = registrationRepository.save(registration);
+    
+    ensureAthlete(saved); // Creates the athlete if not exists
+    registrationEmailService.sendPaymentConfirmedEmail(saved);
+    
+    return saved;
   }
 
   private Event resolveEvent(String eventId, PublicRegistrationRequest request) {
@@ -239,6 +347,7 @@ public class PublicRegistrationService {
     response.setEventDate(event != null && event.getDate() != null ? event.getDate().toString() : null);
     response.setEventLocation(event != null ? event.getLocation() : null);
     response.setNome(registration.getNome());
+    response.setProfileId(registration.getProfileId());
     response.setEmail(registration.getEmail());
     response.setPhone(registration.getPhone());
     response.setAcademia(registration.getAcademia());
@@ -258,6 +367,46 @@ public class PublicRegistrationService {
         registration.getPaymentReviewedAt() != null ? registration.getPaymentReviewedAt().toString() : null
     );
     return response;
+  }
+
+  private Optional<EventRegistration> findDuplicateRegistration(
+      String eventId,
+      String profileId,
+      String sourceAthleteId,
+      String nome,
+      String email,
+      String academia
+  ) {
+    String normalizedEventId = clean(eventId);
+    if (normalizedEventId.isBlank()) return Optional.empty();
+
+    String normalizedProfileId = clean(profileId);
+    String normalizedSourceAthleteId = clean(sourceAthleteId);
+    String normalizedNome = clean(nome);
+    String normalizedEmail = clean(email);
+    String normalizedAcademia = clean(academia);
+
+    return registrationRepository.findByEvent_Id(normalizedEventId).stream()
+        .filter((registration) -> {
+          String existingProfileId = clean(registration.getProfileId());
+          if (!normalizedProfileId.isBlank() && !existingProfileId.isBlank()) {
+            return existingProfileId.equalsIgnoreCase(normalizedProfileId);
+          }
+
+          String existingSourceAthleteId = clean(registration.getSourceAthleteId());
+          if (!normalizedSourceAthleteId.isBlank() && !existingSourceAthleteId.isBlank()) {
+            return existingSourceAthleteId.equalsIgnoreCase(normalizedSourceAthleteId);
+          }
+
+          if (!normalizedEmail.isBlank() && !clean(registration.getEmail()).isBlank()) {
+            return equalsNormalized(registration.getEmail(), normalizedEmail)
+                && equalsNormalized(registration.getNome(), normalizedNome);
+          }
+
+          return equalsNormalized(registration.getNome(), normalizedNome)
+              && equalsNormalized(registration.getAcademia(), normalizedAcademia);
+        })
+        .findFirst();
   }
 
   private String resolveAthleteIdIfConfirmed(

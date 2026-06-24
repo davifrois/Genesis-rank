@@ -10,8 +10,13 @@ public class BracketResponse {
   private String categoryKey;
   private String label;
   private String mode;
+  private String format;
   private Integer size;
+  private boolean isPublished;
   private List<String> seedIds = new ArrayList<>();
+  private List<String> walkovers = new ArrayList<>();
+  private List<BracketLiveMatchDto> liveMatches = new ArrayList<>();
+  private List<BracketSeedInfoDto> seedInfos = new ArrayList<>();
   private PodiumDto podium;
   private String appliedAt;
 
@@ -63,6 +68,14 @@ public class BracketResponse {
     this.mode = mode;
   }
 
+  public String getFormat() {
+    return format;
+  }
+
+  public void setFormat(String format) {
+    this.format = format;
+  }
+
   public Integer getSize() {
     return size;
   }
@@ -71,12 +84,44 @@ public class BracketResponse {
     this.size = size;
   }
 
+  public boolean getIsPublished() {
+    return isPublished;
+  }
+
+  public void setIsPublished(boolean isPublished) {
+    this.isPublished = isPublished;
+  }
+
   public List<String> getSeedIds() {
     return seedIds;
   }
 
   public void setSeedIds(List<String> seedIds) {
     this.seedIds = seedIds;
+  }
+
+  public List<String> getWalkovers() {
+    return walkovers;
+  }
+
+  public void setWalkovers(List<String> walkovers) {
+    this.walkovers = walkovers;
+  }
+
+  public List<BracketLiveMatchDto> getLiveMatches() {
+    return liveMatches;
+  }
+
+  public void setLiveMatches(List<BracketLiveMatchDto> liveMatches) {
+    this.liveMatches = liveMatches;
+  }
+
+  public List<BracketSeedInfoDto> getSeedInfos() {
+    return seedInfos;
+  }
+
+  public void setSeedInfos(List<BracketSeedInfoDto> seedInfos) {
+    this.seedInfos = seedInfos;
   }
 
   public PodiumDto getPodium() {

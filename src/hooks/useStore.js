@@ -1,12 +1,13 @@
-﻿import React, { createContext, useContext, useEffect, useState } from 'react';
-import { calculateTotalPoints, rankAthletes } from '../services/scoringService';
-import { authService } from '../services/authService';
-import { eventAdminService } from '../services/eventAdminService';
-import { publicRegistrationService } from '../services/publicRegistrationService';
-import { buildCategoryDescriptor, matchesBracketMode } from '../services/categoryService';
-import { nextPowerOfTwo, shuffleList } from '../services/bracketService';
-import { normalizeEventFees, resolveEventPixKey } from '../utils/eventPricing';
-import { formatBrazilPhone } from '../utils/phone';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import localforage from 'localforage';
+import { calculateTotalPoints, rankAthletes } from "/src/services/scoringService.js";
+import { authService } from "/src/services/authService.js";
+import { eventAdminService } from "/src/services/eventAdminService.js";
+import { publicRegistrationService } from "/src/services/publicRegistrationService.js";
+import { buildCategoryDescriptor, matchesBracketMode } from "/src/services/categoryService.js";
+import { nextPowerOfTwo, shuffleList } from "/src/services/bracketService.js";
+import { normalizeEventFees, resolveEventPixKey } from "/src/utils/eventPricing.js";
+import { formatBrazilPhone } from "/src/utils/phone.js";
 
 const STORAGE_KEY = 'genesis_ranking_data';
 const STORAGE_BACKUP_KEY = 'genesis_ranking_data_backup_v1';
@@ -889,9 +890,9 @@ const migrateStoredData = (payload) => {
     return { ...payload, schemaVersion: STORAGE_VERSION };
 };
 
-const useStoreState = () => {
+const useStoreState = (loadedState) => {
     const [data, setData] = useState(() => {
-        let parsed = loadStoredPayload() || initialData;
+        let parsed = loadedState || initialData;
         parsed = migrateStoredData(parsed);
 
         const athletes = normalizeArray(parsed.athletes || initialData.athletes).map(normalizeAthlete);
@@ -1016,22 +1017,20 @@ const useStoreState = () => {
         const timeout = setTimeout(() => {
             const payload = { ...data, schemaVersion: STORAGE_VERSION };
             const serialized = JSON.stringify(payload);
+            
+            localforage.setItem(STORAGE_KEY, serialized).catch(err => {
+                if (err && err.name === 'QuotaExceededError') {
+                    alert('Erro: Limite de armazenamento atingido no IndexedDB! As alterações não foram salvas. Por favor, remova imagens antigas.');
+                }
+            });
+
             try {
                 localStorage.setItem(STORAGE_KEY, serialized);
-            } catch {
-                try {
-                    localStorage.setItem(STORAGE_BACKUP_KEY, serialized);
-                } catch {
-                    // Ignore storage write errors to avoid white screen when quota is exceeded.
-                }
-                return;
-            }
+            } catch {}
 
             try {
                 localStorage.setItem(STORAGE_BACKUP_KEY, serialized);
-            } catch {
-                // Backup storage is best effort.
-            }
+            } catch {}
         }, 250);
 
         return () => clearTimeout(timeout);
@@ -1614,7 +1613,9 @@ const useStoreState = () => {
             internalRegistration: normalizeBoolean(
                 updates?.internalRegistration,
                 current.internalRegistration ?? true
-            )
+            ),
+            superFights: Array.isArray(updates?.superFights) ? updates.superFights : current.superFights || [],
+            superFightsPublished: updates?.superFightsPublished ?? current.superFightsPublished ?? false
         };
 
         setData(prev => ({
@@ -1733,6 +1734,52 @@ const useStoreState = () => {
             };
         });
         addLog({ type: 'INFO', action: 'ADD_ATHLETE', details: `Novo atleta: ${athlete.nome} (${athlete.academia})` });
+    };
+
+    const updateAthlete = (id, updates = {}) => {
+        const normalizedId = normalizeId(id);
+        if (!normalizedId) {
+            addLog({ type: 'ERROR', action: 'UPDATE_ATHLETE', details: 'ID inválido para atualização.' });
+            return;
+        }
+
+        setData((prev) => {
+            const previousRanks = buildRankMap(prev.athletes);
+            const updatedAthletes = prev.athletes.map((athlete) => {
+                if (athlete.id === normalizedId) {
+                    return {
+                        ...athlete,
+                        ...updates,
+                        // Ensure critical fields are normalized if they were updated
+                        nome: updates.nome !== undefined ? normalizeTextTrimmed(updates.nome) : athlete.nome,
+                        faixa: updates.faixa !== undefined ? normalizeTextTrimmed(updates.faixa) : athlete.faixa,
+                        peso: updates.peso !== undefined ? normalizeTextTrimmed(updates.peso) : athlete.peso,
+                        categoria: updates.categoria !== undefined ? normalizeTextTrimmed(updates.categoria) : athlete.categoria,
+                        academia: updates.academia !== undefined ? normalizeTextTrimmed(updates.academia) : athlete.academia
+                    };
+                }
+                return athlete;
+            });
+            const nextRanks = buildRankMap(updatedAthletes);
+
+            return {
+                ...prev,
+                athletes: updatedAthletes,
+                rankHistory: ensureRankHistory(updatedAthletes, prev.rankHistory || {}),
+                notifications: buildRankNotifications(
+                    previousRanks,
+                    nextRanks,
+                    updatedAthletes,
+                    prev.notifications || []
+                )
+            };
+        });
+
+        addLog({
+            type: 'INFO',
+            action: 'UPDATE_ATHLETE',
+            details: `Dados atualizados para o atleta: ${normalizedId}`
+        });
     };
 
     const removeAthlete = (id) => {
@@ -2165,6 +2212,7 @@ const useStoreState = () => {
         setActiveEvent,
         assignAthletesToEvent,
         addAthlete,
+        updateAthlete,
         removeAthlete,
         updateAthletePoints,
         setManualPoints,
@@ -2182,7 +2230,43 @@ const useStoreState = () => {
 };
 
 export const StoreProvider = ({ children }) => {
-    const store = useStoreState();
+    const [isLoaded, setIsLoaded] = useState(false);
+    const [loadedState, setLoadedState] = useState(null);
+
+    useEffect(() => {
+        let mounted = true;
+        (async () => {
+            let parsed = null;
+            try {
+                const storedForage = await localforage.getItem(STORAGE_KEY);
+                parsed = typeof storedForage === 'string' ? JSON.parse(storedForage) : storedForage;
+            } catch (e) { console.error('LocalForage read error', e); }
+
+            if (!parsed) {
+                parsed = loadStoredPayload();
+                if (parsed) {
+                    try {
+                        await localforage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+                    } catch (e) {}
+                }
+            }
+
+            if (!mounted) return;
+            setLoadedState(parsed);
+            setIsLoaded(true);
+        })();
+        return () => { mounted = false; };
+    }, []);
+
+    if (!isLoaded) {
+        return React.createElement('div', { style: { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#0a0a0a', color: '#fff', fontFamily: 'system-ui, sans-serif' } }, 'Carregando Genesis...');
+    }
+
+    return React.createElement(StoreProviderInner, { loadedState }, children);
+};
+
+const StoreProviderInner = ({ loadedState, children }) => {
+    const store = useStoreState(loadedState);
     return React.createElement(StoreContext.Provider, { value: store }, children);
 };
 

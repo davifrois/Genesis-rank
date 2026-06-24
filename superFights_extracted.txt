@@ -1,0 +1,244 @@
+<div className="bracket-event-selector">
+                            <label className="bracket-field">
+                                <span>{copy.schedulePanel.selectEventLabel || 'Selecione o Campeonato'}</span>
+                                <select
+                                    className="input select-compact"
+                                    value={superFightsEventId}
+                                    onChange={(event) => setSuperFightsEventId(event.target.value)}
+                                >
+                                    <option value="">{copy.schedulePanel.selectEvent || 'Selecione'}</option>
+                                    {events.filter(e => e.beltRegistrationEnabled).map((event) => (
+                                        <option key={`sf-event-${event.id}`} value={event.id}>{event.name}</option>
+                                    ))}
+                                </select>
+                            </label>
+                        </div>
+                        {!superFightsEventId && (
+                            <div className="panel-subtitle">{copy.schedulePanel.selectEvent || 'Selecione um evento para continuar.'}</div>
+                        )}
+                        {superFightsEventId && (() => {
+                            const sfEvent = events.find(e => e.id === superFightsEventId);
+                            const superFightsList = sfEvent?.superFights || [];
+
+                            const BELT_OPTIONS = ['Branca', 'Cinza', 'Amarela', 'Laranja', 'Verde', 'Azul', 'Roxa', 'Marrom', 'Preta'];
+                            const CATEGORY_OPTIONS = ['Mirim', 'Infantil', 'Infanto-Juvenil', 'Juvenil', 'Adulto', 'Master'];
+
+                            const handleSave = async () => {
+                                const validFights = pendingSuperFights.filter(sf => sf.athlete1Name && sf.athlete2Name);
+                                if (validFights.length === 0) {
+                                    showFeedback('error', 'Preencha o nome dos atletas em pelo menos uma luta.');
+                                    return;
+                                }
+                                try {
+                                    const fightsToAdd = validFights.map(sf => ({ ...sf, id: crypto.randomUUID() }));
+                                    const updatedPayload = { ...sfEvent, superFights: [...superFightsList, ...fightsToAdd] };
+                                    const res = await eventAdminService.updateEvent(sfEvent.id, updatedPayload);
+                                    if (!res.skipped) {
+                                        showFeedback('success', fightsToAdd.length > 1 ? 'Lutas adicionadas com sucesso!' : 'Luta adicionada com sucesso!');
+                                        updateEvent(sfEvent.id, updatedPayload);
+                                        setPendingSuperFights([{
+                                            id: crypto.randomUUID(),
+                                            category: 'Adulto',
+                                            athlete1Name: '', athlete1Belt: 'Branca', athlete1Academy: '',
+                                            athlete2Name: '', athlete2Belt: 'Branca', athlete2Academy: '',
+                                            scheduledTime: ''
+                                        }]);
+                                    }
+                                } catch (error) {
+                                    showFeedback('error', error.message || 'Erro ao adicionar luta.');
+                                }
+                            };
+
+                            const handleRemove = async (sfId) => {
+                                try {
+                                    const updatedPayload = { ...sfEvent, superFights: superFightsList.filter(sf => sf.id !== sfId) };
+                                    const res = await eventAdminService.updateEvent(sfEvent.id, updatedPayload);
+                                    if (!res.skipped) {
+                                        showFeedback('success', 'Luta removida com sucesso!');
+                                        updateEvent(sfEvent.id, updatedPayload);
+                                    }
+                                } catch (error) {
+                                    showFeedback('error', error.message || 'Erro ao remover luta.');
+                                }
+                            };
+
+                            const handleAutoGenerate = async () => {
+                                if (!autoGenerateOptions.startTime || !autoGenerateOptions.intervalMins) {
+                                    showFeedback('error', 'Preencha o horário de início e o intervalo.');
+                                    return;
+                                }
+                                
+                                const categoryWeights = { 'Mirim': 1, 'Infantil': 2, 'Infanto-Juvenil': 3, 'Juvenil': 4, 'Adulto': 5, 'Master': 6 };
+                                const beltWeights = { 'Branca': 0, 'Cinza': 1, 'Amarela': 2, 'Laranja': 3, 'Verde': 4, 'Azul': 5, 'Roxa': 6, 'Marrom': 7, 'Preta': 8 };
+
+                                const sortedList = [...superFightsList].sort((a, b) => {
+                                    const catA = a.category || 'Adulto';
+                                    const catB = b.category || 'Adulto';
+                                    const isKidsA = categoryWeights[catA] < 5;
+                                    const isKidsB = categoryWeights[catB] < 5;
+
+                                    if (isKidsA && !isKidsB) return -1;
+                                    if (!isKidsA && isKidsB) return 1;
+
+                                    if (isKidsA && isKidsB) {
+                                        return categoryWeights[catA] - categoryWeights[catB];
+                                    }
+
+                                    // Para adultos/master: ordem de faixa decrescente (Preta -> Branca)
+                                    const beltA = beltWeights[a.athlete1Belt || 'Branca'] || 0;
+                                    const beltB = beltWeights[b.athlete1Belt || 'Branca'] || 0;
+                                    return beltB - beltA;
+                                });
+
+                                let [hours, mins] = autoGenerateOptions.startTime.split(':').map(Number);
+                                let currentTime = new Date();
+                                currentTime.setHours(hours, mins, 0, 0);
+
+                                const interval = parseInt(autoGenerateOptions.intervalMins, 10);
+
+                                const updatedList = sortedList.map(sf => {
+                                    const h = String(currentTime.getHours()).padStart(2, '0');
+                                    const m = String(currentTime.getMinutes()).padStart(2, '0');
+                                    const newTime = `${h}:${m}`;
+                                    currentTime.setMinutes(currentTime.getMinutes() + interval);
+                                    return { ...sf, scheduledTime: newTime };
+                                });
+
+                                try {
+                                    const updatedPayload = { ...sfEvent, superFights: updatedList };
+                                    const res = await eventAdminService.updateEvent(sfEvent.id, updatedPayload);
+                                    if (!res.skipped) {
+                                        showFeedback('success', 'Horários gerados com sucesso!');
+                                        updateEvent(sfEvent.id, updatedPayload);
+                                    }
+                                } catch (error) {
+                                    showFeedback('error', error.message || 'Erro ao salvar horários gerados.');
+                                }
+                            };
+
+                            const handleTogglePublishSuperFights = async () => {
+                                try {
+                                    const validFights = pendingSuperFights.filter(sf => sf.athlete1Name && sf.athlete2Name);
+                                    const fightsToAdd = validFights.map(sf => ({ ...sf, id: crypto.randomUUID() }));
+                                    
+                                    const updatedPayload = { 
+                                        ...sfEvent, 
+                                        superFights: [...superFightsList, ...fightsToAdd],
+                                        superFightsPublished: !sfEvent.superFightsPublished 
+                                    };
+                                    const res = await eventAdminService.updateEvent(sfEvent.id, updatedPayload);
+                                    if (!res.skipped) {
+                                        showFeedback('success', sfEvent.superFightsPublished ? 'Lutas despublicadas com sucesso!' : 'Lutas salvas e publicadas com sucesso!');
+                                        updateEvent(sfEvent.id, updatedPayload);
+                                        if (fightsToAdd.length > 0) {
+                                            setPendingSuperFights([{
+                                                id: crypto.randomUUID(),
+                                                category: 'Adulto',
+                                                athlete1Name: '', athlete1Belt: 'Branca', athlete1Academy: '',
+                                                athlete2Name: '', athlete2Belt: 'Branca', athlete2Academy: '',
+                                                scheduledTime: ''
+                                            }]);
+                                        }
+                                    }
+                                } catch (error) {
+                                    showFeedback('error', error.message || 'Erro ao alterar visibilidade das lutas.');
+                                }
+                            };
+
+                            return (
+                                <div className="bracket-schedule">
+                                    <div className="bracket-schedule__controls schedule-manual-form" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', marginBottom: '20px' }}>
+                                        {pendingSuperFights.map((fight, index) => (
+                                            <div key={fight.id} style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', position: 'relative' }}>
+                                                {pendingSuperFights.length > 1 && (
+                                                    <button type="button" onClick={() => setPendingSuperFights(pendingSuperFights.filter(f => f.id !== fight.id))} style={{ position: 'absolute', top: '10px', right: '10px', background: 'transparent', border: 'none', color: '#ff4444', cursor: 'pointer' }}>âœ–</button>
+                                                )}
+                                                <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end' }}>
+                                                    <label className="bracket-field" style={{ flex: 1 }}>
+                                                        <span>Categoria da Luta</span>
+                                                        <select className="input select-compact" value={fight.category} onChange={e => setPendingSuperFights(pendingSuperFights.map(f => f.id === fight.id ? {...f, category: e.target.value} : f))}>
+                                                            {CATEGORY_OPTIONS.map(opt => <option key={`cat-${opt}`} value={opt}>{opt}</option>)}
+                                                        </select>
+                                                    </label>
+                                                    <label className="bracket-field" style={{ flex: 1 }}>
+                                                        <span>Horário Manual (Opcional)</span>
+                                                        <input className="input" placeholder="ex: 15:30" value={fight.scheduledTime} onChange={e => setPendingSuperFights(pendingSuperFights.map(f => f.id === fight.id ? {...f, scheduledTime: e.target.value} : f))} />
+                                                    </label>
+                                                </div>
+
+                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                                    <div>
+                                                        <label className="bracket-field" style={{ marginBottom: '8px' }}><span>Atleta 1</span></label>
+                                                        <input className="input" placeholder="Nome" value={fight.athlete1Name} onChange={e => setPendingSuperFights(pendingSuperFights.map(f => f.id === fight.id ? {...f, athlete1Name: e.target.value} : f))} style={{ marginBottom: '8px' }} />
+                                                        <select className="input select-compact" value={fight.athlete1Belt} onChange={e => setPendingSuperFights(pendingSuperFights.map(f => f.id === fight.id ? {...f, athlete1Belt: e.target.value} : f))} style={{ marginBottom: '8px' }}>
+                                                            {BELT_OPTIONS.map(b => <option key={`b1-${b}`} value={b}>{b}</option>)}
+                                                        </select>
+                                                        <input className="input" placeholder="Academia" value={fight.athlete1Academy} onChange={e => setPendingSuperFights(pendingSuperFights.map(f => f.id === fight.id ? {...f, athlete1Academy: e.target.value} : f))} />
+                                                    </div>
+                                                    <div>
+                                                        <label className="bracket-field" style={{ marginBottom: '8px' }}><span>Atleta 2</span></label>
+                                                        <input className="input" placeholder="Nome" value={fight.athlete2Name} onChange={e => setPendingSuperFights(pendingSuperFights.map(f => f.id === fight.id ? {...f, athlete2Name: e.target.value} : f))} style={{ marginBottom: '8px' }} />
+                                                        <select className="input select-compact" value={fight.athlete2Belt} onChange={e => setPendingSuperFights(pendingSuperFights.map(f => f.id === fight.id ? {...f, athlete2Belt: e.target.value} : f))} style={{ marginBottom: '8px' }}>
+                                                            {BELT_OPTIONS.map(b => <option key={`b2-${b}`} value={b}>{b}</option>)}
+                                                        </select>
+                                                        <input className="input" placeholder="Academia" value={fight.athlete2Academy} onChange={e => setPendingSuperFights(pendingSuperFights.map(f => f.id === fight.id ? {...f, athlete2Academy: e.target.value} : f))} />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+
+                                        <div style={{ display: 'flex', gap: '16px', marginTop: '8px' }}>
+                                            <button type="button" className="btn btn-secondary" onClick={() => setPendingSuperFights([...pendingSuperFights, { id: crypto.randomUUID(), category: 'Adulto', athlete1Name: '', athlete1Belt: 'Branca', athlete1Academy: '', athlete2Name: '', athlete2Belt: 'Branca', athlete2Academy: '', scheduledTime: '' }])}>
+                                                + Adicionar Mais Lutas
+                                            </button>
+                                            <button type="button" className="btn btn-primary" onClick={handleSave} style={{ flex: 1 }}>
+                                                Salvar Lutas Casadas
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div style={{ padding: '20px', background: 'rgba(0,0,0,0.1)', borderRadius: '8px', marginBottom: '20px', display: 'flex', gap: '16px', alignItems: 'flex-end' }}>
+                                        <label className="bracket-field">
+                                            <span>Horário Início</span>
+                                            <input type="time" className="input" value={autoGenerateOptions.startTime} onChange={e => setAutoGenerateOptions({...autoGenerateOptions, startTime: e.target.value})} />
+                                        </label>
+                                        <label className="bracket-field">
+                                            <span>Intervalo (min)</span>
+                                            <input type="number" className="input" style={{ width: '100px' }} value={autoGenerateOptions.intervalMins} onChange={e => setAutoGenerateOptions({...autoGenerateOptions, intervalMins: e.target.value})} />
+                                        </label>
+                                        <button type="button" className="btn btn-secondary" onClick={handleAutoGenerate}>
+                                            Gerar Horários Automaticamente
+                                        </button>
+                                        <button type="button" className={`btn ${sfEvent.superFightsPublished ? 'btn-danger' : 'btn-success'}`} onClick={handleTogglePublishSuperFights}>
+                                            {sfEvent.superFightsPublished ? 'Despublicar Lutas Casadas' : 'Publicar Lutas Casadas'}
+                                        </button>
+                                    </div>
+
+                                    <div className="bracket-schedule__list">
+                                        {superFightsList.length > 0 ? superFightsList.map((sf, index) => (
+                                            <article key={sf.id} className="bracket-schedule__row schedule-row">
+                                                <div className="schedule-row__drag">
+                                                    <Swords size={16} />
+                                                </div>
+                                                <div className="schedule-row__time" style={{ width: '80px', flexShrink: 0 }}>
+                                                    {sf.scheduledTime || '--:--'}
+                                                    <div style={{ fontSize: '10px', color: '#a1a1aa', marginTop: '4px' }}>{sf.category}</div>
+                                                </div>
+                                                <div className="schedule-row__content" style={{ flex: 1 }}>
+                                                    <strong>{sf.athlete1Name} <span style={{color: '#a1a1aa', fontWeight: 400}}>({sf.athlete1Belt} - {sf.athlete1Academy})</span></strong>
+                                                    <div style={{ color: '#22c55e', fontSize: '12px', fontWeight: 'bold', margin: '4px 0' }}>VS</div>
+                                                    <strong>{sf.athlete2Name} <span style={{color: '#a1a1aa', fontWeight: 400}}>({sf.athlete2Belt} - {sf.athlete2Academy})</span></strong>
+                                                </div>
+                                                <div className="schedule-row__actions">
+                                                    <button type="button" className="btn btn-ghost" onClick={() => handleRemove(sf.id)}>
+                                                        <Trash2 size={14} /> Remover
+                                                    </button>
+                                                </div>
+                                            </article>
+                                        )) : <div className="panel-subtitle">Nenhuma luta casada adicionada.</div>}
+                                    </div>
+                                </div>
+                            );
+                        })()}
+                    </div>
+                

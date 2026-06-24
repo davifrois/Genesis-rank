@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import br.com.genesis.ranking.dto.BracketPodiumUpdateRequest;
 import br.com.genesis.ranking.dto.BracketRequest;
 import br.com.genesis.ranking.dto.BracketResponse;
+import br.com.genesis.ranking.dto.BracketLiveUpdateRequest;
 import br.com.genesis.ranking.service.BracketService;
 
 @RestController
@@ -48,12 +49,25 @@ public class BracketController {
   }
 
   @PutMapping("/{id}/podium")
-  @PreAuthorize("hasAnyRole('ADMIN','MESARIO','STAFF')")
+  @PreAuthorize("hasRole('ADMIN')")
   public BracketResponse updateBracketPodium(
       @PathVariable String id,
       @RequestBody BracketPodiumUpdateRequest request
   ) {
     return bracketService.updatePodiumOnly(id, request == null ? null : request.getPodium(), request == null ? null : request.getAppliedAt());
+  }
+
+  @PutMapping("/{id}/live")
+  @PreAuthorize("hasAnyRole('ADMIN','MESARIO','STAFF')")
+  public BracketResponse updateBracketLiveState(
+      @PathVariable String id,
+      @RequestBody BracketLiveUpdateRequest request
+  ) {
+    return bracketService.updateLiveStateOnly(
+        id,
+        request == null ? null : request.getLiveMatches(),
+        request == null ? null : request.getWalkovers()
+    );
   }
 
   @DeleteMapping("/{id}")

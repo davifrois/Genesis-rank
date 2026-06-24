@@ -19,6 +19,12 @@ public class EventRegistration extends BaseEntity {
   @Column(nullable = false, length = 180)
   private String nome;
 
+  @Column(length = 80)
+  private String profileId;
+
+  @Column(length = 80)
+  private String sourceAthleteId;
+
   @Column(length = 180)
   private String email;
 
@@ -60,6 +66,11 @@ public class EventRegistration extends BaseEntity {
 
   private Instant paymentReviewedAt;
 
+  @Column(length = 255)
+  private String paymentTransactionId;
+
+  @Column(columnDefinition = "TEXT")
+  private String pixCopyPaste;
   public Event getEvent() {
     return event;
   }
@@ -74,6 +85,22 @@ public class EventRegistration extends BaseEntity {
 
   public void setNome(String nome) {
     this.nome = nome;
+  }
+
+  public String getProfileId() {
+    return profileId;
+  }
+
+  public void setProfileId(String profileId) {
+    this.profileId = profileId;
+  }
+
+  public String getSourceAthleteId() {
+    return sourceAthleteId;
+  }
+
+  public void setSourceAthleteId(String sourceAthleteId) {
+    this.sourceAthleteId = sourceAthleteId;
   }
 
   public String getEmail() {
@@ -186,5 +213,21 @@ public class EventRegistration extends BaseEntity {
 
   public void setPaymentReviewedAt(Instant paymentReviewedAt) {
     this.paymentReviewedAt = paymentReviewedAt;
+  }
+
+  public String getPaymentTransactionId() {
+    return paymentTransactionId;
+  }
+
+  public void setPaymentTransactionId(String paymentTransactionId) {
+    this.paymentTransactionId = paymentTransactionId;
+  }
+
+  public String getPixCopyPaste() {
+    return pixCopyPaste;
+  }
+
+  public void setPixCopyPaste(String pixCopyPaste) {
+    this.pixCopyPaste = pixCopyPaste;
   }
 }

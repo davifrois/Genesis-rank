@@ -1,8 +1,8 @@
 import { REGISTRATION_STATUS, normalizeRegistrationStatus } from '../utils/registrationStatus';
 import { authService } from './authService';
 
-const ENV_API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').trim();
-const API_BASE_URL = ENV_API_BASE_URL ? ENV_API_BASE_URL.replace(/\/$/, '') : '';
+const ENV_API_BASE_URL = ("" || '').trim();
+const API_BASE_URL = ENV_API_BASE_URL.includes('sua-url-do-ngrok') ? '' : ENV_API_BASE_URL.replace(/\/$/, '');
 const LOCAL_PENDING_REGISTRATIONS_KEY = 'genesis_public_registration_pending_v1';
 const LOCAL_SYNC_DIAGNOSTICS_KEY = 'genesis_public_registration_sync_diag_v1';
 const MAX_PENDING_RECORDS = 20;
@@ -265,13 +265,18 @@ const sanitizePayloadForOfflineQueue = (payload) => {
   try {
     const parsedNotes = JSON.parse(safePayload.notes);
     if (!parsedNotes || typeof parsedNotes !== 'object') return safePayload;
-    if (typeof parsedNotes.comprovanteArquivoDataUrl !== 'string' || !parsedNotes.comprovanteArquivoDataUrl) {
+    
+    const hasComprovante = typeof parsedNotes.comprovanteArquivoDataUrl === 'string' && parsedNotes.comprovanteArquivoDataUrl;
+    const hasProof = typeof parsedNotes.proofDataUrl === 'string' && parsedNotes.proofDataUrl;
+
+    if (!hasComprovante && !hasProof) {
       return safePayload;
     }
 
     const cleanedNotes = {
       ...parsedNotes,
       comprovanteArquivoDataUrl: '',
+      proofDataUrl: '',
       comprovanteOfflineRemovido: true
     };
     safePayload.notes = JSON.stringify(cleanedNotes);
@@ -325,6 +330,8 @@ const toPendingRegistrationRow = (record) => {
     eventDate: payload.eventDate || '',
     eventLocation: payload.eventLocation || '',
     nome: payload.nome || '',
+    profileId: payload.profileId || '',
+    sourceAthleteId: payload.athleteId || '',
     email: payload.email || '',
     phone: payload.phone || '',
     academia: payload.academia || '',
@@ -335,7 +342,7 @@ const toPendingRegistrationRow = (record) => {
     modalidade: payload.modalidade || '',
     clientRequestId: payload.clientRequestId || '',
     notes: payload.notes || '',
-    status: REGISTRATION_STATUS.PENDING_SYNC,
+    status: payload.status || REGISTRATION_STATUS.PENDING_SYNC,
     createdAt: safeRecord.createdAt || new Date().toISOString(),
     athleteId: '',
     lastError: safeRecord.lastError || '',
@@ -347,7 +354,8 @@ const postRegistration = async (payload) => {
   const response = await fetch(buildApiUrl('/api/public/registrations'), {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'ngrok-skip-browser-warning': 'true'
     },
     body: JSON.stringify(payload)
   });
@@ -487,7 +495,10 @@ export const publicRegistrationService = {
 
   listPublicEvents: async () => {
     try {
-      const response = await fetch(buildApiUrl('/api/public/events'));
+      const response = await fetch(buildApiUrl('/api/public/events'), {
+        headers: { 'ngrok-skip-browser-warning': 'true', 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache' },
+        cache: 'no-store'
+      });
       if (!response.ok) {
         throw await buildHttpError(response, DEFAULT_NETWORK_ERROR_MESSAGE);
       }
@@ -509,7 +520,10 @@ export const publicRegistrationService = {
     const query = eventId ? `?eventId=${encodeURIComponent(eventId)}` : '';
 
     try {
-      const response = await fetch(buildApiUrl(`/api/public/registrations${query}`));
+      const response = await fetch(buildApiUrl(`/api/public/registrations${query}`), {
+        headers: { 'ngrok-skip-browser-warning': 'true', 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache' },
+        cache: 'no-store'
+      });
       if (!response.ok) {
         throw await buildHttpError(response, DEFAULT_NETWORK_ERROR_MESSAGE);
       }
@@ -552,6 +566,33 @@ export const publicRegistrationService = {
       throw new Error('Status de pagamento inválido.');
     }
 
+    if (normalizedId.startsWith('pending-')) {
+      const pending = readPendingRegistrations();
+      const targetIndex = pending.findIndex(r => r.id === normalizedId);
+      if (targetIndex >= 0) {
+        const target = pending[targetIndex];
+        const updatedPayload = {
+          ...target.payload,
+          status: normalizedStatus,
+          paymentReviewNotes: reviewNotes,
+          paymentReviewedBy: reviewedBy,
+          paymentReviewedAt: new Date().toISOString()
+        };
+        const updatedRecord = {
+          ...target,
+          payload: updatedPayload
+        };
+        const newPending = [...pending];
+        newPending[targetIndex] = updatedRecord;
+        if (writePendingRegistrations(newPending)) {
+          return {
+            id: updatedRecord.id,
+            ...updatedPayload
+          };
+        }
+      }
+    }
+
     let token = normalizeAuthToken();
     if (!token && authService?.ensureApiAdminToken) {
       try {
@@ -571,7 +612,8 @@ export const publicRegistrationService = {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
+          'ngrok-skip-browser-warning': 'true'
         },
         body: JSON.stringify({ status: normalizedStatus, reviewNotes, reviewedBy })
       });
@@ -614,6 +656,73 @@ export const publicRegistrationService = {
       throw error;
     }
   },
+
+  updateRegistrationDetails: async (registrationId, details) => {
+    const normalizedId = (registrationId || '').toString().trim();
+    if (!normalizedId) {
+      throw new Error('Inscrição inválida.');
+    }
+
+    let token = normalizeAuthToken();
+    if (!token && authService?.ensureApiAdminToken) {
+      try {
+        token = await authService.ensureApiAdminToken();
+      } catch {
+        token = '';
+      }
+    }
+    if (!token) {
+      throw buildAuthRequiredError(
+        'Faça login como administrador para atualizar a inscrição.'
+      );
+    }
+
+    try {
+      const response = await fetch(buildApiUrl(`/api/admin/registrations/${encodeURIComponent(normalizedId)}/details`), {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          'ngrok-skip-browser-warning': 'true'
+        },
+        body: JSON.stringify(details)
+      });
+
+      if (response.status === 401) {
+        if (authService?.clearApiToken) {
+          authService.clearApiToken();
+        }
+        const parsed = await parseErrorMessage(
+          response,
+          'Sessão de administrador expirada. Faça login novamente para atualizar a inscrição.'
+        );
+        throw buildAuthRequiredError(parsed?.message);
+      }
+
+      if (response.status === 403) {
+        const parsed = await parseErrorMessage(
+          response,
+          'Apenas administradores podem atualizar inscrições.'
+        );
+        throw buildForbiddenError(parsed?.message);
+      }
+
+      if (!response.ok) {
+        throw await buildHttpError(response, 'Falha ao atualizar inscrição.');
+      }
+
+      return response.json();
+    } catch (error) {
+      if (error?.code === 'AUTH_REQUIRED' || error?.code === 'FORBIDDEN') {
+        throw error;
+      }
+      if (isNetworkError(error) || isUnavailableHttpError(error)) {
+        throw new Error(DEFAULT_NETWORK_ERROR_MESSAGE);
+      }
+      throw error;
+    }
+  },
+
   getSyncDiagnostics: () => (safeReadSyncDiagnostics() || {
     successCount: 0,
     failureCount: 0,
@@ -625,3 +734,63 @@ export const publicRegistrationService = {
   })
 };
 
+// Iniciamos o background sync automaticamente com Exponential Backoff
+let syncTimer = null;
+let currentDelay = 15000;
+const MAX_DELAY = 120000; // Máximo de 2 minutos
+const INITIAL_DELAY = 15000;
+
+const scheduleNextSync = (success) => {
+  if (typeof window === 'undefined') return;
+  if (syncTimer) clearTimeout(syncTimer);
+
+  if (success) {
+    currentDelay = INITIAL_DELAY;
+  } else {
+    currentDelay = Math.min(currentDelay * 2, MAX_DELAY);
+  }
+
+  syncTimer = setTimeout(async () => {
+    if (navigator.onLine) {
+      const pending = readPendingRegistrations();
+      if (pending.length > 0) {
+        try {
+          const result = await flushPendingRegistrations();
+          scheduleNextSync(result.synced > 0 && result.pending.length === 0);
+        } catch {
+          scheduleNextSync(false);
+        }
+      } else {
+        // Nada pendente, reseta o delay e tenta depois do delay inicial
+        scheduleNextSync(true);
+      }
+    } else {
+      scheduleNextSync(false);
+    }
+  }, currentDelay);
+};
+
+const startBackgroundSync = () => {
+  if (typeof window === 'undefined') return;
+  
+  scheduleNextSync(true);
+
+  // Forçar uma tentativa imediata ao voltar a ficar online
+  window.addEventListener('online', async () => {
+    if (syncTimer) clearTimeout(syncTimer);
+    currentDelay = INITIAL_DELAY; // Reseta delay ao voltar online
+    const pending = readPendingRegistrations();
+    if (pending.length > 0) {
+      try {
+        const result = await flushPendingRegistrations();
+        scheduleNextSync(result.synced > 0 && result.pending.length === 0);
+      } catch {
+        scheduleNextSync(false);
+      }
+    } else {
+      scheduleNextSync(true);
+    }
+  });
+};
+
+startBackgroundSync();

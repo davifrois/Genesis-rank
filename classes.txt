@@ -1,0 +1,217 @@
+event-card
+event-card__poster
+event-card__poster-placeholder
+event-card__header
+event-name
+table-meta
+event-card__stats
+event-stat
+event-card__footer
+btn btn-ghost
+admin-shell
+sidebar-backdrop
+admin-sidebar__header
+admin-sidebar__title
+admin-sidebar__nav
+sidebar-link__label
+sidebar-link__meta
+admin-sidebar__card
+sidebar-stat
+btn btn-primary
+admin-main
+admin-hero
+meta-pill
+hero-title
+hero-subtitle
+hero-meta
+hero-actions
+hero-actions__buttons
+btn btn-ghost mobile-only
+hero-info-card
+hero-info-meta
+stats-grid
+stat-card stat-card--focus
+stat-card__icon
+stat-card__value
+stat-card__label
+stat-card__trend
+stat-card stat-card--secondary
+panel
+panel-header
+panel-title
+panel-subtitle
+panel-actions
+event-grid
+btn btn-secondary
+table-meta table-meta--tight
+login-error
+news-admin-grid
+news-admin-form
+form-grid
+input
+news-admin-form__image-actions
+news-admin-file-input
+table-meta table-meta--tight news-admin-form__image-file
+news-admin-form__image-preview
+news-admin-form__image-preview-frame
+form-actions
+news-admin-list
+news-admin-card
+news-admin-card__cover
+news-card__meta
+news-admin-card__footer
+btn btn-danger
+tag tag--warning
+search-input
+input select-compact
+table-meta table-meta--tight registration-sync-monitor
+registration-event-groups
+registration-event-group
+registration-event-group__head
+table-name
+tag
+table-scroll
+data-table
+athlete-photo-cell
+athlete-photo
+athlete-photo-empty
+registration-proof-preview
+registration-proof-thumb
+registration-proof-thumb registration-proof-thumb--pdf
+registration-proof-thumb registration-proof-thumb--placeholder
+text-link
+registration-pipeline-cell
+registration-pipeline
+registration-status-actions
+btn btn-ghost registration-status-btn
+registration-review-meta
+table-meta table-meta--tight registration-sync-error
+bracket-workspace
+bracket-workspace__header
+bracket-workspace__title
+bracket-workspace__stats
+tag bracket-tag--applied
+bracket-workspace__controls
+bracket-workspace__filter-group
+bracket-section-title
+bracket-workspace__filter-pills
+bracket-workspace__grid
+bracket-workspace__panel
+bracket-workspace__panel-header
+bracket-workspace__list
+bracket-workspace__item
+bracket-workspace__item-main
+bracket-workspace__item-meta
+bracket-workspace__academy-list
+bracket-workspace__academy-row
+bracket-workspace__academy-name
+bracket-workspace__academy-stats
+bracket-toolbar
+bracket-list
+bracket-card__header
+bracket-number
+bracket-tags
+bracket-card__meta
+bracket-grid
+bracket-matches
+bracket-match
+bracket-seed
+bracket-seed__name
+bracket-seed__academy
+bracket-vs
+bracket-match__index
+bracket-seed-editor
+bracket-seed-editor__list
+bracket-seed-editor__index
+bracket-seed-editor__name
+bracket-seed-editor__academy
+bracket-podium
+bracket-field
+input bracket-select
+btn btn-primary bracket-apply
+bracket-schedule
+bracket-schedule__controls schedule-manual-form
+input bracket-schedule-input
+bracket-schedule__header-actions
+bracket-schedule__stats
+schedule-manual-list
+schedule-manual-item
+schedule-manual-item__header
+schedule-manual-item__grid
+schedule-manual-item__footer
+schedule-manual-item__actions
+panel-content
+bracket-event-selector
+bracket-schedule__list
+bracket-schedule__row schedule-row
+schedule-row__drag
+schedule-row__time
+schedule-row__content
+schedule-row__actions
+tag tag-button
+mini-chart
+mini-chart__bar
+mini-chart__label
+view-toggle
+points-col
+points-pill
+row-actions
+points-editor
+action-btn action-btn--set
+action-btn action-btn--reset
+action-btn action-btn--podium
+action-btn action-btn--podium-silver
+action-btn action-btn--podium-bronze
+action-btn action-btn--danger
+card-grid
+athlete-card
+athlete-card__header
+athlete-card__identity
+athlete-photo athlete-photo--card
+athlete-photo-empty athlete-photo-empty--card
+athlete-card__actions
+athletes-pagination
+athletes-pagination__controls
+athletes-pagination__label
+btn btn-secondary btn-event btn-event--small
+import-panel import-panel--admin
+import-actions
+import-button
+import-debug
+import-debug__title
+action-grid
+action-card
+action-card__footer
+shortcut-list
+shortcut-pill
+activity-list
+activity-item
+activity-time
+panel-users-list
+panel-user-item
+panel-user-item__meta
+panel-user-item__actions
+btn-icon
+btn-icon btn-icon--danger
+mobile-quickbar mobile-only
+mobile-quickbar__btn
+mobile-quickbar__btn mobile-quickbar__btn--primary
+modal-backdrop
+modal-card
+modal-panel modal-panel--wide bracket-tv-mode
+modal-header
+modal-title
+bracket-tv-mode__stats
+bracket-tv-mode__list
+bracket-tv-mode__time
+bracket-tv-mode__content
+modal-panel modal-panel--wide
+modal-panel
+event-ocr-actions
+btn btn-secondary btn-sm
+checkbox-inline
+event-assign-toolbar
+event-assign-list
+event-assign-item
+event-assign-name
+login-success

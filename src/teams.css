@@ -1,0 +1,482 @@
+/* Teams Showcase & Team Profile */
+
+/* TEAMS LIST PAGE */
+.teams-page {
+  padding-bottom: 4rem;
+}
+
+.teams-hero {
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  padding: 4rem 0;
+  border-bottom: 1px solid #334155;
+}
+
+.teams-hero__inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 2rem;
+}
+
+.teams-hero__content {
+  flex: 1;
+  min-width: 300px;
+}
+
+.teams-hero h1 {
+  font-size: 2.5rem;
+  color: #f8fafc;
+  margin-bottom: 0.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.teams-hero p {
+  color: #cbd5e1;
+  font-size: 1.1rem;
+  margin-bottom: 2rem;
+  max-width: 600px;
+}
+
+.teams-search {
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 0 1rem;
+  max-width: 400px;
+  transition: border-color 0.2s;
+}
+
+.teams-search:focus-within {
+  border-color: #3b82f6;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.teams-search svg {
+  color: #94a3b8;
+}
+
+.teams-search input {
+  background: transparent;
+  border: none;
+  padding: 0.8rem 1rem;
+  color: #fff;
+  width: 100%;
+  outline: none;
+}
+
+.teams-search input::placeholder {
+  color: #94a3b8;
+}
+
+.teams-hero__actions .btn {
+  padding: 0.8rem 1.5rem;
+}
+
+.teams-grid-container {
+  margin-top: -2rem;
+  position: relative;
+  z-index: 10;
+}
+
+.teams-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.team-card {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
+}
+
+.team-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
+  border-color: #cbd5e1;
+}
+
+.team-card__header {
+  height: 120px;
+  background: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid #e2e8f0;
+  position: relative;
+}
+
+.team-card__logo {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+  background: #fff;
+  border-radius: 50%;
+  padding: 4px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+  position: absolute;
+  bottom: -40px;
+  border: 1px solid #e2e8f0;
+}
+
+.team-card__logo-placeholder {
+  width: 80px;
+  height: 80px;
+  background: #3b82f6;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  position: absolute;
+  bottom: -40px;
+  border: 4px solid #fff;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+}
+
+.team-card__body {
+  padding: 3rem 1.5rem 1.5rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.team-card__name {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 0.5rem;
+  text-align: center;
+}
+
+.team-card__location {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  color: #64748b;
+  font-size: 0.85rem;
+  margin-bottom: 1.5rem;
+}
+
+.team-card__footer {
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #3b82f6;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.teams-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 4rem 2rem;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.teams-empty-icon {
+  color: #94a3b8;
+  margin-bottom: 1rem;
+}
+
+.teams-empty h2 {
+  font-size: 1.5rem;
+  color: #1e293b;
+  margin-bottom: 0.5rem;
+}
+
+.teams-empty p {
+  color: #64748b;
+}
+
+/* TEAM PROFILE PAGE */
+.team-profile-page {
+  padding-bottom: 4rem;
+}
+
+.tp-hero {
+  position: relative;
+  background-size: cover;
+  background-position: center;
+  padding: 3rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.tp-back-btn {
+  margin-bottom: 2rem;
+}
+
+.tp-hero__main {
+  display: flex;
+  align-items: flex-end;
+  gap: 2rem;
+}
+
+.tp-hero__logo-wrapper {
+  flex-shrink: 0;
+}
+
+.tp-hero__logo {
+  width: 140px;
+  height: 140px;
+  object-fit: contain;
+  background: #fff;
+  border-radius: 16px;
+  padding: 8px;
+  box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+  border: 2px solid rgba(255,255,255,0.8);
+}
+
+.tp-hero__logo-placeholder {
+  width: 140px;
+  height: 140px;
+  background: #1e293b;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: #fff;
+  border: 2px solid rgba(255,255,255,0.8);
+  box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+}
+
+.tp-hero__info {
+  flex: 1;
+}
+
+.tp-hero__name {
+  font-size: 2.5rem;
+  font-weight: 800;
+  margin-bottom: 0.5rem;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+
+.tp-hero__meta {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.tp-hero__meta-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+  color: #e2e8f0;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+
+.tp-content {
+  margin-top: 2rem;
+}
+
+.tp-grid {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 2rem;
+}
+
+.tp-card {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+
+.tp-card__header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #f1f5f9;
+  background: #f8fafc;
+}
+
+.tp-card__header h2 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.tp-card__body {
+  padding: 1.5rem;
+}
+
+.tp-about-text {
+  color: #475569;
+  line-height: 1.6;
+  font-size: 0.95rem;
+  margin-bottom: 1.5rem;
+  white-space: pre-line;
+}
+
+.tp-empty-text {
+  color: #94a3b8;
+  font-style: italic;
+  font-size: 0.95rem;
+  margin-bottom: 1.5rem;
+}
+
+.tp-contact-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 1.5rem;
+}
+
+.tp-contact-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #475569;
+  font-size: 0.9rem;
+}
+
+.tp-contact-item svg {
+  color: #94a3b8;
+}
+
+.tp-contact-item a {
+  color: #3b82f6;
+  text-decoration: none;
+}
+
+.tp-contact-item a:hover {
+  text-decoration: underline;
+}
+
+.tp-students-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+.tp-student-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.tp-student-card:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.tp-student-card--prof {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.tp-student-card__photo {
+  flex-shrink: 0;
+}
+
+.tp-student-card__photo img {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.tp-student-card__initials {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.tp-student-card__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.tp-student-card__name {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 0.25rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tp-student-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.tp-student-card__belt {
+  font-weight: 700;
+}
+
+.tp-empty-students {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #64748b;
+}
+
+.tp-empty-icon {
+  color: #cbd5e1;
+  margin-bottom: 1rem;
+}
+
+.tp-empty-students h3 {
+  color: #334155;
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+}
+
+@media (max-width: 768px) {
+  .tp-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .tp-hero__main {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  
+  .tp-hero__meta {
+    justify-content: center;
+  }
+}

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Image, Lock, Save, ShieldCheck, UserRound } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import LoginOverlay from '../components/LoginOverlay';
 import { useStore } from '../hooks/useStore';
 import { useI18n } from '../hooks/useI18n';
@@ -11,6 +12,8 @@ import {
   buildPublicProfileSnapshot,
   encodePublicProfileSnapshot
 } from '../utils/profileShare';
+import { compressImage } from '../utils/imageUtils';
+import PublicProfile from './PublicProfile';
 
 const BELT_OPTIONS = ['Branca', 'Cinza', 'Amarela', 'Laranja', 'Verde', 'Azul', 'Roxa', 'Marrom', 'Preta'];
 
@@ -38,14 +41,7 @@ const createForm = () => ({
   beltHistory: ''
 });
 
-const fileToDataUrl = (file) => (
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
-    reader.onerror = () => reject(new Error('Falha ao ler o arquivo.'));
-    reader.readAsDataURL(file);
-  })
-);
+const fileToDataUrl = (file) => compressImage(file, 800, 800, 0.7);
 
 const copyTextToClipboard = async (value) => {
   const text = (value || '').toString();
@@ -554,14 +550,28 @@ const MyAccount = () => {
     return <LoginOverlay redirectTo="/minha-conta" />;
   }
 
+  const previewProfile = currentProfile || {
+    id: currentUser?.id || `temp-${Date.now()}`,
+    fullName: buildFullName(form.firstName, form.middleName, form.lastName) || currentUser?.name || 'Atleta Genesis',
+    academyName: selectedAcademy?.name || 'Sem academia',
+    belt: form.belt || '',
+    weight: form.weight || '',
+    country: form.country || 'Brasil',
+    city: form.city || '',
+    age: age === '' ? '' : age,
+    photoUrl: form.photoUrl || '',
+    coverUrl: form.coverUrl || '',
+    modality: 'Jiu-Jitsu (BJJ)',
+  };
+
   return (
     <div className="public-page profile-page profile-page--account profile-settings-page">
       <section className="profile-header">
         <div>
           <span className="section-kicker">Conta</span>
-          <h1 className="profile-title">Configuracoes de perfil</h1>
+          <h1 className="profile-title">Meu Perfil</h1>
           <p className="profile-subtitle">
-            Atualize os dados do atleta para inscricao automatica, categoria correta e comunicacao oficial.
+            Visualize os dados do seu perfil publico que os outros verao.
           </p>
         </div>
         <div className="profile-settings-toolbar">
@@ -571,319 +581,24 @@ const MyAccount = () => {
           <button type="button" className="btn btn-secondary profile-settings-toolbar__btn" onClick={handleShareProfile}>
             Compartilhar dados do usuario
           </button>
+          <Link to="/configuracoes" className="btn btn-secondary profile-settings-toolbar__btn">
+            Editar configurações
+          </Link>
+          {(currentUser?.role === 'coach' || currentUser?.role === 'professor') && (
+            <Link to="/gerente-treinador" className="btn btn-secondary profile-settings-toolbar__btn" style={{ borderColor: 'var(--brand-primary)', color: 'var(--brand-primary)' }}>
+              Gerente de treinador
+            </Link>
+          )}
         </div>
         {shareError && <div className="login-error profile-share-feedback"><p>{shareError}</p></div>}
         {shareSuccess && <div className="profile-success profile-share-feedback">{shareSuccess}</div>}
       </section>
 
-      <section className="profile-settings-layout">
-        <form className="profile-settings-main" onSubmit={handleSubmit}>
-          <article className="profile-card profile-card--dark">
-            <div className="profile-card__header profile-card__header--dark">
-              <h2>Detalhes do atleta</h2>
-            </div>
-            <div className="profile-card__body">
-              <p className="profile-note profile-note--dark">
-                Nome, faixa, genero e data de nascimento sao usados automaticamente na inscricao.
-              </p>
-              <div className="profile-fields">
-                <div className="profile-field">
-                  <label>Usuario de acesso</label>
-                  <input className="profile-input profile-input--dark" value={currentUser.username || ''} readOnly />
-                </div>
-                <div className="profile-field">
-                  <label>Perfil de acesso</label>
-                  <input className="profile-input profile-input--dark" value={currentUser.role || ''} readOnly />
-                </div>
-                <div className="profile-field">
-                  <label>Primeiro nome *</label>
-                  <input className="profile-input profile-input--dark" value={form.firstName} onChange={(event) => setForm((previous) => ({ ...previous, firstName: event.target.value }))} />
-                </div>
-                <div className="profile-field">
-                  <label>Nome do meio</label>
-                  <input className="profile-input profile-input--dark" value={form.middleName} onChange={(event) => setForm((previous) => ({ ...previous, middleName: event.target.value }))} />
-                </div>
-                <div className="profile-field">
-                  <label>Sobrenome *</label>
-                  <input className="profile-input profile-input--dark" value={form.lastName} onChange={(event) => setForm((previous) => ({ ...previous, lastName: event.target.value }))} />
-                </div>
-                <div className="profile-field">
-                  <label>E-mail *</label>
-                  <input className="profile-input profile-input--dark" type="email" value={form.email} onChange={(event) => setForm((previous) => ({ ...previous, email: event.target.value }))} />
-                </div>
-                <div className="profile-field">
-                  <label>Data de nascimento</label>
-                  <input className="profile-input profile-input--dark" type="date" value={form.birthDate} onChange={(event) => setForm((previous) => ({ ...previous, birthDate: event.target.value }))} />
-                </div>
-                <div className="profile-field">
-                  <label>Idade do ano</label>
-                  <input className="profile-input profile-input--dark" value={age === '' ? '' : String(age)} readOnly />
-                </div>
-                <div className="profile-field">
-                  <label>Genero *</label>
-                  <select className="profile-input profile-input--dark" value={form.gender} onChange={(event) => setForm((previous) => ({ ...previous, gender: event.target.value }))}>
-                    <option value="">Selecione o genero</option>
-                    <option value="Masculino">Masculino</option>
-                    <option value="Feminino">Feminino</option>
-                  </select>
-                </div>
-                <div className="profile-field">
-                  <label>Idioma preferido</label>
-                  <select className="profile-input profile-input--dark" value={form.languagePreference} onChange={(event) => setForm((previous) => ({ ...previous, languagePreference: event.target.value }))}>
-                    <option value="pt-BR">Portugues (Brasil)</option>
-                    <option value="en-US">English</option>
-                    <option value="es-ES">Espanol</option>
-                    <option value="fr-FR">Francais</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          </article>
+      <div className="profile-preview-wrapper" style={{ marginBottom: '40px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #1f2937' }}>
+        <PublicProfile profileOverride={previewProfile} isPreview={true} />
+      </div>
 
-          <article className="profile-card profile-card--dark">
-            <div className="profile-card__header profile-card__header--dark"><h2>Seguranca da conta</h2></div>
-            <div className="profile-card__body">
-              <p className="profile-note profile-note--dark">
-                Defina uma senha forte com no minimo 8 caracteres, letra maiuscula, minuscula, numero e simbolo.
-              </p>
-              <div className="profile-fields">
-                <div className="profile-field">
-                  <label>Nova senha</label>
-                  <input
-                    className="profile-input profile-input--dark"
-                    type="password"
-                    minLength={8}
-                    value={accountPassword}
-                    onChange={(event) => setAccountPassword(event.target.value)}
-                    placeholder="********"
-                  />
-                  {accountPassword && (
-                    <small className={`password-strength password-strength--${accountPasswordStrength.level}`}>
-                      {accountPasswordStrength.message}
-                    </small>
-                  )}
-                </div>
-                <div className="profile-field">
-                  <label>Confirmar nova senha</label>
-                  <input
-                    className="profile-input profile-input--dark"
-                    type="password"
-                    minLength={8}
-                    value={accountPasswordConfirm}
-                    onChange={(event) => setAccountPasswordConfirm(event.target.value)}
-                    placeholder="********"
-                  />
-                </div>
-              </div>
-              {passwordError && <div className="login-error"><p>{passwordError}</p></div>}
-              {passwordSuccess && <div className="profile-success"><p>{passwordSuccess}</p></div>}
-              <div className="profile-actions-row">
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={handleUpdatePassword}
-                  disabled={passwordLoading || !accountPasswordStrength.isStrong || accountPassword !== accountPasswordConfirm}
-                >
-                  <Lock size={14} />
-                  Atualizar senha
-                </button>
-              </div>
-            </div>
-          </article>
 
-          <article className="profile-card profile-card--dark">
-            <div className="profile-card__header profile-card__header--dark"><h2>Contato e residencia</h2></div>
-            <div className="profile-card__body">
-              <div className="profile-fields">
-                <div className="profile-field">
-                  <label>Telefone / WhatsApp</label>
-                  <input className="profile-input profile-input--dark" type="tel" inputMode="numeric" autoComplete="tel-national" value={form.phone} onChange={(event) => setForm((previous) => ({ ...previous, phone: formatBrazilPhone(event.target.value) }))} />
-                </div>
-                <div className="profile-field">
-                  <label>CEP</label>
-                  <input className="profile-input profile-input--dark" value={form.postalCode} onChange={(event) => setForm((previous) => ({ ...previous, postalCode: event.target.value }))} />
-                </div>
-                <div className="profile-field profile-field--full">
-                  <label>Endereco</label>
-                  <input className="profile-input profile-input--dark" value={form.address} onChange={(event) => setForm((previous) => ({ ...previous, address: event.target.value }))} />
-                </div>
-                <div className="profile-field">
-                  <label>Cidade</label>
-                  <input className="profile-input profile-input--dark" value={form.city} onChange={(event) => setForm((previous) => ({ ...previous, city: event.target.value }))} />
-                </div>
-                <div className="profile-field">
-                  <label>Estado / provincia</label>
-                  <input className="profile-input profile-input--dark" value={form.state} onChange={(event) => setForm((previous) => ({ ...previous, state: event.target.value }))} />
-                </div>
-                <div className="profile-field">
-                  <label>Pais</label>
-                  <input className="profile-input profile-input--dark" value={form.country} onChange={(event) => setForm((previous) => ({ ...previous, country: event.target.value }))} />
-                </div>
-                <div className="profile-field">
-                  <label>Nacionalidade</label>
-                  <input className="profile-input profile-input--dark" value={form.nationality} onChange={(event) => setForm((previous) => ({ ...previous, nationality: event.target.value }))} />
-                </div>
-              </div>
-            </div>
-          </article>
-
-          <article className="profile-card profile-card--dark">
-            <div className="profile-card__header profile-card__header--dark"><h2>Academia vinculada</h2></div>
-            <div className="profile-card__body">
-              <div className="profile-fields profile-fields--single">
-                <div className="profile-field">
-                  <label>Academia *</label>
-                  <select className="profile-input profile-input--dark" value={form.academyId} onChange={(event) => setForm((previous) => ({ ...previous, academyId: event.target.value }))}>
-                    <option value="">Selecione a academia</option>
-                    {academies.map((academy) => (
-                      <option value={academy.id} key={academy.id}>{academy.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-          </article>
-
-          <article className="profile-card profile-card--dark">
-            <div className="profile-card__header profile-card__header--dark"><h2>Perfil publico</h2></div>
-            <div className="profile-card__body">
-              <label className="profile-switch">
-                <input type="checkbox" checked={!form.publicProfile} onChange={(event) => setForm((previous) => ({ ...previous, publicProfile: !event.target.checked }))} />
-                <span>{form.publicProfile ? 'Exibir perfil publico' : 'Ocultar perfil publico'}</span>
-              </label>
-            </div>
-          </article>
-
-          <article className="profile-card profile-card--dark">
-            <div className="profile-card__header profile-card__header--dark"><h2>Imagem de perfil e capa</h2></div>
-            <div className="profile-card__body">
-              <div className="profile-upload-grid">
-                <div className="profile-upload-panel">
-                  <label>URL da foto de perfil</label>
-                  <input className="profile-input profile-input--dark" value={form.photoUrl} onChange={(event) => setForm((previous) => ({ ...previous, photoUrl: event.target.value }))} placeholder="https://..." />
-                  <div className="profile-upload-row">
-                    <label className="profile-file-btn">
-                      <Image size={14} />
-                      Selecionar foto
-                      <input type="file" accept="image/*" onChange={handleImageFile('photoUrl')} />
-                    </label>
-                    {form.photoUrl && (
-                      <div className="profile-image-preview profile-image-preview--athlete">
-                        <img src={form.photoUrl} alt={buildFullName(form.firstName, form.middleName, form.lastName) || 'Atleta'} />
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="profile-upload-panel">
-                  <label>URL da imagem de capa</label>
-                  <input className="profile-input profile-input--dark" value={form.coverUrl} onChange={(event) => setForm((previous) => ({ ...previous, coverUrl: event.target.value }))} placeholder="https://..." />
-                  <div className="profile-upload-row">
-                    <label className="profile-file-btn">
-                      <Image size={14} />
-                      Selecionar capa
-                      <input type="file" accept="image/*" onChange={handleImageFile('coverUrl')} />
-                    </label>
-                  </div>
-                  {form.coverUrl && (
-                    <div className="profile-cover-preview">
-                      <img src={form.coverUrl} alt="Capa" />
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </article>
-
-          <article className="profile-card profile-card--dark">
-            <div className="profile-card__header profile-card__header--dark"><h2>Faixa e historico tecnico</h2></div>
-            <div className="profile-card__body">
-              <div className="profile-fields">
-                <div className="profile-field">
-                  <label>Faixa atual</label>
-                  <select className="profile-input profile-input--dark" value={form.belt} onChange={(event) => setForm((previous) => ({ ...previous, belt: event.target.value }))}>
-                    <option value="">Selecione a faixa</option>
-                    {BELT_OPTIONS.map((belt) => (
-                      <option key={belt} value={belt}>{belt}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="profile-field">
-                  <label>Peso / divisao</label>
-                  <input className="profile-input profile-input--dark" value={form.weight} onChange={(event) => setForm((previous) => ({ ...previous, weight: event.target.value }))} />
-                </div>
-                <div className="profile-field profile-field--full">
-                  <label>Historico de faixa</label>
-                  <textarea className="profile-input profile-input--dark profile-textarea" value={form.beltHistory} onChange={(event) => setForm((previous) => ({ ...previous, beltHistory: event.target.value }))} placeholder="Ex: Azul (2023), Roxa (2025)." rows={3} />
-                </div>
-              </div>
-            </div>
-          </article>
-
-          {error && <div className="login-error"><p>{error}</p></div>}
-          {success && <div className="profile-success">{success}</div>}
-
-          <div className="profile-actions-row">
-            <button type="submit" className="btn btn-primary">
-              <Save size={14} />
-              Salvar alteracoes
-            </button>
-            <button type="button" className="btn btn-secondary" onClick={handleReset}>
-              <UserRound size={14} />
-              Restaurar dados
-            </button>
-          </div>
-        </form>
-
-        <aside className="profile-settings-side">
-          <article className="profile-card profile-card--dark">
-            <div className="profile-card__header profile-card__header--dark"><h2>Resumo da conta</h2></div>
-            <div className="profile-card__body">
-              <div className="profile-summary-list">
-                <div className="profile-summary-item">
-                  <span>Nome completo</span>
-                  <strong>{buildFullName(form.firstName, form.middleName, form.lastName) || '-'}</strong>
-                </div>
-                <div className="profile-summary-item">
-                  <span>Academia</span>
-                  <strong>{selectedAcademy?.name || 'Sem academia vinculada'}</strong>
-                </div>
-                <div className="profile-summary-item">
-                  <span>Faixa</span>
-                  <strong>{form.belt || '-'}</strong>
-                </div>
-                <div className="profile-summary-item">
-                  <span>Visibilidade</span>
-                  <strong>{form.publicProfile ? 'Publico' : 'Oculto'}</strong>
-                </div>
-                <div className="profile-summary-item">
-                  <span>E-mail</span>
-                  <strong>{form.email || '-'}</strong>
-                </div>
-              </div>
-            </div>
-          </article>
-
-          <article className="profile-card profile-card--dark">
-            <div className="profile-card__header profile-card__header--dark"><h2>Zona de risco</h2></div>
-            <div className="profile-card__body">
-              <p className="profile-note profile-note--dark">
-                Esta acao remove seu perfil de atleta da base de filiacao.
-              </p>
-              <button type="button" className="btn btn-secondary profile-danger-btn" onClick={handleRemoveProfile} disabled={!currentProfile?.id}>
-                <AlertTriangle size={14} />
-                Remover perfil de atleta
-              </button>
-              {!currentProfile?.id && (
-                <p className="profile-danger-help">
-                  <ShieldCheck size={14} />
-                  Nenhum perfil salvo para remover.
-                </p>
-              )}
-            </div>
-          </article>
-        </aside>
-      </section>
     </div>
   );
 };

@@ -10,8 +10,12 @@ public class BracketRequest {
   private String categoryKey;
   private String label;
   private String mode;
+  private String format;
   private Integer size;
+  private Boolean isPublished;
   private List<String> seedIds = new ArrayList<>();
+  private List<String> walkovers = new ArrayList<>();
+  private List<BracketLiveMatchDto> liveMatches = new ArrayList<>();
   private PodiumDto podium;
   private String appliedAt;
 
@@ -63,6 +67,14 @@ public class BracketRequest {
     this.mode = mode;
   }
 
+  public String getFormat() {
+    return format;
+  }
+
+  public void setFormat(String format) {
+    this.format = format;
+  }
+
   public Integer getSize() {
     return size;
   }
@@ -71,12 +83,36 @@ public class BracketRequest {
     this.size = size;
   }
 
+  public Boolean getIsPublished() {
+    return isPublished;
+  }
+
+  public void setIsPublished(Boolean isPublished) {
+    this.isPublished = isPublished;
+  }
+
   public List<String> getSeedIds() {
     return seedIds;
   }
 
   public void setSeedIds(List<String> seedIds) {
     this.seedIds = seedIds;
+  }
+
+  public List<String> getWalkovers() {
+    return walkovers;
+  }
+
+  public void setWalkovers(List<String> walkovers) {
+    this.walkovers = walkovers;
+  }
+
+  public List<BracketLiveMatchDto> getLiveMatches() {
+    return liveMatches;
+  }
+
+  public void setLiveMatches(List<BracketLiveMatchDto> liveMatches) {
+    this.liveMatches = liveMatches;
   }
 
   public PodiumDto getPodium() {

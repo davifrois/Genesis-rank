@@ -309,6 +309,47 @@ const Home = () => {
   ), [news]);
   return (
     <div className="public-page">
+      <section style={{ 
+          position: 'relative', 
+          width: '100vw', 
+          minHeight: '85vh', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          backgroundImage: `url('/hero-bg.jpg.jpeg')`, 
+          backgroundSize: 'cover', 
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          marginLeft: 'calc(-50vw + 50%)',
+          marginRight: 'calc(-50vw + 50%)',
+          marginTop: '-120px', // Pull up to cover the header gap
+          paddingTop: '80px', // Push content back down slightly
+          paddingBottom: '40px',
+          paddingLeft: '1rem',
+          paddingRight: '1rem'
+      }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.75)' }} />
+        
+        <div style={{ position: 'relative', zIndex: 1, padding: '2rem', maxWidth: '1200px', width: '100%' }}>
+          <div style={{ textAlign: 'left', maxWidth: '800px' }}>
+            <h1 style={{ fontSize: '3.5rem', fontWeight: '800', lineHeight: '1.2', marginBottom: '1.5rem', color: '#ffffff' }}>
+              Impulsionamos a performance dos maiores atletas e a infraestrutura dos eventos que movem o mundo.
+            </h1>
+            <p style={{ fontSize: '1.25rem', color: 'rgba(255,255,255,0.9)', marginBottom: '2.5rem', fontWeight: '400' }}>
+              Campeonatos e ranking em um único ambiente oficial.
+            </p>
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+              <Link to="/eventos" style={{ backgroundColor: '#2563eb', color: '#fff', padding: '0.875rem 2rem', borderRadius: '50px', fontWeight: '600', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', transition: 'background-color 0.2s', border: '1px solid #2563eb' }}>
+                Procurar evento
+              </Link>
+              <Link to="/painel" style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)', backdropFilter: 'blur(8px)', color: '#fff', padding: '0.875rem 2rem', borderRadius: '50px', fontWeight: '600', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', transition: 'background-color 0.2s', border: '1px solid rgba(255,255,255,0.3)' }}>
+                Criar evento
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="public-section championships-main">
         <div className="section-heading championships-main__header championships-main__header--minimal">
           <h1 className="championships-main__minimal-title">{copy.eventsKicker}</h1>
@@ -324,64 +365,57 @@ const Home = () => {
               const countdown = resolveCountdownLabel(daysOffset, copy);
 
               return (
-                <article className="championship-main-card" key={event.id}>
-                  <div className="championship-main-card__poster">
+                <article className="championship-main-card" key={event.id} style={{ position: 'relative', overflow: 'hidden', height: 'auto', backgroundColor: '#fff' }}>
+                  <div className="championship-main-card__poster" style={{ position: 'relative', height: '180px', flex: '0 0 180px' }}>
                     {event.posterUrl ? (
-                      <img src={event.posterUrl} alt={event.name || copy.eventFallback} loading="lazy" />
+                      <img src={event.posterUrl} alt={event.name || copy.eventFallback} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (
-                      <div className="championship-main-card__fallback">
+                      <div className="championship-main-card__fallback" style={{ height: '100%', backgroundColor: '#1e40af' }}>
                         <span>{event.name || copy.eventFallback}</span>
                       </div>
                     )}
-                  </div>
-                  <div className="championship-main-card__body">
-                    <div className="championship-main-card__badges">
-                      <span className={`championship-main-card__status ${isRegistrationOpen ? 'is-open' : 'is-closed'}`}>
-                        {isRegistrationOpen ? copy.soon : copy.closedEvent}
+                    
+                    {/* Blue gradient overlay with big Date/Location */}
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(to bottom, rgba(30, 64, 175, 0.8) 0%, rgba(30, 64, 175, 0.1) 100%)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', padding: '1rem', color: 'white' }}>
+                      <span style={{ fontSize: '1.8rem', fontWeight: '800', lineHeight: '1', textTransform: 'uppercase', textShadow: '1px 1px 3px rgba(0,0,0,0.3)' }}>
+                        {new Date(event.parsedDate || event.date).toLocaleDateString(locale, { month: 'long' }).replace('.', '')} {new Date(event.parsedDate || event.date).getDate() || ''}
+                      </span>
+                      <span style={{ fontSize: '1.4rem', fontWeight: '700', lineHeight: '1.2', textTransform: 'uppercase', opacity: 0.95, textShadow: '1px 1px 3px rgba(0,0,0,0.3)' }}>
+                        {eventLocation.split(',')[0]}
                       </span>
                     </div>
-                    <h3 className="championship-main-card__title">{event.name || copy.eventFallback}</h3>
-                    <span className="championship-main-card__location">
-                      <MapPin size={14} />
-                      {eventLocation}
-                    </span>
-                    <div className="championship-main-card__meta">
-                      <span>
-                        <Calendar size={14} />
-                        {eventDate}
+
+                    {/* Badge de Lote Atual (Canto Superior Direito) */}
+                    <div style={{ position: 'absolute', top: '10px', right: '10px', backgroundColor: 'rgba(71, 85, 105, 0.85)', color: '#fff', padding: '0.3rem 0.6rem', borderRadius: '4px', display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: '1.2', zIndex: 2 }}>
+                      <span style={{ fontSize: '0.55rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Lote Atual</span>
+                      <span style={{ fontSize: '0.8rem', fontWeight: '800' }}>
+                        R$ {event.feeOver15 ? parseFloat(event.feeOver15).toFixed(2).replace('.', ',') : 'Consulte'}
                       </span>
-                      {countdown && <span className="championship-main-card__meta-countdown">{countdown}</span>}
                     </div>
-                    {event.internalRegistration ? (
-                      <Link
-                        className={`btn ${isRegistrationOpen ? 'btn-event' : 'btn-secondary btn-event--small'}`}
-                        to={`/eventos/${event.id}`}
-                        onClick={(clickEvent) => {
-                          if (!isRegistrationOpen) {
-                            clickEvent.preventDefault();
-                          }
-                        }}
-                        aria-disabled={!isRegistrationOpen}
-                      >
-                        {isRegistrationOpen ? copy.accessEvent : copy.closedEvent}
-                      </Link>
-                    ) : (
-                      <a
-                        className={`btn ${isRegistrationOpen ? 'btn-event' : 'btn-secondary btn-event--small'}`}
-                        href={event.registrationUrl || '#'}
-                        target={event.registrationUrl ? '_blank' : undefined}
-                        rel={event.registrationUrl ? 'noreferrer' : undefined}
-                        onClick={(clickEvent) => {
-                          if (!isRegistrationOpen || !event.registrationUrl) {
-                            clickEvent.preventDefault();
-                          }
-                        }}
-                        aria-disabled={!isRegistrationOpen || !event.registrationUrl}
-                      >
-                        {isRegistrationOpen ? copy.accessEvent : copy.closedEvent}
-                      </a>
-                    )}
                   </div>
+                  
+                  <div className="championship-main-card__body" style={{ padding: '1.2rem 1rem 1rem', display: 'flex', flexDirection: 'column', backgroundColor: '#fff' }}>
+                    <h3 className="championship-main-card__title" style={{ fontSize: '1rem', color: '#1e40af', fontWeight: '800', marginBottom: '0.5rem', textTransform: 'uppercase', lineHeight: '1.3' }}>
+                      {event.name || copy.eventFallback}
+                    </h3>
+                    
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '1rem', color: '#475569', fontSize: '0.8rem' }}>
+                      <span>🇧🇷</span>
+                      <span>{eventLocation}</span>
+                    </div>
+                    
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '0.8rem', color: '#94a3b8', fontSize: '0.75rem' }}>
+                      <span>{new Date(event.parsedDate || event.date).toLocaleDateString(locale, { month: 'long', day: 'numeric' })}</span>
+                      <span>{countdown}</span>
+                    </div>
+                  </div>
+                  
+                  {/* Clickable Overlay */}
+                  {event.internalRegistration ? (
+                    <Link to={`/eventos/${event.id}`} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10 }} aria-label={copy.accessEvent} />
+                  ) : (
+                    <a href={event.registrationUrl || '#'} target={event.registrationUrl ? '_blank' : undefined} rel={event.registrationUrl ? 'noreferrer' : undefined} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10 }} aria-label={copy.accessEvent} />
+                  )}
                 </article>
               );
             })

@@ -12,6 +12,7 @@ public interface EventRegistrationRepository extends JpaRepository<EventRegistra
   Optional<EventRegistration> findByClientRequestId(String clientRequestId);
   List<EventRegistration> findAllByOrderByCreatedAtDesc();
   List<EventRegistration> findByEvent_IdOrderByCreatedAtDesc(String eventId);
+  List<EventRegistration> findByEvent_Id(String eventId);
 
   @Query("select distinct er.email from EventRegistration er where er.email is not null and trim(er.email) <> ''")
   List<String> findDistinctAthleteEmails();

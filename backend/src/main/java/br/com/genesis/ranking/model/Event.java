@@ -4,6 +4,7 @@ import java.time.LocalDate;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
 
 @Entity
@@ -16,6 +17,19 @@ public class Event extends BaseEntity {
 
   @Column(length = 180)
   private String location;
+
+  @Column(columnDefinition = "boolean default false")
+  private Boolean accommodationEnabled = false;
+
+  @Column(length = 140)
+  private String accommodationTitle;
+
+  @Lob
+  @Column(name = "accommodation_description")
+  private String accommodationDescription;
+
+  @Column(length = 220)
+  private String accommodationSearchLocation;
 
   @Column(length = 600)
   private String posterUrl;
@@ -34,11 +48,26 @@ public class Event extends BaseEntity {
 
   private Double feeAbsolute;
 
-  @Column(nullable = false)
-  private boolean registrationOpen = true;
+  @Column(columnDefinition = "boolean default false")
+  private Boolean beltRegistrationEnabled = false;
 
-  @Column(nullable = false)
-  private boolean internalRegistration = true;
+  @Column(length = 140)
+  private String beltRegistrationTitle;
+
+  private Double beltRegistrationPrice;
+
+  @Column(length = 600)
+  private String beltRegistrationDescription;
+
+  @Lob
+  @Column(name = "batches_json")
+  private String batchesJson;
+
+  @Column(columnDefinition = "boolean default true")
+  private Boolean registrationOpen = true;
+
+  @Column(columnDefinition = "boolean default true")
+  private Boolean internalRegistration = true;
 
   public String getName() {
     return name;
@@ -62,6 +91,38 @@ public class Event extends BaseEntity {
 
   public void setLocation(String location) {
     this.location = location;
+  }
+
+  public boolean isAccommodationEnabled() {
+    return accommodationEnabled != null ? accommodationEnabled : false;
+  }
+
+  public void setAccommodationEnabled(Boolean accommodationEnabled) {
+    this.accommodationEnabled = accommodationEnabled;
+  }
+
+  public String getAccommodationTitle() {
+    return accommodationTitle;
+  }
+
+  public void setAccommodationTitle(String accommodationTitle) {
+    this.accommodationTitle = accommodationTitle;
+  }
+
+  public String getAccommodationDescription() {
+    return accommodationDescription;
+  }
+
+  public void setAccommodationDescription(String accommodationDescription) {
+    this.accommodationDescription = accommodationDescription;
+  }
+
+  public String getAccommodationSearchLocation() {
+    return accommodationSearchLocation;
+  }
+
+  public void setAccommodationSearchLocation(String accommodationSearchLocation) {
+    this.accommodationSearchLocation = accommodationSearchLocation;
   }
 
   public String getPosterUrl() {
@@ -120,19 +181,59 @@ public class Event extends BaseEntity {
     this.feeAbsolute = feeAbsolute;
   }
 
-  public boolean isRegistrationOpen() {
-    return registrationOpen;
+  public boolean isBeltRegistrationEnabled() {
+    return beltRegistrationEnabled != null ? beltRegistrationEnabled : false;
   }
 
-  public void setRegistrationOpen(boolean registrationOpen) {
+  public void setBeltRegistrationEnabled(Boolean beltRegistrationEnabled) {
+    this.beltRegistrationEnabled = beltRegistrationEnabled;
+  }
+
+  public String getBeltRegistrationTitle() {
+    return beltRegistrationTitle;
+  }
+
+  public void setBeltRegistrationTitle(String beltRegistrationTitle) {
+    this.beltRegistrationTitle = beltRegistrationTitle;
+  }
+
+  public Double getBeltRegistrationPrice() {
+    return beltRegistrationPrice;
+  }
+
+  public void setBeltRegistrationPrice(Double beltRegistrationPrice) {
+    this.beltRegistrationPrice = beltRegistrationPrice;
+  }
+
+  public String getBeltRegistrationDescription() {
+    return beltRegistrationDescription;
+  }
+
+  public void setBeltRegistrationDescription(String beltRegistrationDescription) {
+    this.beltRegistrationDescription = beltRegistrationDescription;
+  }
+
+  public String getBatchesJson() {
+    return batchesJson;
+  }
+
+  public void setBatchesJson(String batchesJson) {
+    this.batchesJson = batchesJson;
+  }
+
+  public boolean isRegistrationOpen() {
+    return registrationOpen != null ? registrationOpen : true;
+  }
+
+  public void setRegistrationOpen(Boolean registrationOpen) {
     this.registrationOpen = registrationOpen;
   }
 
   public boolean isInternalRegistration() {
-    return internalRegistration;
+    return internalRegistration != null ? internalRegistration : true;
   }
 
-  public void setInternalRegistration(boolean internalRegistration) {
+  public void setInternalRegistration(Boolean internalRegistration) {
     this.internalRegistration = internalRegistration;
   }
 }

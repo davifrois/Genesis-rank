@@ -1,0 +1,126 @@
+<svg width="1600" height="1000" viewBox="0 0 1600 1000" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1600" y2="1000" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0A0D14"/>
+      <stop offset="1" stop-color="#111723"/>
+    </linearGradient>
+    <radialGradient id="glowLeft" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(220 180) rotate(28) scale(420 260)">
+      <stop stop-color="#AAB7CB" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#AAB7CB" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowRight" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1290 690) rotate(22) scale(380 240)">
+      <stop stop-color="#7E8CA5" stop-opacity="0.14"/>
+      <stop offset="1" stop-color="#7E8CA5" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="shell" x1="104" y1="98" x2="1496" y2="902" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#10151F"/>
+      <stop offset="1" stop-color="#141B28"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="360" y2="200" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1A2230"/>
+      <stop offset="1" stop-color="#131A26"/>
+    </linearGradient>
+    <linearGradient id="winner" x1="0" y1="0" x2="330" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#173726"/>
+      <stop offset="1" stop-color="#0F4A30"/>
+    </linearGradient>
+    <filter id="shadow" x="0" y="0" width="1600" height="1000" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="24" stdDeviation="26" flood-color="#02060D" flood-opacity="0.5"/>
+    </filter>
+    <filter id="softShadow" x="0" y="0" width="1600" height="1000" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#03070F" flood-opacity="0.34"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="1000" fill="url(#bg)"/>
+  <rect width="1600" height="1000" fill="url(#glowLeft)"/>
+  <rect width="1600" height="1000" fill="url(#glowRight)"/>
+
+  <g opacity="0.18">
+    <path d="M104 170H1496" stroke="#252D3A"/>
+    <path d="M104 286H1496" stroke="#252D3A"/>
+    <path d="M104 402H1496" stroke="#252D3A"/>
+    <path d="M104 518H1496" stroke="#252D3A"/>
+    <path d="M104 634H1496" stroke="#252D3A"/>
+    <path d="M104 750H1496" stroke="#252D3A"/>
+    <path d="M104 866H1496" stroke="#252D3A"/>
+    <path d="M226 98V902" stroke="#252D3A"/>
+    <path d="M362 98V902" stroke="#252D3A"/>
+    <path d="M498 98V902" stroke="#252D3A"/>
+    <path d="M634 98V902" stroke="#252D3A"/>
+    <path d="M770 98V902" stroke="#252D3A"/>
+    <path d="M906 98V902" stroke="#252D3A"/>
+    <path d="M1042 98V902" stroke="#252D3A"/>
+    <path d="M1178 98V902" stroke="#252D3A"/>
+    <path d="M1314 98V902" stroke="#252D3A"/>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="104" y="98" width="1392" height="804" rx="30" fill="url(#shell)" stroke="#3B4555" stroke-width="2"/>
+  </g>
+
+  <rect x="150" y="136" width="228" height="42" rx="18" fill="#171D28" stroke="#566173"/>
+  <text x="178" y="162" fill="#F1F4F9" font-size="18" font-family="Segoe UI, Arial, sans-serif" font-weight="700" letter-spacing="1.7">CHAVEAMENTO GENESIS</text>
+
+  <text x="150" y="230" fill="#F5F7FB" font-size="42" font-family="Segoe UI, Arial, sans-serif" font-weight="700">Visual profissional para mesa, cronograma e final oficial.</text>
+  <text x="150" y="286" fill="#AAB4C2" font-size="28" font-family="Segoe UI, Arial, sans-serif">Uma leitura premium do torneio para apresentar a operacao aos clientes</text>
+  <text x="150" y="324" fill="#AAB4C2" font-size="28" font-family="Segoe UI, Arial, sans-serif">com fluxo claro de semifinais, final ao vivo e painel da equipe.</text>
+
+  <g filter="url(#softShadow)">
+    <rect x="150" y="400" width="342" height="188" rx="24" fill="url(#card)" stroke="#4A5567" stroke-width="2"/>
+    <text x="178" y="438" fill="#C1C9D5" font-size="20" font-family="Segoe UI, Arial, sans-serif" font-weight="700" letter-spacing="1.2">SEMIFINAL 1</text>
+    <rect x="176" y="466" width="290" height="56" rx="14" fill="url(#winner)" stroke="#398559" stroke-width="2"/>
+    <text x="198" y="501" fill="#F0F8F3" font-size="30" font-family="Segoe UI, Arial, sans-serif" font-weight="700">Davi Frois</text>
+    <rect x="176" y="532" width="290" height="56" rx="14" fill="#161D2A" stroke="#556073" stroke-width="2"/>
+    <text x="198" y="567" fill="#EEF2F7" font-size="30" font-family="Segoe UI, Arial, sans-serif" font-weight="700">Lucas Mendes</text>
+  </g>
+
+  <g filter="url(#softShadow)">
+    <rect x="150" y="628" width="342" height="188" rx="24" fill="url(#card)" stroke="#4A5567" stroke-width="2"/>
+    <text x="178" y="666" fill="#C1C9D5" font-size="20" font-family="Segoe UI, Arial, sans-serif" font-weight="700" letter-spacing="1.2">SEMIFINAL 2</text>
+    <rect x="176" y="694" width="290" height="56" rx="14" fill="#161D2A" stroke="#556073" stroke-width="2"/>
+    <text x="198" y="729" fill="#EEF2F7" font-size="30" font-family="Segoe UI, Arial, sans-serif" font-weight="700">Pedro Alves</text>
+    <rect x="176" y="760" width="290" height="56" rx="14" fill="url(#winner)" stroke="#398559" stroke-width="2"/>
+    <text x="198" y="795" fill="#F0F8F3" font-size="30" font-family="Segoe UI, Arial, sans-serif" font-weight="700">Vini Souza</text>
+  </g>
+
+  <path d="M492 494H590V546H730" stroke="#B0B8C6" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M492 722H590V602H730" stroke="#B0B8C6" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <g filter="url(#softShadow)">
+    <rect x="730" y="500" width="394" height="198" rx="26" fill="url(#card)" stroke="#667284" stroke-width="2"/>
+    <text x="762" y="542" fill="#D6DDE7" font-size="21" font-family="Segoe UI, Arial, sans-serif" font-weight="700" letter-spacing="1.2">FINAL . AREA 1</text>
+    <rect x="760" y="570" width="334" height="58" rx="14" fill="url(#winner)" stroke="#398559" stroke-width="2"/>
+    <text x="784" y="606" fill="#F3F8F5" font-size="32" font-family="Segoe UI, Arial, sans-serif" font-weight="700">Davi Frois</text>
+    <rect x="760" y="640" width="334" height="58" rx="14" fill="#161D2A" stroke="#596578" stroke-width="2"/>
+    <text x="784" y="676" fill="#F0F3F8" font-size="32" font-family="Segoe UI, Arial, sans-serif" font-weight="700">Vini Souza</text>
+  </g>
+
+  <g filter="url(#softShadow)">
+    <rect x="1170" y="378" width="256" height="366" rx="26" fill="#121824" stroke="#4F596B" stroke-width="2"/>
+    <text x="1200" y="422" fill="#D5DCE7" font-size="20" font-family="Segoe UI, Arial, sans-serif" font-weight="700" letter-spacing="1.15">PAINEL DA OPERACAO</text>
+
+    <rect x="1200" y="454" width="196" height="46" rx="16" fill="#19202C" stroke="#5E697B"/>
+    <text x="1222" y="483" fill="#EFF3F8" font-size="22" font-family="Segoe UI, Arial, sans-serif" font-weight="700">AREA 1 AO VIVO</text>
+
+    <rect x="1200" y="518" width="196" height="46" rx="16" fill="#173727" stroke="#398559"/>
+    <text x="1222" y="547" fill="#EDF7F0" font-size="22" font-family="Segoe UI, Arial, sans-serif" font-weight="700">CRONOGRAMA OK</text>
+
+    <rect x="1200" y="582" width="196" height="46" rx="16" fill="#19202C" stroke="#5E697B"/>
+    <text x="1222" y="611" fill="#EFF3F8" font-size="22" font-family="Segoe UI, Arial, sans-serif" font-weight="700">TELAO PRONTO</text>
+
+    <text x="1200" y="678" fill="#9AA6B7" font-size="18" font-family="Segoe UI, Arial, sans-serif" font-weight="700" letter-spacing="1.15">ATUALIZACAO</text>
+    <text x="1200" y="714" fill="#E1E8F1" font-size="23" font-family="Segoe UI, Arial, sans-serif">Sincronizado com mesa, publico</text>
+    <text x="1200" y="746" fill="#E1E8F1" font-size="23" font-family="Segoe UI, Arial, sans-serif">e transmissao em tempo real.</text>
+  </g>
+
+  <rect x="150" y="856" width="1276" height="30" rx="15" fill="#111823" stroke="#404A5C"/>
+  <circle cx="194" cy="871" r="7" fill="#D2D9E4"/>
+  <text x="214" y="878" fill="#DDE4ED" font-size="20" font-family="Segoe UI, Arial, sans-serif">Arraste e solte</text>
+  <circle cx="492" cy="871" r="7" fill="#D2D9E4"/>
+  <text x="512" y="878" fill="#DDE4ED" font-size="20" font-family="Segoe UI, Arial, sans-serif">QR por chave</text>
+  <circle cx="760" cy="871" r="7" fill="#D2D9E4"/>
+  <text x="780" y="878" fill="#DDE4ED" font-size="20" font-family="Segoe UI, Arial, sans-serif">Modo TV</text>
+  <circle cx="980" cy="871" r="7" fill="#D2D9E4"/>
+  <text x="1000" y="878" fill="#DDE4ED" font-size="20" font-family="Segoe UI, Arial, sans-serif">Resultado oficial</text>
+</svg>

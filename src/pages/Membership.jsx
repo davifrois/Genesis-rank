@@ -8,6 +8,7 @@ import { coachNotificationService } from '../services/coachNotificationService';
 import { authService } from '../services/authService';
 import { formatBrazilPhone } from '../utils/phone';
 import { evaluatePasswordStrength } from '../utils/passwordStrength';
+import { compressImage } from '../utils/imageUtils';
 
 const createAcademyForm = () => ({
   name: '',
@@ -158,14 +159,7 @@ const resolveBeltGuideByLanguage = (guide, variant) => {
   };
 };
 
-const fileToDataUrl = (file) => (
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
-    reader.onerror = () => reject(new Error('Falha ao ler o arquivo de imagem.'));
-    reader.readAsDataURL(file);
-  })
-);
+const fileToDataUrl = (file) => compressImage(file, 800, 800, 0.7);
 
 const formatDate = (value, locale) => {
   if (!value) return '';

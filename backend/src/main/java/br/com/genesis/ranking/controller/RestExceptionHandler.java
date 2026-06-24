@@ -12,6 +12,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 
 import br.com.genesis.ranking.config.RequestTraceFilter;
 import br.com.genesis.ranking.dto.ErrorResponse;
@@ -52,6 +53,21 @@ public class RestExceptionHandler {
         HttpStatus.BAD_REQUEST,
         "VALIDATION_ERROR",
         message,
+        request
+    );
+  }
+
+  @ExceptionHandler(HttpMessageNotReadableException.class)
+  public ResponseEntity<ErrorResponse> handleUnreadableJson(
+      HttpMessageNotReadableException ex,
+      HttpServletRequest request
+  ) {
+    String traceId = resolveTraceId(request);
+    logger.warn("Unreadable JSON request. traceId={}, path={}, message={}", traceId, resolvePath(request), ex.getMessage());
+    return buildResponse(
+        HttpStatus.BAD_REQUEST,
+        "INVALID_JSON",
+        "Payload JSON invalido.",
         request
     );
   }

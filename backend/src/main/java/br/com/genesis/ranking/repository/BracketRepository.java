@@ -8,4 +8,6 @@ import br.com.genesis.ranking.model.Bracket;
 
 public interface BracketRepository extends JpaRepository<Bracket, String> {
   List<Bracket> findByEvent_Id(String eventId);
+  List<Bracket> findByPublishedTrue();
+  List<Bracket> findByEvent_IdAndPublishedTrue(String eventId);
 }

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Authentication service with local fallback and admin user management helpers.
  */
 import { validateStrongPassword } from '../utils/passwordStrength';
@@ -24,7 +24,7 @@ const AUTH_MODE = env.MODE === 'test' ? 'local' : (env.VITE_AUTH_MODE || 'local'
 const ENV_API_BASE_URL = (env.VITE_API_BASE_URL || '').trim();
 const API_BASE_URL = ENV_API_BASE_URL ? ENV_API_BASE_URL.replace(/\/$/, '') : '';
 const ENV_AUTH_URL = (env.VITE_AUTH_URL || '').trim();
-const AUTH_URL = ENV_AUTH_URL || (API_BASE_URL ? `${API_BASE_URL}/api/auth/login` : '');
+const AUTH_URL = ENV_AUTH_URL || (API_BASE_URL ? `${API_BASE_URL}/api/auth/login` : '/api/auth/login');
 const FALLBACK_API_ADMIN_USERNAME = (env.VITE_API_ADMIN_FALLBACK_USERNAME || 'admin').toString().trim();
 const FALLBACK_API_ADMIN_PASSWORD = (env.VITE_API_ADMIN_FALLBACK_PASSWORD || 'admin123').toString().trim();
 
@@ -154,6 +154,80 @@ const writeLocalUsers = (users) => {
         storage.setItem(AUTH_USERS_KEY, JSON.stringify(users));
     } catch {
         // Ignore storage errors.
+    }
+};
+
+const AUTH_LOCKOUT_KEY = 'genesis_auth_lockout_v1';
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
+
+const checkLockout = (username) => {
+    const storage = getStorage();
+    if (!storage) return;
+    
+    try {
+        const raw = storage.getItem(AUTH_LOCKOUT_KEY);
+        if (!raw) return;
+        const lockouts = JSON.parse(raw);
+        const record = lockouts[username];
+        if (record) {
+            if (record.lockedUntil && Date.now() < record.lockedUntil) {
+                const remainingMinutes = Math.ceil((record.lockedUntil - Date.now()) / 60000);
+                const error = new Error(`Conta bloqueada por múltiplas tentativas falhas. Tente novamente em ${remainingMinutes} minuto(s).`);
+                error.code = 'ACCOUNT_LOCKED';
+                throw error;
+            }
+            if (record.lockedUntil && Date.now() >= record.lockedUntil) {
+                delete lockouts[username];
+                storage.setItem(AUTH_LOCKOUT_KEY, JSON.stringify(lockouts));
+            }
+        }
+    } catch {
+        // Ignorar erros
+    }
+};
+
+const recordFailedAttempt = (username) => {
+    const storage = getStorage();
+    if (!storage) return;
+
+    try {
+        const raw = storage.getItem(AUTH_LOCKOUT_KEY);
+        const lockouts = raw ? JSON.parse(raw) : {};
+        const record = lockouts[username] || { attempts: 0, firstFailedAt: Date.now() };
+        
+        if (Date.now() - record.firstFailedAt > 30 * 60 * 1000) {
+            record.attempts = 0;
+            record.firstFailedAt = Date.now();
+        }
+        
+        record.attempts += 1;
+        
+        if (record.attempts >= MAX_FAILED_ATTEMPTS) {
+            record.lockedUntil = Date.now() + LOCKOUT_DURATION_MS;
+        }
+        
+        lockouts[username] = record;
+        storage.setItem(AUTH_LOCKOUT_KEY, JSON.stringify(lockouts));
+    } catch {
+        // Ignorar erros
+    }
+};
+
+const clearFailedAttempts = (username) => {
+    const storage = getStorage();
+    if (!storage) return;
+
+    try {
+        const raw = storage.getItem(AUTH_LOCKOUT_KEY);
+        if (!raw) return;
+        const lockouts = JSON.parse(raw);
+        if (lockouts[username]) {
+            delete lockouts[username];
+            storage.setItem(AUTH_LOCKOUT_KEY, JSON.stringify(lockouts));
+        }
+    } catch {
+        // Ignorar erros
     }
 };
 
@@ -558,7 +632,8 @@ const deleteUserWithApi = async ({ id }) => {
 
 export const authService = {
     login: async (username, password) => {
-        if (!username) {
+        const normalized = normalizeUsername(username);
+        if (!normalized) {
             throw new Error('Por favor, informe o nome de usuario.');
         }
 
@@ -566,13 +641,26 @@ export const authService = {
             throw new Error('Por favor, informe a senha de acesso.');
         }
 
-        if (AUTH_MODE === 'api') {
-            return loginWithApi(username, password);
-        }
+        checkLockout(normalized);
 
-        await new Promise((resolve) => setTimeout(resolve, 600));
-        writeApiToken('');
-        return loginLocal(username, password);
+        try {
+            let result;
+            if (AUTH_MODE === 'api') {
+                result = await loginWithApi(normalized, password);
+            } else {
+                await new Promise((resolve) => setTimeout(resolve, 600));
+                writeApiToken('');
+                result = await loginLocal(normalized, password);
+            }
+            
+            clearFailedAttempts(normalized);
+            return result;
+        } catch (error) {
+            if (error.code !== 'ACCOUNT_LOCKED') {
+                recordFailedAttempt(normalized);
+            }
+            throw error;
+        }
     },
 
     listUsers: () => {

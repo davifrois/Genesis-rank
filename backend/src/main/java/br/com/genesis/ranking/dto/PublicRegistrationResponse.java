@@ -8,6 +8,7 @@ public class PublicRegistrationResponse {
   private String eventDate;
   private String eventLocation;
   private String nome;
+  private String profileId;
   private String email;
   private String phone;
   private String academia;
@@ -78,6 +79,14 @@ public class PublicRegistrationResponse {
 
   public void setNome(String nome) {
     this.nome = nome;
+  }
+
+  public String getProfileId() {
+    return profileId;
+  }
+
+  public void setProfileId(String profileId) {
+    this.profileId = profileId;
   }
 
   public String getEmail() {

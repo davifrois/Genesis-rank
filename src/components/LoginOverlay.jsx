@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Lock, User, ShieldCheck, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
@@ -7,7 +7,7 @@ import { useI18n } from '../hooks/useI18n';
 import { authService } from '../services/authService';
 import { evaluatePasswordStrength } from '../utils/passwordStrength';
 
-const LoginOverlay = ({ onClose, onSuccess, redirectTo = '' }) => {
+const LoginOverlay = ({ onClose, onSuccess, redirectTo = '', initialMode = 'login', pageMode = false }) => {
     const { login, addLog } = useStore();
     const { uiLanguage } = useI18n();
     const navigate = useNavigate();
@@ -21,7 +21,7 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '' }) => {
     const [success, setSuccess] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [resetMode, setResetMode] = useState(false);
-    const [registerMode, setRegisterMode] = useState(false);
+    const [registerMode, setRegisterMode] = useState(initialMode === 'register');
     const [resetUsername, setResetUsername] = useState('');
     const [resetPassword, setResetPassword] = useState('');
     const [resetConfirm, setResetConfirm] = useState('');
@@ -42,9 +42,10 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '' }) => {
         ? {
             loadingReset: 'Updating password...',
             loadingAuth: 'Validating credentials...',
-            title: 'Organizer Area',
-            subtitle: 'Access Genesis administration',
+            title: 'Genesis Account',
+            subtitle: 'Login or create your secure credential',
             close: 'Close',
+            loginTab: 'Log in',
             resetUnavailable: 'Password reset is not available in this mode.',
             registerUnavailable: 'Registration is not available in this mode.',
             mismatch: 'Passwords do not match.',
@@ -55,7 +56,7 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '' }) => {
                 userPlaceholder: 'Ex: simone',
                 password: 'Password',
                 passwordPlaceholder: '********',
-                loginButton: 'Authenticate organizer',
+                loginButton: 'Log in',
                 forgot: 'Forgot password',
                 create: 'Create account'
             },
@@ -84,9 +85,10 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '' }) => {
             ? {
                 loadingReset: 'Actualizando contrasena...',
                 loadingAuth: 'Validando credenciales...',
-                title: 'Area del Organizador',
-                subtitle: 'Acceso a la administracion Genesis',
+                title: 'Cuenta Genesis',
+                subtitle: 'Inicia sesion o crea tu credencial segura',
                 close: 'Cerrar',
+                loginTab: 'Iniciar sesion',
                 resetUnavailable: 'La recuperacion de contrasena no esta disponible en este modo.',
                 registerUnavailable: 'El registro no esta disponible en este modo.',
                 mismatch: 'Las contrasenas no coinciden.',
@@ -97,7 +99,7 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '' }) => {
                     userPlaceholder: 'Ej: simone',
                     password: 'Contrasena',
                     passwordPlaceholder: '********',
-                    loginButton: 'Autenticar organizador',
+                    loginButton: 'Iniciar sesion',
                     forgot: 'Olvide mi contrasena',
                     create: 'Crear cuenta'
                 },
@@ -126,9 +128,10 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '' }) => {
                 ? {
                     loadingReset: 'Mise a jour du mot de passe...',
                     loadingAuth: 'Validation des identifiants...',
-                    title: 'Espace Organisateur',
-                    subtitle: "Acces a l'administration Genesis",
+                    title: 'Compte Genesis',
+                    subtitle: 'Connectez-vous ou creez votre acces securise',
                     close: 'Fermer',
+                    loginTab: 'Connexion',
                     resetUnavailable: 'La reinitialisation du mot de passe nest pas disponible dans ce mode.',
                     registerUnavailable: "Linscription nest pas disponible dans ce mode.",
                     mismatch: 'Les mots de passe ne correspondent pas.',
@@ -139,7 +142,7 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '' }) => {
                         userPlaceholder: 'Ex: simone',
                         password: 'Mot de passe',
                         passwordPlaceholder: '********',
-                        loginButton: 'Authentifier organisateur',
+                        loginButton: 'Connexion',
                         forgot: 'Mot de passe oublie',
                         create: 'Creer un compte'
                     },
@@ -167,9 +170,10 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '' }) => {
                 : {
                     loadingReset: 'Atualizando senha...',
                     loadingAuth: 'Validando credenciais...',
-                    title: 'Area do Organizador',
-                    subtitle: 'Acesso a administracao Genesis',
+                    title: 'Conta Genesis',
+                    subtitle: 'Entre ou crie sua credencial segura',
                     close: 'Fechar',
+                    loginTab: 'Entrar',
                     resetUnavailable: 'Redefinicao de senha indisponivel neste modo.',
                     registerUnavailable: 'Cadastro indisponivel neste modo.',
                     mismatch: 'As senhas nao conferem.',
@@ -180,7 +184,7 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '' }) => {
                         userPlaceholder: 'Ex: simone',
                         password: 'Senha de acesso',
                         passwordPlaceholder: '********',
-                        loginButton: 'Autenticar organizador',
+                        loginButton: 'Entrar',
                         forgot: 'Esqueci minha senha',
                         create: 'Criar conta'
                     },
@@ -206,6 +210,13 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '' }) => {
                     }
                 };
 
+    useEffect(() => {
+        setResetMode(false);
+        setRegisterMode(initialMode === 'register');
+        setError('');
+        setSuccess('');
+    }, [initialMode]);
+
     const handleLogin = async (event) => {
         event.preventDefault();
         setIsLoading(true);
@@ -227,7 +238,13 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '' }) => {
                 navigate(targetRoute, { replace: true });
             } else {
                 const normalizedRole = (user?.role || '').toString().trim().toLowerCase();
-                navigate(normalizedRole === 'admin' || normalizedRole === 'mesario' ? '/admin' : '/ranking');
+                if (normalizedRole === 'mesario') {
+                    navigate('/admin/mesa', { replace: true });
+                } else if (normalizedRole === 'admin') {
+                    navigate('/admin', { replace: true });
+                } else {
+                    navigate('/ranking', { replace: true });
+                }
             }
         } catch (err) {
             setError(err.message);
@@ -296,8 +313,17 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '' }) => {
                 password: registerPassword,
                 name: registerName
             });
+            login(user);
             setSuccess(copy.registerSuccess);
             addLog({ type: 'AUTH', action: 'REGISTER', details: `Conta criada: ${user.username}.` });
+            if (onSuccess) {
+                onSuccess(user);
+            }
+            if (canClose) {
+                onClose();
+            }
+            const targetRoute = (redirectTo || '').toString().trim();
+            navigate(targetRoute || '/minha-conta', { replace: true });
             setUsername(user.username);
             setPassword('');
             setRegisterMode(false);
@@ -362,13 +388,13 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '' }) => {
 
     return (
         <div
-            className="login-overlay"
+            className={`login-overlay ${pageMode ? 'login-overlay--page' : ''}`}
             onClick={canClose ? onClose : undefined}
         >
             <motion.div
                 initial={{ y: 24, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                className="login-card"
+                className={`login-card ${registerMode ? 'login-card--register' : ''} ${resetMode ? 'login-card--reset' : ''}`}
                 onClick={(event) => event.stopPropagation()}
             >
                 <AnimatePresence>
@@ -393,6 +419,27 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '' }) => {
                         event.currentTarget.style.display = 'none';
                     }}
                 />
+                {supportsLocalReset && (
+                    <div className="login-mode-switch" aria-label="Account access mode">
+                        <button
+                            type="button"
+                            className={!registerMode && !resetMode ? 'is-active' : ''}
+                            onClick={() => {
+                                setResetMode(false);
+                                handleCloseRegister();
+                            }}
+                        >
+                            {copy.loginTab}
+                        </button>
+                        <button
+                            type="button"
+                            className={registerMode ? 'is-active' : ''}
+                            onClick={handleOpenRegister}
+                        >
+                            {copy.form.create}
+                        </button>
+                    </div>
+                )}
                 <div className="login-header-row">
                     <div className="login-header">
                         <div className="login-brand">

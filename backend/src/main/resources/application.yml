@@ -36,7 +36,7 @@ app:
     expiration-minutes: ${JWT_EXP_MIN:720}
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:4173}
-    allowed-origin-patterns: ${CORS_ORIGIN_PATTERNS:http://localhost:*,http://127.0.0.1:*,http://192.168.*:*,http://10.*:*}
+    allowed-origin-patterns: ${CORS_ORIGIN_PATTERNS:http://localhost:*,http://127.0.0.1:*,http://192.168.*:*,http://10.*:*,https://*.ngrok-free.app,https://*.ngrok.app,https://*.ngrok.io}
   bootstrap:
     admin:
       username: ${BOOTSTRAP_ADMIN_USER:admin}

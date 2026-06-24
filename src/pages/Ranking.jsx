@@ -4,16 +4,17 @@ import { useSearchParams } from 'react-router-dom';
 import { useStore } from '../hooks/useStore';
 import { useI18n } from '../hooks/useI18n';
 import { buildScoreBreakdown, rankAthletes } from '../services/scoringService';
+import { buildTeamRanking } from '../services/teamRankingService';
 import { buildCategoryDescriptor } from '../services/categoryService';
 import { generateFilteredRankingPDF } from '../services/pdfService';
 import { buildFileSafeName, downloadCsv } from '../services/exportService';
 import { translateBelt, translateCompositeLabel, translateWeight } from '../utils/localeLabels';
-import { countryCodeFromAthlete, countryLabelFromAthlete, flagFromCountryCode } from '../utils/countryFlags';
+import { countryCodeFromAthlete, countryLabelFromAthlete, countryLabelFromCode, flagFromCountryCode } from '../utils/countryFlags';
 
 const DEFAULT_GROUP_LIMIT = 8;
 const GROUP_PAGE_SIZE = 10;
 const WINNERS_PAGE_SIZE = 40;
-const TAB_OPTIONS = ['GI', 'NO-GI', 'ABS-GI', 'ABS-NO-GI', 'GERAL'];
+const TAB_OPTIONS = ['GI', 'NO-GI', 'ABS-GI', 'ABS-NO-GI', 'GERAL', 'EQUIPE'];
 
 const normalizeSearchTerm = (value) => {
     if (!value) return '';
@@ -91,42 +92,6 @@ const photoUrlFromAthlete = (athlete) => (
     || ''
 );
 
-const buildTeamRanking = (athletes) => {
-    const teams = new Map();
-
-    (Array.isArray(athletes) ? athletes : []).forEach((athlete) => {
-        const academy = (athlete?.academia || 'Sem academia').toString().trim() || 'Sem academia';
-        const key = normalizeSearchTerm(academy);
-        const current = teams.get(key) || {
-            key,
-            academy,
-            points: 0,
-            wins: 0,
-            podiums: 0,
-            athletes: 0
-        };
-
-        const history = Array.isArray(athlete?.historico) ? athlete.historico : [];
-        const breakdown = buildScoreBreakdown(history);
-        current.points += Number(athlete?.pontos) || 0;
-        current.wins += Number(breakdown?.wins || 0);
-        current.podiums += Number(breakdown?.podium1 || 0) + Number(breakdown?.podium2 || 0) + Number(breakdown?.podium3 || 0);
-        current.athletes += 1;
-
-        teams.set(key, current);
-    });
-
-    return [...teams.values()]
-        .sort((a, b) => {
-            if (b.points !== a.points) return b.points - a.points;
-            if (b.wins !== a.wins) return b.wins - a.wins;
-            if (b.podiums !== a.podiums) return b.podiums - a.podiums;
-            if (b.athletes !== a.athletes) return b.athletes - a.athletes;
-            return a.academy.localeCompare(b.academy);
-        })
-        .map((team, index) => ({ ...team, rank: index + 1 }));
-};
-
 const Ranking = () => {
     const { athletes, events, activeEventId, memberProfiles, currentUser } = useStore();
     const { uiLanguage } = useI18n();
@@ -143,18 +108,19 @@ const Ranking = () => {
     const deferredSearch = useDeferredValue(searchTerm);
     const [compactView, setCompactView] = useState(() => searchParams.get('compact') !== '0');
     const [competitionMode, setCompetitionMode] = useState(() => searchParams.get('comp') === '1');
-    const [showFullList, setShowFullList] = useState(() => searchParams.get('list') === '1');
+    const [showFullList, setShowFullList] = useState(false);
     const [expandedGroups, setExpandedGroups] = useState(() => new Set());
     const [groupLimit, setGroupLimit] = useState(GROUP_PAGE_SIZE);
     const [winnersLimit, setWinnersLimit] = useState(WINNERS_PAGE_SIZE);
     const copy = isEnglish
         ? {
             tabs: {
-                GI: 'GI Weight Category',
-                'NO-GI': 'NO-GI Weight Category',
-                'ABS-GI': 'GI Absolute',
-                'ABS-NO-GI': 'NO-GI Absolute',
-                GERAL: 'OVERALL'
+                GI: 'GI',
+                'NO-GI': 'NO-GI',
+                'ABS-GI': 'ABS GI',
+                'ABS-NO-GI': 'ABS NO-GI',
+                GERAL: 'OVERALL',
+                EQUIPE: 'TEAM'
             },
             noDate: 'Date TBD',
             rankingTitle: 'Official ranking',
@@ -167,9 +133,9 @@ const Ranking = () => {
             eventFallback: 'Event',
             exportPdf: 'Export PDF',
             exportCsv: 'Export CSV',
-            eventLabel: 'Event',
+            eventLabel: 'Championship',
             selectEventAria: 'Select event',
-            searchPlaceholder: 'Search athlete, academy or category',
+            searchPlaceholder: 'Search athlete by name',
             searchAria: 'Search athlete',
             clearSearch: 'Clear search',
             competitionMode: 'Competition mode',
@@ -213,11 +179,12 @@ const Ranking = () => {
         : isSpanish
             ? {
                 tabs: {
-                    GI: 'Categoria de peso GI (con kimono)',
-                    'NO-GI': 'Categoria de peso NO-GI (sin kimono)',
-                    'ABS-GI': 'Absoluto GI (con kimono)',
-                    'ABS-NO-GI': 'Absoluto NO-GI (sin kimono)',
-                    GERAL: 'GENERAL'
+                    GI: 'GI',
+                    'NO-GI': 'NO-GI',
+                    'ABS-GI': 'ABS GI',
+                    'ABS-NO-GI': 'ABS NO-GI',
+                    GERAL: 'GENERAL',
+                    EQUIPE: 'EQUIPO'
                 },
                 noDate: 'Fecha por confirmar',
                 rankingTitle: 'Ranking oficial',
@@ -230,9 +197,9 @@ const Ranking = () => {
                 eventFallback: 'Evento',
                 exportPdf: 'Exportar PDF',
                 exportCsv: 'Exportar CSV',
-                eventLabel: 'Evento',
+                eventLabel: 'Campeonato',
                 selectEventAria: 'Seleccionar evento',
-                searchPlaceholder: 'Buscar atleta, academia o categoria',
+                searchPlaceholder: 'Buscar atleta por nombre',
                 searchAria: 'Buscar atleta',
                 clearSearch: 'Limpiar busqueda',
                 competitionMode: 'Modo competicion',
@@ -276,11 +243,12 @@ const Ranking = () => {
             : isFrench
                 ? {
                     tabs: {
-                        GI: 'Categorie de poids GI (avec kimono)',
-                        'NO-GI': 'Categorie de poids NO-GI (sans kimono)',
-                        'ABS-GI': 'Absolu GI (avec kimono)',
-                        'ABS-NO-GI': 'Absolu NO-GI (sans kimono)',
-                        GERAL: 'GENERAL'
+                        GI: 'GI',
+                        'NO-GI': 'NO-GI',
+                        'ABS-GI': 'ABS GI',
+                        'ABS-NO-GI': 'ABS NO-GI',
+                        GERAL: 'GENERAL',
+                        EQUIPE: 'EQUIPE'
                     },
                     noDate: 'Date a confirmer',
                     rankingTitle: 'Classement officiel',
@@ -293,9 +261,9 @@ const Ranking = () => {
                     eventFallback: 'Evenement',
                     exportPdf: 'Exporter PDF',
                     exportCsv: 'Exporter CSV',
-                    eventLabel: 'Evenement',
+                    eventLabel: 'Championnat',
                     selectEventAria: "Selectionner l'evenement",
-                    searchPlaceholder: 'Rechercher athlete, academie ou categorie',
+                    searchPlaceholder: 'Rechercher athlete par nom',
                     searchAria: 'Rechercher athlete',
                     clearSearch: 'Effacer la recherche',
                     competitionMode: 'Mode competition',
@@ -338,11 +306,12 @@ const Ranking = () => {
                 }
                 : {
                     tabs: {
-                        GI: 'Categoria de Peso GI (COM Pano)',
-                        'NO-GI': 'Categoria de Peso NO-GI (SEM Pano)',
-                        'ABS-GI': 'Absoluto GI (COM Pano)',
-                        'ABS-NO-GI': 'Absoluto NO-GI (SEM Pano)',
-                        GERAL: 'GERAL'
+                        GI: 'GI',
+                        'NO-GI': 'NO-GI',
+                        'ABS-GI': 'ABS GI',
+                        'ABS-NO-GI': 'ABS NO-GI',
+                        GERAL: 'GERAL',
+                        EQUIPE: 'EQUIPE'
                     },
                     noDate: 'Data a confirmar',
                     rankingTitle: 'Ranking oficial',
@@ -355,9 +324,9 @@ const Ranking = () => {
                     eventFallback: 'Evento',
                     exportPdf: 'Exportar PDF',
                     exportCsv: 'Exportar CSV',
-                    eventLabel: 'Evento',
+                    eventLabel: 'Campeonato',
                     selectEventAria: 'Selecionar evento',
-                    searchPlaceholder: 'Buscar atleta, academia ou categoria',
+                    searchPlaceholder: 'Pesquisar atleta pelo nome',
                     searchAria: 'Buscar atleta',
                     clearSearch: 'Limpar busca',
                     competitionMode: 'Modo competicao',
@@ -416,7 +385,6 @@ const Ranking = () => {
         const paramQuery = normalizeQueryParam(searchParams.get('q'));
         const paramCompact = searchParams.get('compact');
         const paramCompetition = searchParams.get('comp');
-        const paramList = searchParams.get('list');
 
         if (paramTab && paramTab !== activeTab) {
             setActiveTab(paramTab);
@@ -438,10 +406,6 @@ const Ranking = () => {
             if (nextCompetitionMode !== competitionMode) {
                 setCompetitionMode(nextCompetitionMode);
             }
-        }
-        const nextShowFullList = paramList === '1';
-        if (nextShowFullList !== showFullList) {
-            setShowFullList(nextShowFullList);
         }
     }, [searchParamsKey]);
 
@@ -495,20 +459,10 @@ const Ranking = () => {
             changed = true;
         }
 
-        if (showFullList) {
-            if (params.get('list') !== '1') {
-                params.set('list', '1');
-                changed = true;
-            }
-        } else if (params.has('list')) {
-            params.delete('list');
-            changed = true;
-        }
-
         if (changed) {
             setSearchParams(params, { replace: true });
         }
-    }, [activeTab, selectedEventId, searchTerm, compactView, competitionMode, showFullList, searchParams, setSearchParams]);
+    }, [activeTab, selectedEventId, searchTerm, compactView, competitionMode, searchParams, setSearchParams]);
 
     const selectedEvent = useMemo(() => (
         events.find((event) => event.id === selectedEventId)
@@ -556,7 +510,8 @@ const Ranking = () => {
         { id: 'NO-GI', label: copy.tabs['NO-GI'] },
         { id: 'ABS-GI', label: copy.tabs['ABS-GI'] },
         { id: 'ABS-NO-GI', label: copy.tabs['ABS-NO-GI'] },
-        { id: 'GERAL', label: copy.tabs.GERAL }
+        { id: 'GERAL', label: copy.tabs.GERAL },
+        { id: 'EQUIPE', label: copy.tabs.EQUIPE }
     ]), [copy.tabs]);
 
     const eventFilteredAthletes = useMemo(() => {
@@ -573,6 +528,7 @@ const Ranking = () => {
             if (activeTab === 'NO-GI') return athlete.isNoGi && !athlete.isAbsolute;
             if (activeTab === 'ABS-GI') return !athlete.isNoGi && athlete.isAbsolute;
             if (activeTab === 'ABS-NO-GI') return athlete.isNoGi && athlete.isAbsolute;
+            if (activeTab === 'EQUIPE') return false;
             return true;
         });
     }, [activeTab, eventFilteredAthletes]);
@@ -670,6 +626,16 @@ const Ranking = () => {
             .filter((group) => group.entries.length > 0);
     }, [groupedAthletes, normalizedSearch, athleteSearchIndex]);
 
+    const groupRankIndex = useMemo(() => {
+        const map = new Map();
+        groupedAthletes.forEach((group) => {
+            group.entries.forEach((athlete, index) => {
+                map.set(`${group.key || group.label}:${athlete.id}`, index + 1);
+            });
+        });
+        return map;
+    }, [groupedAthletes]);
+
     const filteredWinners = useMemo(() => {
         if (!normalizedSearch) return overallWinners;
         return overallWinners.filter((item) => (
@@ -742,7 +708,6 @@ const Ranking = () => {
 
     const isGeneralCategoryBoards = activeTab === 'GERAL';
     const boardAthleteTopLimit = isGeneralCategoryBoards ? 5 : 3;
-    const boardAthleteTopLabel = `Top ${boardAthleteTopLimit}`;
 
     const boardAthletePanels = useMemo(() => {
         const sorted = [...searchedGroups].sort((a, b) => {
@@ -787,7 +752,6 @@ const Ranking = () => {
     ]);
 
     const boardTeamTopLimit = isGeneralCategoryBoards ? 5 : 3;
-    const boardTeamTopLabel = `Top ${boardTeamTopLimit}`;
 
     const boardTeamPanels = useMemo(() => {
         const baseAthletes = [...eventFilteredAthletes];
@@ -810,9 +774,51 @@ const Ranking = () => {
         ];
     }, [eventFilteredAthletes, normalizedSearch, copy.boardsTeamsTitle, copy.boardsTeamsOverallTitle, boardTeamTopLimit]);
 
-    const hasBoardData = boardAthletePanels.length > 0 || boardTeamPanels.length > 0;
+    const activeTeamRanking = useMemo(() => {
+        if (activeTab !== 'EQUIPE') return [];
+        const baseAthletes = [...eventFilteredAthletes];
+        const filteredBySearch = normalizedSearch
+            ? baseAthletes.filter((athlete) => (
+                normalizeSearchTerm([
+                    athlete?.nome,
+                    athlete?.academia,
+                    athlete?.faixa,
+                    athlete?.peso,
+                    athlete?.categoria,
+                    athlete?.genero
+                ].filter(Boolean).join(' ')).includes(normalizedSearch)
+            ))
+            : baseAthletes;
+        return buildTeamRanking(filteredBySearch);
+    }, [activeTab, eventFilteredAthletes, normalizedSearch]);
+
+    const hasBoardData = (boardAthletePanels.length > 0 || boardTeamPanels.length > 0) && activeTab !== 'EQUIPE';
 
     const handleExportCsv = () => {
+        if (activeTab === 'EQUIPE') {
+            const headers = isEnglish
+                ? ['POS', 'TEAM', 'COUNTRY', 'POINTS', 'WINS', 'GOLD', 'SILVER', 'BRONZE', 'ATHLETES']
+                : isSpanish
+                    ? ['POS', 'EQUIPO', 'PAIS', 'PUNTOS', 'VICTORIAS', 'ORO', 'PLATA', 'BRONCE', 'ATLETAS']
+                    : isFrench
+                        ? ['POS', 'EQUIPE', 'PAYS', 'POINTS', 'VICTOIRES', 'OR', 'ARGENT', 'BRONZE', 'ATHLETES']
+                        : ['POS', 'EQUIPE', 'PAIS', 'PONTOS', 'VITORIAS', 'OURO', 'PRATA', 'BRONZE', 'ATLETAS'];
+            const rows = activeTeamRanking.map((team) => ([
+                team.rank,
+                team.academy,
+                countryLabelFromCode(team.countryCode, uiLanguage) || team.countryCode,
+                team.pontos,
+                team.wins,
+                team.campeao,
+                team.vice,
+                team.terceiro,
+                team.athletes
+            ]));
+            const fileName = `ranking_equipes_${buildFileSafeName(eventLabel)}`;
+            downloadCsv(fileName, headers, rows);
+            return;
+        }
+
         if (activeTab === 'GERAL' && !isEventMode) {
             const headers = isEnglish
                 ? ['POS', 'ATHLETE', 'CATEGORY', 'ACADEMY', 'MODE', 'PTS']
@@ -889,99 +895,45 @@ const Ranking = () => {
 
     return (
         <div className={`ranking-minimal ranking-ajp ranking-clean ranking-reference-v2 ${isEventMode ? 'ranking-event-mode' : ''}`}>
-            <div className="rank-page-head">
-                <div>
-                    <span className="rank-page-head__kicker">{copy.overallRanking}</span>
-                    <h1>{copy.rankingTitle}</h1>
-                    <p>{copy.rankingDescription}</p>
+            <div className="ranking-page-header-new">
+                <h1>{copy.rankingTitle || 'RANKINGS'}</h1>
+                <div className="ranking-page-header-pill">
+                    {copy.rankingTitle || 'Rankings'} / {new Date().getFullYear()}
                 </div>
             </div>
 
-            <div className="rank-event-picker rank-v2-event-picker">
-                <label htmlFor="ranking-event-select">{copy.eventLabel}</label>
-                <div className="rank-event-picker__control">
-                    <span className="rank-event-picker__icon" aria-hidden="true">
-                        <Trophy size={14} />
-                    </span>
-                    <select
-                        id="ranking-event-select"
-                        className="input select-compact"
-                        value={selectedEventId}
-                        onChange={(event) => setSelectedEventId(event.target.value)}
-                        aria-label={copy.selectEventAria}
-                    >
-                        <option value="all">{copy.allEvents}</option>
-                        <option value="none">{copy.noEvent}</option>
-                        {events.map((eventItem) => (
-                            <option key={eventItem.id} value={eventItem.id}>{eventItem.name}</option>
-                        ))}
-                    </select>
-                </div>
-            </div>
-
-            <div className="rank-toolbar rank-v2-toolbar">
-                <div className="rank-search rank-search--inline">
-                    <Search size={16} />
-                    <input
-                        type="text"
-                        placeholder={copy.searchPlaceholder}
-                        value={searchTerm}
-                        onChange={(event) => setSearchTerm(event.target.value)}
-                        aria-label={copy.searchAria}
-                    />
-                    {hasSearch && (
-                        <button
-                            type="button"
-                            className="rank-search-clear"
-                            onClick={() => setSearchTerm('')}
-                            aria-label={copy.clearSearch}
-                        >
-                            <X size={14} />
-                        </button>
-                    )}
-                </div>
-                <div className="rank-toolbar__actions">
-                    <button
+            <div className="ranking-event-carousel-wrap">
+                <div className="ranking-event-carousel">
+                    <button 
                         type="button"
-                        className={`btn btn-secondary ${competitionMode ? 'is-active' : ''}`}
-                        onClick={() => setCompetitionMode((prev) => !prev)}
+                        className={`event-pill ${selectedEventId === 'all' ? 'is-active' : ''}`}
+                        onClick={() => setSelectedEventId('all')}
                     >
-                        {copy.competitionMode}
+                        <div className="event-pill__logo is-fallback">
+                            <Trophy size={14} />
+                        </div>
+                        <span>{copy.allEvents}</span>
                     </button>
-                    {!isEventMode && (
-                        <button
-                            type="button"
-                            className={`btn btn-secondary ${compactView ? '' : 'is-active'}`}
-                            onClick={() => setCompactView((prev) => !prev)}
-                        >
-                            {compactView ? copy.showAll : copy.compactMode}
-                        </button>
-                    )}
-                    {isAdmin && (
-                        <>
-                            <button type="button" className="btn btn-ghost" onClick={handleExportCsv}>
-                                {copy.exportCsv}
+                    {events.map((eventItem) => {
+                        const hasLogo = Boolean(eventItem.posterUrl);
+                        return (
+                            <button 
+                                type="button"
+                                key={eventItem.id}
+                                className={`event-pill ${selectedEventId === eventItem.id ? 'is-active' : ''}`}
+                                onClick={() => setSelectedEventId(eventItem.id)}
+                            >
+                                <div className={`event-pill__logo ${hasLogo ? '' : 'is-fallback'}`}>
+                                    {hasLogo ? (
+                                        <img src={eventItem.posterUrl} alt="" loading="lazy" />
+                                    ) : (
+                                        <span>{(eventItem.name || '?').trim().charAt(0).toUpperCase()}</span>
+                                    )}
+                                </div>
+                                <span>{eventItem.name}</span>
                             </button>
-                            <button type="button" className="btn btn-ghost" onClick={handleExportPdf}>
-                                {copy.exportPdf}
-                            </button>
-                        </>
-                    )}
-                </div>
-            </div>
-
-            <div className="rank-stats-bar rank-v2-stats">
-                <div className="rank-stat">
-                    <span>{copy.athletes}</span>
-                    <strong>{totalAthletes}</strong>
-                </div>
-                <div className="rank-stat">
-                    <span>{copy.categories}</span>
-                    <strong>{totalGroups}</strong>
-                </div>
-                <div className="rank-stat">
-                    <span>{copy.results}</span>
-                    <strong>{showGeneralWinners ? filteredWinners.length : visibleAthletes}</strong>
+                        );
+                    })}
                 </div>
             </div>
 
@@ -1003,73 +955,130 @@ const Ranking = () => {
                         <div className="rank-boards-head__title">{copy.boardsSectionTitle}</div>
                         <div className="rank-boards-head__subtitle">{copy.boardsSectionSubtitle}</div>
                     </header>
-                    <div className="rank-boards">
+                    <div className="board-grid">
                         {boardAthletePanels.map((panel) => (
-                            <article key={panel.key} className="rank-board">
-                                <div className="rank-board__header">
-                                    <div>
-                                        <h3>{panel.title}</h3>
-                                        <p>{panel.subtitle}</p>
+                            <article key={panel.key} className="board-card">
+                                <header className="board-card__header">
+                                    <div className="board-card__header-main">
+                                        <h3>{panel.title} {modeLabel}</h3>
+                                        <span className="board-card__year">{new Date().getFullYear()}</span>
                                     </div>
-                                    <span>{boardAthleteTopLabel}</span>
-                                </div>
-                                <div className="rank-board__list">
+                                    <span className="board-card__subtitle">último cálculo há 6 horas 🔄</span>
+                                </header>
+                                <div className="board-card__list">
                                     {panel.entries.length === 0 ? (
-                                        <div className="rank-empty">{copy.boardsNoData}</div>
+                                        <div className="board-empty">{copy.boardsNoData}</div>
                                     ) : (
                                         panel.entries.map((athlete, index) => {
-                                            const metrics = athleteMetrics.get(athlete.id) || {
-                                                wins: 0,
-                                                podiumTotal: 0
-                                            };
+                                            const metrics = athleteMetrics.get(athlete.id) || { wins: 0, podiumTotal: 0, podium1: 0, podium2: 0, podium3: 0 };
+                                            const photoUrl = resolvePhotoUrl(athlete);
+                                            const countryCode = countryCodeFromAthlete(athlete);
                                             return (
-                                                <div key={`${panel.key}-${athlete.id}`} className="rank-board__row">
-                                                    <div className="rank-board__rank">{index + 1}</div>
-                                                    <div className="rank-board__identity">
-                                                        <strong>{athlete.nome}</strong>
-                                                        <span>{athlete.academia || '-'}</span>
+                                                <div key={`${panel.key}-${athlete.id}`} className="board-row">
+                                                    <div className="board-row__rank">{index + 1}.</div>
+                                                    <div className={`board-row__avatar ${photoUrl ? '' : 'is-empty'}`}>
+                                                        {photoUrl ? (
+                                                            <img src={photoUrl} alt="" loading="lazy" />
+                                                        ) : (
+                                                            <span>{(athlete.nome || '?').trim().charAt(0).toUpperCase()}</span>
+                                                        )}
                                                     </div>
-                                                    <div className="rank-board__metrics">
-                                                        <span>{athlete.pontos} {copy.points}</span>
-                                                        <span>{metrics.wins} {copy.wins}</span>
-                                                        <span>{translateAthleteBelt(athlete.faixa)} / {translateAthleteWeight(athlete.peso)}</span>
+                                                    <div className="board-row__identity">
+                                                        <strong>{athlete.nome}</strong>
+                                                        <span className="board-row__country"><span className="board-flag">{flagFromCountryCode(countryCode)}</span> {countryLabelFromAthlete(athlete, uiLanguage) || athlete.academia || '-'}</span>
+                                                    </div>
+                                                    <div className="board-row__metrics">
+                                                        <div className="board-metric metric-blue">
+                                                            <strong>{athlete.pontos}</strong>
+                                                            <span>Points</span>
+                                                        </div>
+                                                        <div className="board-metric metric-green">
+                                                            <strong>{metrics.wins}</strong>
+                                                            <span>Wins</span>
+                                                        </div>
+                                                        <div className="board-metric metric-red">
+                                                            <strong>0</strong>
+                                                            <span>Losses</span>
+                                                        </div>
+                                                        <div className="board-metric metric-gold">
+                                                            <strong>{metrics.podium1 || 0}</strong>
+                                                            <span><Trophy size={14} color="#fbbf24" fill="#fbbf24" /></span>
+                                                        </div>
+                                                        <div className="board-metric metric-silver">
+                                                            <strong>{metrics.podium2 || 0}</strong>
+                                                            <span><Trophy size={14} color="#94a3b8" fill="#94a3b8" /></span>
+                                                        </div>
+                                                        <div className="board-metric metric-bronze">
+                                                            <strong>{metrics.podium3 || 0}</strong>
+                                                            <span><Trophy size={14} color="#b45309" fill="#b45309" /></span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             );
                                         })
                                     )}
                                 </div>
+                                <div className="board-card__footer">
+                                    <button type="button" onClick={() => { setShowFullList(true); setTimeout(() => window.scrollTo({ top: 800, behavior: 'smooth' }), 100); }}>{copy.seeAll}</button>
+                                </div>
                             </article>
                         ))}
 
                         {boardTeamPanels.map((panel) => (
-                            <article key={panel.key} className="rank-board rank-board--team">
-                                <div className="rank-board__header">
-                                    <div>
+                            <article key={panel.key} className="board-card board-card--team">
+                                <header className="board-card__header">
+                                    <div className="board-card__header-main">
                                         <h3>{panel.title}</h3>
-                                        <p>{eventLabel}</p>
+                                        <span className="board-card__year">{new Date().getFullYear()}</span>
                                     </div>
-                                    <span>{boardTeamTopLabel}</span>
-                                </div>
-                                <div className="rank-board__list">
+                                    <span className="board-card__subtitle">último cálculo há 6 horas 🔄</span>
+                                </header>
+                                <div className="board-card__list">
                                     {panel.entries.length === 0 ? (
-                                        <div className="rank-empty">{copy.boardsNoData}</div>
+                                        <div className="board-empty">{copy.boardsNoData}</div>
                                     ) : (
-                                        panel.entries.map((team) => (
-                                            <div key={`${panel.key}-${team.key}`} className="rank-board__row">
-                                                <div className="rank-board__rank">{team.rank}</div>
-                                                <div className="rank-board__identity">
-                                                    <strong>{team.academy}</strong>
-                                                    <span>{team.athletes} {copy.boardsAthletesSuffix}</span>
+                                        panel.entries.map((team, index) => (
+                                            <div key={`${panel.key}-${team.key}`} className="board-row">
+                                                <div className="board-row__rank">{team.rank || index + 1}.</div>
+                                                <div className="board-row__avatar is-empty">
+                                                    <span>{(team.academy || '?').trim().charAt(0).toUpperCase()}</span>
                                                 </div>
-                                                <div className="rank-board__metrics">
-                                                    <span>{team.points} {copy.points}</span>
-                                                    <span>{team.wins} {copy.wins}</span>
-                                                    <span>{team.podiums} {copy.podiums}</span>
+                                                <div className="board-row__identity">
+                                                    <strong>{team.academy}</strong>
+                                                    <span className="board-row__country"><span className="board-flag">{flagFromCountryCode(team.countryCode)}</span> {countryLabelFromCode(team.countryCode, uiLanguage) || team.countryCode}</span>
+                                                </div>
+                                                <div className="board-row__metrics">
+                                                    <div className="board-metric metric-blue">
+                                                        <strong>{team.points || team.pontos || 0}</strong>
+                                                        <span>Points</span>
+                                                    </div>
+                                                    <div className="board-metric metric-green">
+                                                        <strong>{team.wins || 0}</strong>
+                                                        <span>Wins</span>
+                                                    </div>
+                                                    <div className="board-metric metric-red">
+                                                        <strong>0</strong>
+                                                        <span>Losses</span>
+                                                    </div>
+                                                    <div className="board-metric metric-gold">
+                                                        <strong>{team.campeao || 0}</strong>
+                                                        <span><Trophy size={14} color="#fbbf24" fill="#fbbf24" /></span>
+                                                    </div>
+                                                    <div className="board-metric metric-silver">
+                                                        <strong>{team.vice || 0}</strong>
+                                                        <span><Trophy size={14} color="#94a3b8" fill="#94a3b8" /></span>
+                                                    </div>
+                                                    <div className="board-metric metric-bronze">
+                                                        <strong>{team.terceiro || 0}</strong>
+                                                        <span><Trophy size={14} color="#b45309" fill="#b45309" /></span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         ))
                                     )}
+                                </div>
+                                <div className="board-card__footer">
+                                    <button type="button" onClick={() => { setShowFullList(true); setTimeout(() => window.scrollTo({ top: 800, behavior: 'smooth' }), 100); }}>{copy.seeAll}</button>
                                 </div>
                             </article>
                         ))}
@@ -1077,18 +1086,72 @@ const Ranking = () => {
                 </section>
             )}
 
-            <div className="rank-list-toggle">
-                <button
-                    type="button"
-                    className={`btn btn-secondary ${showFullList ? 'is-active' : ''}`}
-                    onClick={() => setShowFullList((prev) => !prev)}
-                >
-                    {showFullList ? copy.hideFullList : copy.showFullList}
-                </button>
-            </div>
-
-            <div className={`ajp-grid ${showFullList ? '' : 'is-hidden'}`}>
-                {showGeneralWinners ? (
+            {showFullList && (
+                <div className="ajp-grid">
+                    {activeTab === 'EQUIPE' ? (
+                    <section className="ajp-card ajp-card--full">
+                        <div className="ajp-card__header">
+                            <div>
+                                <div className="ajp-card__title">{copy.boardsTeamsTitle}</div>
+                                <div className="ajp-card__meta">{eventLabel}</div>
+                            </div>
+                            <span className="ajp-card__status">{copy.updatedNow}</span>
+                        </div>
+                        {competitionMode && activeTeamRanking.length > 0 && (
+                            <div className="ajp-podium">
+                                <div className="ajp-podium__title">{copy.podiumHighlight}</div>
+                                <div className="ajp-podium__grid">
+                                    {activeTeamRanking.slice(0, 3).map((team, index) => (
+                                        <article key={`team-podium-${team.key}`} className={`ajp-podium__item is-place-${index + 1}`}>
+                                            <span className="ajp-podium__place">{podiumPlaceLabel(index)}</span>
+                                            <strong className="ajp-podium__name">{team.academy}</strong>
+                                            <span className="ajp-podium__meta">{team.athletes} {copy.boardsAthletesSuffix}</span>
+                                            <span className="ajp-podium__score">{team.pontos} {copy.points}</span>
+                                        </article>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        <div className="ajp-list">
+                            {activeTeamRanking.map((team, index) => {
+                                const rankPosition = team.rank || index + 1;
+                                const isPodium = competitionMode && index < 3;
+                                return (
+                                    <div key={team.key} className={`ajp-row ${isPodium ? `is-podium is-podium-${index + 1}` : ''}`}>
+                                        <div className={`ajp-rank ${index < 3 ? 'is-top' : ''}`}>
+                                            {rankPosition}
+                                            {isPodium && <span className="ajp-rank-pill">P{index + 1}</span>}
+                                        </div>
+                                        <div className="ajp-info" style={{ marginLeft: '12px' }}>
+                                            <div className="ajp-name">{team.academy}</div>
+                                            <div className="ajp-sub">
+                                                <span className="ajp-country">
+                                                    <span className="ajp-flag">{flagFromCountryCode(team.countryCode)}</span>
+                                                    {countryLabelFromCode(team.countryCode, uiLanguage) || team.countryCode}
+                                                </span>
+                                                <span>{team.athletes} {copy.boardsAthletesSuffix}</span>
+                                            </div>
+                                        </div>
+                                        <div className="ajp-metrics">
+                                            <div className="ajp-metric">
+                                                <strong>{team.pontos}</strong>
+                                                <span>{copy.points}</span>
+                                            </div>
+                                            <div className="ajp-metric ajp-metric--win">
+                                                <strong>{team.wins}</strong>
+                                                <span>{copy.wins}</span>
+                                            </div>
+                                            <div className="ajp-metric ajp-metric--podium">
+                                                <strong>{team.campeao + team.vice + team.terceiro}</strong>
+                                                <span>{copy.podiums}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </section>
+                ) : showGeneralWinners ? (
                     <section className="ajp-card ajp-card--full">
                         <div className="ajp-card__header">
                             <div>
@@ -1289,7 +1352,8 @@ const Ranking = () => {
                         ))
                     )
                 )}
-            </div>
+                </div>
+            )}
 
             {showFullList && activeTab === 'GERAL' && filteredWinners.length > winnersLimit && (
                 <div className="rank-more">
@@ -1315,11 +1379,13 @@ const Ranking = () => {
                 </div>
             )}
 
-            {showFullList && (showGeneralWinners
-                ? filteredWinners.length === 0 && <div className="rank-empty">{copy.noWinner}</div>
-                : !isEventMode && searchedGroups.length === 0 && (
-                    <div className="rank-empty">{copy.noAthleteInCategory}</div>
-                ))}
+            {showFullList && (activeTab === 'EQUIPE'
+                ? activeTeamRanking.length === 0 && <div className="rank-empty">{copy.boardsNoData}</div>
+                : showGeneralWinners
+                    ? filteredWinners.length === 0 && <div className="rank-empty">{copy.noWinner}</div>
+                    : !isEventMode && searchedGroups.length === 0 && (
+                        <div className="rank-empty">{copy.noAthleteInCategory}</div>
+                    ))}
         </div>
     );
 };

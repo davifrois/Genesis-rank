@@ -39,7 +39,7 @@ public class CorsConfig {
       config.setAllowedOriginPatterns(originPatterns);
     }
     config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-    config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Trace-Id"));
+    config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Trace-Id", "ngrok-skip-browser-warning"));
     config.setExposedHeaders(List.of("X-Trace-Id", "X-Instagram-Feed-Updated-At", "X-Instagram-Feed-Status"));
     config.setAllowCredentials(true);
 

@@ -1,6 +1,6 @@
 import { authService } from './authService';
 
-const ENV_API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').trim();
+const ENV_API_BASE_URL = ("" || '').trim();
 const API_BASE_URL = ENV_API_BASE_URL ? ENV_API_BASE_URL.replace(/\/$/, '') : '';
 
 const buildApiUrl = (path) => {
@@ -17,9 +17,15 @@ const clampLimit = (value) => {
 const buildInstagramQuery = (limit, options = {}) => {
   const normalizedLimit = clampLimit(limit);
   const shouldRefresh = options?.refresh === true;
-  return shouldRefresh
-    ? `limit=${encodeURIComponent(normalizedLimit)}&refresh=true`
-    : `limit=${encodeURIComponent(normalizedLimit)}`;
+  const username = (options?.username || '').toString().trim();
+  const parts = [`limit=${encodeURIComponent(normalizedLimit)}`];
+  if (shouldRefresh) {
+    parts.push('refresh=true');
+  }
+  if (username) {
+    parts.push(`username=${encodeURIComponent(username)}`);
+  }
+  return parts.join('&');
 };
 
 const parseInstagramLastUpdatedHeader = (response) => {

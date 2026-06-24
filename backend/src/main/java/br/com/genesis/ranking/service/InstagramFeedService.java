@@ -16,8 +16,10 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -47,6 +49,16 @@ public class InstagramFeedService {
   private static final String IG_PUBLIC_APP_ID = "936619743392459";
   public static final String FEED_STATUS_CACHE = "CACHE";
   public static final String FEED_STATUS_UPDATED_NOW = "UPDATED_NOW";
+
+  private static final class RuntimeFeedCache {
+    private final List<SocialMediaPostResponse> posts;
+    private final Instant fetchedAt;
+
+    private RuntimeFeedCache(List<SocialMediaPostResponse> posts, Instant fetchedAt) {
+      this.posts = posts == null ? List.of() : List.copyOf(posts);
+      this.fetchedAt = fetchedAt == null ? Instant.EPOCH : fetchedAt;
+    }
+  }
 
   public static final class FeedResult {
     private final List<SocialMediaPostResponse> posts;
@@ -85,6 +97,7 @@ public class InstagramFeedService {
 
   private volatile Instant cacheUpdatedAt = Instant.EPOCH;
   private volatile List<SocialMediaPostResponse> cachedPosts = List.of();
+  private final Map<String, RuntimeFeedCache> runtimeFeedCacheByUsername = new ConcurrentHashMap<>();
 
   public InstagramFeedService(
       ObjectMapper objectMapper,
@@ -113,7 +126,16 @@ public class InstagramFeedService {
   }
 
   public FeedResult listLatestPosts(Integer requestedLimit, boolean forceRefresh) {
+    return listLatestPostsForUsername(requestedLimit, forceRefresh, "");
+  }
+
+  public FeedResult listLatestPostsForUsername(Integer requestedLimit, boolean forceRefresh, String requestedUsername) {
     int limit = clamp(requestedLimit == null ? defaultLimit : requestedLimit);
+    String targetUsername = clean(requestedUsername);
+    if (!targetUsername.isBlank() && !targetUsername.equalsIgnoreCase(username)) {
+      return loadForAlternateUsername(targetUsername, limit, forceRefresh);
+    }
+
     hydrateInMemoryCacheIfNeeded();
     FeedResult data = loadFromCacheOrApi(Math.max(defaultLimit, limit), forceRefresh);
     List<SocialMediaPostResponse> posts = data.getPosts();
@@ -153,6 +175,48 @@ public class InstagramFeedService {
     return current.toString();
   }
 
+  private FeedResult loadForAlternateUsername(String targetUsername, int limit, boolean forceRefresh) {
+    String cacheKey = clean(targetUsername).toLowerCase();
+    if (cacheKey.isBlank()) {
+      return new FeedResult(List.of(), FEED_STATUS_CACHE, "");
+    }
+
+    Instant now = Instant.now();
+    RuntimeFeedCache runtimeCache = runtimeFeedCacheByUsername.get(cacheKey);
+    if (!forceRefresh && runtimeCache != null && !runtimeCache.posts.isEmpty()
+        && Duration.between(runtimeCache.fetchedAt, now).compareTo(CACHE_TTL) < 0) {
+      List<SocialMediaPostResponse> cached = runtimeCache.posts.size() <= limit
+          ? runtimeCache.posts
+          : runtimeCache.posts.subList(0, limit);
+      return new FeedResult(cached, FEED_STATUS_CACHE, runtimeCache.fetchedAt.toString());
+    }
+
+    try {
+      List<SocialMediaPostResponse> fetched = fetchPosts(limit, cacheKey);
+      if (fetched.isEmpty()) {
+        if (runtimeCache != null && !runtimeCache.posts.isEmpty()) {
+          List<SocialMediaPostResponse> cached = runtimeCache.posts.size() <= limit
+              ? runtimeCache.posts
+              : runtimeCache.posts.subList(0, limit);
+          return new FeedResult(cached, FEED_STATUS_CACHE, runtimeCache.fetchedAt.toString());
+        }
+        return new FeedResult(List.of(), FEED_STATUS_CACHE, "");
+      }
+
+      runtimeFeedCacheByUsername.put(cacheKey, new RuntimeFeedCache(fetched, now));
+      return new FeedResult(fetched, FEED_STATUS_UPDATED_NOW, now.toString());
+    } catch (Exception ex) {
+      logger.warn("Failed to fetch Instagram feed for username={}: {}", cacheKey, ex.getMessage());
+      if (runtimeCache != null && !runtimeCache.posts.isEmpty()) {
+        List<SocialMediaPostResponse> cached = runtimeCache.posts.size() <= limit
+            ? runtimeCache.posts
+            : runtimeCache.posts.subList(0, limit);
+        return new FeedResult(cached, FEED_STATUS_CACHE, runtimeCache.fetchedAt.toString());
+      }
+      return new FeedResult(List.of(), FEED_STATUS_CACHE, "");
+    }
+  }
+
   private FeedResult loadFromCacheOrApi(int fetchLimit, boolean forceRefresh) {
     Instant now = Instant.now();
     if (!forceRefresh && !cachedPosts.isEmpty() && Duration.between(cacheUpdatedAt, now).compareTo(CACHE_TTL) < 0) {
@@ -160,7 +224,7 @@ public class InstagramFeedService {
     }
 
     try {
-      List<SocialMediaPostResponse> fetched = fetchPosts(fetchLimit);
+      List<SocialMediaPostResponse> fetched = fetchPosts(fetchLimit, username);
       if (fetched.isEmpty()) {
         if (!cachedPosts.isEmpty()) {
           return new FeedResult(cachedPosts, FEED_STATUS_CACHE, getLastUpdatedAt());
@@ -192,19 +256,20 @@ public class InstagramFeedService {
     }
   }
 
-  private List<SocialMediaPostResponse> fetchPosts(int limit) throws IOException, InterruptedException {
-    if (!accessToken.isBlank()) {
+  private List<SocialMediaPostResponse> fetchPosts(int limit, String targetUsername) throws IOException, InterruptedException {
+    String resolvedUsername = clean(targetUsername).isBlank() ? username : clean(targetUsername);
+    if (!accessToken.isBlank() && resolvedUsername.equalsIgnoreCase(username)) {
       List<SocialMediaPostResponse> graphPosts = fetchPostsFromGraph(limit);
       if (!graphPosts.isEmpty()) return graphPosts;
       logger.info("Instagram Graph API returned empty feed. Trying public fallback.");
     } else {
-      logger.info("Instagram token not configured. Trying public fallback for username={}", username);
+      logger.info("Instagram token not configured or username override detected. Trying public fallback for username={}", resolvedUsername);
     }
 
-    List<SocialMediaPostResponse> webPosts = fetchPostsFromPublicWeb(limit);
+    List<SocialMediaPostResponse> webPosts = fetchPostsFromPublicWeb(limit, resolvedUsername);
     if (!webPosts.isEmpty()) return webPosts;
 
-    List<SocialMediaPostResponse> htmlPosts = fetchPostsFromProfileHtml(limit);
+    List<SocialMediaPostResponse> htmlPosts = fetchPostsFromProfileHtml(limit, resolvedUsername);
     if (!htmlPosts.isEmpty()) return htmlPosts;
 
     return List.of();
@@ -256,8 +321,9 @@ public class InstagramFeedService {
     return posts;
   }
 
-  private List<SocialMediaPostResponse> fetchPostsFromPublicWeb(int limit) throws IOException, InterruptedException {
-    HttpRequest warmup = HttpRequest.newBuilder(URI.create(webBaseUrl + "/" + encodePathSegment(username) + "/"))
+  private List<SocialMediaPostResponse> fetchPostsFromPublicWeb(int limit, String targetUsername) throws IOException, InterruptedException {
+    String resolvedUsername = clean(targetUsername).isBlank() ? username : clean(targetUsername);
+    HttpRequest warmup = HttpRequest.newBuilder(URI.create(webBaseUrl + "/" + encodePathSegment(resolvedUsername) + "/"))
         .GET()
         .timeout(Duration.ofSeconds(12))
         .header("Accept", "text/html")
@@ -269,11 +335,11 @@ public class InstagramFeedService {
     }
 
     String csrfToken = resolveCookie("csrftoken");
-    HttpRequest request = HttpRequest.newBuilder(URI.create(webBaseUrl + "/api/v1/users/web_profile_info/?username=" + encode(username)))
+    HttpRequest request = HttpRequest.newBuilder(URI.create(webBaseUrl + "/api/v1/users/web_profile_info/?username=" + encode(resolvedUsername)))
         .GET()
         .timeout(Duration.ofSeconds(12))
         .header("Accept", "application/json")
-        .header("Referer", webBaseUrl + "/" + encodePathSegment(username) + "/")
+        .header("Referer", webBaseUrl + "/" + encodePathSegment(resolvedUsername) + "/")
         .header("User-Agent", browserUserAgent())
         .header("X-IG-App-ID", IG_PUBLIC_APP_ID)
         .header("X-Requested-With", "XMLHttpRequest")
@@ -303,8 +369,13 @@ public class InstagramFeedService {
       String permalink = webBaseUrl + "/p/" + shortcode + "/";
       String caption = extractCaption(node);
       boolean isVideo = node.path("is_video").asBoolean(false);
-      String mediaUrl = text(node, "display_url");
+      String videoUrl = text(node, "video_url");
+      String displayUrl = text(node, "display_url");
       String thumbnailUrl = text(node, "thumbnail_src");
+      String mediaUrl = isVideo ? videoUrl : displayUrl;
+      if (thumbnailUrl.isBlank()) {
+        thumbnailUrl = displayUrl;
+      }
       String publishedAt = extractTimestamp(node.path("taken_at_timestamp"));
 
       SocialMediaPostResponse post = new SocialMediaPostResponse();
@@ -315,7 +386,7 @@ public class InstagramFeedService {
       post.setThumbnailUrl(thumbnailUrl);
       post.setPermalink(permalink);
       post.setPublishedAt(publishedAt);
-      post.setUsername(username);
+      post.setUsername(resolvedUsername);
       post.setSource("instagram_public");
       posts.add(post);
     }
@@ -324,8 +395,9 @@ public class InstagramFeedService {
     return posts;
   }
 
-  private List<SocialMediaPostResponse> fetchPostsFromProfileHtml(int limit) throws IOException, InterruptedException {
-    HttpRequest request = HttpRequest.newBuilder(URI.create(webBaseUrl + "/" + encodePathSegment(username) + "/"))
+  private List<SocialMediaPostResponse> fetchPostsFromProfileHtml(int limit, String targetUsername) throws IOException, InterruptedException {
+    String resolvedUsername = clean(targetUsername).isBlank() ? username : clean(targetUsername);
+    HttpRequest request = HttpRequest.newBuilder(URI.create(webBaseUrl + "/" + encodePathSegment(resolvedUsername) + "/"))
         .GET()
         .timeout(Duration.ofSeconds(12))
         .header("Accept", "text/html")
@@ -335,11 +407,12 @@ public class InstagramFeedService {
     if (response.statusCode() < 200 || response.statusCode() >= 300) {
       throw new IllegalStateException("Instagram profile HTML HTTP " + response.statusCode());
     }
-    return parsePostsFromHtml(response.body(), limit);
+    return parsePostsFromHtml(response.body(), limit, resolvedUsername);
   }
 
-  private List<SocialMediaPostResponse> parsePostsFromHtml(String html, int limit) {
+  private List<SocialMediaPostResponse> parsePostsFromHtml(String html, int limit, String targetUsername) {
     String safeHtml = html == null ? "" : html;
+    String resolvedUsername = clean(targetUsername).isBlank() ? username : clean(targetUsername);
     Set<String> shortcodes = new LinkedHashSet<>();
     Matcher matcher = Pattern.compile("https?:\\\\/\\\\/www\\\\.instagram\\\\.com\\\\/p\\\\/([A-Za-z0-9_-]{5,})\\\\/?").matcher(safeHtml);
     while (matcher.find() && shortcodes.size() < limit) {
@@ -369,13 +442,13 @@ public class InstagramFeedService {
       if (code.isBlank()) continue;
       SocialMediaPostResponse post = new SocialMediaPostResponse();
       post.setId(code);
-      post.setCaption("Post publicado no Instagram @" + username);
+      post.setCaption("Post publicado no Instagram @" + resolvedUsername);
       post.setMediaType("IMAGE");
       post.setMediaUrl("");
       post.setThumbnailUrl("");
       post.setPermalink(webBaseUrl + "/p/" + code + "/");
       post.setPublishedAt("");
-      post.setUsername(username);
+      post.setUsername(resolvedUsername);
       post.setSource("instagram_html");
       posts.add(post);
     }

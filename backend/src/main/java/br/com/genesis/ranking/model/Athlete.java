@@ -33,9 +33,9 @@ public class Athlete extends BaseEntity {
   @Column(length = 40)
   private String genero;
 
-  private boolean isNoGi;
+  private Boolean isNoGi = false;
 
-  private boolean isAbsolute;
+  private Boolean isAbsolute = false;
 
   private Integer pontos;
 
@@ -94,16 +94,14 @@ public class Athlete extends BaseEntity {
     this.genero = genero;
   }
 
-  public boolean isNoGi() {
-    return isNoGi;
+  public boolean isNoGi() { isNoGi != null ? isNoGi : false;
   }
 
   public void setNoGi(boolean noGi) {
     isNoGi = noGi;
   }
 
-  public boolean isAbsolute() {
-    return isAbsolute;
+  public boolean isAbsolute() { isAbsolute != null ? isAbsolute : false;
   }
 
   public void setAbsolute(boolean absolute) {

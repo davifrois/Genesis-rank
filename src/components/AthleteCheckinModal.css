@@ -1,0 +1,221 @@
+.checkin-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    padding: 20px;
+    backdrop-filter: blur(8px);
+}
+
+.checkin-modal-content {
+    background-color: #1a1f2b; /* Lighter than deep background */
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    width: 100%;
+    max-width: 650px;
+    box-shadow: 0 24px 50px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.checkin-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background-color: rgba(255, 255, 255, 0.02);
+}
+
+.checkin-modal-header h3 {
+    margin: 0;
+    font-size: 1.4rem;
+    color: #f3f4f6;
+    font-weight: 600;
+}
+
+.close-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s ease;
+}
+
+.close-btn:hover {
+    color: var(--danger-color, #ff4757);
+}
+
+.checkin-form {
+    padding: 24px 30px;
+}
+
+.form-info-card {
+    background-color: rgba(59, 130, 246, 0.08);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 24px;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.form-info-card p {
+    margin: 6px 0;
+    color: #9ca3af;
+    font-size: 0.95rem;
+}
+
+.form-info-card strong {
+    color: #e5e7eb;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--text-secondary);
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+.form-control {
+    width: 100%;
+    padding: 14px 18px;
+    background-color: #11141c;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    color: #f3f4f6;
+    font-size: 1.05rem;
+    transition: all 0.2s ease;
+    appearance: none;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.form-control option {
+    background-color: #1a1f2b;
+    color: #f3f4f6;
+}
+
+.checkin-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 30px;
+}
+
+.btn-secondary {
+    padding: 10px 20px;
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #e5e7eb;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+    background-color: var(--surface-secondary);
+}
+
+.btn-primary {
+    padding: 12px 24px;
+    background-color: var(--primary-color);
+    border: none;
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 1.05rem;
+    display: flex;
+    align-items: center;
+    transition: background-color 0.2s ease;
+}
+
+.btn-primary:hover {
+    background-color: var(--primary-color-hover, var(--primary-color));
+    opacity: 0.9;
+}
+
+/* Opponents Preview */
+.opponents-preview {
+    background-color: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 15px;
+    margin-top: 10px;
+}
+
+.opponents-preview h4 {
+    margin: 0 0 10px 0;
+    font-size: 0.85rem;
+    color: #9ca3af;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.opponents-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.opponents-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+.opp-name {
+    color: #f3f4f6;
+    font-weight: 500;
+}
+
+.opp-academy {
+    color: #9ca3af;
+    font-size: 0.8rem;
+}
+
+.opponents-empty {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #6ee7b7; /* subtle green for "you're alone" */
+    font-size: 0.9rem;
+    padding: 10px;
+    background-color: rgba(110, 231, 183, 0.05);
+    border-radius: 6px;
+    border: 1px dashed rgba(110, 231, 183, 0.2);
+}

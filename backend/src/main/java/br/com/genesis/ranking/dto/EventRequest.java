@@ -1,5 +1,7 @@
 package br.com.genesis.ranking.dto;
 
+import java.util.List;
+
 import jakarta.validation.constraints.NotBlank;
 
 public class EventRequest {
@@ -9,6 +11,10 @@ public class EventRequest {
   private String name;
   private String date;
   private String location;
+  private Boolean accommodationEnabled;
+  private String accommodationTitle;
+  private String accommodationDescription;
+  private String accommodationSearchLocation;
   private String posterUrl;
   private String registrationUrl;
   private String pixKey;
@@ -16,8 +22,18 @@ public class EventRequest {
   private Double feeOver15;
   private Double feeCombo;
   private Double feeAbsolute;
+  private Boolean beltRegistrationEnabled;
+  private String beltRegistrationTitle;
+  private Double beltRegistrationPrice;
+  private String beltRegistrationDescription;
+  private List<EventBatchDto> batches;
+  private List<SuperFightDto> superFights;
+  private Boolean superFightsPublished;
   private Boolean registrationOpen;
   private Boolean internalRegistration;
+  private String eventPhase;
+  private Boolean publicPublished;
+  private String publishedAt;
 
   public String getId() {
     return id;
@@ -49,6 +65,38 @@ public class EventRequest {
 
   public void setLocation(String location) {
     this.location = location;
+  }
+
+  public Boolean getAccommodationEnabled() {
+    return accommodationEnabled;
+  }
+
+  public void setAccommodationEnabled(Boolean accommodationEnabled) {
+    this.accommodationEnabled = accommodationEnabled;
+  }
+
+  public String getAccommodationTitle() {
+    return accommodationTitle;
+  }
+
+  public void setAccommodationTitle(String accommodationTitle) {
+    this.accommodationTitle = accommodationTitle;
+  }
+
+  public String getAccommodationDescription() {
+    return accommodationDescription;
+  }
+
+  public void setAccommodationDescription(String accommodationDescription) {
+    this.accommodationDescription = accommodationDescription;
+  }
+
+  public String getAccommodationSearchLocation() {
+    return accommodationSearchLocation;
+  }
+
+  public void setAccommodationSearchLocation(String accommodationSearchLocation) {
+    this.accommodationSearchLocation = accommodationSearchLocation;
   }
 
   public String getPosterUrl() {
@@ -107,6 +155,62 @@ public class EventRequest {
     this.feeAbsolute = feeAbsolute;
   }
 
+  public Boolean getBeltRegistrationEnabled() {
+    return beltRegistrationEnabled;
+  }
+
+  public void setBeltRegistrationEnabled(Boolean beltRegistrationEnabled) {
+    this.beltRegistrationEnabled = beltRegistrationEnabled;
+  }
+
+  public String getBeltRegistrationTitle() {
+    return beltRegistrationTitle;
+  }
+
+  public void setBeltRegistrationTitle(String beltRegistrationTitle) {
+    this.beltRegistrationTitle = beltRegistrationTitle;
+  }
+
+  public Double getBeltRegistrationPrice() {
+    return beltRegistrationPrice;
+  }
+
+  public void setBeltRegistrationPrice(Double beltRegistrationPrice) {
+    this.beltRegistrationPrice = beltRegistrationPrice;
+  }
+
+  public String getBeltRegistrationDescription() {
+    return beltRegistrationDescription;
+  }
+
+  public void setBeltRegistrationDescription(String beltRegistrationDescription) {
+    this.beltRegistrationDescription = beltRegistrationDescription;
+  }
+
+  public List<EventBatchDto> getBatches() {
+    return batches;
+  }
+
+  public void setBatches(List<EventBatchDto> batches) {
+    this.batches = batches;
+  }
+
+  public List<SuperFightDto> getSuperFights() {
+    return superFights;
+  }
+
+  public void setSuperFights(List<SuperFightDto> superFights) {
+    this.superFights = superFights;
+  }
+
+  public Boolean getSuperFightsPublished() {
+    return superFightsPublished;
+  }
+
+  public void setSuperFightsPublished(Boolean superFightsPublished) {
+    this.superFightsPublished = superFightsPublished;
+  }
+
   public Boolean getRegistrationOpen() {
     return registrationOpen;
   }
@@ -121,5 +225,29 @@ public class EventRequest {
 
   public void setInternalRegistration(Boolean internalRegistration) {
     this.internalRegistration = internalRegistration;
+  }
+
+  public String getEventPhase() {
+    return eventPhase;
+  }
+
+  public void setEventPhase(String eventPhase) {
+    this.eventPhase = eventPhase;
+  }
+
+  public Boolean getPublicPublished() {
+    return publicPublished;
+  }
+
+  public void setPublicPublished(Boolean publicPublished) {
+    this.publicPublished = publicPublished;
+  }
+
+  public String getPublishedAt() {
+    return publishedAt;
+  }
+
+  public void setPublishedAt(String publishedAt) {
+    this.publishedAt = publishedAt;
   }
 }

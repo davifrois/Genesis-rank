@@ -54,7 +54,7 @@ class BracketPodiumEndpointE2ETest {
 
   @Test
   @WithMockUser(username = "mesa1", roles = { "MESARIO" })
-  void mesarioCanUpdatePodiumUsingDedicatedEndpoint() throws Exception {
+  void mesarioCannotUpdatePodiumUsingDedicatedEndpoint() throws Exception {
     SeedData seed = seedBracketWithSingleAthlete();
 
     String payload = """
@@ -73,10 +73,7 @@ class BracketPodiumEndpointE2ETest {
             .contentType(MediaType.APPLICATION_JSON)
             .content(payload)
     )
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.id").value(seed.bracketId()))
-        .andExpect(jsonPath("$.podium.goldId").value(seed.athleteId()))
-        .andExpect(jsonPath("$.appliedAt").value("2026-03-06T12:00:00Z"));
+        .andExpect(status().isForbidden());
   }
 
   @Test

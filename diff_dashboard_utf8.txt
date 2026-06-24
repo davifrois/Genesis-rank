@@ -1,0 +1,803 @@
+﻿diff --git a/src/pages/Dashboard.jsx b/src/pages/Dashboard.jsx
+index 1a23089..39026c2 100644
+--- a/src/pages/Dashboard.jsx
++++ b/src/pages/Dashboard.jsx
+@@ -1,4 +1,4 @@
+-´╗┐import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
++import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+ import { Link, useLocation, useNavigate } from 'react-router-dom';
+ import { useStore } from '../hooks/useStore';
+ import {
+@@ -25,8 +25,10 @@ import {
+     Sparkles,
+     Trophy,
+     Trash2,
++    Swords,
+     Upload,
+     UserPlus,
++    User,
+     Users,
+     Zap
+ } from 'lucide-react';
+@@ -35,6 +37,7 @@ import { extractTextFromPdfFile, parseAthletesFromText } from '../services/pdfIm
+ import { buildBracketMatches } from '../services/bracketService';
+ import { authService } from '../services/authService';
+ import { publicRegistrationService } from '../services/publicRegistrationService';
++import { eventAdminService } from '../services/eventAdminService';
+ import { socialMediaService } from '../services/socialMediaService';
+ import { motion, AnimatePresence } from 'framer-motion';
+ import LoginOverlay from '../components/LoginOverlay';
+@@ -45,6 +48,7 @@ import { translateBelt, translateCategory, translateCompositeLabel, translateWei
+ import { REGISTRATION_STATUS, normalizeRegistrationStatus } from '../utils/registrationStatus';
+ import { extractWeightOptionsFromFile, extractWeightOptionsFromUrl } from '../services/weightTableOcrService';
+ import { evaluatePasswordStrength } from '../utils/passwordStrength';
++import { compressImage } from '../utils/imageUtils';
+ 
+ const ATHLETE_PAGE_SIZE_OPTIONS = [20, 40, 80];
+ const MAX_NEWS_IMAGE_UPLOAD_BYTES = 8_000_000;
+@@ -106,6 +110,7 @@ const ADMIN_SECTION_ROUTES = {
+     brackets: '/admin/chaveamento',
+     schedule: '/admin/cronograma',
+     athletes: '/admin/atletas',
++    superFights: '/admin/lutas-casadas',
+     automation: '/admin/automacoes',
+     activity: '/admin/atividade'
+ };
+@@ -137,12 +142,7 @@ const resolveAdminRouteFromSection = (section, canManagePanel) => {
+     return ADMIN_SECTION_ROUTES[normalizedSection] || (canManagePanel ? ADMIN_SECTION_ROUTES.overview : ADMIN_SECTION_ROUTES.brackets);
+ };
+ 
+-const readFileAsDataUrl = (file) => new Promise((resolve, reject) => {
+-    const reader = new FileReader();
+-    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+-    reader.onerror = () => reject(new Error('Falha ao ler arquivo.'));
+-    reader.readAsDataURL(file);
+-});
++const readFileAsDataUrl = (file) => compressImage(file, 800, 800, 0.7);
+ 
+ const isDataImageUrl = (value) => /^data:image\//i.test((value || '').toString().trim());
+ 
+@@ -1606,7 +1606,7 @@ const Dashboard = () => {
+                 bracketsPanel: {
+                     title: 'Chaveamento',
+                     subtitle: 'Gere chaves por categoria e aplique o p├│dio automaticamente.',
+-                    workspaceTitle: '├ürea do chaveamento',
++                    workspaceTitle: '├â┬ürea do chaveamento',
+                     workspaceSubtitle: 'Inscri├º├Áes aprovadas s├úo sincronizadas na base de atletas e ficam prontas para categoria e chave.',
+                     quickFilter: 'Filtro rapido por academia',
+                     allAcademies: 'Todas as academias',
+@@ -2031,6 +2031,15 @@ const Dashboard = () => {
+     const [draggingBracketId, setDraggingBracketId] = useState('');
+     const [dragSeedContext, setDragSeedContext] = useState({ bracketId: '', athleteId: '' });
+     const [scheduleEventId, setScheduleEventId] = useState(activeEventId || '');
++    const [superFightsEventId, setSuperFightsEventId] = useState(activeEventId || '');
++    const [pendingSuperFights, setPendingSuperFights] = useState([{
++        id: crypto.randomUUID(),
++        category: 'Adulto',
++        athlete1Name: '', athlete1Belt: 'Branca', athlete1Academy: '',
++        athlete2Name: '', athlete2Belt: 'Branca', athlete2Academy: '',
++        scheduledTime: ''
++    }]);
++    const [autoGenerateOptions, setAutoGenerateOptions] = useState({ startTime: '18:00', intervalMins: '10' });
+     const [manualScheduleByEvent, setManualScheduleByEvent] = useState(loadManualScheduleByEvent);
+     const [scheduleDraft, setScheduleDraft] = useState(createScheduleDraftState);
+     const [showScheduleTvMode, setShowScheduleTvMode] = useState(false);
+@@ -3846,11 +3855,17 @@ const Dashboard = () => {
+             }
+ 
+             if (normalizedUpdated.isPaymentConfirmed) {
++                const matchedAthlete = athletes.find((athlete) => (
++                    athleteMatchesRegistrationRecord(athlete, normalizedUpdated)
++                ));
++                if (!matchedAthlete?.id) {
++                    addAthlete(toAthleteFromRegistration(normalizedUpdated));
++                }
++
+                 if (normalizedUpdated.eventId) {
+                     setActiveEvent(normalizedUpdated.eventId);
+                     setBracketEventId(normalizedUpdated.eventId);
+                 }
+-                navigate(resolveAdminRouteFromSection('brackets', canManagePanel));
+             }
+ 
+             showFeedback('success', copy.feedback.registrationStatusUpdated);
+@@ -4558,10 +4573,12 @@ const Dashboard = () => {
+     const recentLogs = logs.slice(0, 6);
+ 
+     const navItems = useMemo(() => {
++        const hasBeltEvent = events.some(e => e.beltRegistrationEnabled);
+         if (!canManagePanel) {
+             return [
+                 { id: 'brackets', label: copy.nav.brackets, icon: ClipboardList },
+                 { id: 'schedule', label: copy.nav.schedule, icon: Clock },
++                ...(hasBeltEvent ? [{ id: 'superFights', label: 'Lutas Casadas', icon: Swords }] : []),
+                 { id: 'activity', label: copy.nav.activity, icon: Activity }
+             ];
+         }
+@@ -4572,11 +4589,12 @@ const Dashboard = () => {
+             { id: 'registrations', label: copy.nav.registrations, icon: ClipboardList, meta: publicRegistrations.length },
+             { id: 'brackets', label: copy.nav.brackets, icon: ClipboardList },
+             { id: 'schedule', label: copy.nav.schedule, icon: Clock },
++            ...(hasBeltEvent ? [{ id: 'superFights', label: 'Lutas Casadas', icon: Swords }] : []),
+             { id: 'athletes', label: copy.nav.athletes, icon: Users, meta: athletes.length },
+             { id: 'automation', label: copy.nav.automation, icon: Zap },
+             { id: 'activity', label: copy.nav.activity, icon: Activity }
+         ];
+-    }, [canManagePanel, copy.nav, events.length, news.length, publicRegistrations.length, athletes.length]);
++    }, [canManagePanel, copy.nav, events, news.length, publicRegistrations.length, athletes.length]);
+ 
+     const orderedNews = useMemo(() => (
+         [...news].sort((a, b) => {
+@@ -5423,15 +5441,17 @@ const Dashboard = () => {
+                                 const eventNameForReport = group.eventName || copy.common.noEvent;
+                                 const eventDateForReport = group.eventDate || '';
+                                 const eventLocationForReport = group.eventLocation || '';
+-                                const updatedLabel = group.updatedAt
+-                                    ? formatEventDateTime(group.updatedAt)
+-                                    : formatEventDateTime(new Date().toISOString());
++                                const updatedLabel = group.updatedAt ? formatEventDateTime(group.updatedAt) : formatEventDateTime(new Date().toISOString());
++                                const totalRevenue = group.rows.filter(r => r.isPaymentConfirmed).reduce((sum, r) => sum + (r.totalValue || 0), 0);
+ 
+                                 return (
+                                     <article key={group.eventId} className="registration-event-group">
+                                         <div className="registration-event-group__head">
+                                             <div>
+                                                 <div className="table-name">{eventNameForReport}</div>
++                                                {totalRevenue > 0 && (
++                                                    <div className="revenue-badge">Valor Total Recebido: {currencyFormatter.format(totalRevenue)}</div>
++                                                )}
+                                                 <div className="table-meta table-meta--tight">
+                                                     {formatEventDate(eventDateForReport) || copy.eventsPanel.undefinedDate}
+                                                     {eventLocationForReport ? ` - ${eventLocationForReport}` : ''}
+@@ -5450,188 +5470,155 @@ const Dashboard = () => {
+                     {registrationsLoading ? (
+                         <div className="panel-subtitle">{copy.registrationsPanel.refresh}...</div>
+                     ) : registrationRows.length ? (
+-                        <div className="table-scroll">
+-                        <table className="data-table">
+-                            <thead>
+-                                <tr>
+-                                    <th>{copy.registrationsPanel.tablePhoto}</th>
+-                                    <th>{copy.registrationsPanel.tableAthlete}</th>
+-                                    <th>{copy.registrationsPanel.tableEvent}</th>
+-                                    <th>{copy.registrationsPanel.tableCategory}</th>
+-                                    <th>{copy.registrationsPanel.tableContact}</th>
+-                                    <th>{copy.registrationsPanel.tablePayment}</th>
+-                                    <th>{copy.registrationsPanel.tableNotes}</th>
+-                                    <th>{copy.registrationsPanel.tablePipeline}</th>
+-                                    <th>{copy.registrationsPanel.tableStatus}</th>
+-                                </tr>
+-                            </thead>
+-                            <tbody>
+-                                {registrationRows.map((item) => {
+-                                    const pipelineState = registrationPipelineById.get(item.id) || {
+-                                        doneSteps: [true, false, false, false],
+-                                        currentStepIndex: 0
+-                                    };
+-                                    const pipelineSteps = [
+-                                        copy.registrationsPanel.pipelineRegistered,
+-                                        copy.registrationsPanel.pipelineApproved,
+-                                        copy.registrationsPanel.pipelineCategory,
+-                                        copy.registrationsPanel.pipelineBracket
+-                                    ];
+-                                    const hasCategory = Boolean(pipelineState.doneSteps?.[2]);
+-                                    const hasBracket = Boolean(pipelineState.doneSteps?.[3]);
+-                                    const flowIndicator = item.isPaymentError
+-                                        ? { label: copy.registrationsPanel.flowStatusPaymentError, tone: 'danger' }
+-                                        : item.isPaymentConfirmed
+-                                            ? hasCategory && hasBracket
+-                                                ? { label: copy.registrationsPanel.flowStatusDone, tone: 'success' }
+-                                                : hasCategory
+-                                                    ? { label: copy.registrationsPanel.flowStatusCategory, tone: 'info' }
+-                                                    : { label: copy.registrationsPanel.flowStatusApproved, tone: 'pending' }
+-                                            : { label: copy.registrationsPanel.flowStatusPending, tone: 'pending' };
++                        
++                        <div className="registration-card-grid">
++                            {registrationRows.map((item) => {
++                                const pipelineState = registrationPipelineById.get(item.id) || {
++                                    doneSteps: [true, false, false, false],
++                                    currentStepIndex: 0
++                                };
++                                const pipelineSteps = [
++                                    copy.registrationsPanel.pipelineRegistered,
++                                    copy.registrationsPanel.pipelineApproved,
++                                    copy.registrationsPanel.pipelineCategory,
++                                    copy.registrationsPanel.pipelineBracket
++                                ];
++                                const hasCategory = Boolean(pipelineState.doneSteps?.[2]);
++                                const hasBracket = Boolean(pipelineState.doneSteps?.[3]);
++                                const flowIndicator = item.isPaymentError
++                                    ? { label: copy.registrationsPanel.flowStatusPaymentError, tone: 'danger' }
++                                    : item.isPaymentConfirmed
++                                        ? hasCategory && hasBracket
++                                            ? { label: copy.registrationsPanel.flowStatusDone, tone: 'success' }
++                                            : hasCategory
++                                                ? { label: copy.registrationsPanel.flowStatusCategory, tone: 'info' }
++                                                : { label: copy.registrationsPanel.flowStatusApproved, tone: 'pending' }
++                                        : { label: copy.registrationsPanel.flowStatusPending, tone: 'pending' };
+ 
+-                                    return (
+-                                    <tr key={item.id}>
+-                                        <td className="athlete-photo-cell">
+-                                            {item.athletePhotoUrl ? (
+-                                                <img className="athlete-photo" src={item.athletePhotoUrl} alt={item.nome || copy.registrationsPanel.tableAthlete} loading="lazy" />
+-                                            ) : (
+-                                                <span className="athlete-photo-empty">{copy.registrationsPanel.noPhoto}</span>
+-                                            )}
+-                                        </td>
+-                                        <td>
++                                return (
++                                <div key={item.id} className="registration-card">
++                                    <div className="registration-card__header">
++                                        {item.athletePhotoUrl ? (
++                                            <img className="registration-card__photo" src={item.athletePhotoUrl} alt={item.nome || copy.registrationsPanel.tableAthlete} loading="lazy" />
++                                        ) : (
++                                            <div className="registration-card__photo" title={copy.registrationsPanel.noPhoto}>
++                                                <User size={28} color="currentColor" style={{ opacity: 0.5 }} />
++                                            </div>
++                                        )}
++                                        <div className="registration-card__header-info">
+                                             <div className="table-name">{item.nome}</div>
+                                             <div className="table-meta table-meta--tight">{item.academia || copy.modalAssign.noAcademy}</div>
+-                                        </td>
+-                                        <td>
+-                                            <div className="table-name">{item.eventName}</div>
+-                                            <div className="table-meta table-meta--tight">{formatEventDate(item.eventDate)}</div>
+-                                        </td>
+-                                        <td>
+-                                            <div className="table-meta table-meta--tight">{item.modalidade || '-'}</div>
+-                                            <div className="table-meta table-meta--tight">
+-                                                {item.categoria || '-'} / {item.faixa || '-'} / {item.peso || '-'}
++                                            <div className={`points-pill ${item.isPendingSync ? 'points-pill--warning' : item.isPaymentError ? 'points-pill--danger' : ''}`} style={{ marginTop: '4px', display: 'inline-block' }}>
++                                                {item.statusLabel}
+                                             </div>
+-                                        </td>
+-                                        <td>
+-                                            <div className="table-meta table-meta--tight">{item.email || '-'}</div>
+-                                            <div className="table-meta table-meta--tight">{item.phone || '-'}</div>
+-                                        </td>
+-                                        <td>
+-                                            <div className="table-meta table-meta--tight">
+-                                                {copy.registrationsPanel.totalValue}: {currencyFormatter.format(item.totalValue || 0)}
++                                        </div>
++                                    </div>
++                                    <div className="registration-card__body">
++                                        <div className="registration-card__section-row">
++                                            <div className="registration-card__section">
++                                                <div className="registration-card__section-title">{copy.registrationsPanel.tableEvent}</div>
++                                                <div className="table-name">{item.eventName}</div>
++                                                <div className="table-meta table-meta--tight">{formatEventDate(item.eventDate)}</div>
+                                             </div>
+-                                            <div className="table-meta table-meta--tight">
+-                                                {copy.registrationsPanel.pixKey}: {item.notes?.pixKey || '-'}
++                                            <div className="registration-card__section" style={{ textAlign: 'right' }}>
++                                                <div className="registration-card__section-title">{copy.registrationsPanel.tableCategory}</div>
++                                                <div className="table-meta table-meta--tight">{item.modalidade || '-'}</div>
++                                                <div className="table-meta table-meta--tight">
++                                                    {item.categoria || '-'} / {item.faixa || '-'} / {item.peso || '-'}
++                                                </div>
+                                             </div>
+-                                            <div className="table-meta table-meta--tight">
+-                                                {copy.registrationsPanel.receipt}: {item.proofName || copy.registrationsPanel.noReceipt}
++                                        </div>
++                                        <div className="registration-card__section-row">
++                                            <div className="registration-card__section">
++                                                <div className="registration-card__section-title">{copy.registrationsPanel.tableContact}</div>
++                                                <div className="table-meta table-meta--tight">{item.email || '-'}</div>
++                                                <div className="table-meta table-meta--tight">{item.phone || '-'}</div>
+                                             </div>
+-                                            {item.proofFileUrl && (
+-                                                <div className="registration-proof-preview">
+-                                                    <div className="table-meta table-meta--tight">{copy.registrationsPanel.proofPreviewTitle}</div>
+-                                                    {item.isImageProof ? (
+-                                                        <img
+-                                                            className="registration-proof-thumb"
+-                                                            src={item.proofFileUrl}
+-                                                            alt={item.proofName || copy.registrationsPanel.proofPreviewTitle}
+-                                                            loading="lazy"
+-                                                        />
+-                                                    ) : item.isPdfProof ? (
+-                                                        <embed
+-                                                            className="registration-proof-thumb registration-proof-thumb--pdf"
+-                                                            src={`${item.proofFileUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+-                                                            type="application/pdf"
+-                                                        />
+-                                                    ) : (
+-                                                        <div className="registration-proof-thumb registration-proof-thumb--placeholder">
+-                                                            {copy.registrationsPanel.proofPreviewPdf}
+-                                                        </div>
+-                                                    )}
++                                            <div className="registration-card__section" style={{ textAlign: 'right' }}>
++                                                <div className="registration-card__section-title">{copy.registrationsPanel.tablePayment}</div>
++                                                <div className="registration-card__price-badge">
++                                                    {currencyFormatter.format(item.totalValue || 0)}
+                                                 </div>
+-                                            )}
+-                                            {item.proofFileUrl && (
+-                                                <button
+-                                                    type="button"
+-                                                    className="text-link"
+-                                                    onClick={() => handleOpenProofFile(item)}
+-                                                >
+-                                                    {copy.registrationsPanel.openReceipt}
+-                                                </button>
+-                                            )}
+-                                        </td>
+-                                        <td>
+-                                            <div className="table-meta table-meta--tight">{item.notesText || copy.registrationsPanel.noNotes}</div>
+-                                        </td>
+-                                        <td className="registration-pipeline-cell">
+-                                            <div className="registration-pipeline" role="list" aria-label={copy.registrationsPanel.tablePipeline}>
++                                            </div>
++                                        </div>
++                                        <div className="registration-card__section-row">
++                                           <div className="registration-card__section">
++                                                <div className="registration-card__section-title">{copy.registrationsPanel.receipt}</div>
++                                                <div className="table-meta table-meta--tight" style={{wordBreak: 'break-all'}}>
++                                                    {item.notes?.pixKey ? `Pix: ${item.notes.pixKey}` : '-'}
++                                                </div>
++                                                {item.proofFileUrl ? (
++                                                    <button type="button" className="text-link" onClick={() => handleOpenProofFile(item)} style={{ textAlign: 'left', padding: 0 }}>
++                                                        {copy.registrationsPanel.openReceipt}
++                                                    </button>
++                                                ) : (
++                                                    <div className="table-meta table-meta--tight">{copy.registrationsPanel.noReceipt}</div>
++                                                )}
++                                            </div>
++                                        </div>
++                                        {item.notesText && (
++                                            <div className="registration-card__section">
++                                                <div className="registration-card__section-title">{copy.registrationsPanel.tableNotes}</div>
++                                                <div className="table-meta table-meta--tight">{item.notesText}</div>
++                                            </div>
++                                        )}
++                                        <div className="registration-card__section">
++                                            <div className="registration-card__section-title">{copy.registrationsPanel.tablePipeline}</div>
++                                            <div className="registration-pipeline" role="list" style={{ marginTop: '4px' }}>
+                                                 {pipelineSteps.map((label, stepIndex) => (
+                                                     <span
+                                                         key={`${item.id}-pipeline-${stepIndex}`}
+                                                         className={`registration-pipeline__step ${pipelineState.doneSteps[stepIndex] ? 'is-done' : ''} ${pipelineState.currentStepIndex === stepIndex ? 'is-current' : ''}`}
+                                                         role="listitem"
++                                                        style={{ fontSize: '10px', padding: '2px 4px' }}
+                                                     >
+                                                         {label}
+                                                     </span>
+                                                 ))}
+                                             </div>
+-                                        </td>
+-                                        <td>
+-                                            <div className={`points-pill ${item.isPendingSync ? 'points-pill--warning' : item.isPaymentError ? 'points-pill--danger' : ''}`}>
+-                                                {item.statusLabel}
+-                                            </div>
+-                                            <div className="table-meta table-meta--tight">{formatEventDate(item.createdAt)}</div>
+-                                            <div className={`registration-flow-indicator registration-flow-indicator--${flowIndicator.tone}`}>
++                                            <div className={`registration-flow-indicator registration-flow-indicator--${flowIndicator.tone}`} style={{ marginTop: '8px' }}>
+                                                 {flowIndicator.tone === 'success' ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
+                                                 <span>{flowIndicator.label}</span>
+                                             </div>
+-                                            {!item.isPendingSync && canManagePanel && (
+-                                                <div className="registration-status-actions">
+-                                                    <button
+-                                                        type="button"
+-                                                        className="btn btn-ghost registration-status-btn"
+-                                                        onClick={() => handleUpdateRegistrationPaymentStatus(item, REGISTRATION_STATUS.PAYMENT_CONFIRMED)}
+-                                                        disabled={registrationStatusUpdatingId === item.id || item.isPaymentConfirmed}
+-                                                    >
+-                                                        <CheckCircle2 size={14} />
+-                                                        {copy.registrationsPanel.confirmPayment}
+-                                                    </button>
+-                                                    <button
+-                                                        type="button"
+-                                                        className="btn btn-ghost registration-status-btn"
+-                                                        onClick={() => handleUpdateRegistrationPaymentStatus(item, REGISTRATION_STATUS.PAYMENT_ERROR)}
+-                                                        disabled={registrationStatusUpdatingId === item.id || item.isPaymentError}
+-                                                    >
+-                                                        <AlertCircle size={14} />
+-                                                        {copy.registrationsPanel.markPaymentError}
+-                                                    </button>
+-                                                </div>
+-                                            )}
+-                                            {(item.paymentReviewNotes || item.paymentReviewedBy || item.paymentReviewedAt) && (
+-                                                <div className="registration-review-meta">
+-                                                    <div className="table-meta table-meta--tight">
+-                                                        {copy.registrationsPanel.reviewNotes}: {item.paymentReviewNotes || '-'}
+-                                                    </div>
+-                                                    <div className="table-meta table-meta--tight">
+-                                                        {copy.registrationsPanel.reviewedBy}: {item.paymentReviewedBy || '-'}
+-                                                    </div>
+-                                                    <div className="table-meta table-meta--tight">
+-                                                        {copy.registrationsPanel.reviewedAt}: {formatEventDate(item.paymentReviewedAt)}
+-                                                    </div>
+-                                                </div>
+-                                            )}
+-                                            {item.syncError && (
+-                                                <div className="table-meta table-meta--tight registration-sync-error">
+-                                                    {copy.registrationsPanel.lastError}: {item.syncError}
+-                                                    {item.syncTraceId ? ` - ${copy.registrationsPanel.traceId}: ${item.syncTraceId}` : ''}
+-                                                </div>
+-                                            )}
+-                                        </td>
+-                                    </tr>
+-                                    );
+-                                })}
+-                            </tbody>
+-                        </table>
++                                        </div>
++                                    </div>
++                                    <div className="registration-card__footer">
++                                        {!item.isPendingSync && canManagePanel && (
++                                            <div className="registration-card__actions">
++                                                <button
++                                                    type="button"
++                                                    className="btn btn-ghost registration-status-btn"
++                                                    onClick={() => handleUpdateRegistrationPaymentStatus(item, REGISTRATION_STATUS.PAYMENT_CONFIRMED)}
++                                                    disabled={registrationStatusUpdatingId === item.id || item.isPaymentConfirmed}
++                                                >
++                                                    <CheckCircle2 size={14} />
++                                                    Confirmar
++                                                </button>
++                                                <button
++                                                    type="button"
++                                                    className="btn btn-ghost registration-status-btn"
++                                                    onClick={() => handleUpdateRegistrationPaymentStatus(item, REGISTRATION_STATUS.PAYMENT_ERROR)}
++                                                    disabled={registrationStatusUpdatingId === item.id || item.isPaymentError}
++                                                >
++                                                    <AlertCircle size={14} />
++                                                    Erro
++                                                </button>
++                                            </div>
++                                        )}
++                                        {(item.paymentReviewNotes || item.paymentReviewedBy || item.paymentReviewedAt || item.syncError) && (
++                                            <div className="registration-review-meta">
++                                                {item.paymentReviewNotes && <div className="table-meta table-meta--tight">{copy.registrationsPanel.reviewNotes}: {item.paymentReviewNotes}</div>}
++                                                {item.paymentReviewedBy && <div className="table-meta table-meta--tight">{copy.registrationsPanel.reviewedBy}: {item.paymentReviewedBy}</div>}
++                                                {item.paymentReviewedAt && <div className="table-meta table-meta--tight">{copy.registrationsPanel.reviewedAt}: {formatEventDate(item.paymentReviewedAt)}</div>}
++                                                {item.syncError && <div className="table-meta table-meta--tight registration-sync-error" style={{marginTop: '4px'}}>{copy.registrationsPanel.lastError}: {item.syncError}</div>}
++                                            </div>
++                                        )}
++                                    </div>
++                                </div>
++                                );
++                            })}
+                         </div>
++
+                     ) : (
+                         <div className="panel-subtitle">{copy.registrationsPanel.noData}</div>
+                     )}
+@@ -5640,47 +5627,6 @@ const Dashboard = () => {
+                 {activeSection === 'brackets' && (
+                 <section className="panel" id="brackets">
+                     <div className="panel-header">
+-                        <div>
+-                            <div className="panel-title">{copy.bracketsPanel.title}</div>
+-                            <div className="panel-subtitle">{copy.bracketsPanel.subtitle}</div>
+-                        </div>
+-                        <div className="panel-actions">
+-                            {events.length > 0 && (
+-                                <select
+-                                    className="input select-compact"
+-                                    value={bracketEventId}
+-                                    onChange={(event) => setBracketEventId(event.target.value)}
+-                                    aria-label={copy.bracketsPanel.selectEventAria}
+-                                >
+-                                    <option value="">{copy.bracketsPanel.selectEvent}</option>
+-                                    {events.map((event) => (
+-                                        <option key={event.id} value={event.id}>{event.name}</option>
+-                                    ))}
+-                                </select>
+-                            )}
+-                            <select
+-                                className="input select-compact"
+-                                value={bracketMode}
+-                                onChange={(event) => setBracketMode(event.target.value)}
+-                                aria-label={copy.bracketsPanel.selectCategoryAria}
+-                            >
+-                                <option value="ALL">{copy.bracketsPanel.allCategories}</option>
+-                                <option value="GI">{isEnglish ? 'GI (weight)' : 'GI (peso)'}</option>
+-                                <option value="NO-GI">{isEnglish ? 'NO-GI (weight)' : 'NO-GI (peso)'}</option>
+-                                <option value="ABS-GI">ABS GI</option>
+-                                <option value="ABS-NO-GI">ABS NO-GI</option>
+-                            </select>
+-                            {canManagePanel && (
+-                                <button
+-                                    type="button"
+-                                    className="btn btn-primary"
+-                                    onClick={handleGenerateBrackets}
+-                                    disabled={!events.length}
+-                                >
+-                                    <ClipboardList size={14} />
+-                                    {copy.bracketsPanel.generate}
+-                                </button>
+-                            )}
+                             <button
+                                 type="button"
+                                 className="btn btn-secondary"
+@@ -5856,7 +5802,7 @@ const Dashboard = () => {
+                                         </div>
+                                     </div>
+                                     <div className="bracket-card__meta">
+-                                        {copy.bracketsPanel.event}: {eventLabel} ┬À {copy.bracketsPanel.athletes}: {bracketAthletes.length}
++                                        {copy.bracketsPanel.event}: {eventLabel} ÔÇó {copy.bracketsPanel.athletes}: {bracketAthletes.length}
+                                     </div>
+                                     <div className="bracket-grid">
+                                         <div className="bracket-matches">
+@@ -6200,6 +6146,260 @@ const Dashboard = () => {
+                     )}
+                 </section>
+                 )}
++                {canManagePanel && activeSection === 'superFights' && (
++                <section className="panel" id="superFights">
++                    <div className="panel-header">
++                        <div>
++                            <div className="panel-title">Lutas Casadas</div>
++                            <div className="panel-subtitle">Gerencie as lutas de disputa de cintur├úo.</div>
++                        </div>
++                    </div>
++                    <div className="panel-content">
++                        <div className="bracket-event-selector">
++                            <label className="bracket-field">
++                                <span>{copy.schedulePanel.selectEventLabel || 'Selecione o Campeonato'}</span>
++                                <select
++                                    className="input select-compact"
++                                    value={superFightsEventId}
++                                    onChange={(event) => setSuperFightsEventId(event.target.value)}
++                                >
++                                    <option value="">{copy.schedulePanel.selectEvent || 'Selecione'}</option>
++                                    {events.filter(e => e.beltRegistrationEnabled).map((event) => (
++                                        <option key={`sf-event-${event.id}`} value={event.id}>{event.name}</option>
++                                    ))}
++                                </select>
++                            </label>
++                        </div>
++                        {!superFightsEventId && (
++                            <div className="panel-subtitle">{copy.schedulePanel.selectEvent || 'Selecione um evento para continuar.'}</div>
++                        )}
++                        {superFightsEventId && (() => {
++                            const sfEvent = events.find(e => e.id === superFightsEventId);
++                            const superFightsList = sfEvent?.superFights || [];
++
++                            const BELT_OPTIONS = ['Branca', 'Cinza', 'Amarela', 'Laranja', 'Verde', 'Azul', 'Roxa', 'Marrom', 'Preta'];
++                            const CATEGORY_OPTIONS = ['Mirim', 'Infantil', 'Infanto-Juvenil', 'Juvenil', 'Adulto', 'Master'];
++
++                            const handleSave = async () => {
++                                const validFights = pendingSuperFights.filter(sf => sf.athlete1Name && sf.athlete2Name);
++                                if (validFights.length === 0) {
++                                    showFeedback('error', 'Preencha o nome dos atletas em pelo menos uma luta.');
++                                    return;
++                                }
++                                try {
++                                    const fightsToAdd = validFights.map(sf => ({ ...sf, id: crypto.randomUUID() }));
++                                    const updatedPayload = { ...sfEvent, superFights: [...superFightsList, ...fightsToAdd] };
++                                    const res = await eventAdminService.updateEvent(sfEvent.id, updatedPayload);
++                                    if (!res.skipped) {
++                                        showFeedback('success', fightsToAdd.length > 1 ? 'Lutas adicionadas com sucesso!' : 'Luta adicionada com sucesso!');
++                                        updateEvent(sfEvent.id, updatedPayload);
++                                        setPendingSuperFights([{
++                                            id: crypto.randomUUID(),
++                                            category: 'Adulto',
++                                            athlete1Name: '', athlete1Belt: 'Branca', athlete1Academy: '',
++                                            athlete2Name: '', athlete2Belt: 'Branca', athlete2Academy: '',
++                                            scheduledTime: ''
++                                        }]);
++                                    }
++                                } catch (error) {
++                                    showFeedback('error', error.message || 'Erro ao adicionar luta.');
++                                }
++                            };
++
++                            const handleRemove = async (sfId) => {
++                                try {
++                                    const updatedPayload = { ...sfEvent, superFights: superFightsList.filter(sf => sf.id !== sfId) };
++                                    const res = await eventAdminService.updateEvent(sfEvent.id, updatedPayload);
++                                    if (!res.skipped) {
++                                        showFeedback('success', 'Luta removida com sucesso!');
++                                        updateEvent(sfEvent.id, updatedPayload);
++                                    }
++                                } catch (error) {
++                                    showFeedback('error', error.message || 'Erro ao remover luta.');
++                                }
++                            };
++
++                            const handleAutoGenerate = async () => {
++                                if (!autoGenerateOptions.startTime || !autoGenerateOptions.intervalMins) {
++                                    showFeedback('error', 'Preencha o hor├írio de in├¡cio e o intervalo.');
++                                    return;
++                                }
++                                
++                                const categoryWeights = { 'Mirim': 1, 'Infantil': 2, 'Infanto-Juvenil': 3, 'Juvenil': 4, 'Adulto': 5, 'Master': 6 };
++                                const beltWeights = { 'Branca': 0, 'Cinza': 1, 'Amarela': 2, 'Laranja': 3, 'Verde': 4, 'Azul': 5, 'Roxa': 6, 'Marrom': 7, 'Preta': 8 };
++
++                                const sortedList = [...superFightsList].sort((a, b) => {
++                                    const catA = a.category || 'Adulto';
++                                    const catB = b.category || 'Adulto';
++                                    const isKidsA = categoryWeights[catA] < 5;
++                                    const isKidsB = categoryWeights[catB] < 5;
++
++                                    if (isKidsA && !isKidsB) return -1;
++                                    if (!isKidsA && isKidsB) return 1;
++
++                                    if (isKidsA && isKidsB) {
++                                        return categoryWeights[catA] - categoryWeights[catB];
++                                    }
++
++                                    // Para adultos/master: ordem de faixa decrescente (Preta -> Branca)
++                                    const beltA = beltWeights[a.athlete1Belt || 'Branca'] || 0;
++                                    const beltB = beltWeights[b.athlete1Belt || 'Branca'] || 0;
++                                    return beltB - beltA;
++                                });
++
++                                let [hours, mins] = autoGenerateOptions.startTime.split(':').map(Number);
++                                let currentTime = new Date();
++                                currentTime.setHours(hours, mins, 0, 0);
++
++                                const interval = parseInt(autoGenerateOptions.intervalMins, 10);
++
++                                const updatedList = sortedList.map(sf => {
++                                    const h = String(currentTime.getHours()).padStart(2, '0');
++                                    const m = String(currentTime.getMinutes()).padStart(2, '0');
++                                    const newTime = `${h}:${m}`;
++                                    currentTime.setMinutes(currentTime.getMinutes() + interval);
++                                    return { ...sf, scheduledTime: newTime };
++                                });
++
++                                try {
++                                    const updatedPayload = { ...sfEvent, superFights: updatedList };
++                                    const res = await eventAdminService.updateEvent(sfEvent.id, updatedPayload);
++                                    if (!res.skipped) {
++                                        showFeedback('success', 'Hor├írios gerados com sucesso!');
++                                        updateEvent(sfEvent.id, updatedPayload);
++                                    }
++                                } catch (error) {
++                                    showFeedback('error', error.message || 'Erro ao salvar hor├írios gerados.');
++                                }
++                            };
++
++                            const handleTogglePublishSuperFights = async () => {
++                                try {
++                                    const validFights = pendingSuperFights.filter(sf => sf.athlete1Name && sf.athlete2Name);
++                                    const fightsToAdd = validFights.map(sf => ({ ...sf, id: crypto.randomUUID() }));
++                                    
++                                    const updatedPayload = { 
++                                        ...sfEvent, 
++                                        superFights: [...superFightsList, ...fightsToAdd],
++                                        superFightsPublished: !sfEvent.superFightsPublished 
++                                    };
++                                    const res = await eventAdminService.updateEvent(sfEvent.id, updatedPayload);
++                                    if (!res.skipped) {
++                                        showFeedback('success', sfEvent.superFightsPublished ? 'Lutas despublicadas com sucesso!' : 'Lutas salvas e publicadas com sucesso!');
++                                        updateEvent(sfEvent.id, updatedPayload);
++                                        if (fightsToAdd.length > 0) {
++                                            setPendingSuperFights([{
++                                                id: crypto.randomUUID(),
++                                                category: 'Adulto',
++                                                athlete1Name: '', athlete1Belt: 'Branca', athlete1Academy: '',
++                                                athlete2Name: '', athlete2Belt: 'Branca', athlete2Academy: '',
++                                                scheduledTime: ''
++                                            }]);
++                                        }
++                                    }
++                                } catch (error) {
++                                    showFeedback('error', error.message || 'Erro ao alterar visibilidade das lutas.');
++                                }
++                            };
++
++                            return (
++                                <div className="bracket-schedule">
++                                    <div className="bracket-schedule__controls schedule-manual-form" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', marginBottom: '20px' }}>
++                                        {pendingSuperFights.map((fight, index) => (
++                                            <div key={fight.id} style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', position: 'relative' }}>
++                                                {pendingSuperFights.length > 1 && (
++                                                    <button type="button" onClick={() => setPendingSuperFights(pendingSuperFights.filter(f => f.id !== fight.id))} style={{ position: 'absolute', top: '10px', right: '10px', background: 'transparent', border: 'none', color: '#ff4444', cursor: 'pointer' }}>├ó┼ôÔÇô</button>
++                                                )}
++                                                <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end' }}>
++                                                    <label className="bracket-field" style={{ flex: 1 }}>
++                                                        <span>Categoria da Luta</span>
++                                                        <select className="input select-compact" value={fight.category} onChange={e => setPendingSuperFights(pendingSuperFights.map(f => f.id === fight.id ? {...f, category: e.target.value} : f))}>
++                                                            {CATEGORY_OPTIONS.map(opt => <option key={`cat-${opt}`} value={opt}>{opt}</option>)}
++                                                        </select>
++                                                    </label>
++                                                    <label className="bracket-field" style={{ flex: 1 }}>
++                                                        <span>Hor├írio Manual (Opcional)</span>
++                                                        <input className="input" placeholder="ex: 15:30" value={fight.scheduledTime} onChange={e => setPendingSuperFights(pendingSuperFights.map(f => f.id === fight.id ? {...f, scheduledTime: e.target.value} : f))} />
++                                                    </label>
++                                                </div>
++
++                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
++                                                    <div>
++                                                        <label className="bracket-field" style={{ marginBottom: '8px' }}><span>Atleta 1</span></label>
++                                                        <input className="input" placeholder="Nome" value={fight.athlete1Name} onChange={e => setPendingSuperFights(pendingSuperFights.map(f => f.id === fight.id ? {...f, athlete1Name: e.target.value} : f))} style={{ marginBottom: '8px' }} />
++                                                        <select className="input select-compact" value={fight.athlete1Belt} onChange={e => setPendingSuperFights(pendingSuperFights.map(f => f.id === fight.id ? {...f, athlete1Belt: e.target.value} : f))} style={{ marginBottom: '8px' }}>
++                                                            {BELT_OPTIONS.map(b => <option key={`b1-${b}`} value={b}>{b}</option>)}
++                                                        </select>
++                                                        <input className="input" placeholder="Academia" value={fight.athlete1Academy} onChange={e => setPendingSuperFights(pendingSuperFights.map(f => f.id === fight.id ? {...f, athlete1Academy: e.target.value} : f))} />
++                                                    </div>
++                                                    <div>
++                                                        <label className="bracket-field" style={{ marginBottom: '8px' }}><span>Atleta 2</span></label>
++                                                        <input className="input" placeholder="Nome" value={fight.athlete2Name} onChange={e => setPendingSuperFights(pendingSuperFights.map(f => f.id === fight.id ? {...f, athlete2Name: e.target.value} : f))} style={{ marginBottom: '8px' }} />
++                                                        <select className="input select-compact" value={fight.athlete2Belt} onChange={e => setPendingSuperFights(pendingSuperFights.map(f => f.id === fight.id ? {...f, athlete2Belt: e.target.value} : f))} style={{ marginBottom: '8px' }}>
++                                                            {BELT_OPTIONS.map(b => <option key={`b2-${b}`} value={b}>{b}</option>)}
++                                                        </select>
++                                                        <input className="input" placeholder="Academia" value={fight.athlete2Academy} onChange={e => setPendingSuperFights(pendingSuperFights.map(f => f.id === fight.id ? {...f, athlete2Academy: e.target.value} : f))} />
++                                                    </div>
++                                                </div>
++                                            </div>
++                                        ))}
++
++                                        <div style={{ display: 'flex', gap: '16px', marginTop: '8px' }}>
++                                            <button type="button" className="btn btn-secondary" onClick={() => setPendingSuperFights([...pendingSuperFights, { id: crypto.randomUUID(), category: 'Adulto', athlete1Name: '', athlete1Belt: 'Branca', athlete1Academy: '', athlete2Name: '', athlete2Belt: 'Branca', athlete2Academy: '', scheduledTime: '' }])}>
++                                                + Adicionar Mais Lutas
++                                            </button>
++                                            <button type="button" className="btn btn-primary" onClick={handleSave} style={{ flex: 1 }}>
++                                                Salvar Lutas Casadas
++                                            </button>
++                                        </div>
++                                    </div>
++                                    
++                                    <div style={{ padding: '20px', background: 'rgba(0,0,0,0.1)', borderRadius: '8px', marginBottom: '20px', display: 'flex', gap: '16px', alignItems: 'flex-end' }}>
++                                        <label className="bracket-field">
++                                            <span>Hor├írio In├¡cio</span>
++                                            <input type="time" className="input" value={autoGenerateOptions.startTime} onChange={e => setAutoGenerateOptions({...autoGenerateOptions, startTime: e.target.value})} />
++                                        </label>
++                                        <label className="bracket-field">
++                                            <span>Intervalo (min)</span>
++                                            <input type="number" className="input" style={{ width: '100px' }} value={autoGenerateOptions.intervalMins} onChange={e => setAutoGenerateOptions({...autoGenerateOptions, intervalMins: e.target.value})} />
++                                        </label>
++                                        <button type="button" className="btn btn-secondary" onClick={handleAutoGenerate}>
++                                            Gerar Hor├írios Automaticamente
++                                        </button>
++                                        <button type="button" className={`btn ${sfEvent.superFightsPublished ? 'btn-danger' : 'btn-success'}`} onClick={handleTogglePublishSuperFights}>
++                                            {sfEvent.superFightsPublished ? 'Despublicar Lutas Casadas' : 'Publicar Lutas Casadas'}
++                                        </button>
++                                    </div>
++
++                                    <div className="bracket-schedule__list">
++                                        {superFightsList.length > 0 ? superFightsList.map((sf, index) => (
++                                            <article key={sf.id} className="bracket-schedule__row schedule-row">
++                                                <div className="schedule-row__drag">
++                                                    <Swords size={16} />
++                                                </div>
++                                                <div className="schedule-row__time" style={{ width: '80px', flexShrink: 0 }}>
++                                                    {sf.scheduledTime || '--:--'}
++                                                    <div style={{ fontSize: '10px', color: '#a1a1aa', marginTop: '4px' }}>{sf.category}</div>
++                                                </div>
++                                                <div className="schedule-row__content" style={{ flex: 1 }}>
++                                                    <strong>{sf.athlete1Name} <span style={{color: '#a1a1aa', fontWeight: 400}}>({sf.athlete1Belt} - {sf.athlete1Academy})</span></strong>
++                                                    <div style={{ color: '#22c55e', fontSize: '12px', fontWeight: 'bold', margin: '4px 0' }}>VS</div>
++                                                    <strong>{sf.athlete2Name} <span style={{color: '#a1a1aa', fontWeight: 400}}>({sf.athlete2Belt} - {sf.athlete2Academy})</span></strong>
++                                                </div>
++                                                <div className="schedule-row__actions">
++                                                    <button type="button" className="btn btn-ghost" onClick={() => handleRemove(sf.id)}>
++                                                        <Trash2 size={14} /> Remover
++                                                    </button>
++                                                </div>
++                                            </article>
++                                        )) : <div className="panel-subtitle">Nenhuma luta casada adicionada.</div>}
++                                    </div>
++                                </div>
++                            );
++                        })()}
++                    </div>
++                </section>
++                )}
+                 {canManagePanel && activeSection === 'overview' && (
+                 <section className="panel">
+                     <div className="panel-header">
+@@ -6889,7 +7089,7 @@ const Dashboard = () => {
+                                     <div>
+                                         <div className="modal-title">{copy.schedulePanel.tvModeTitle}</div>
+                                         <div className="panel-subtitle">
+-                                            {eventMap[scheduleEventId]?.name || copy.common.noEvent} ┬À {copy.schedulePanel.tvModeNow}: {now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
++                                            {eventMap[scheduleEventId]?.name || copy.common.noEvent} ÔÇó {copy.schedulePanel.tvModeNow}: {now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
+                                         </div>
+                                     </div>
+                                     <button type="button" className="btn btn-ghost" onClick={() => setShowScheduleTvMode(false)}>
+@@ -6915,7 +7115,7 @@ const Dashboard = () => {
+                                                 <div className="bracket-tv-mode__time">{row.startLabel} - {row.endLabel}</div>
+                                                 <div className="bracket-tv-mode__content">
+                                                     <strong>{row.title}</strong>
+-                                                    <span>{row.typeLabel} ┬À {row.area || '-'}</span>
++                                                    <span>{row.typeLabel} ÔÇó {row.area || '-'}</span>
+                                                 </div>
+                                             </div>
+                                         );

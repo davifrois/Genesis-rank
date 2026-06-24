@@ -1,6 +1,7 @@
 package br.com.genesis.ranking.controller;
 
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -29,9 +30,10 @@ public class RankingController {
   }
 
   @GetMapping("/teams")
-  public List<TeamRankingDto> getTeamRanking(
+  public Map<String, List<TeamRankingDto>> getTeamRanking(
       @RequestParam(name = "eventId", required = false) String eventId
   ) {
     return rankingService.buildTeamRanking(eventId);
   }
 }
+

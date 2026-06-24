@@ -1,16 +1,72 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { useSiteAutoTranslator } from './useSiteAutoTranslator';
 
 const I18N_STORAGE_KEY = 'genesis_site_language';
+const FLAG_CDN_BASE = 'https://flagcdn.com/w40';
+const TRANSLATION_CODE_BY_LANGUAGE = {
+  'en-US': 'en',
+  'pt-BR': 'pt',
+  'es-ES': 'es',
+  'de-DE': 'de',
+  'nl-NL': 'nl',
+  'ja-JP': 'ja',
+  'fr-FR': 'fr',
+  'it-IT': 'it',
+  'nb-NO': 'no',
+  'pl-PL': 'pl',
+  'ru-RU': 'ru',
+  'sv-SE': 'sv',
+  'cs-CZ': 'cs',
+  'sr-RS': 'sr',
+  'zh-CN': 'zh-CN',
+  'ko-KR': 'ko',
+  'ar-AE': 'ar',
+  'uk-UA': 'uk'
+};
+
+const buildFlag = (code = '') => {
+  const normalized = code.toString().trim().toLowerCase();
+  return normalized ? `${FLAG_CDN_BASE}/${normalized}.png` : '';
+};
+
+const buildLanguageOption = ({
+  id,
+  label,
+  country,
+  countryCodes,
+  uiLanguage,
+  translationCode = TRANSLATION_CODE_BY_LANGUAGE[id] || 'en',
+  translationStatus = 'auto'
+}) => ({
+  id,
+  label,
+  country,
+  countryCodes,
+  flagImages: countryCodes.map(buildFlag).filter(Boolean),
+  uiLanguage: uiLanguage || id,
+  translationCode,
+  translationStatus
+});
 
 const LANGUAGE_OPTIONS = [
-  { id: 'pt-BR', label: 'Portugues', country: 'Brasil', flag: '🇧🇷', uiLanguage: 'pt-BR' },
-  { id: 'en-US', label: 'English', country: 'United States', flag: '🇺🇸', uiLanguage: 'en-US' },
-  { id: 'es-ES', label: 'Espanol', country: 'Espana', flag: '🇪🇸', uiLanguage: 'es-ES' },
-  { id: 'fr-FR', label: 'Francais', country: 'France', flag: '🇫🇷', uiLanguage: 'fr-FR' },
-  { id: 'de-DE', label: 'Deutsch', country: 'Deutschland', flag: '🇩🇪', uiLanguage: 'en-US' },
-  { id: 'it-IT', label: 'Italiano', country: 'Italia', flag: '🇮🇹', uiLanguage: 'en-US' },
-  { id: 'ja-JP', label: 'Nihongo', country: 'Nihon', flag: '🇯🇵', uiLanguage: 'en-US' },
-  { id: 'ar-SA', label: 'Arabic', country: 'Saudi Arabia', flag: '🇸🇦', uiLanguage: 'en-US' }
+  buildLanguageOption({ id: 'en-US', label: 'English', country: 'United States', countryCodes: ['us'], uiLanguage: 'en-US' }),
+  buildLanguageOption({ id: 'pt-BR', label: 'Portugues', country: 'Brasil / Portugal', countryCodes: ['br', 'pt'], uiLanguage: 'pt-BR', translationStatus: 'native' }),
+  buildLanguageOption({ id: 'es-ES', label: 'Espanol', country: 'Mexico / Espana', countryCodes: ['mx', 'es'], uiLanguage: 'es-ES' }),
+  buildLanguageOption({ id: 'de-DE', label: 'Deutsch', country: 'Deutschland', countryCodes: ['de'] }),
+  buildLanguageOption({ id: 'nl-NL', label: 'Nederlands', country: 'Nederland', countryCodes: ['nl'] }),
+  buildLanguageOption({ id: 'ja-JP', label: 'Japanese', country: 'Japan', countryCodes: ['jp'] }),
+  buildLanguageOption({ id: 'fr-FR', label: 'Francais', country: 'France', countryCodes: ['fr'], uiLanguage: 'fr-FR', translationStatus: 'native' }),
+  buildLanguageOption({ id: 'it-IT', label: 'Italiano', country: 'Italia', countryCodes: ['it'] }),
+  buildLanguageOption({ id: 'nb-NO', label: 'Norsk', country: 'Norge', countryCodes: ['no'] }),
+  buildLanguageOption({ id: 'pl-PL', label: 'Polski', country: 'Polska', countryCodes: ['pl'] }),
+  buildLanguageOption({ id: 'ru-RU', label: 'Russian', country: 'Russia', countryCodes: ['ru'] }),
+  buildLanguageOption({ id: 'sv-SE', label: 'Svenska', country: 'Sverige', countryCodes: ['se'] }),
+  buildLanguageOption({ id: 'cs-CZ', label: 'Cestina', country: 'Cesko', countryCodes: ['cz'] }),
+  buildLanguageOption({ id: 'sr-RS', label: 'Srpski', country: 'Srbija', countryCodes: ['rs'] }),
+  buildLanguageOption({ id: 'zh-CN', label: 'Chinese', country: 'China', countryCodes: ['cn'] }),
+  buildLanguageOption({ id: 'ko-KR', label: 'Korean', country: 'Korea', countryCodes: ['kr'] }),
+  buildLanguageOption({ id: 'ar-AE', label: 'Arabic', country: 'United Arab Emirates', countryCodes: ['ae'] }),
+  buildLanguageOption({ id: 'uk-UA', label: 'Ukrainian', country: 'Ukraine', countryCodes: ['ua'] })
 ];
 
 const findLanguageOption = (id) => LANGUAGE_OPTIONS.find((option) => option.id === id) || null;
@@ -23,9 +79,19 @@ const resolveBrowserLanguage = (browserLanguage) => {
   if (browser.startsWith('es')) return 'es-ES';
   if (browser.startsWith('fr')) return 'fr-FR';
   if (browser.startsWith('de')) return 'de-DE';
+  if (browser.startsWith('nl')) return 'nl-NL';
   if (browser.startsWith('it')) return 'it-IT';
   if (browser.startsWith('ja')) return 'ja-JP';
-  if (browser.startsWith('ar')) return 'ar-SA';
+  if (browser.startsWith('nb') || browser.startsWith('no')) return 'nb-NO';
+  if (browser.startsWith('pl')) return 'pl-PL';
+  if (browser.startsWith('ru')) return 'ru-RU';
+  if (browser.startsWith('sv')) return 'sv-SE';
+  if (browser.startsWith('cs')) return 'cs-CZ';
+  if (browser.startsWith('sr')) return 'sr-RS';
+  if (browser.startsWith('zh')) return 'zh-CN';
+  if (browser.startsWith('ko')) return 'ko-KR';
+  if (browser.startsWith('ar')) return 'ar-AE';
+  if (browser.startsWith('uk')) return 'uk-UA';
   return 'pt-BR';
 };
 
@@ -44,6 +110,7 @@ const resolveInitialLanguage = () => {
 };
 
 const resolveUiVariant = (uiLanguage) => {
+  if (uiLanguage === 'pt-BR') return 'pt';
   if (uiLanguage === 'en-US') return 'en';
   if (uiLanguage === 'es-ES') return 'es';
   if (uiLanguage === 'fr-FR') return 'fr';
@@ -54,43 +121,44 @@ const I18nContext = createContext(null);
 
 export const I18nProvider = ({ children }) => {
   const [language, setLanguage] = useState(resolveInitialLanguage);
+  const option = findLanguageOption(language) || LANGUAGE_OPTIONS[0];
+  useSiteAutoTranslator(option);
 
   useEffect(() => {
-    const option = findLanguageOption(language) || LANGUAGE_OPTIONS[0];
     const isRtl = option.id.startsWith('ar');
 
     if (typeof window !== 'undefined') {
       try {
-        window.localStorage.setItem(I18N_STORAGE_KEY, language);
+        window.localStorage.setItem(I18N_STORAGE_KEY, option.id);
       } catch {
         // Ignore storage write errors.
       }
     }
     if (typeof document !== 'undefined') {
-      document.documentElement.lang = language;
+      document.documentElement.lang = option.id;
       document.documentElement.dir = isRtl ? 'rtl' : 'ltr';
     }
-  }, [language]);
+  }, [option]);
 
   const value = useMemo(() => {
-    const option = findLanguageOption(language) || LANGUAGE_OPTIONS[0];
-    const uiLanguage = option.uiLanguage || 'pt-BR';
+    const uiLanguage = option.uiLanguage || 'en-US';
     const uiVariant = resolveUiVariant(uiLanguage);
 
     return {
-      language,
+      language: option.id,
       uiLanguage,
       uiVariant,
-      locale: language,
+      locale: option.id,
       currentLanguage: option,
       languages: LANGUAGE_OPTIONS,
+      translationCode: option.translationCode,
       isEnglishUi: uiLanguage === 'en-US',
       isPortugueseUi: uiLanguage === 'pt-BR',
       isSpanishUi: uiLanguage === 'es-ES',
       isFrenchUi: uiLanguage === 'fr-FR',
       setLanguage
     };
-  }, [language]);
+  }, [option]);
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 };

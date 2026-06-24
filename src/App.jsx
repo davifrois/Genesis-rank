@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import {
   AlertCircle,
@@ -11,6 +11,7 @@ import {
   Mail,
   MapPin,
   Phone,
+  Settings,
   Trophy,
   User,
   Users,
@@ -19,6 +20,8 @@ import {
 import { AnimatePresence, motion } from 'framer-motion';
 import About from './pages/About';
 import Athletes from './pages/Athletes';
+import Teams from './pages/Teams';
+import TeamProfile from './pages/TeamProfile';
 import Dashboard from './pages/Dashboard';
 import Events from './pages/Events';
 import EventDetails from './pages/EventDetails';
@@ -33,10 +36,13 @@ import Regulations from './pages/Regulations';
 import Ranking from './pages/Ranking';
 import TeamRanking from './pages/TeamRanking';
 import EventRegistration from './pages/EventRegistration';
+import SettingsPage from './pages/Settings';
+import AcademyRegistration from './pages/AcademyRegistration';
 import { useStore } from './hooks/useStore';
 import { useI18n } from './hooks/useI18n';
 import LoginOverlay from './components/LoginOverlay';
 import { DEFAULT_EVENT_FEES, DEFAULT_EVENT_PIX_KEY } from './utils/eventPricing';
+import { compressImage } from './utils/imageUtils';
 import './index.css';
 
 const MAX_EVENT_POSTER_UPLOAD_BYTES = 8_000_000;
@@ -92,12 +98,7 @@ const formatBytes = (bytes) => {
   return `${mb.toFixed(2)} MB`;
 };
 
-const readFileAsDataUrl = (file) => new Promise((resolve, reject) => {
-  const reader = new FileReader();
-  reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
-  reader.onerror = () => reject(new Error('Falha ao ler o arquivo.'));
-  reader.readAsDataURL(file);
-});
+const readFileAsDataUrl = (file) => compressImage(file, 800, 800, 0.7);
 
 const loadImageFromDataUrl = (dataUrl) => new Promise((resolve, reject) => {
   const image = new Image();
@@ -175,6 +176,8 @@ const AppLayout = () => {
   const {
     currentUser,
     events,
+    memberProfiles,
+    deleteMemberProfile,
     eventModalOpen,
     closeEventModal,
     addEvent,
@@ -184,14 +187,55 @@ const AppLayout = () => {
   const [logoReady, setLogoReady] = useState(true);
   const [eventForm, setEventForm] = useState(createEventFormState);
   const [eventError, setEventError] = useState('');
+
+  // ONE-TIME CLEANUP FOR TEST PROFILES
+  useEffect(() => {
+    if (memberProfiles?.length > 0 && deleteMemberProfile) {
+      const namesToRemove = [
+        "Davi frois",
+        "Regis Frois santos Frois",
+        "Teste Davifrois Token",
+        "Davifrois",
+        "Teste Fluxo Aprovacao",
+        "ATLETA SMOKE 20260310140618",
+        "Teste Approve Fluxo",
+        "Atleta Mail"
+      ];
+      const toRemove = memberProfiles.filter(p => namesToRemove.includes(p.fullName) || namesToRemove.includes(p.nome));
+      if (toRemove.length > 0) {
+        toRemove.forEach(p => deleteMemberProfile(p.id));
+      }
+    }
+  }, [memberProfiles, deleteMemberProfile]);
   const [eventSuccess, setEventSuccess] = useState('');
   const [showLogin, setShowLogin] = useState(false);
+  
+  const linkedProfiles = useMemo(() => {
+    if (!currentUser || !memberProfiles) return [];
+    const username = (currentUser.username || '').toLowerCase();
+    return memberProfiles.filter(p => {
+      const accUser = (p.accountUsername || p.loginUsername || p.username || '').toLowerCase();
+      const createdBy = (p.createdByUsername || '').toLowerCase();
+      const email = (p.email || '').toLowerCase();
+      return accUser === username || createdBy === username || email === username || p.id === currentUser.id;
+    });
+  }, [currentUser, memberProfiles]);
+
+  const mainProfile = linkedProfiles[0];
+  const finalAvatar = mainProfile?.photoUrl || mainProfile?.avatarUrl || currentUser?.avatarUrl || currentUser?.avatar || currentUser?.photoUrl;
+  const finalName = mainProfile?.fullName || currentUser?.name || currentUser?.fullName || 'Atleta';
+  const finalBelt = mainProfile?.belt || currentUser?.belt || 'Branca';
+
   const currentUserRole = (currentUser?.role || '').toString().trim().toLowerCase();
   const isCoachUser = currentUserRole === 'coach' || currentUserRole === 'professor';
   const canAccessAdmin = currentUserRole === 'admin';
   const canAccessDashboard = canAccessAdmin || currentUserRole === 'mesario';
   const isAdminRoute = location.pathname.startsWith('/admin');
   const isHomeRoute = location.pathname === '/';
+  const isEventsRoute = location.pathname.startsWith('/eventos');
+  const isOrganizersRoute = location.pathname.startsWith('/organizadores');
+  const isAboutRoute = location.pathname.startsWith('/institucional');
+  const isRegulationsRoute = location.pathname.startsWith('/regulamento');
   const { language, setLanguage, currentLanguage, languages, uiLanguage } = useI18n();
   const isEnglish = uiLanguage === 'en-US';
   const isSpanish = uiLanguage === 'es-ES';
@@ -222,7 +266,7 @@ const AppLayout = () => {
             events: 'Events',
             rankings: 'Rankings',
             athletes: 'Athletes',
-            membership: 'Membership',
+            teams: 'Teams',
             news: 'News',
             regulations: 'Regulations'
           },
@@ -345,7 +389,7 @@ const AppLayout = () => {
               events: 'Eventos',
               rankings: 'Rankings',
               athletes: 'Atletas',
-              membership: 'Filiacion',
+              teams: 'Equipos',
               news: 'Noticias',
               regulations: 'Reglamento'
             },
@@ -468,7 +512,7 @@ const AppLayout = () => {
                 events: 'Evenements',
                 rankings: 'Rankings',
                 athletes: 'Athletes',
-                membership: 'Affiliation',
+                teams: 'Equipes',
                 news: 'Actualites',
                 regulations: 'Reglement'
               },
@@ -590,7 +634,7 @@ const AppLayout = () => {
                 events: 'Eventos',
                 rankings: 'Rankings',
                 athletes: 'Atletas',
-                membership: 'Filiacao',
+                teams: 'Equipes',
                 news: 'Noticias',
                 regulations: 'Regulamento'
               },
@@ -755,12 +799,9 @@ const AppLayout = () => {
 
   const navRight = useMemo(() => ([
     {
-      label: copy.nav.membership,
-      activePaths: ['/filiacao'],
-      items: [
-        { label: copy.membershipMenu.member, path: '/filiacao?tab=member', icon: User },
-        { label: copy.membershipMenu.registerAcademy, path: '/filiacao?tab=academy', icon: Users }
-      ]
+      label: copy.nav.teams,
+      activePaths: ['/equipes', '/equipe'],
+      path: '/equipes'
     },
     {
       label: copy.nav.news,
@@ -965,6 +1006,7 @@ const AppLayout = () => {
         ...(isCoachUser
           ? [{ label: copy.accountMenu.academy, path: '/academia', icon: Users }]
           : []),
+        { label: copy.accountMenu.settings, path: '/configuracoes', icon: Settings },
         ...(canAccessDashboard
           ? [{ label: copy.accountMenu.manageProfiles, path: '/admin', icon: Users }]
           : []),
@@ -1105,8 +1147,59 @@ const AppLayout = () => {
                   {copy.utility.account}
                   <ChevronDown size={12} />
                 </button>
-                <div className="utility-dropdown__panel">
-                  {accountItems.map(renderAccountItem)}
+                <div className="utility-dropdown__panel utility-dropdown__panel--account">
+                  {currentUser && (
+                    <div className="account-dropdown-header">
+                      <div className="account-dropdown-avatar">
+                        {finalAvatar ? (
+                          <img src={finalAvatar} alt="" />
+                        ) : (
+                          <span>{(finalName).charAt(0).toUpperCase()}</span>
+                        )}
+                      </div>
+                      <div className="account-dropdown-info">
+                        <strong>{finalName}</strong>
+                        <small>{finalBelt}</small>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="account-dropdown-group">
+                    {accountItems.map(renderAccountItem)}
+                  </div>
+                  
+                  {currentUser && linkedProfiles.length > 0 && (
+                    <div className="account-dropdown-linked">
+                      <div className="linked-label">PERFIS LIGADOS</div>
+                      {linkedProfiles.map(profile => (
+                        <Link to="/minha-conta" key={profile.id} className="linked-profile" style={{ marginBottom: linkedProfiles.length > 1 ? '8px' : 0 }}>
+                          <div className="account-dropdown-avatar account-dropdown-avatar--small">
+                            {profile.photoUrl || profile.avatarUrl ? (
+                              <img src={profile.photoUrl || profile.avatarUrl} alt="" />
+                            ) : (
+                              <span>{(profile.fullName || 'U').charAt(0).toUpperCase()}</span>
+                            )}
+                          </div>
+                          <span>{profile.fullName}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                  {currentUser && linkedProfiles.length === 0 && (
+                    <div className="account-dropdown-linked">
+                      <div className="linked-label">PERFIS LIGADOS</div>
+                      <Link to="/minha-conta" className="linked-profile">
+                        <div className="account-dropdown-avatar account-dropdown-avatar--small">
+                          {finalAvatar ? (
+                            <img src={finalAvatar} alt="" />
+                          ) : (
+                            <span>{(finalName).charAt(0).toUpperCase()}</span>
+                          )}
+                        </div>
+                        <span>{finalName}</span>
+                      </Link>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="utility-dropdown utility-dropdown--language">
@@ -1165,8 +1258,8 @@ const AppLayout = () => {
         </div>
       </header>
 
-      <main className={`app-main ${isAdminRoute ? 'app-main--admin' : ''}`}>
-        <div className={`container ${isAdminRoute ? 'container--admin' : ''} ${isHomeRoute ? 'container--home' : ''}`}>
+      <main className={`app-main ${isAdminRoute ? 'app-main--admin' : ''} ${(isEventsRoute || isOrganizersRoute || isAboutRoute || isRegulationsRoute) ? 'app-main--full' : ''}`}>
+        <div className={`container ${isAdminRoute ? 'container--admin' : ''} ${isHomeRoute ? 'container--home' : ''} ${(isEventsRoute || isOrganizersRoute || isAboutRoute || isRegulationsRoute) ? 'container--full' : ''}`}>
           <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}
@@ -1191,9 +1284,13 @@ const AppLayout = () => {
                 <Route path="/ranking" element={<Ranking />} />
                 <Route path="/ranking-equipes" element={<TeamRanking />} />
                 <Route path="/atletas" element={<Athletes />} />
+                <Route path="/equipes" element={<Teams />} />
+                <Route path="/equipe/:academyId" element={<TeamProfile />} />
                 <Route path="/filiacao" element={<Membership />} />
                 <Route path="/academia" element={<Membership />} />
+                <Route path="/registro-academia" element={<AcademyRegistration />} />
                 <Route path="/minha-conta" element={<MyAccount />} />
+                <Route path="/configuracoes" element={<SettingsPage />} />
                 <Route path="/regulamento" element={<Regulations />} />
                 <Route path="/noticias" element={<News />} />
               </Routes>

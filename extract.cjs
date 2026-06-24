@@ -1,0 +1,20 @@
+const fs = require('fs');
+let code = fs.readFileSync('src/pages/Dashboard.jsx', 'utf8');
+const sfStart = code.indexOf('<div className="bracket-event-selector">');
+const sfEnd = code.indexOf('</section>', sfStart);
+const superFightsCode = code.substring(sfStart, sfEnd);
+let oldCode = fs.readFileSync('dashboard_old.jsx', 'utf8');
+const bracketsStart = oldCode.indexOf('<div className="panel-content">', oldCode.indexOf('{activeSection === \'brackets\' && ('));
+const bracketsEnd = oldCode.indexOf('</section>', bracketsStart);
+const bracketsCode = oldCode.substring(bracketsStart, bracketsEnd);
+const scheduleStart = oldCode.indexOf('{activeSection === \'schedule\' && (');
+const scheduleEndStr = '</section>\\r\\n                )}\\r\\n                {canManagePanel && activeSection === \'overview\' && (';
+const scheduleEnd = oldCode.indexOf('</section>', scheduleStart) + 10;
+const scheduleCode = oldCode.substring(scheduleStart, scheduleEnd);
+console.log('SF len:', superFightsCode.length);
+console.log('Brackets len:', bracketsCode.length);
+console.log('Schedule len:', scheduleCode.length);
+fs.writeFileSync('superFights_extracted.txt', superFightsCode);
+fs.writeFileSync('brackets_extracted.txt', bracketsCode);
+fs.writeFileSync('schedule_extracted.txt', scheduleCode);
+

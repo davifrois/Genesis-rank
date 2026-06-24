@@ -9,6 +9,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
@@ -32,9 +33,23 @@ public class Bracket extends BaseEntity {
   @Column(length = 20)
   private String mode;
 
+  @Column(length = 40)
+  private String format;
+
   private Integer size;
 
   private Instant appliedAt;
+
+  @Column(name = "is_published", nullable = false)
+  private Boolean published = false;
+
+  @Lob
+  @Column(name = "walkovers_json")
+  private String walkoversJson;
+
+  @Lob
+  @Column(name = "live_matches_json")
+  private String liveMatchesJson;
 
   @OneToMany(mappedBy = "bracket", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
   private List<BracketSeed> seeds = new ArrayList<>();
@@ -90,12 +105,43 @@ public class Bracket extends BaseEntity {
     this.size = size;
   }
 
+  public String getFormat() {
+    return format;
+  }
+
+  public void setFormat(String format) {
+    this.format = format;
+  }
+
   public Instant getAppliedAt() {
     return appliedAt;
   }
 
   public void setAppliedAt(Instant appliedAt) {
     this.appliedAt = appliedAt;
+  }
+
+  public boolean isPublished() { published != null ? published : false;
+  }
+
+  public void setPublished(Boolean published) {
+    this.published = published;
+  }
+
+  public String getWalkoversJson() {
+    return walkoversJson;
+  }
+
+  public void setWalkoversJson(String walkoversJson) {
+    this.walkoversJson = walkoversJson;
+  }
+
+  public String getLiveMatchesJson() {
+    return liveMatchesJson;
+  }
+
+  public void setLiveMatchesJson(String liveMatchesJson) {
+    this.liveMatchesJson = liveMatchesJson;
   }
 
   public List<BracketSeed> getSeeds() {

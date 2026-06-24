@@ -77,29 +77,30 @@ const EventReports = () => {
   const copyByLanguage = {
     pt: {
       back: 'Voltar para evento',
-      titleAcademy: 'Relacao de atletas por academia',
-      titleCategory: 'Relacao de atletas por categoria',
+      titleAcademy: 'Relação de atletas por academia',
+      titleCategory: 'Relação de atletas por categoria',
       updatedAt: 'Atualizado em',
       totalAthletes: 'Total de atletas',
       athlete: 'Atleta',
       academy: 'Academia',
-      division: 'Divisao',
-      noData: 'Nenhuma inscricao encontrada para este evento/modalidade.',
-      loading: 'Carregando inscricoes...',
+      division: 'Divisão',
+      noData: 'Nenhuma inscrição encontrada para este evento/modalidade.',
+      loading: 'Carregando inscrições...',
       printReport: 'Imprimir',
       exportPdf: 'Exportar PDF',
       exportingPdf: 'Gerando PDF...',
-      exportPdfError: 'Falha ao gerar PDF do relatorio.',
+      exportPdfError: 'Falha ao gerar PDF do relatório.',
       openWeightGi: 'Tabela de peso',
       openWeightNoGi: 'Tabela de peso NO-GI',
       openCircular: 'Circular do evento',
-      missingResource: 'Arquivo nao configurado',
+      missingResource: 'Arquivo não configurado',
       actions: {
         byAcademyGi: 'Atletas por academia',
         byCategoryGi: 'Atletas por categoria',
         byAcademyNoGi: 'Atletas por academia NO-GI',
         byCategoryNoGi: 'Atletas por categoria NO-GI'
-      }
+      },
+      notPublishedYet: 'Relatórios em preparação. Aguarde a publicação oficial do evento.'
     },
     en: {
       back: 'Back to event',
@@ -125,7 +126,8 @@ const EventReports = () => {
         byCategoryGi: 'Athletes by category',
         byAcademyNoGi: 'Athletes by academy NO-GI',
         byCategoryNoGi: 'Athletes by category NO-GI'
-      }
+      },
+      notPublishedYet: 'Reports are in preparation. Wait for official event publishing.'
     },
     es: {
       back: 'Volver al evento',
@@ -151,7 +153,8 @@ const EventReports = () => {
         byCategoryGi: 'Atletas por categoria',
         byAcademyNoGi: 'Atletas por academia NO-GI',
         byCategoryNoGi: 'Atletas por categoria NO-GI'
-      }
+      },
+      notPublishedYet: 'Los reportes estan en preparacion. Espere la publicacion oficial del evento.'
     },
     fr: {
       back: "Retour a l'evenement",
@@ -177,7 +180,8 @@ const EventReports = () => {
         byCategoryGi: 'Athletes par categorie',
         byAcademyNoGi: 'Athletes par academie NO-GI',
         byCategoryNoGi: 'Athletes par categorie NO-GI'
-      }
+      },
+      notPublishedYet: 'Les rapports sont en preparation. Attendez la publication officielle de l evenement.'
     }
   };
 
@@ -200,7 +204,7 @@ const EventReports = () => {
       } catch (err) {
         if (cancelled) return;
         setRegistrations([]);
-        setError(err?.message || 'Falha ao carregar inscricoes.');
+        setError(err?.message || 'Falha ao carregar inscrições.');
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -303,6 +307,7 @@ const EventReports = () => {
   const eventName = event?.name || (registrations[0]?.eventName || 'Evento');
   const eventDate = event?.date || registrations[0]?.eventDate || '';
   const eventLocation = event?.location || registrations[0]?.eventLocation || '';
+  const isPublicLocked = Boolean(event && event.registrationOpen === false && event.publicPublished === false);
 
   const handleExportPdf = async () => {
     if (loading || rows.length === 0 || exportingPdf) return;
@@ -328,6 +333,14 @@ const EventReports = () => {
 
   return (
     <div className="public-page">
+      {isPublicLocked ? (
+        <section className="public-section">
+          <div className="content-card">
+            <p>{copy.notPublishedYet}</p>
+            <Link className="text-link" to={`/eventos/${eventId}`}>{copy.back}</Link>
+          </div>
+        </section>
+      ) : (
       <section className="event-report-shell">
         <header className="event-report-top">
           <div className="event-report-top__head">
@@ -454,6 +467,7 @@ const EventReports = () => {
           )}
         </article>
       </section>
+      )}
     </div>
   );
 };
