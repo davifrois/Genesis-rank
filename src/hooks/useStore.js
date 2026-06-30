@@ -55,6 +55,10 @@ const DEFAULT_ACADEMIES = [
         city: 'Belo Horizonte',
         state: 'MG',
         logoUrl: '',
+        ownerUsername: 'davifrois',
+        ownerName: 'Davi oliveira frois',
+        coachUsername: 'davifrois',
+        coachName: 'Davi oliveira frois',
         createdAt: '2026-01-10T12:00:00.000Z'
     },
     {
@@ -65,6 +69,33 @@ const DEFAULT_ACADEMIES = [
         state: 'MG',
         logoUrl: '',
         createdAt: '2026-01-15T12:00:00.000Z'
+    }
+];
+
+const DEFAULT_MEMBER_PROFILES = [
+    {
+        id: 'member-davi-frois-coach-001',
+        firstName: 'Davi',
+        lastName: 'oliveira frois',
+        fullName: 'Davi oliveira frois',
+        birthDate: '',
+        age: '',
+        gender: 'Masculino',
+        accountUsername: 'davifrois',
+        email: '',
+        phone: '',
+        createdByUsername: 'davifrois',
+        createdByName: 'Davi oliveira frois',
+        academyId: 'academy-1',
+        academyName: 'Templum Fight',
+        country: 'Brasil',
+        city: 'Belo Horizonte',
+        belt: 'Roxa',
+        weight: '',
+        photoUrl: '',
+        coverUrl: '',
+        role: 'coach',
+        createdAt: '2026-01-10T13:00:00.000Z'
     }
 ];
 
@@ -189,7 +220,7 @@ const initialData = {
     events: [],
     news: DEFAULT_NEWS_ITEMS,
     academies: DEFAULT_ACADEMIES,
-    memberProfiles: [],
+    memberProfiles: DEFAULT_MEMBER_PROFILES,
     activeEventId: null,
     logs: [],
     notifications: [],
@@ -975,13 +1006,27 @@ const useStoreState = (loadedState) => {
             ? normalizedActiveEventId
             : null;
         let currentUser = normalizeUser(parsed.currentUser);
-        if (currentUser && !currentUser.role) {
-            currentUser = {
-                ...currentUser,
-                role: authService.getRoleForUsername
-                    ? authService.getRoleForUsername(currentUser.username)
-                    : currentUser.role
-            };
+        if (currentUser && authService.getRoleForUsername && (!authService.isLocalAuth || authService.isLocalAuth())) {
+            const freshRole = authService.getRoleForUsername(currentUser.username);
+            const freshName = authService.getNameForUsername
+                ? authService.getNameForUsername(currentUser.username)
+                : null;
+            let needsUpdate = false;
+            const updates = {};
+            if (freshRole && freshRole !== currentUser.role) {
+                updates.role = freshRole;
+                needsUpdate = true;
+            } else if (!currentUser.role && freshRole) {
+                updates.role = freshRole;
+                needsUpdate = true;
+            }
+            if (freshName && freshName !== currentUser.name) {
+                updates.name = freshName;
+                needsUpdate = true;
+            }
+            if (needsUpdate) {
+                currentUser = { ...currentUser, ...updates };
+            }
         }
         const rankHistory = parsed.rankHistory && typeof parsed.rankHistory === 'object' && !Array.isArray(parsed.rankHistory)
             ? parsed.rankHistory
@@ -1004,11 +1049,45 @@ const useStoreState = (loadedState) => {
             currentUser
         };
 
+        // Seed: garantir que a academia Templum Fight exista e tenha o ownerUsername do Davi
+        let hasAcademy1 = false;
+        let seededAcademies = merged.academies.map((academy) => {
+            if (academy.id === 'academy-1' || (academy.name && academy.name.toLowerCase().includes('templum'))) {
+                hasAcademy1 = true;
+                return {
+                    ...academy,
+                    id: academy.id || 'academy-1',
+                    ownerUsername: academy.ownerUsername || 'davifrois',
+                    ownerName: academy.ownerName || 'Davi oliveira frois',
+                    coachUsername: academy.coachUsername || 'davifrois',
+                    coachName: academy.coachName || 'Davi oliveira frois'
+                };
+            }
+            return academy;
+        });
+
+        if (!hasAcademy1) {
+            seededAcademies = [DEFAULT_ACADEMIES[0], ...seededAcademies];
+        }
+
+        // Seed: garantir que o perfil do Davi como Professor da Templum Fight exista
+        const daviSeedProfile = DEFAULT_MEMBER_PROFILES[0];
+        const hasDaviProfile = merged.memberProfiles.some((p) =>
+            p.accountUsername === 'davifrois' ||
+            (p.fullName && p.fullName.toLowerCase().replace(/\s+/g, ' ').trim() === 'davi oliveira frois')
+        );
+        const seededProfiles = hasDaviProfile
+            ? merged.memberProfiles
+            : [daviSeedProfile, ...merged.memberProfiles];
+
         return {
             ...merged,
+            academies: seededAcademies,
+            memberProfiles: seededProfiles,
             rankHistory: ensureRankHistory(normalizedAthletes, merged.rankHistory)
         };
     });
+
 
     const [eventResults, setEventResults] = useState([]);
     const [uiState, setUiState] = useState({ eventModalOpen: false });
@@ -1468,7 +1547,9 @@ const useStoreState = (loadedState) => {
             id: Date.now().toString(),
             name,
             date: typeof event?.date === 'string' ? event.date.trim() : event?.date || '',
+            endDate: typeof event?.endDate === 'string' ? event.endDate.trim() || null : event?.endDate || null,
             location: normalizeTextTrimmed(event?.location || ''),
+            eventDescription: (event?.eventDescription || '').toString().trim() || null,
             posterUrl: normalizeOptionalUrl(event?.posterUrl || event?.imageUrl || ''),
             registrationUrl: normalizeOptionalUrl(event?.registrationUrl || event?.registrationLink || ''),
             weightTableGiUrl: normalizeOptionalUrl(event?.weightTableGiUrl || ''),
@@ -1481,6 +1562,20 @@ const useStoreState = (loadedState) => {
             feeOver15: fees.over15,
             feeCombo: fees.combo,
             feeAbsolute: fees.absolute,
+            beltRegistrationEnabled: Boolean(event?.beltRegistrationEnabled),
+            beltRegistrationTitle: (event?.beltRegistrationTitle || '').toString().trim() || null,
+            beltRegistrationPrice: event?.beltRegistrationPrice != null ? Number(event.beltRegistrationPrice) : 0,
+            beltRegistrationDescription: (event?.beltRegistrationDescription || '').toString().trim() || null,
+            beltRegistrationPhone: (event?.beltRegistrationPhone || '').toString().trim() || null,
+            maxAthletes: event?.maxAthletes ? parseInt(event.maxAthletes, 10) : 0,
+            closeOnCapacity: Boolean(event?.closeOnCapacity),
+            accommodationEnabled: Boolean(event?.accommodationEnabled),
+            accommodationTitle: (event?.accommodationTitle || '').toString().trim() || null,
+            accommodationDescription: (event?.accommodationDescription || '').toString().trim() || null,
+            accommodationSearchLocation: (event?.accommodationSearchLocation || '').toString().trim() || null,
+            batches: Array.isArray(event?.batches) ? event.batches : [],
+            superFights: Array.isArray(event?.superFights) ? event.superFights : [],
+            superFightsPublished: Boolean(event?.superFightsPublished),
             registrationOpen: normalizeBoolean(event?.registrationOpen, true),
             internalRegistration: normalizeBoolean(event?.internalRegistration, true),
             createdAt: new Date().toISOString()
@@ -1553,7 +1648,7 @@ const useStoreState = (loadedState) => {
         return savedEvent;
     };
 
-    const updateEvent = (eventId, updates = {}) => {
+    const updateEvent = async (eventId, updates = {}) => {
         if (!eventId) {
             addLog({ type: 'ERROR', action: 'UPDATE_EVENT', details: 'Evento inválido para edição.' });
             throw new Error('Evento inválido.');
@@ -1593,7 +1688,11 @@ const useStoreState = (loadedState) => {
             date: typeof updates?.date === 'string'
                 ? updates.date.trim()
                 : updates?.date ?? current.date ?? '',
+            endDate: typeof updates?.endDate === 'string'
+                ? updates.endDate.trim() || null
+                : updates?.endDate ?? current.endDate ?? null,
             location: normalizeTextTrimmed(updates?.location ?? current.location ?? ''),
+            eventDescription: (updates?.eventDescription ?? current.eventDescription ?? '').toString().trim() || null,
             posterUrl: normalizeOptionalUrl(updates?.posterUrl ?? current.posterUrl ?? ''),
             registrationUrl: normalizeOptionalUrl(updates?.registrationUrl ?? current.registrationUrl ?? ''),
             weightTableGiUrl: normalizeOptionalUrl(updates?.weightTableGiUrl ?? current.weightTableGiUrl ?? ''),
@@ -1606,6 +1705,18 @@ const useStoreState = (loadedState) => {
             feeOver15: fees.over15,
             feeCombo: fees.combo,
             feeAbsolute: fees.absolute,
+            beltRegistrationEnabled: updates?.beltRegistrationEnabled ?? current.beltRegistrationEnabled ?? false,
+            beltRegistrationTitle: (updates?.beltRegistrationTitle ?? current.beltRegistrationTitle ?? '').toString().trim() || null,
+            beltRegistrationPrice: updates?.beltRegistrationPrice != null ? Number(updates.beltRegistrationPrice) : (current.beltRegistrationPrice ?? 0),
+            beltRegistrationDescription: (updates?.beltRegistrationDescription ?? current.beltRegistrationDescription ?? '').toString().trim() || null,
+            beltRegistrationPhone: (updates?.beltRegistrationPhone ?? current.beltRegistrationPhone ?? '').toString().trim() || null,
+            maxAthletes: updates?.maxAthletes != null ? parseInt(updates.maxAthletes, 10) : (current.maxAthletes ?? 0),
+            closeOnCapacity: updates?.closeOnCapacity ?? current.closeOnCapacity ?? false,
+            accommodationEnabled: updates?.accommodationEnabled ?? current.accommodationEnabled ?? false,
+            accommodationTitle: (updates?.accommodationTitle ?? current.accommodationTitle ?? '').toString().trim() || null,
+            accommodationDescription: (updates?.accommodationDescription ?? current.accommodationDescription ?? '').toString().trim() || null,
+            accommodationSearchLocation: (updates?.accommodationSearchLocation ?? current.accommodationSearchLocation ?? '').toString().trim() || null,
+            batches: Array.isArray(updates?.batches) ? updates.batches : (current.batches || []),
             registrationOpen: normalizeBoolean(
                 updates?.registrationOpen,
                 current.registrationOpen ?? true
@@ -1622,6 +1733,21 @@ const useStoreState = (loadedState) => {
             ...prev,
             events: prev.events.map((event) => (event.id === eventId ? updatedEvent : event))
         }));
+
+        // Sync to backend API if authenticated
+        const hasApiToken = Boolean(
+            authService?.getApiToken
+            && authService.getApiToken()?.toString().trim()
+        );
+        if (hasApiToken) {
+            try {
+                await eventAdminService.updateEvent(eventId, updatedEvent);
+            } catch (error) {
+                const message = error?.message || 'Falha ao atualizar campeonato no servidor.';
+                addLog({ type: 'ERROR', action: 'UPDATE_EVENT_REMOTE', details: message });
+                // Don't throw — local update already succeeded
+            }
+        }
 
         addLog({ type: 'INFO', action: 'UPDATE_EVENT', details: `Evento atualizado: ${name}` });
         return updatedEvent;

@@ -34,7 +34,7 @@ public class BootstrapAdmin {
 
   private static final List<BootstrapUserSeed> DEFAULT_PANEL_USERS = List.of(
       new BootstrapUserSeed("simone", "simone123", "Simone", "ADMIN"),
-      new BootstrapUserSeed("davifrois", "davifrois324@", "Davifrois", "ADMIN"),
+      new BootstrapUserSeed("davifrois", "davifrois324@", "Davi oliveira frois", "ADMIN"),
       new BootstrapUserSeed("mesario1", "mesario123", "Mesario 1", "MESARIO")
   );
 

@@ -5,11 +5,11 @@ import { validateStrongPassword } from '../utils/passwordStrength';
 
 const DEFAULT_USERS = [
     { username: 'simone', password: 'simone123', name: 'Simone', role: 'admin' },
-    { username: 'davifrois', password: 'davifrois324@', name: 'Davifrois', role: 'admin' },
+    { username: 'davifrois', password: 'davifrois324@', name: 'Davi oliveira frois', role: 'admin' },
     { username: 'mesario1', password: 'mesario123', name: 'Mesario 1', role: 'mesario' }
 ];
 
-const ADMIN_USERS = new Set(['simone', 'davifrois']);
+const ADMIN_USERS = new Set(['simone']);
 const VALID_ROLES = new Set(['admin', 'athlete', 'mesario', 'coach']);
 const PANEL_ALLOWED_ROLES = new Set(['admin', 'mesario', 'coach']);
 
@@ -242,13 +242,35 @@ const ensureLocalUsers = () => {
     }
     try {
         if (!storage.getItem(AUTH_USERS_KEY)) {
-            writeLocalUsers(users);
+            writeLocalUsers(DEFAULT_USERS);
+            return DEFAULT_USERS;
+        }
+        // Migração: garantir que os usuários padrão tenham os dados atualizados
+        let needsWrite = false;
+        const merged = users.map((user) => {
+            const defaultUser = DEFAULT_USERS.find(
+                (d) => normalizeUsername(d.username) === normalizeUsername(user.username)
+            );
+            if (!defaultUser) return user;
+            // Atualizar nome e role se o usuário padrão tiver dados diferentes
+            const updatedName = defaultUser.name !== user.name ? defaultUser.name : user.name;
+            const updatedRole = resolveRole(defaultUser);
+            if (updatedName !== user.name || updatedRole !== user.role) {
+                needsWrite = true;
+                return { ...user, name: updatedName, role: updatedRole };
+            }
+            return user;
+        });
+        if (needsWrite) {
+            writeLocalUsers(merged);
+            return merged;
         }
     } catch {
         // Ignore storage errors.
     }
     return users;
 };
+
 
 const normalizeUserFromApi = (source) => {
     const user = source && typeof source === 'object' ? source : {};
@@ -693,6 +715,19 @@ export const authService = {
             }
         }
         return resolveRole({ username: normalized });
+    },
+
+    getNameForUsername: (username) => {
+        const normalized = normalizeUsername(username);
+        if (isLocalAuth()) {
+            const localMatch = ensureLocalUsers().find((entry) => (
+                normalizeUsername(entry.username) === normalized
+            ));
+            if (localMatch && localMatch.name) {
+                return localMatch.name;
+            }
+        }
+        return null;
     },
 
     register: async ({ username, password, name, role }) => {

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Image, Lock, Save, ShieldCheck, UserRound } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import LoginOverlay from '../components/LoginOverlay';
 import { useStore } from '../hooks/useStore';
 import { useI18n } from '../hooks/useI18n';
@@ -139,6 +139,9 @@ const MyAccount = () => {
     deleteMemberProfile
   } = useStore();
 
+  const [searchParams] = useSearchParams();
+  const targetProfileId = searchParams.get('profileId');
+
   const [form, setForm] = useState(createForm);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -152,6 +155,11 @@ const MyAccount = () => {
 
   const currentProfile = useMemo(() => {
     if (!currentUser) return null;
+
+    if (targetProfileId) {
+      const target = memberProfiles.find(p => p.id === targetProfileId);
+      if (target) return target;
+    }
 
     const normalizedUserRole = normalizeLookup(currentUser.role || '');
     const normalizedUserName = normalizeLookup(currentUser.name || '');
@@ -213,15 +221,10 @@ const MyAccount = () => {
       return { profile, score };
     });
 
-    const bestMatch = scoredMatches
-      .filter((item) => item.score > 0)
-      .sort((a, b) => {
-        if (b.score !== a.score) return b.score - a.score;
-        return new Date(b.profile?.createdAt || 0).getTime() - new Date(a.profile?.createdAt || 0).getTime();
-      })[0];
+    const bestMatch = scoredMatches.sort((a, b) => b.score - a.score)[0]?.profile;
 
-    return bestMatch?.profile || null;
-  }, [currentUser, memberProfiles]);
+    return bestMatch || null;
+  }, [currentUser, memberProfiles, targetProfileId]);
 
   const resolvedProfileAcademyId = useMemo(() => {
     if (!currentProfile) return '';

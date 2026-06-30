@@ -38,12 +38,14 @@ import TeamRanking from './pages/TeamRanking';
 import EventRegistration from './pages/EventRegistration';
 import SettingsPage from './pages/Settings';
 import AcademyRegistration from './pages/AcademyRegistration';
+import CoachManagerPage from './pages/CoachManagerPage';
 import { useStore } from './hooks/useStore';
 import { useI18n } from './hooks/useI18n';
 import LoginOverlay from './components/LoginOverlay';
 import { DEFAULT_EVENT_FEES, DEFAULT_EVENT_PIX_KEY } from './utils/eventPricing';
 import { compressImage } from './utils/imageUtils';
 import './index.css';
+import './components/Footer.css';
 
 const MAX_EVENT_POSTER_UPLOAD_BYTES = 8_000_000;
 const MAX_EVENT_ASSET_UPLOAD_BYTES = 1_500_000;
@@ -59,21 +61,40 @@ const EVENT_POSTER_MAX_ATTEMPTS = 8;
 const createEventFormState = () => ({
   name: '',
   date: '',
+  endDate: '',
   location: '',
+  eventDescription: '',
   posterUrl: '',
   registrationUrl: '',
+  accommodationEnabled: false,
+  accommodationTitle: '',
+  accommodationDescription: '',
+  beltRegistrationEnabled: false,
+  beltRegistrationPhone: '',
   weightTableGiUrl: '',
   weightTableNoGiUrl: '',
   circularUrl: '',
   weightTableGiOptions: '',
+  useCustomWeightTableGi: false,
+  useCustomWeightTableNoGi: false,
   weightTableNoGiOptions: '',
   pixKey: DEFAULT_EVENT_PIX_KEY,
-  feeUnder15: DEFAULT_EVENT_FEES.under15,
-  feeOver15: DEFAULT_EVENT_FEES.over15,
-  feeCombo: DEFAULT_EVENT_FEES.combo,
-  feeAbsolute: DEFAULT_EVENT_FEES.absolute,
+  batches: [
+    {
+      id: Date.now().toString(),
+      name: 'Lote 1',
+      startDate: '',
+      endDate: '',
+      feeUnder15: DEFAULT_EVENT_FEES.under15,
+      feeOver15: DEFAULT_EVENT_FEES.over15,
+      feeCombo: DEFAULT_EVENT_FEES.combo,
+      feeAbsolute: DEFAULT_EVENT_FEES.absolute
+    }
+  ],
   registrationOpen: true,
-  internalRegistration: true
+  internalRegistration: true,
+  closeOnCapacity: false,
+  maxAthletes: ''
 });
 
 const isDataImageUrl = (value) => /^data:image\//i.test((value || '').toString().trim());
@@ -187,32 +208,16 @@ const AppLayout = () => {
   const [logoReady, setLogoReady] = useState(true);
   const [eventForm, setEventForm] = useState(createEventFormState);
   const [eventError, setEventError] = useState('');
+  const [eventModalTab, setEventModalTab] = useState('info');
 
-  // ONE-TIME CLEANUP FOR TEST PROFILES
-  useEffect(() => {
-    if (memberProfiles?.length > 0 && deleteMemberProfile) {
-      const namesToRemove = [
-        "Davi frois",
-        "Regis Frois santos Frois",
-        "Teste Davifrois Token",
-        "Davifrois",
-        "Teste Fluxo Aprovacao",
-        "ATLETA SMOKE 20260310140618",
-        "Teste Approve Fluxo",
-        "Atleta Mail"
-      ];
-      const toRemove = memberProfiles.filter(p => namesToRemove.includes(p.fullName) || namesToRemove.includes(p.nome));
-      if (toRemove.length > 0) {
-        toRemove.forEach(p => deleteMemberProfile(p.id));
-      }
-    }
-  }, [memberProfiles, deleteMemberProfile]);
+
   const [eventSuccess, setEventSuccess] = useState('');
   const [showLogin, setShowLogin] = useState(false);
   
   const linkedProfiles = useMemo(() => {
     if (!currentUser || !memberProfiles) return [];
     const username = (currentUser.username || '').toLowerCase();
+    
     return memberProfiles.filter(p => {
       const accUser = (p.accountUsername || p.loginUsername || p.username || '').toLowerCase();
       const createdBy = (p.createdByUsername || '').toLowerCase();
@@ -221,13 +226,45 @@ const AppLayout = () => {
     });
   }, [currentUser, memberProfiles]);
 
-  const mainProfile = linkedProfiles[0];
+  const mainProfile = useMemo(() => {
+    if (!currentUser || linkedProfiles.length === 0) return null;
+    const username = (currentUser.username || '').toLowerCase();
+    const currentName = (currentUser.name || '').toLowerCase();
+
+    let best = null;
+    let bestScore = 0;
+
+    linkedProfiles.forEach(p => {
+      let score = 0;
+      if ((p.fullName || '').toLowerCase() === currentName) score += 5;
+      if ((p.email || '').toLowerCase() === username) score += 3;
+      if (score > bestScore) {
+        bestScore = score;
+        best = p;
+      }
+    });
+
+    return bestScore > 0 ? best : null;
+  }, [currentUser, linkedProfiles]);
+
+  const otherProfiles = useMemo(() => {
+    let filtered = linkedProfiles;
+    if (mainProfile) {
+      filtered = linkedProfiles.filter(p => p.id !== mainProfile.id);
+    }
+    const role = (currentUser?.role || '').toString().trim().toLowerCase();
+    if (role === 'professor' || role === 'coach') {
+      return filtered.slice(0, 2);
+    }
+    return filtered;
+  }, [linkedProfiles, mainProfile, currentUser]);
+
   const finalAvatar = mainProfile?.photoUrl || mainProfile?.avatarUrl || currentUser?.avatarUrl || currentUser?.avatar || currentUser?.photoUrl;
   const finalName = mainProfile?.fullName || currentUser?.name || currentUser?.fullName || 'Atleta';
   const finalBelt = mainProfile?.belt || currentUser?.belt || 'Branca';
 
   const currentUserRole = (currentUser?.role || '').toString().trim().toLowerCase();
-  const isCoachUser = currentUserRole === 'coach' || currentUserRole === 'professor';
+  const isCoachUser = currentUserRole === 'coach' || currentUserRole === 'professor' || currentUserRole === 'admin';
   const canAccessAdmin = currentUserRole === 'admin';
   const canAccessDashboard = canAccessAdmin || currentUserRole === 'mesario';
   const isAdminRoute = location.pathname.startsWith('/admin');
@@ -236,6 +273,7 @@ const AppLayout = () => {
   const isOrganizersRoute = location.pathname.startsWith('/organizadores');
   const isAboutRoute = location.pathname.startsWith('/institucional');
   const isRegulationsRoute = location.pathname.startsWith('/regulamento');
+  const isRankingRoute = location.pathname.startsWith('/ranking');
   const { language, setLanguage, currentLanguage, languages, uiLanguage } = useI18n();
   const isEnglish = uiLanguage === 'en-US';
   const isSpanish = uiLanguage === 'es-ES';
@@ -828,6 +866,40 @@ const AppLayout = () => {
     closeEventModal();
   };
 
+  const handleAddBatch = () => {
+    setEventForm(prev => ({
+      ...prev,
+      batches: [
+        ...(prev.batches || []),
+        {
+          id: Date.now().toString() + Math.random().toString(36).substring(2, 7),
+          name: `Lote ${(prev.batches?.length || 0) + 1}`,
+          startDate: '',
+          endDate: '',
+          feeUnder15: DEFAULT_EVENT_FEES.under15,
+          feeOver15: DEFAULT_EVENT_FEES.over15,
+          feeCombo: DEFAULT_EVENT_FEES.combo,
+          feeAbsolute: DEFAULT_EVENT_FEES.absolute
+        }
+      ]
+    }));
+  };
+
+  const handleRemoveBatch = (indexToRemove) => {
+    setEventForm(prev => ({
+      ...prev,
+      batches: prev.batches.filter((_, idx) => idx !== indexToRemove)
+    }));
+  };
+
+  const handleBatchChange = (index, field, value) => {
+    setEventForm(prev => {
+      const newBatches = [...prev.batches];
+      newBatches[index] = { ...newBatches[index], [field]: value };
+      return { ...prev, batches: newBatches };
+    });
+  };
+
   const handleCreateEvent = async (event) => {
     event.preventDefault();
     setEventError('');
@@ -1004,7 +1076,10 @@ const AppLayout = () => {
     ? [
         { label: copy.accountMenu.myAccount, path: '/minha-conta', icon: User },
         ...(isCoachUser
-          ? [{ label: copy.accountMenu.academy, path: '/academia', icon: Users }]
+          ? [
+              { label: copy.accountMenu.academy, path: '/academia', icon: Users },
+              { label: 'Gerente de Inscrições', path: '/gerente-treinador', icon: Users }
+            ]
           : []),
         { label: copy.accountMenu.settings, path: '/configuracoes', icon: Settings },
         ...(canAccessDashboard
@@ -1168,11 +1243,11 @@ const AppLayout = () => {
                     {accountItems.map(renderAccountItem)}
                   </div>
                   
-                  {currentUser && linkedProfiles.length > 0 && (
+                  {currentUser && otherProfiles.length > 0 && (
                     <div className="account-dropdown-linked">
                       <div className="linked-label">PERFIS LIGADOS</div>
-                      {linkedProfiles.map(profile => (
-                        <Link to="/minha-conta" key={profile.id} className="linked-profile" style={{ marginBottom: linkedProfiles.length > 1 ? '8px' : 0 }}>
+                      {otherProfiles.map(profile => (
+                        <Link to={`/minha-conta?profileId=${profile.id}`} key={profile.id} className="linked-profile" style={{ marginBottom: otherProfiles.length > 1 ? '8px' : 0 }}>
                           <div className="account-dropdown-avatar account-dropdown-avatar--small">
                             {profile.photoUrl || profile.avatarUrl ? (
                               <img src={profile.photoUrl || profile.avatarUrl} alt="" />
@@ -1185,26 +1260,13 @@ const AppLayout = () => {
                       ))}
                     </div>
                   )}
-                  {currentUser && linkedProfiles.length === 0 && (
-                    <div className="account-dropdown-linked">
-                      <div className="linked-label">PERFIS LIGADOS</div>
-                      <Link to="/minha-conta" className="linked-profile">
-                        <div className="account-dropdown-avatar account-dropdown-avatar--small">
-                          {finalAvatar ? (
-                            <img src={finalAvatar} alt="" />
-                          ) : (
-                            <span>{(finalName).charAt(0).toUpperCase()}</span>
-                          )}
-                        </div>
-                        <span>{finalName}</span>
-                      </Link>
-                    </div>
-                  )}
                 </div>
               </div>
               <div className="utility-dropdown utility-dropdown--language">
                 <button className="utility-link utility-link--language" type="button" aria-label={copy.utility.language}>
-                  <span className="utility-flag" aria-hidden="true">{currentLanguage.flag}</span>
+                  {currentLanguage?.flagImages?.[0] && (
+                    <img src={currentLanguage.flagImages[0]} alt="" className="utility-flag" style={{ width: '20px', minHeight: 'auto', height: 'auto', objectFit: 'contain', marginRight: '6px', borderRadius: '2px' }} />
+                  )}
                   <span>{currentLanguage.label}</span>
                   <ChevronDown size={12} />
                 </button>
@@ -1215,11 +1277,13 @@ const AppLayout = () => {
                       type="button"
                       className={`utility-dropdown__item utility-dropdown__language-item ${language === item.id ? 'is-active' : ''}`}
                       onClick={() => setLanguage(item.id)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
                     >
-                      <span className="utility-flag" aria-hidden="true">{item.flag}</span>
-                      <span className="utility-language-labels">
-                        <span>{item.label}</span>
-                        <small>{item.country}</small>
+                      {item.flagImages?.[0] && (
+                        <img src={item.flagImages[0]} alt="" className="utility-flag" style={{ width: '24px', minHeight: 'auto', height: 'auto', objectFit: 'contain', borderRadius: '2px' }} />
+                      )}
+                      <span className="utility-language-labels" style={{ textAlign: 'left' }}>
+                        <span style={{ fontWeight: 500 }}>{item.label}</span>
                       </span>
                     </button>
                   ))}
@@ -1258,8 +1322,8 @@ const AppLayout = () => {
         </div>
       </header>
 
-      <main className={`app-main ${isAdminRoute ? 'app-main--admin' : ''} ${(isEventsRoute || isOrganizersRoute || isAboutRoute || isRegulationsRoute) ? 'app-main--full' : ''}`}>
-        <div className={`container ${isAdminRoute ? 'container--admin' : ''} ${isHomeRoute ? 'container--home' : ''} ${(isEventsRoute || isOrganizersRoute || isAboutRoute || isRegulationsRoute) ? 'container--full' : ''}`}>
+      <main className={`app-main ${isAdminRoute ? 'app-main--admin' : ''} ${(isEventsRoute || isOrganizersRoute || isAboutRoute || isRegulationsRoute || isRankingRoute) ? 'app-main--full' : ''}`}>
+        <div className={`container ${isAdminRoute ? 'container--admin' : ''} ${isHomeRoute ? 'container--home' : ''} ${(isEventsRoute || isOrganizersRoute || isAboutRoute || isRegulationsRoute || isRankingRoute) ? 'container--full' : ''}`}>
           <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}
@@ -1281,6 +1345,7 @@ const AppLayout = () => {
                 <Route path="/eventos/:eventId/relatorios" element={<EventReports />} />
                 <Route path="/eventos/:eventId/inscricao" element={<EventRegistration />} />
                 <Route path="/perfil-publico" element={<PublicProfile />} />
+                <Route path="/perfil-publico/:athleteId" element={<PublicProfile />} />
                 <Route path="/ranking" element={<Ranking />} />
                 <Route path="/ranking-equipes" element={<TeamRanking />} />
                 <Route path="/atletas" element={<Athletes />} />
@@ -1289,6 +1354,7 @@ const AppLayout = () => {
                 <Route path="/filiacao" element={<Membership />} />
                 <Route path="/academia" element={<Membership />} />
                 <Route path="/registro-academia" element={<AcademyRegistration />} />
+                <Route path="/gerente-treinador" element={<CoachManagerPage />} />
                 <Route path="/minha-conta" element={<MyAccount />} />
                 <Route path="/configuracoes" element={<SettingsPage />} />
                 <Route path="/regulamento" element={<Regulations />} />
@@ -1299,89 +1365,81 @@ const AppLayout = () => {
         </div>
       </main>
 
-      <footer className="app-footer">
-        <div className="container footer-grid">
-          <div className="footer-column footer-column--brand footer-brand">
-            <div className="footer-brand__logo">
+      {isHomeRoute && (
+        <div className="genesis-cta-section" style={{ backgroundImage: 'url(/cta_background.png)' }}>
+          <div className="genesis-cta-overlay"></div>
+          <div className="genesis-cta-content">
+            <h2 className="genesis-cta-title">Prepare-se para o Próximo Nível.</h2>
+            <p className="genesis-cta-text">A maior plataforma de gestão de lutas do Brasil. Organize, compita e vença.</p>
+            <Link to="/eventos" className="genesis-cta-button">COMEÇAR AGORA</Link>
+          </div>
+        </div>
+      )}
+
+      <footer className="genesis-footer">
+        <div className="genesis-footer-container">
+          <div className="genesis-footer-top">
+            <div className="genesis-footer-brand">
               {logoReady ? (
                 <img
                   src="/genesis-logo.png"
                   alt="Genesis Esportes"
-                  className="footer-brand__logo-img"
+                  className="genesis-footer-logo"
                   onError={() => setLogoReady(false)}
                 />
               ) : (
-                <Trophy size={28} />
+                <div className="genesis-footer-logo-placeholder">
+                  <Trophy size={28} />
+                  <span>GENESIS ESPORTES</span>
+                </div>
               )}
             </div>
-            <p className="footer-description">
-              {copy.footer.description}
-            </p>
-            <div className="footer-social">
-              <span className="footer-title footer-title--small">{copy.footer.followUs}</span>
-              <div className="footer-social__links">
-                <a className="footer-social__link" href="https://www.instagram.com/genesis_esportes/" target="_blank" rel="noreferrer">
-                  <Instagram size={16} />
-                </a>
-                <a className="footer-social__link" href="https://www.facebook.com/genesis.tatames" target="_blank" rel="noreferrer">
-                  <Facebook size={16} />
-                </a>
-                <a className="footer-social__link" href="https://www.youtube.com/channel/UCg9eEbos83Rw4S6fzT4peVA" target="_blank" rel="noreferrer">
-                  <Youtube size={16} />
-                </a>
+
+            <div className="genesis-footer-links">
+              <div className="genesis-footer-col">
+                <h4 className="genesis-footer-title">ATLETAS</h4>
+                <Link to="/ranking">Ranking</Link>
+                <Link to="/atletas">Atletas</Link>
+                <Link to="/filiacao">Filiação</Link>
+                <Link to="/regulamento">Regulamento</Link>
+              </div>
+
+              <div className="genesis-footer-col">
+                <h4 className="genesis-footer-title">ORGANIZADOR</h4>
+                <Link to="/organizadores">Torne-se um organizador</Link>
+                <Link to="/admin">Plataforma de Federação</Link>
+                <a href="mailto:contato@genesisesportes.com.br">Suporte</a>
+              </div>
+
+              <div className="genesis-footer-col">
+                <h4 className="genesis-footer-title">COMUNIDADE</h4>
+                <Link to="/equipes">Academias e Equipes</Link>
+                <Link to="/ranking-equipes">Ranking de Equipes</Link>
+                <Link to="/institucional">Sobre nós</Link>
               </div>
             </div>
           </div>
 
-          <div className="footer-column footer-column--contact">
-            <div className="footer-title">{copy.footer.contact}</div>
-            <div className="footer-contact">
-              <div className="footer-contact__item">
-                <span className="footer-contact__icon"><Phone size={16} /></span>
-                <div>
-                  <span className="footer-contact__label">{copy.footer.phone}</span>
-                  <a className="footer-link" href="tel:+5531993383014">(31) 99338-3014</a>
-                </div>
-              </div>
-              <div className="footer-contact__item">
-                <span className="footer-contact__icon"><Mail size={16} /></span>
-                <div>
-                  <span className="footer-contact__label">{copy.footer.email}</span>
-                  <a className="footer-link" href="mailto:contato@genesisesportes.com.br">
-                    contato@genesisesportes.com.br
-                  </a>
-                </div>
-              </div>
+          <div className="genesis-footer-bottom">
+            <div className="genesis-footer-bottom-left">
+              <span>Genesis Esportes, Brasil</span>
+              <span className="genesis-footer-separator">|</span>
+              <Link to="/regulamento">Contratos</Link>
+              <Link to="/institucional">Privacy Policy</Link>
+              <Link to="/institucional">Sobre nós</Link>
             </div>
-          </div>
-
-          <div className="footer-column footer-column--location">
-            <div className="footer-title">{copy.footer.location}</div>
-            <div className="footer-map">
-              <div className="footer-map__frame">
-                <MapPin size={18} />
-                <div>
-                  <strong>{copy.footer.mapLabel}</strong>
-                  <span>{copy.footer.mapAddress}</span>
-                </div>
-              </div>
-              <a
-                className="footer-link footer-link--map"
-                href="https://www.google.com/maps?q=Rua+Pains+139+Contagem+MG"
-                target="_blank"
-                rel="noreferrer"
-              >
-                {copy.footer.viewMap} <ExternalLink size={12} />
+            
+            <div className="genesis-footer-bottom-right">
+              <a href="https://www.youtube.com/channel/UCg9eEbos83Rw4S6fzT4peVA" target="_blank" rel="noreferrer" aria-label="Youtube">
+                <Youtube size={18} />
+              </a>
+              <a href="https://www.facebook.com/genesis.tatames" target="_blank" rel="noreferrer" aria-label="Facebook">
+                <Facebook size={18} />
+              </a>
+              <a href="https://www.instagram.com/genesis_esportes/" target="_blank" rel="noreferrer" aria-label="Instagram">
+                <Instagram size={18} />
               </a>
             </div>
-          </div>
-
-        </div>
-
-        <div className="footer-bottom">
-          <div className="container footer-bottom__inner">
-            <span>&copy; 2025 Genesis Esportes. {copy.footer.rights}</span>
-            <span>CNPJ 27.835.080/0001-51</span>
           </div>
         </div>
       </footer>
@@ -1409,288 +1467,400 @@ const AppLayout = () => {
               onClick={handleCloseEventModal}
             />
             <motion.div
-              className="modal-card modal-card--event"
+              className="modal-card"
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 12 }}
+              style={{ padding: 0 }}
             >
-              <div className="modal-panel modal-panel--event">
-                <div className="modal-header">
-                  <div className="modal-title">{copy.eventModal.title}</div>
-                  <button type="button" className="btn btn-ghost" onClick={handleCloseEventModal}>
-                    {copy.eventModal.close}
-                  </button>
+              <div className="modal-panel" style={{ padding: 0, overflow: 'hidden', width: '100vw', height: '100vh', maxWidth: '100vw', maxHeight: '100vh', borderRadius: 0 }}>
+
+                {/* ── Header com abas ──────────────────────── */}
+                <div style={{ background: 'linear-gradient(135deg,#0f172a 0%,#1e293b 100%)', borderBottom: '1px solid rgba(255,255,255,0.08)', padding: '32px 40px 0 40px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px' }}>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.12em', color: 'var(--brand-primary,#00c2cb)', textTransform: 'uppercase', marginBottom: '8px' }}>Genesis Sports · Admin</div>
+                      <div className="modal-title" style={{ fontSize: '28px', margin: 0 }}>{copy.eventModal.title}</div>
+                      {eventForm.name && <div style={{ fontSize: '15px', color: '#94a3b8', marginTop: '6px' }}>{eventForm.name}</div>}
+                    </div>
+                    <button type="button" className="btn btn-ghost" onClick={handleCloseEventModal} style={{ alignSelf: 'flex-start' }}>{copy.eventModal.close}</button>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    {[{ id: 'info', label: '📋 Informações Básicas' }, { id: 'registration', label: '💰 Inscrições e Valores' }, { id: 'documents', label: '⚖️ Tabelas e Documentos' }].map(tab => (
+                      <button key={tab.id} type="button" onClick={() => setEventModalTab(tab.id)} style={{ padding: '12px 24px', fontSize: '15px', fontWeight: eventModalTab === tab.id ? 700 : 500, color: eventModalTab === tab.id ? 'var(--brand-primary,#00c2cb)' : '#64748b', background: 'transparent', border: 'none', borderBottom: eventModalTab === tab.id ? '3px solid var(--brand-primary,#00c2cb)' : '3px solid transparent', borderRadius: 0, cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap' }}>{tab.label}</button>
+                    ))}
+                  </div>
                 </div>
-                {eventError && (
-                  <div className="login-error" role="alert">
-                    <AlertCircle size={18} />
-                    <p>{eventError}</p>
-                  </div>
-                )}
-                {eventSuccess && (
-                  <div className="profile-success" role="status">
-                    <p>{eventSuccess}</p>
-                  </div>
-                )}
+
+                {/* ── Erros / Sucesso ──────────────────────── */}
+                {eventError && (<div className="login-error" role="alert" style={{ margin: '16px 32px 0 32px', borderRadius: '10px' }}><AlertCircle size={18} /><p>{eventError}</p></div>)}
+                {eventSuccess && (<div className="profile-success" role="status" style={{ margin: '16px 32px 0 32px', borderRadius: '10px' }}><p>{eventSuccess}</p></div>)}
+
                 <form onSubmit={handleCreateEvent}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <div>
-                      <label className="table-meta">{copy.eventModal.name}</label>
-                      <input
-                        className="input"
-                        type="text"
-                        value={eventForm.name}
-                        onChange={(event) => setEventForm({ ...eventForm, name: event.target.value })}
-                        placeholder={copy.eventModal.namePlaceholder}
-                        required
-                      />
-                    </div>
-                    <div className="form-grid">
-                      <div>
-                        <label className="table-meta">{copy.eventModal.date}</label>
-                        <input
-                          className="input"
-                          type="date"
-                          value={eventForm.date}
-                          onChange={(event) => setEventForm({ ...eventForm, date: event.target.value })}
-                        />
-                      </div>
-                      <div>
-                        <label className="table-meta">{copy.eventModal.location}</label>
-                        <input
-                          className="input"
-                          type="text"
-                          value={eventForm.location}
-                          onChange={(event) => setEventForm({ ...eventForm, location: event.target.value })}
-                          placeholder={copy.eventModal.locationPlaceholder}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="table-meta">{copy.eventModal.posterUrl}</label>
-                      <input
-                        className="input"
-                        type="text"
-                        value={eventForm.posterUrl}
-                        onChange={handleEventPosterUrlChange}
-                        placeholder={copy.eventModal.posterUrlPlaceholder}
-                      />
-                    </div>
-                    <div>
-                      <label className="table-meta">{copy.eventModal.posterFile}</label>
-                      <input
-                        className="input"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleEventPosterFileChange}
-                      />
-                      <div className="table-meta table-meta--tight">{copy.eventModal.posterCompressionHint}</div>
-                      {eventPosterStoredSizeBytes > 0 && (
-                        <div className="table-meta table-meta--tight">
-                          {copy.eventModal.posterCompressedSize}: {formatBytes(eventPosterStoredSizeBytes)}
+                  <div style={{ padding: '32px 40px', minHeight: '520px', maxHeight: '65vh', overflowY: 'auto' }}>
+
+                    {/* ── TAB 1 ──────────────────────────────── */}
+                    {eventModalTab === 'info' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                        <div>
+                          <label className="table-meta" style={{ fontSize: '14px', fontWeight: 700, marginBottom: '10px', display: 'block', color: '#94a3b8' }}>NOME DO EVENTO *</label>
+                          <input className="input" type="text" value={eventForm.name} onChange={e => setEventForm({ ...eventForm, name: e.target.value })} placeholder={copy.eventModal.namePlaceholder} required style={{ fontSize: '18px', padding: '16px 20px', fontWeight: 600 }} />
                         </div>
-                      )}
-                    </div>
-                    {eventForm.posterUrl && (
-                      <div>
-                        <img
-                          src={eventForm.posterUrl}
-                          alt="Poster preview"
-                          style={{
-                            width: '100%',
-                            maxHeight: '220px',
-                            objectFit: 'cover',
-                            borderRadius: '10px',
-                            border: '1px solid var(--border)'
-                          }}
-                        />
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                          <div>
+                            <label className="table-meta" style={{ fontSize: '14px', fontWeight: 700, marginBottom: '10px', display: 'block', color: '#94a3b8' }}>DATA DO EVENTO (DIA 1) *</label>
+                            <input className="input" type="date" value={eventForm.date} onChange={e => setEventForm({ ...eventForm, date: e.target.value })} required style={{ fontSize: '17px', padding: '14px 18px' }} />
+                          </div>
+                          <div>
+                            <label className="table-meta" style={{ fontSize: '14px', fontWeight: 700, marginBottom: '10px', display: 'block', color: '#94a3b8' }}>DATA DO EVENTO (DIA 2 - opcional)</label>
+                            <input className="input" type="date" value={eventForm.endDate} onChange={e => setEventForm({ ...eventForm, endDate: e.target.value })} style={{ fontSize: '17px', padding: '14px 18px' }} />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="table-meta" style={{ fontSize: '14px', fontWeight: 700, marginBottom: '10px', display: 'block', color: '#94a3b8' }}>LOCAL / ARENA</label>
+                          <input className="input" type="text" value={eventForm.location} onChange={e => setEventForm({ ...eventForm, location: e.target.value })} placeholder={copy.eventModal.locationPlaceholder} style={{ fontSize: '17px', padding: '14px 18px' }} />
+                        </div>
+                        <div>
+                          <label className="table-meta" style={{ fontSize: '14px', fontWeight: 700, marginBottom: '10px', display: 'block', color: '#94a3b8' }}>DESCRIÇÃO COMPLETA DO EVENTO</label>
+                          <textarea className="input" rows="4" value={eventForm.eventDescription} onChange={e => setEventForm({ ...eventForm, eventDescription: e.target.value })} placeholder="Ex: Regras da IBJJF, premiações especiais em dinheiro, etc..." style={{ fontSize: '16px', padding: '16px 20px', resize: 'vertical' }}></textarea>
+                        </div>
+                        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${eventForm.accommodationEnabled ? '#00c2cb44' : 'rgba(255,255,255,0.06)'}`, borderRadius: '14px', padding: '24px', marginTop: '10px', transition: 'all 0.2s' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: eventForm.accommodationEnabled ? '20px' : '0', cursor: 'pointer' }} onClick={() => {
+                            const isChecked = !eventForm.accommodationEnabled;
+                            const updates = { accommodationEnabled: isChecked };
+                            if (isChecked && eventForm.location && (!eventForm.accommodationDescription || eventForm.accommodationDescription.trim() === '')) {
+                              const loc = eventForm.location;
+                              const encodedLoc = encodeURIComponent(loc);
+                              updates.accommodationTitle = `Hospedagem Recomendada`;
+                              updates.accommodationDescription = `Ficar perto da arena é essencial para seu descanso e foco na competição!\n\nProcurando onde ficar em ${loc}?\n\n🏡 Airbnb: https://www.airbnb.com.br/s/${encodedLoc}/homes\n🏨 Booking: https://www.booking.com/searchresults.pt-br.html?ss=${encodedLoc}`;
+                            }
+                            setEventForm({ ...eventForm, ...updates });
+                          }}>
+                            <div>
+                              <div style={{ fontSize: '16px', fontWeight: 700, color: '#e2e8f0', display: 'flex', alignItems: 'center', gap: '8px' }}>🛌 Opções de Hospedagem</div>
+                              <div style={{ fontSize: '13px', color: '#94a3b8', marginTop: '4px' }}>Habilita informações de hotel/alojamento na página do evento</div>
+                            </div>
+                            <div style={{ flexShrink: 0, width: '56px', height: '32px', borderRadius: '16px', background: eventForm.accommodationEnabled ? '#00c2cb' : '#334155', position: 'relative', transition: 'background 0.2s' }}>
+                              <div style={{ position: 'absolute', top: '4px', left: eventForm.accommodationEnabled ? '28px' : '4px', width: '24px', height: '24px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
+                            </div>
+                          </div>
+                          {eventForm.accommodationEnabled && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                              <div>
+                                <label className="table-meta" style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px', display: 'block', color: '#94a3b8' }}>Título (Ex: Hotel Oficial)</label>
+                                <input className="input" type="text" value={eventForm.accommodationTitle} onChange={e => setEventForm({ ...eventForm, accommodationTitle: e.target.value })} placeholder="Hotel Parceiro" style={{ fontSize: '15px' }} />
+                              </div>
+                              <div>
+                                <label className="table-meta" style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px', display: 'block', color: '#94a3b8' }}>Descrição / Preço / Contato</label>
+                                <textarea className="input" rows="6" value={eventForm.accommodationDescription} onChange={e => setEventForm({ ...eventForm, accommodationDescription: e.target.value })} placeholder="Diárias a partir de R$ 100. Fale com (11) 9999-9999" style={{ fontSize: '15px', resize: 'vertical', lineHeight: '1.5' }}></textarea>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <label className="table-meta" style={{ fontSize: '14px', fontWeight: 700, marginBottom: '10px', display: 'block', color: '#94a3b8' }}>URL DO CARTAZ (opcional)</label>
+                          <input className="input" type="text" value={eventForm.posterUrl} onChange={handleEventPosterUrlChange} placeholder={copy.eventModal.posterUrlPlaceholder} style={{ fontSize: '15px' }} />
+                        </div>
+                        <div>
+                          <label className="table-meta" style={{ fontSize: '14px', fontWeight: 700, marginBottom: '10px', display: 'block', color: '#94a3b8' }}>ENVIAR ARQUIVO DO CARTAZ</label>
+                          <input className="input" type="file" accept="image/*" onChange={handleEventPosterFileChange} style={{ fontSize: '15px' }} />
+                          <div className="table-meta table-meta--tight" style={{ marginTop: '6px', fontSize: '13px' }}>{copy.eventModal.posterCompressionHint}</div>
+                          {eventPosterStoredSizeBytes > 0 && <div className="table-meta table-meta--tight" style={{ fontSize: '13px' }}>{copy.eventModal.posterCompressedSize}: {formatBytes(eventPosterStoredSizeBytes)}</div>}
+                        </div>
+                        {eventForm.posterUrl && (
+                          <div style={{ borderRadius: '14px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', maxHeight: '360px' }}>
+                            <img src={eventForm.posterUrl} alt="Poster preview" style={{ width: '100%', maxHeight: '360px', objectFit: 'cover', display: 'block' }} />
+                          </div>
+                        )}
                       </div>
                     )}
-                    <div>
-                      <label className="table-meta">{copy.eventModal.registrationUrl}</label>
-                      <input
-                        className="input"
-                        type="text"
-                        value={eventForm.registrationUrl}
-                        onChange={(event) => setEventForm({ ...eventForm, registrationUrl: event.target.value })}
-                        placeholder={copy.eventModal.registrationUrlPlaceholder}
-                      />
-                    </div>
-                    <div className="form-grid">
-                      <div>
-                        <label className="table-meta">{copy.eventModal.weightTableGiUrl}</label>
-                        <input
-                          className="input"
-                          type="text"
-                          value={eventForm.weightTableGiUrl}
-                          onChange={handleWeightTableGiUrlChange}
-                          placeholder={copy.eventModal.weightTableGiUrlPlaceholder}
-                        />
-                        <label className="table-meta table-meta--tight">{copy.eventModal.weightTableGiFile}</label>
-                        <input
-                          className="input"
-                          type="file"
-                          accept="image/*,application/pdf"
-                          onChange={handleWeightTableGiFileChange}
-                        />
-                        {eventWeightTableGiStoredSizeBytes > 0 && (
-                          <div className="table-meta table-meta--tight">
-                            {copy.eventModal.assetStoredSize}: {formatBytes(eventWeightTableGiStoredSizeBytes)}
-                          </div>
-                        )}
-                      </div>
-                      <div>
-                        <label className="table-meta">{copy.eventModal.weightTableNoGiUrl}</label>
-                        <input
-                          className="input"
-                          type="text"
-                          value={eventForm.weightTableNoGiUrl}
-                          onChange={handleWeightTableNoGiUrlChange}
-                          placeholder={copy.eventModal.weightTableNoGiUrlPlaceholder}
-                        />
-                        <label className="table-meta table-meta--tight">{copy.eventModal.weightTableNoGiFile}</label>
-                        <input
-                          className="input"
-                          type="file"
-                          accept="image/*,application/pdf"
-                          onChange={handleWeightTableNoGiFileChange}
-                        />
-                        {eventWeightTableNoGiStoredSizeBytes > 0 && (
-                          <div className="table-meta table-meta--tight">
-                            {copy.eventModal.assetStoredSize}: {formatBytes(eventWeightTableNoGiStoredSizeBytes)}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <label className="table-meta">{copy.eventModal.circularUrl}</label>
-                      <input
-                        className="input"
-                        type="text"
-                        value={eventForm.circularUrl}
-                        onChange={handleCircularUrlChange}
-                        placeholder={copy.eventModal.circularUrlPlaceholder}
-                      />
-                      <label className="table-meta table-meta--tight">{copy.eventModal.circularFile}</label>
-                      <input
-                        className="input"
-                        type="file"
-                        accept="image/*,application/pdf"
-                        onChange={handleCircularFileChange}
-                      />
-                      {eventCircularStoredSizeBytes > 0 && (
-                        <div className="table-meta table-meta--tight">
-                          {copy.eventModal.assetStoredSize}: {formatBytes(eventCircularStoredSizeBytes)}
+
+                    {/* ── TAB 2 ──────────────────────────────── */}
+                    {eventModalTab === 'registration' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                        {/* Toggle switches */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                          {[
+                            { label: 'Inscrições Abertas', desc: 'Permite que atletas se inscrevam neste evento.', key: 'registrationOpen', icon: '🟢', activeColor: '#22c55e' },
+                            { label: 'Inscrição pelo Sistema Genesis', desc: 'Usa o fluxo interno de pagamento. Desative para usar link externo.', key: 'internalRegistration', icon: '🔗', activeColor: 'var(--brand-primary,#00c2cb)' },
+                          ].map(toggle => (
+                            <div key={toggle.key} onClick={() => setEventForm(f => ({ ...f, [toggle.key]: !f[toggle.key] }))} style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${eventForm[toggle.key] ? toggle.activeColor + '44' : 'rgba(255,255,255,0.06)'}`, borderRadius: '14px', padding: '24px', cursor: 'pointer', transition: 'all 0.2s' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
+                                <div>
+                                  <div style={{ fontSize: '18px', fontWeight: 700, color: '#e2e8f0', marginBottom: '8px' }}>{toggle.icon} {toggle.label}</div>
+                                  <div style={{ fontSize: '14px', color: '#94a3b8', lineHeight: 1.5 }}>{toggle.desc}</div>
+                                </div>
+                                <div style={{ flexShrink: 0, width: '56px', height: '32px', borderRadius: '16px', background: eventForm[toggle.key] ? toggle.activeColor : '#334155', position: 'relative', transition: 'background 0.2s' }}>
+                                  <div style={{ position: 'absolute', top: '4px', left: eventForm[toggle.key] ? '28px' : '4px', width: '24px', height: '24px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      )}
-                    </div>
-                    <div className="form-grid">
-                      <div>
-                        <label className="table-meta">{copy.eventModal.weightTableGiOptions}</label>
-                        <textarea
-                          className="input"
-                          value={eventForm.weightTableGiOptions}
-                          onChange={(event) => setEventForm({ ...eventForm, weightTableGiOptions: event.target.value })}
-                          placeholder={copy.eventModal.weightTableGiOptionsPlaceholder}
-                          rows={4}
-                        />
+                        {!eventForm.internalRegistration && (
+                          <div>
+                            <label className="table-meta" style={{ fontSize: '14px', fontWeight: 700, marginBottom: '10px', display: 'block', color: '#94a3b8' }}>URL DE INSCRIÇÃO EXTERNA</label>
+                            <input className="input" type="text" value={eventForm.registrationUrl} onChange={e => setEventForm({ ...eventForm, registrationUrl: e.target.value })} placeholder={copy.eventModal.registrationUrlPlaceholder} style={{ fontSize: '17px', padding: '14px 18px' }} />
+                          </div>
+                        )}
+                        <div>
+                          <label className="table-meta" style={{ fontSize: '14px', fontWeight: 700, marginBottom: '10px', display: 'block', color: '#94a3b8' }}>CHAVE PIX (responsável pelo campeonato) *</label>
+                          <input className="input" type="text" value={eventForm.pixKey} onChange={e => setEventForm({ ...eventForm, pixKey: e.target.value })} placeholder={copy.eventModal.pixKeyPlaceholder} required style={{ fontSize: '18px', padding: '16px 20px' }} />
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                          <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '24px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: eventForm.closeOnCapacity ? '20px' : '0' }}>
+                              <div>
+                                <div style={{ fontSize: '16px', fontWeight: 700, color: '#e2e8f0', display: 'flex', alignItems: 'center', gap: '8px' }}>🚫 Fechar inscrições automaticamente</div>
+                                <div style={{ fontSize: '13px', color: '#94a3b8', marginTop: '4px' }}>Encerra as inscrições ao atingir o limite.</div>
+                              </div>
+                              <div className="ios-toggle-wrapper">
+                                <input type="checkbox" id="capacity-toggle" checked={eventForm.closeOnCapacity} onChange={e => setEventForm({ ...eventForm, closeOnCapacity: e.target.checked })} />
+                                <label htmlFor="capacity-toggle" className="ios-toggle-label"></label>
+                              </div>
+                            </div>
+                            {eventForm.closeOnCapacity && (
+                              <div>
+                                <label className="table-meta" style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px', display: 'block', color: '#94a3b8' }}>Quantidade Máxima de Atletas</label>
+                                <input className="input" type="number" value={eventForm.maxAthletes} onChange={e => setEventForm({ ...eventForm, maxAthletes: e.target.value })} placeholder="Ex: 500" style={{ fontSize: '15px' }} />
+                              </div>
+                            )}
+                          </div>
+
+                          <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '24px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: eventForm.beltRegistrationEnabled ? '20px' : '0' }}>
+                              <div>
+                                <div style={{ fontSize: '16px', fontWeight: 700, color: '#e2e8f0', display: 'flex', alignItems: 'center', gap: '8px' }}>🥊 Cinturão / Super Lutas</div>
+                                <div style={{ fontSize: '13px', color: '#94a3b8', marginTop: '4px' }}>Venda acesso direto com organizador no Whatsapp.</div>
+                              </div>
+                              <div className="ios-toggle-wrapper">
+                                <input type="checkbox" id="belt-toggle" checked={eventForm.beltRegistrationEnabled} onChange={e => setEventForm({ ...eventForm, beltRegistrationEnabled: e.target.checked })} />
+                                <label htmlFor="belt-toggle" className="ios-toggle-label"></label>
+                              </div>
+                            </div>
+                            {eventForm.beltRegistrationEnabled && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                <div>
+                                  <label className="table-meta" style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px', display: 'block', color: '#94a3b8' }}>Telefone WhatsApp</label>
+                                  <input className="input" type="text" value={eventForm.beltRegistrationPhone} onChange={e => setEventForm({ ...eventForm, beltRegistrationPhone: e.target.value })} placeholder="Ex: 11999999999" style={{ fontSize: '15px' }} />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '24px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                            <div style={{ fontSize: '18px', fontWeight: 700, color: '#e2e8f0', letterSpacing: '0.04em' }}>Lotes de Inscrição</div>
+                            <button type="button" className="btn btn-secondary" onClick={handleAddBatch} style={{ padding: '10px 16px', fontSize: '14px' }}>+ Adicionar Lote</button>
+                          </div>
+                          
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                            {(eventForm.batches || []).map((batch, index) => (
+                              <div key={batch.id} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '24px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                                  <div style={{ fontSize: '16px', fontWeight: 700, color: '#00c2cb' }}>Lote {index + 1}</div>
+                                  {index > 0 && (
+                                    <button type="button" className="btn btn-ghost" onClick={() => handleRemoveBatch(index)} style={{ color: '#ef4444', padding: '6px 12px', fontSize: '13px' }}>Remover</button>
+                                  )}
+                                </div>
+                                
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px', marginBottom: '24px' }}>
+                                  <div>
+                                    <label className="table-meta" style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px', display: 'block', color: '#94a3b8' }}>Nome do Lote</label>
+                                    <input className="input" type="text" value={batch.name} onChange={e => handleBatchChange(index, 'name', e.target.value)} required style={{ fontSize: '16px', padding: '12px 16px' }} />
+                                  </div>
+                                  <div>
+                                    <label className="table-meta" style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px', display: 'block', color: '#94a3b8' }}>Data/Hora de Início (opcional)</label>
+                                    <input className="input" type="datetime-local" value={batch.startDate} onChange={e => handleBatchChange(index, 'startDate', e.target.value)} style={{ fontSize: '15px', padding: '12px 16px' }} />
+                                  </div>
+                                  <div>
+                                    <label className="table-meta" style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px', display: 'block', color: '#94a3b8' }}>Data/Hora de Fim (opcional)</label>
+                                    <input className="input" type="datetime-local" value={batch.endDate} onChange={e => handleBatchChange(index, 'endDate', e.target.value)} style={{ fontSize: '15px', padding: '12px 16px' }} />
+                                  </div>
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '16px' }}>
+                                  {[
+                                    { label: 'Sub-15 (até 14 anos)', key: 'feeUnder15', emoji: '🧒', color: '#3b82f6' },
+                                    { label: 'Adulto (15+ anos)', key: 'feeOver15', emoji: '🥋', color: '#00c2cb' },
+                                    { label: 'Combo (Gi + No-Gi)', key: 'feeCombo', emoji: '🎯', color: '#f59e0b' },
+                                    { label: 'Absoluto (+valor base)', key: 'feeAbsolute', emoji: '🏆', color: '#a78bfa' },
+                                  ].map(fee => (
+                                    <div key={fee.key} style={{ background: `${fee.color}11`, border: `1px solid ${fee.color}33`, borderRadius: '16px', padding: '24px' }}>
+                                      <div style={{ fontSize: '32px', marginBottom: '12px' }}>{fee.emoji}</div>
+                                      <div style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '14px', lineHeight: 1.4, fontWeight: 600 }}>{fee.label}</div>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <span style={{ color: '#64748b', fontSize: '18px', fontWeight: 700 }}>R$</span>
+                                        <input className="input" type="number" min="0" step="0.01" value={batch[fee.key]} onChange={e => handleBatchChange(index, fee.key, e.target.value)} required style={{ fontSize: '32px', fontWeight: 800, color: fee.color, background: 'transparent', border: 'none', borderBottom: `2px solid ${fee.color}55`, borderRadius: 0, padding: '4px 0', width: '100%' }} />
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <label className="table-meta">{copy.eventModal.weightTableNoGiOptions}</label>
-                        <textarea
-                          className="input"
-                          value={eventForm.weightTableNoGiOptions}
-                          onChange={(event) => setEventForm({ ...eventForm, weightTableNoGiOptions: event.target.value })}
-                          placeholder={copy.eventModal.weightTableNoGiOptionsPlaceholder}
-                          rows={4}
-                        />
+                    )}
+
+                    {/* ── TAB 3 ──────────────────────────────── */}
+                    {eventModalTab === 'documents' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+
+                        {/* ── Info Banner ─── */}
+                        <div style={{ background: 'rgba(0,194,203,0.07)', border: '1px solid rgba(0,194,203,0.2)', borderRadius: '12px', padding: '16px 20px', display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+                          <span style={{ fontSize: '22px', flexShrink: 0 }}>ℹ️</span>
+                          <div>
+                            <div style={{ fontSize: '14px', fontWeight: 700, color: '#00c2cb', marginBottom: '4px' }}>Tabelas Predefinidas Ativas</div>
+                            <div style={{ fontSize: '13px', color: '#94a3b8', lineHeight: 1.6 }}>
+                              Por padrão, o sistema usa as <strong style={{ color: '#e2e8f0' }}>tabelas oficiais Genesis Sports</strong> com todas as categorias de peso. Se quiser usar uma tabela própria do seu evento, ative a opção abaixo e carregue o arquivo.
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+
+                          {/* ── GI ─── */}
+                          <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${eventForm.useCustomWeightTableGi ? '#00c2cb44' : 'rgba(255,255,255,0.06)'}`, borderRadius: '16px', padding: '28px', transition: 'border-color 0.2s' }}>
+                            <div style={{ fontSize: '18px', fontWeight: 700, color: '#e2e8f0', marginBottom: '16px' }}>🥋 Tabela de Peso — GI</div>
+
+                            {/* Predefined Preview */}
+                            {!eventForm.useCustomWeightTableGi && (
+                              <div style={{ background: 'rgba(0,194,203,0.05)', border: '1px dashed rgba(0,194,203,0.3)', borderRadius: '10px', padding: '16px', marginBottom: '20px' }}>
+                                <div style={{ fontSize: '12px', fontWeight: 700, color: '#00c2cb', marginBottom: '10px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>✅ Tabela Padrão Genesis (em uso)</div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                                  {[
+                                    ['Galo', 'até 57,5 kg'], ['Pluma', 'até 64 kg'], ['Pena', 'até 70 kg'],
+                                    ['Leve', 'até 76 kg'], ['Médio', 'até 82,3 kg'], ['Meio-Pesado', 'até 88,3 kg'],
+                                    ['Pesado', 'até 94,3 kg'], ['Super-Pesado', 'até 100,5 kg'], ['Pesadíssimo', 'acima de 100,5 kg'],
+                                  ].map(([cat, weight]) => (
+                                    <div key={cat} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#64748b', padding: '4px 8px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>
+                                      <span style={{ color: '#94a3b8', fontWeight: 600 }}>{cat}</span>
+                                      <span style={{ color: '#64748b' }}>{weight}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Custom Toggle */}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', padding: '12px 0', borderTop: '1px solid rgba(255,255,255,0.06)' }} onClick={() => setEventForm(f => ({ ...f, useCustomWeightTableGi: !f.useCustomWeightTableGi }))}>
+                              <div>
+                                <div style={{ fontSize: '14px', fontWeight: 700, color: eventForm.useCustomWeightTableGi ? '#00c2cb' : '#e2e8f0' }}>Usar tabela personalizada (GI)</div>
+                                <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>Substitui a tabela padrão pela sua imagem/PDF</div>
+                              </div>
+                              <div style={{ flexShrink: 0, width: '48px', height: '28px', borderRadius: '14px', background: eventForm.useCustomWeightTableGi ? '#00c2cb' : '#334155', position: 'relative', transition: 'background 0.2s' }}>
+                                <div style={{ position: 'absolute', top: '3px', left: eventForm.useCustomWeightTableGi ? '23px' : '3px', width: '22px', height: '22px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
+                              </div>
+                            </div>
+
+                            {eventForm.useCustomWeightTableGi && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '16px' }}>
+                                <div>
+                                  <label className="table-meta" style={{ fontSize: '13px', marginBottom: '8px', display: 'block', color: '#94a3b8', fontWeight: 700 }}>URL da Tabela (imagem/PDF)</label>
+                                  <input className="input" type="text" value={eventForm.weightTableGiUrl} onChange={handleWeightTableGiUrlChange} placeholder={copy.eventModal.weightTableGiUrlPlaceholder} style={{ fontSize: '15px' }} />
+                                </div>
+                                <div>
+                                  <label className="table-meta" style={{ fontSize: '13px', marginBottom: '8px', display: 'block', color: '#94a3b8', fontWeight: 700 }}>Enviar arquivo da tabela GI</label>
+                                  <input className="input" type="file" accept="image/*,application/pdf" onChange={handleWeightTableGiFileChange} style={{ fontSize: '15px' }} />
+                                  {eventWeightTableGiStoredSizeBytes > 0 && <div className="table-meta table-meta--tight" style={{ fontSize: '13px', marginTop: '6px' }}>{copy.eventModal.assetStoredSize}: {formatBytes(eventWeightTableGiStoredSizeBytes)}</div>}
+                                </div>
+                                <div>
+                                  <label className="table-meta" style={{ fontSize: '13px', marginBottom: '8px', display: 'block', color: '#94a3b8', fontWeight: 700 }}>{copy.eventModal.weightTableGiOptions}</label>
+                                  <textarea className="input" value={eventForm.weightTableGiOptions} onChange={e => setEventForm({ ...eventForm, weightTableGiOptions: e.target.value })} placeholder={copy.eventModal.weightTableGiOptionsPlaceholder} rows={5} style={{ fontSize: '15px' }} />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* ── NO-GI ─── */}
+                          <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${eventForm.useCustomWeightTableNoGi ? '#f59e0b44' : 'rgba(255,255,255,0.06)'}`, borderRadius: '16px', padding: '28px', transition: 'border-color 0.2s' }}>
+                            <div style={{ fontSize: '18px', fontWeight: 700, color: '#e2e8f0', marginBottom: '16px' }}>🩳 Tabela de Peso — NO-GI</div>
+
+                            {/* Predefined Preview */}
+                            {!eventForm.useCustomWeightTableNoGi && (
+                              <div style={{ background: 'rgba(245,158,11,0.05)', border: '1px dashed rgba(245,158,11,0.3)', borderRadius: '10px', padding: '16px', marginBottom: '20px' }}>
+                                <div style={{ fontSize: '12px', fontWeight: 700, color: '#f59e0b', marginBottom: '10px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>✅ Tabela Padrão Genesis (em uso)</div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                                  {[
+                                    ['Galo', 'até 58,5 kg'], ['Pluma', 'até 65,8 kg'], ['Pena', 'até 73,9 kg'],
+                                    ['Leve', 'até 83 kg'], ['Médio', 'até 92,5 kg'], ['Meio-Pesado', 'até 102,3 kg'],
+                                    ['Pesado', 'até 112,5 kg'], ['Super-Pesado', 'acima de 112,5 kg'],
+                                  ].map(([cat, weight]) => (
+                                    <div key={cat} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#64748b', padding: '4px 8px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>
+                                      <span style={{ color: '#94a3b8', fontWeight: 600 }}>{cat}</span>
+                                      <span style={{ color: '#64748b' }}>{weight}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Custom Toggle */}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', padding: '12px 0', borderTop: '1px solid rgba(255,255,255,0.06)' }} onClick={() => setEventForm(f => ({ ...f, useCustomWeightTableNoGi: !f.useCustomWeightTableNoGi }))}>
+                              <div>
+                                <div style={{ fontSize: '14px', fontWeight: 700, color: eventForm.useCustomWeightTableNoGi ? '#f59e0b' : '#e2e8f0' }}>Usar tabela personalizada (NO-GI)</div>
+                                <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>Substitui a tabela padrão pela sua imagem/PDF</div>
+                              </div>
+                              <div style={{ flexShrink: 0, width: '48px', height: '28px', borderRadius: '14px', background: eventForm.useCustomWeightTableNoGi ? '#f59e0b' : '#334155', position: 'relative', transition: 'background 0.2s' }}>
+                                <div style={{ position: 'absolute', top: '3px', left: eventForm.useCustomWeightTableNoGi ? '23px' : '3px', width: '22px', height: '22px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
+                              </div>
+                            </div>
+
+                            {eventForm.useCustomWeightTableNoGi && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '16px' }}>
+                                <div>
+                                  <label className="table-meta" style={{ fontSize: '13px', marginBottom: '8px', display: 'block', color: '#94a3b8', fontWeight: 700 }}>URL da Tabela (imagem/PDF)</label>
+                                  <input className="input" type="text" value={eventForm.weightTableNoGiUrl} onChange={handleWeightTableNoGiUrlChange} placeholder={copy.eventModal.weightTableNoGiUrlPlaceholder} style={{ fontSize: '15px' }} />
+                                </div>
+                                <div>
+                                  <label className="table-meta" style={{ fontSize: '13px', marginBottom: '8px', display: 'block', color: '#94a3b8', fontWeight: 700 }}>Enviar arquivo da tabela NO-GI</label>
+                                  <input className="input" type="file" accept="image/*,application/pdf" onChange={handleWeightTableNoGiFileChange} style={{ fontSize: '15px' }} />
+                                  {eventWeightTableNoGiStoredSizeBytes > 0 && <div className="table-meta table-meta--tight" style={{ fontSize: '13px', marginTop: '6px' }}>{copy.eventModal.assetStoredSize}: {formatBytes(eventWeightTableNoGiStoredSizeBytes)}</div>}
+                                </div>
+                                <div>
+                                  <label className="table-meta" style={{ fontSize: '13px', marginBottom: '8px', display: 'block', color: '#94a3b8', fontWeight: 700 }}>{copy.eventModal.weightTableNoGiOptions}</label>
+                                  <textarea className="input" value={eventForm.weightTableNoGiOptions} onChange={e => setEventForm({ ...eventForm, weightTableNoGiOptions: e.target.value })} placeholder={copy.eventModal.weightTableNoGiOptionsPlaceholder} rows={5} style={{ fontSize: '15px' }} />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                        </div>
+
+                        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '28px' }}>
+                          <div style={{ fontSize: '18px', fontWeight: 700, color: '#e2e8f0', marginBottom: '20px' }}>📄 Circular / Regulamento</div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                            <div>
+                              <label className="table-meta" style={{ fontSize: '13px', marginBottom: '8px', display: 'block', color: '#94a3b8', fontWeight: 700 }}>URL da Circular (PDF)</label>
+                              <input className="input" type="text" value={eventForm.circularUrl} onChange={handleCircularUrlChange} placeholder={copy.eventModal.circularUrlPlaceholder} style={{ fontSize: '15px' }} />
+                            </div>
+                            <div>
+                              <label className="table-meta" style={{ fontSize: '13px', marginBottom: '8px', display: 'block', color: '#94a3b8', fontWeight: 700 }}>Enviar arquivo da circular</label>
+                              <input className="input" type="file" accept="image/*,application/pdf" onChange={handleCircularFileChange} style={{ fontSize: '15px' }} />
+                              {eventCircularStoredSizeBytes > 0 && <div className="table-meta table-meta--tight" style={{ fontSize: '13px', marginTop: '6px' }}>{copy.eventModal.assetStoredSize}: {formatBytes(eventCircularStoredSizeBytes)}</div>}
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    <div>
-                      <label className="table-meta">{copy.eventModal.pixKey}</label>
-                      <input
-                        className="input"
-                        type="text"
-                        value={eventForm.pixKey}
-                        onChange={(event) => setEventForm({ ...eventForm, pixKey: event.target.value })}
-                        placeholder={copy.eventModal.pixKeyPlaceholder}
-                        required
-                      />
-                    </div>
-                    <div className="form-grid">
-                      <div>
-                        <label className="table-meta">{copy.eventModal.feeUnder15}</label>
-                        <input
-                          className="input"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={eventForm.feeUnder15}
-                          onChange={(event) => setEventForm({ ...eventForm, feeUnder15: event.target.value })}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="table-meta">{copy.eventModal.feeOver15}</label>
-                        <input
-                          className="input"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={eventForm.feeOver15}
-                          onChange={(event) => setEventForm({ ...eventForm, feeOver15: event.target.value })}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="table-meta">{copy.eventModal.feeCombo}</label>
-                        <input
-                          className="input"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={eventForm.feeCombo}
-                          onChange={(event) => setEventForm({ ...eventForm, feeCombo: event.target.value })}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="table-meta">{copy.eventModal.feeAbsolute}</label>
-                        <input
-                          className="input"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={eventForm.feeAbsolute}
-                          onChange={(event) => setEventForm({ ...eventForm, feeAbsolute: event.target.value })}
-                          required
-                        />
-                      </div>
-                    </div>
-                    <label className="checkbox-inline">
-                      <input
-                        type="checkbox"
-                        checked={eventForm.registrationOpen}
-                        onChange={(event) => setEventForm({ ...eventForm, registrationOpen: event.target.checked })}
-                      />
-                      <span>{copy.eventModal.registrationOpen}</span>
-                    </label>
-                    <label className="checkbox-inline">
-                      <input
-                        type="checkbox"
-                        checked={eventForm.internalRegistration}
-                        onChange={(event) => setEventForm({ ...eventForm, internalRegistration: event.target.checked })}
-                      />
-                      <span>{copy.eventModal.internalRegistration}</span>
-                    </label>
+                    )}
+
                   </div>
-                  <div className="form-actions">
-                    <button type="button" className="btn btn-ghost" onClick={handleCloseEventModal}>
-                      {copy.eventModal.cancel}
-                    </button>
-                    <button type="submit" className="btn btn-primary">
-                      {copy.eventModal.save}
-                    </button>
+
+                  {/* ── Rodapé ────────────────────────────────── */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '24px 40px', borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(0,0,0,0.2)' }}>
+                    <button type="button" className="btn btn-ghost" onClick={handleCloseEventModal} style={{ fontSize: '16px', padding: '12px 20px' }}>{copy.eventModal.cancel}</button>
+                    <div style={{ display: 'flex', gap: '16px' }}>
+                      {eventModalTab !== 'info' && (
+                        <button type="button" className="btn btn-ghost" onClick={() => setEventModalTab(eventModalTab === 'documents' ? 'registration' : 'info')} style={{ fontSize: '16px', padding: '12px 20px' }}>← Anterior</button>
+                      )}
+                      {eventModalTab !== 'documents' && (
+                        <button type="button" className="btn btn-secondary" onClick={() => setEventModalTab(eventModalTab === 'info' ? 'registration' : 'documents')} style={{ fontSize: '16px', padding: '12px 24px' }}>Próxima Aba →</button>
+                      )}
+                      <button type="submit" className="btn btn-primary" style={{ minWidth: '160px', fontSize: '16px', padding: '12px 24px' }}>{copy.eventModal.save}</button>
+                    </div>
                   </div>
                 </form>
               </div>
@@ -1698,6 +1868,7 @@ const AppLayout = () => {
           </>
         )}
       </AnimatePresence>
+
     </div>
   );
 };

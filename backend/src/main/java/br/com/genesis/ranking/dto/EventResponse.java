@@ -5,7 +5,8 @@ import java.util.List;
 public class EventResponse {
   private String id;
   private String name;
-  private String date;
+    private String date;
+  private String endDate;
   private String location;
   private Boolean accommodationEnabled;
   private String accommodationTitle;
@@ -21,7 +22,11 @@ public class EventResponse {
   private Boolean beltRegistrationEnabled;
   private String beltRegistrationTitle;
   private Double beltRegistrationPrice;
-  private String beltRegistrationDescription;
+    private String beltRegistrationDescription;
+  private String beltRegistrationPhone;
+  private Integer maxAthletes;
+  private Boolean closeOnCapacity;
+  private String eventDescription;
   private List<EventBatchDto> batches;
   private List<SuperFightDto> superFights;
   private Boolean superFightsPublished;
@@ -275,11 +280,51 @@ public class EventResponse {
     this.announcementFailed = announcementFailed;
   }
 
-  public Boolean getAnnouncementAttempted() {
+    public Boolean getAnnouncementAttempted() {
     return announcementAttempted;
   }
 
   public void setAnnouncementAttempted(Boolean announcementAttempted) {
     this.announcementAttempted = announcementAttempted;
+  }
+
+  public String getEndDate() {
+    return endDate;
+  }
+
+  public void setEndDate(String endDate) {
+    this.endDate = endDate;
+  }
+
+  public Integer getMaxAthletes() {
+    return maxAthletes;
+  }
+
+  public void setMaxAthletes(Integer maxAthletes) {
+    this.maxAthletes = maxAthletes;
+  }
+
+  public Boolean getCloseOnCapacity() {
+    return closeOnCapacity;
+  }
+
+  public void setCloseOnCapacity(Boolean closeOnCapacity) {
+    this.closeOnCapacity = closeOnCapacity;
+  }
+
+  public String getBeltRegistrationPhone() {
+    return beltRegistrationPhone;
+  }
+
+  public void setBeltRegistrationPhone(String beltRegistrationPhone) {
+    this.beltRegistrationPhone = beltRegistrationPhone;
+  }
+
+  public String getEventDescription() {
+    return eventDescription;
+  }
+
+  public void setEventDescription(String eventDescription) {
+    this.eventDescription = eventDescription;
   }
 }

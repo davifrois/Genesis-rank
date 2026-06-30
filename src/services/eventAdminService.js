@@ -57,7 +57,9 @@ const normalizeApiUrlField = (value) => {
 const normalizePayload = (payload = {}) => ({
   name: (payload.name || '').toString().trim(),
   date: (payload.date || '').toString().trim() || null,
+  endDate: (payload.endDate || '').toString().trim() || null,
   location: (payload.location || '').toString().trim() || null,
+  eventDescription: (payload.eventDescription || '').toString().trim() || null,
   accommodationEnabled: payload.accommodationEnabled === true,
   accommodationTitle: (payload.accommodationTitle || '').toString().trim() || null,
   accommodationDescription: (payload.accommodationDescription || '').toString().trim() || null,
@@ -73,6 +75,9 @@ const normalizePayload = (payload = {}) => ({
   beltRegistrationTitle: (payload.beltRegistrationTitle || '').toString().trim() || null,
   beltRegistrationPrice: payload.beltRegistrationPrice,
   beltRegistrationDescription: (payload.beltRegistrationDescription || '').toString().trim() || null,
+  beltRegistrationPhone: (payload.beltRegistrationPhone || '').toString().trim() || null,
+  maxAthletes: payload.maxAthletes ? parseInt(payload.maxAthletes, 10) : 0,
+  closeOnCapacity: payload.closeOnCapacity === true,
   batches: Array.isArray(payload.batches)
     ? payload.batches.map((batch, index) => {
         const feeUnder15 = resolveBatchFee(batch, 'under15', payload.feeUnder15 || 0);

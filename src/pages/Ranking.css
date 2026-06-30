@@ -1,0 +1,21 @@
+/* Grid layout for Ranking Cards */
+.ranking-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  padding: 10px;
+  justify-content: center;
+}
+
+@media (min-width: 768px) {
+  .ranking-grid {
+    grid-template-columns: repeat(3, 150px);
+  }
+}
+
+@media (min-width: 1024px) {
+  .ranking-grid {
+    grid-template-columns: repeat(4, 150px);
+    justify-content: flex-start;
+  }
+}

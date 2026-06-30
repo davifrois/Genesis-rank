@@ -50,23 +50,8 @@ const buildLanguageOption = ({
 
 const LANGUAGE_OPTIONS = [
   buildLanguageOption({ id: 'en-US', label: 'English', country: 'United States', countryCodes: ['us'], uiLanguage: 'en-US' }),
-  buildLanguageOption({ id: 'pt-BR', label: 'Portugues', country: 'Brasil / Portugal', countryCodes: ['br', 'pt'], uiLanguage: 'pt-BR', translationStatus: 'native' }),
-  buildLanguageOption({ id: 'es-ES', label: 'Espanol', country: 'Mexico / Espana', countryCodes: ['mx', 'es'], uiLanguage: 'es-ES' }),
-  buildLanguageOption({ id: 'de-DE', label: 'Deutsch', country: 'Deutschland', countryCodes: ['de'] }),
-  buildLanguageOption({ id: 'nl-NL', label: 'Nederlands', country: 'Nederland', countryCodes: ['nl'] }),
-  buildLanguageOption({ id: 'ja-JP', label: 'Japanese', country: 'Japan', countryCodes: ['jp'] }),
-  buildLanguageOption({ id: 'fr-FR', label: 'Francais', country: 'France', countryCodes: ['fr'], uiLanguage: 'fr-FR', translationStatus: 'native' }),
-  buildLanguageOption({ id: 'it-IT', label: 'Italiano', country: 'Italia', countryCodes: ['it'] }),
-  buildLanguageOption({ id: 'nb-NO', label: 'Norsk', country: 'Norge', countryCodes: ['no'] }),
-  buildLanguageOption({ id: 'pl-PL', label: 'Polski', country: 'Polska', countryCodes: ['pl'] }),
-  buildLanguageOption({ id: 'ru-RU', label: 'Russian', country: 'Russia', countryCodes: ['ru'] }),
-  buildLanguageOption({ id: 'sv-SE', label: 'Svenska', country: 'Sverige', countryCodes: ['se'] }),
-  buildLanguageOption({ id: 'cs-CZ', label: 'Cestina', country: 'Cesko', countryCodes: ['cz'] }),
-  buildLanguageOption({ id: 'sr-RS', label: 'Srpski', country: 'Srbija', countryCodes: ['rs'] }),
-  buildLanguageOption({ id: 'zh-CN', label: 'Chinese', country: 'China', countryCodes: ['cn'] }),
-  buildLanguageOption({ id: 'ko-KR', label: 'Korean', country: 'Korea', countryCodes: ['kr'] }),
-  buildLanguageOption({ id: 'ar-AE', label: 'Arabic', country: 'United Arab Emirates', countryCodes: ['ae'] }),
-  buildLanguageOption({ id: 'uk-UA', label: 'Ukrainian', country: 'Ukraine', countryCodes: ['ua'] })
+  buildLanguageOption({ id: 'pt-BR', label: 'Português', country: 'Brasil / Portugal', countryCodes: ['br'], uiLanguage: 'pt-BR', translationStatus: 'native' }),
+  buildLanguageOption({ id: 'es-ES', label: 'Español', country: 'Mexico / España', countryCodes: ['es'], uiLanguage: 'es-ES' })
 ];
 
 const findLanguageOption = (id) => LANGUAGE_OPTIONS.find((option) => option.id === id) || null;

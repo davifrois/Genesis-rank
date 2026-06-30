@@ -93,3 +93,37 @@ export const rankAthletes = (athletes) => {
 
   return [...athletes].sort((a, b) => compareRankMeta(getMeta(a), getMeta(b)));
 };
+
+/**
+ * Groups athletes by name, merging their history and points to prevent duplicates
+ * @param {Array} athletes 
+ * @returns {Array} Grouped athletes
+ */
+export const groupAthletesByName = (athletes) => {
+  const grouped = new Map();
+  
+  athletes.forEach((athlete) => {
+    const name = normalizeName(athlete?.nome || athlete?.name);
+    if (!name) return;
+    
+    if (!grouped.has(name)) {
+      grouped.set(name, {
+        ...athlete, // keep basic info of the first registration
+        historico: [],
+        pontos: 0,
+      });
+    }
+    
+    const current = grouped.get(name);
+    
+    // Merge historico
+    if (Array.isArray(athlete.historico)) {
+      current.historico.push(...athlete.historico);
+    }
+    
+    // Sum pontos (recalculate from history to be safe)
+    current.pontos = calculateTotalPoints(current.historico);
+  });
+  
+  return Array.from(grouped.values());
+};

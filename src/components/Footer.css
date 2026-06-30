@@ -1,0 +1,229 @@
+.genesis-footer {
+  background-color: #121212;
+  color: #ffffff;
+  font-family: inherit;
+  padding-top: 64px;
+}
+
+.genesis-footer-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.genesis-footer-top {
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+}
+
+@media (min-width: 768px) {
+  .genesis-footer-top {
+    flex-direction: row;
+    justify-content: space-between;
+  }
+}
+
+.genesis-footer-brand {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.genesis-footer-logo {
+  max-width: 150px;
+  height: auto;
+}
+
+.genesis-footer-logo-placeholder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: 0.5px;
+}
+
+.genesis-footer-links {
+  flex: 3;
+  display: grid;
+  grid-template-columns: repeat(1, 1fr);
+  gap: 32px;
+}
+
+@media (min-width: 576px) {
+  .genesis-footer-links {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 992px) {
+  .genesis-footer-links {
+    grid-template-columns: repeat(3, 1fr);
+    padding-left: 48px;
+  }
+}
+
+.genesis-footer-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.genesis-footer-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #e5a539;
+  text-transform: uppercase;
+  margin: 0 0 4px 0;
+  letter-spacing: 0.5px;
+}
+
+.genesis-footer-col a {
+  color: #a0a0a0;
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+.genesis-footer-col a:hover {
+  color: #ffffff;
+}
+
+.genesis-footer-bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  padding: 32px 0;
+  margin-top: 64px;
+  border-top: 1px solid #2a2a2a;
+}
+
+@media (min-width: 768px) {
+  .genesis-footer-bottom {
+    flex-direction: row;
+    justify-content: space-between;
+  }
+}
+
+.genesis-footer-bottom-left {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  font-size: 0.8rem;
+  color: #888888;
+}
+
+.genesis-footer-bottom-left a {
+  color: #888888;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.genesis-footer-bottom-left a:hover {
+  color: #ffffff;
+}
+
+.genesis-footer-separator {
+  color: #333333;
+}
+
+.genesis-footer-bottom-right {
+  display: flex;
+  gap: 20px;
+}
+
+.genesis-footer-bottom-right a {
+  color: #a0a0a0;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.genesis-footer-bottom-right a:hover {
+  color: #ffffff;
+  transform: translateY(-2px);
+}
+
+/* CTA Section Styles */
+.genesis-cta-section {
+  position: relative;
+  background-color: #111;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  color: #ffffff;
+  padding: 80px 24px;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  min-height: 400px;
+}
+
+.genesis-cta-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(to right, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 100%);
+  z-index: 1;
+}
+
+.genesis-cta-content {
+  position: relative;
+  z-index: 2;
+  max-width: 600px;
+  margin: 0 auto;
+  width: 100%;
+  max-width: 1200px;
+}
+
+.genesis-cta-title {
+  font-size: 2.5rem;
+  font-weight: 800;
+  line-height: 1.1;
+  margin-bottom: 16px;
+  font-family: inherit;
+  color: #ffffff;
+}
+
+.genesis-cta-text {
+  font-size: 1.1rem;
+  color: #dddddd;
+  margin-bottom: 32px;
+  max-width: 480px;
+  line-height: 1.5;
+}
+
+.genesis-cta-button {
+  display: inline-block;
+  background-color: #2b6cb0; /* matching the blue button in the image */
+  color: #ffffff;
+  padding: 16px 32px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-decoration: none;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.genesis-cta-button:hover {
+  background-color: #3182ce;
+  color: #ffffff;
+  transform: translateY(-2px);
+}
+
+@media (min-width: 768px) {
+  .genesis-cta-title {
+    font-size: 3.5rem;
+  }
+  .genesis-cta-text {
+    font-size: 1.25rem;
+  }
+}
+

@@ -1,6 +1,6 @@
 import React, { useDeferredValue, useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronUp, Search, Trophy, X } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
+import { ChevronDown, ChevronUp, Search, Trophy, User, X } from 'lucide-react';
+import { useSearchParams, Link } from 'react-router-dom';
 import { useStore } from '../hooks/useStore';
 import { useI18n } from '../hooks/useI18n';
 import { buildScoreBreakdown, rankAthletes } from '../services/scoringService';
@@ -10,6 +10,7 @@ import { generateFilteredRankingPDF } from '../services/pdfService';
 import { buildFileSafeName, downloadCsv } from '../services/exportService';
 import { translateBelt, translateCompositeLabel, translateWeight } from '../utils/localeLabels';
 import { countryCodeFromAthlete, countryLabelFromAthlete, countryLabelFromCode, flagFromCountryCode } from '../utils/countryFlags';
+import './RankingV2.css';
 
 const DEFAULT_GROUP_LIMIT = 8;
 const GROUP_PAGE_SIZE = 10;
@@ -112,6 +113,8 @@ const Ranking = () => {
     const [expandedGroups, setExpandedGroups] = useState(() => new Set());
     const [groupLimit, setGroupLimit] = useState(GROUP_PAGE_SIZE);
     const [winnersLimit, setWinnersLimit] = useState(WINNERS_PAGE_SIZE);
+    const [globalGender, setGlobalGender] = useState('ALL');
+    const [selectOpen, setSelectOpen] = useState(false);
     const copy = isEnglish
         ? {
             tabs: {
@@ -894,190 +897,231 @@ const Ranking = () => {
     };
 
     return (
-        <div className={`ranking-minimal ranking-ajp ranking-clean ranking-reference-v2 ${isEventMode ? 'ranking-event-mode' : ''}`}>
-            <div className="ranking-page-header-new">
-                <h1>{copy.rankingTitle || 'RANKINGS'}</h1>
-                <div className="ranking-page-header-pill">
-                    {copy.rankingTitle || 'Rankings'} / {new Date().getFullYear()}
-                </div>
-            </div>
+        <div className={`ranking-minimal ranking-ajp ranking-clean ranking-reference-v2 ranking-v2-page ${isEventMode ? 'ranking-event-mode' : ''}`}>
 
-            <div className="ranking-event-carousel-wrap">
-                <div className="ranking-event-carousel">
-                    <button 
-                        type="button"
-                        className={`event-pill ${selectedEventId === 'all' ? 'is-active' : ''}`}
-                        onClick={() => setSelectedEventId('all')}
-                    >
-                        <div className="event-pill__logo is-fallback">
-                            <Trophy size={14} />
-                        </div>
-                        <span>{copy.allEvents}</span>
-                    </button>
-                    {events.map((eventItem) => {
-                        const hasLogo = Boolean(eventItem.posterUrl);
-                        return (
-                            <button 
-                                type="button"
-                                key={eventItem.id}
-                                className={`event-pill ${selectedEventId === eventItem.id ? 'is-active' : ''}`}
-                                onClick={() => setSelectedEventId(eventItem.id)}
-                            >
-                                <div className={`event-pill__logo ${hasLogo ? '' : 'is-fallback'}`}>
-                                    {hasLogo ? (
-                                        <img src={eventItem.posterUrl} alt="" loading="lazy" />
-                                    ) : (
-                                        <span>{(eventItem.name || '?').trim().charAt(0).toUpperCase()}</span>
-                                    )}
-                                </div>
-                                <span>{eventItem.name}</span>
-                            </button>
-                        );
-                    })}
-                </div>
-            </div>
-
-            <div className="tab-container minimal-tabs rank-v2-tabs">
-                {tabs.map((tab) => (
+            {/* ---- HEADER: Título + Dropdown de Campeonato ---- */}
+            <div className="ranking-v2-topbar">
+                <h1>RANKINGS</h1>
+                <div className="rv2-custom-select-wrap">
                     <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
-                        className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
+                        className="rv2-custom-select-btn"
+                        type="button"
+                        onClick={() => setSelectOpen(prev => !prev)}
+                        onBlur={() => setTimeout(() => setSelectOpen(false), 150)}
                     >
-                        {tab.label}
+                        <span>{selectedEventId === 'all' ? copy.allEvents : (events.find(e => e.id === selectedEventId)?.name || copy.allEvents)}</span>
+                        <svg width="12" height="8" viewBox="0 0 12 8" fill="none"><path d="M1 1l5 5 5-5" stroke="#94a3b8" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
                     </button>
-                ))}
+                    {selectOpen && (
+                        <div className="rv2-custom-select-panel">
+                            <div
+                                className={`rv2-custom-select-option ${selectedEventId === 'all' ? 'is-selected' : ''}`}
+                                onMouseDown={() => { setSelectedEventId('all'); setSelectOpen(false); }}
+                            >{copy.allEvents}</div>
+                            {events.map(ev => (
+                                <div
+                                    key={ev.id}
+                                    className={`rv2-custom-select-option ${selectedEventId === ev.id ? 'is-selected' : ''}`}
+                                    onMouseDown={() => { setSelectedEventId(ev.id); setSelectOpen(false); }}
+                                >{ev.name}</div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* ---- BREADCRUMB ---- */}
+            <div className="ranking-v2-breadcrumb">
+                <span>Rankings</span>
+                <span className="bc-sep">/</span>
+                <span>{selectedEventId === 'all' ? copy.allEvents : (events.find(e => e.id === selectedEventId)?.name || copy.allEvents)}</span>
+                {selectedEventId !== 'all' && (
+                    <>
+                        <span className="bc-sep">/</span>
+                        <span className="bc-tag">GENESIS ESPORTES RANKING OFICIAL</span>
+                    </>
+                )}
+            </div>
+
+            {/* ---- GENDER TOGGLE ---- */}
+            <div className="ranking-v2-gender-wrap">
+                <button
+                    type="button"
+                    className={`gender-v2-btn ${globalGender === 'MASCULINO' ? 'is-active' : ''}`}
+                    onClick={() => setGlobalGender(prev => prev === 'MASCULINO' ? 'ALL' : 'MASCULINO')}
+                >
+                    <User size={15} fill="currentColor" strokeWidth={0} /> MASCULINO
+                </button>
+                <button
+                    type="button"
+                    className={`gender-v2-btn ${globalGender === 'FEMININO' ? 'is-active' : ''}`}
+                    onClick={() => setGlobalGender(prev => prev === 'FEMININO' ? 'ALL' : 'FEMININO')}
+                >
+                    <User size={15} fill="currentColor" strokeWidth={0} /> FEMININO
+                </button>
+            </div>
+
+            {/* ---- TABS GI / NO-GI / etc. ---- */}
+            <div className="ranking-v2-tabs-wrap">
+                <div className="ranking-v2-tabs">
+                    {tabs.map((tab) => (
+                        <button
+                            key={tab.id}
+                            type="button"
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`rv2-tab-btn ${activeTab === tab.id ? 'is-active' : ''}`}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
             </div>
 
             {hasBoardData && (
                 <section className="rank-boards-wrap">
-                    <header className="rank-boards-head">
-                        <div className="rank-boards-head__title">{copy.boardsSectionTitle}</div>
-                        <div className="rank-boards-head__subtitle">{copy.boardsSectionSubtitle}</div>
-                    </header>
-                    <div className="board-grid">
-                        {boardAthletePanels.map((panel) => (
-                            <article key={panel.key} className="board-card">
-                                <header className="board-card__header">
-                                    <div className="board-card__header-main">
-                                        <h3>{panel.title} {modeLabel}</h3>
-                                        <span className="board-card__year">{new Date().getFullYear()}</span>
+                    <div className="ranking-v2-section-head">
+                        <h2>{copy.boardsSectionTitle}</h2>
+                        <p>{copy.boardsSectionSubtitle}</p>
+                    </div>
+                    <div className="ranking-v2-board-grid">
+                        {boardAthletePanels.map((panel) => {
+                            const filteredEntries = globalGender === 'ALL'
+                                ? panel.entries
+                                : panel.entries.filter(a => (a.genero || '').toUpperCase() === globalGender);
+                            return (
+                                <article key={panel.key} className="rv2-board-card">
+                                    <div className="rv2-board-card__header">
+                                        <div className="rv2-board-card__title">
+                                            {panel.title} {modeLabel}
+                                            <span className="rv2-board-card__badge">{new Date().getFullYear()}</span>
+                                        </div>
+                                        <div className="rv2-board-card__subtitle">
+                                            Calculado pela última vez há 6 horas 🔄
+                                        </div>
                                     </div>
-                                    <span className="board-card__subtitle">último cálculo há 6 horas 🔄</span>
-                                </header>
-                                <div className="board-card__list">
-                                    {panel.entries.length === 0 ? (
-                                        <div className="board-empty">{copy.boardsNoData}</div>
-                                    ) : (
-                                        panel.entries.map((athlete, index) => {
-                                            const metrics = athleteMetrics.get(athlete.id) || { wins: 0, podiumTotal: 0, podium1: 0, podium2: 0, podium3: 0 };
-                                            const photoUrl = resolvePhotoUrl(athlete);
-                                            const countryCode = countryCodeFromAthlete(athlete);
-                                            return (
-                                                <div key={`${panel.key}-${athlete.id}`} className="board-row">
-                                                    <div className="board-row__rank">{index + 1}.</div>
-                                                    <div className={`board-row__avatar ${photoUrl ? '' : 'is-empty'}`}>
-                                                        {photoUrl ? (
-                                                            <img src={photoUrl} alt="" loading="lazy" />
-                                                        ) : (
-                                                            <span>{(athlete.nome || '?').trim().charAt(0).toUpperCase()}</span>
-                                                        )}
+                                    <div className="rv2-board-card__list">
+                                        {filteredEntries.length === 0 ? (
+                                            <div className="rv2-board-empty">{copy.boardsNoData}</div>
+                                        ) : (
+                                            filteredEntries.map((athlete, index) => {
+                                                const metrics = athleteMetrics.get(athlete.id) || { wins: 0, podiumTotal: 0, podium1: 0, podium2: 0, podium3: 0 };
+                                                const photoUrl = resolvePhotoUrl(athlete);
+                                                const countryCode = countryCodeFromAthlete(athlete);
+                                                const countryLabel = countryLabelFromAthlete(athlete, uiLanguage);
+                                                return (
+                                                    <div key={`${panel.key}-${athlete.id}`} className="rv2-athlete-row">
+                                                        <div className="rv2-athlete-rank">{index + 1}.</div>
+                                                        <div className="rv2-athlete-avatar">
+                                                            <Link to={`/perfil-publico/${athlete.id}`} style={{ display: 'block', width: '100%', height: '100%', textDecoration: 'none', color: 'inherit' }}>
+                                                                {photoUrl ? (
+                                                                    <img src={photoUrl} alt={athlete.nome} loading="lazy" />
+                                                                ) : (
+                                                                    <span>{(athlete.nome || '?').trim().charAt(0).toUpperCase()}</span>
+                                                                )}
+                                                            </Link>
+                                                        </div>
+                                                        <div className="rv2-athlete-identity">
+                                                            <Link to={`/perfil-publico/${athlete.id}`} className="rv2-athlete-name" style={{ textDecoration: 'none', color: 'inherit' }}>{athlete.nome}</Link>
+                                                            <div className="rv2-athlete-country">
+                                                                <span>{flagFromCountryCode(countryCode)}</span>
+                                                                <span>{countryLabel || athlete.academia || '-'}</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="rv2-athlete-metrics">
+                                                            <div className="rv2-metric pts">
+                                                                <strong>{athlete.pontos}</strong>
+                                                                <span>Pontos</span>
+                                                            </div>
+                                                            <div className="rv2-metric wins">
+                                                                <strong>{metrics.wins}</strong>
+                                                                <span>Vitórias</span>
+                                                            </div>
+                                                            <div className="rv2-metric losses">
+                                                                <strong>{metrics.podiumTotal || 0}</strong>
+                                                                <span>Perdas</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="rv2-trophy-group">
+                                                            <div className="rv2-trophy">
+                                                                <Trophy size={12} color="#fbbf24" fill="#fbbf24" />
+                                                                <span>{metrics.podium1 || 0}</span>
+                                                            </div>
+                                                            <div className="rv2-trophy">
+                                                                <Trophy size={12} color="#94a3b8" fill="#94a3b8" />
+                                                                <span>{metrics.podium2 || 0}</span>
+                                                            </div>
+                                                            <div className="rv2-trophy">
+                                                                <Trophy size={12} color="#b45309" fill="#b45309" />
+                                                                <span>{metrics.podium3 || 0}</span>
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                    <div className="board-row__identity">
-                                                        <strong>{athlete.nome}</strong>
-                                                        <span className="board-row__country"><span className="board-flag">{flagFromCountryCode(countryCode)}</span> {countryLabelFromAthlete(athlete, uiLanguage) || athlete.academia || '-'}</span>
-                                                    </div>
-                                                    <div className="board-row__metrics">
-                                                        <div className="board-metric metric-blue">
-                                                            <strong>{athlete.pontos}</strong>
-                                                            <span>Points</span>
-                                                        </div>
-                                                        <div className="board-metric metric-green">
-                                                            <strong>{metrics.wins}</strong>
-                                                            <span>Wins</span>
-                                                        </div>
-                                                        <div className="board-metric metric-red">
-                                                            <strong>0</strong>
-                                                            <span>Losses</span>
-                                                        </div>
-                                                        <div className="board-metric metric-gold">
-                                                            <strong>{metrics.podium1 || 0}</strong>
-                                                            <span><Trophy size={14} color="#fbbf24" fill="#fbbf24" /></span>
-                                                        </div>
-                                                        <div className="board-metric metric-silver">
-                                                            <strong>{metrics.podium2 || 0}</strong>
-                                                            <span><Trophy size={14} color="#94a3b8" fill="#94a3b8" /></span>
-                                                        </div>
-                                                        <div className="board-metric metric-bronze">
-                                                            <strong>{metrics.podium3 || 0}</strong>
-                                                            <span><Trophy size={14} color="#b45309" fill="#b45309" /></span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })
-                                    )}
-                                </div>
-                                <div className="board-card__footer">
-                                    <button type="button" onClick={() => { setShowFullList(true); setTimeout(() => window.scrollTo({ top: 800, behavior: 'smooth' }), 100); }}>{copy.seeAll}</button>
-                                </div>
-                            </article>
-                        ))}
+                                                );
+                                            })
+                                        )}
+                                    </div>
+                                    <div className="rv2-board-card__footer">
+                                        <button type="button" onClick={() => { setShowFullList(true); setTimeout(() => window.scrollTo({ top: 800, behavior: 'smooth' }), 100); }}>{copy.seeAll}</button>
+                                    </div>
+                                </article>
+                            );
+                        })}
 
                         {boardTeamPanels.map((panel) => (
-                            <article key={panel.key} className="board-card board-card--team">
-                                <header className="board-card__header">
-                                    <div className="board-card__header-main">
-                                        <h3>{panel.title}</h3>
-                                        <span className="board-card__year">{new Date().getFullYear()}</span>
+                            <article key={panel.key} className="rv2-board-card">
+                                <div className="rv2-board-card__header">
+                                    <div className="rv2-board-card__title">
+                                        {panel.title}
+                                        <span className="rv2-board-card__badge">{new Date().getFullYear()}</span>
                                     </div>
-                                    <span className="board-card__subtitle">último cálculo há 6 horas 🔄</span>
-                                </header>
-                                <div className="board-card__list">
+                                    <div className="rv2-board-card__subtitle">Calculado pela última vez há 6 horas 🔄</div>
+                                </div>
+                                <div className="rv2-board-card__list">
                                     {panel.entries.length === 0 ? (
-                                        <div className="board-empty">{copy.boardsNoData}</div>
+                                        <div className="rv2-board-empty">{copy.boardsNoData}</div>
                                     ) : (
                                         panel.entries.map((team, index) => (
-                                            <div key={`${panel.key}-${team.key}`} className="board-row">
-                                                <div className="board-row__rank">{team.rank || index + 1}.</div>
-                                                <div className="board-row__avatar is-empty">
+                                            <div key={`${panel.key}-${team.key}`} className="rv2-athlete-row">
+                                                <div className="rv2-athlete-rank">{team.rank || index + 1}.</div>
+                                                <div className="rv2-athlete-avatar">
                                                     <span>{(team.academy || '?').trim().charAt(0).toUpperCase()}</span>
                                                 </div>
-                                                <div className="board-row__identity">
-                                                    <strong>{team.academy}</strong>
-                                                    <span className="board-row__country"><span className="board-flag">{flagFromCountryCode(team.countryCode)}</span> {countryLabelFromCode(team.countryCode, uiLanguage) || team.countryCode}</span>
+                                                <div className="rv2-athlete-identity">
+                                                    <div className="rv2-athlete-name">{team.academy}</div>
+                                                    <div className="rv2-athlete-country">
+                                                        <span>{flagFromCountryCode(team.countryCode)}</span>
+                                                        <span>{countryLabelFromCode(team.countryCode, uiLanguage) || team.countryCode}</span>
+                                                    </div>
                                                 </div>
-                                                <div className="board-row__metrics">
-                                                    <div className="board-metric metric-blue">
+                                                <div className="rv2-athlete-metrics">
+                                                    <div className="rv2-metric pts">
                                                         <strong>{team.points || team.pontos || 0}</strong>
-                                                        <span>Points</span>
+                                                        <span>Pontos</span>
                                                     </div>
-                                                    <div className="board-metric metric-green">
+                                                    <div className="rv2-metric wins">
                                                         <strong>{team.wins || 0}</strong>
-                                                        <span>Wins</span>
+                                                        <span>Vitórias</span>
                                                     </div>
-                                                    <div className="board-metric metric-red">
-                                                        <strong>0</strong>
-                                                        <span>Losses</span>
+                                                </div>
+                                                <div className="rv2-trophy-group">
+                                                    <div className="rv2-trophy">
+                                                        <Trophy size={12} color="#fbbf24" fill="#fbbf24" />
+                                                        <span>{team.campeao || 0}</span>
                                                     </div>
-                                                    <div className="board-metric metric-gold">
-                                                        <strong>{team.campeao || 0}</strong>
-                                                        <span><Trophy size={14} color="#fbbf24" fill="#fbbf24" /></span>
+                                                    <div className="rv2-trophy">
+                                                        <Trophy size={12} color="#94a3b8" fill="#94a3b8" />
+                                                        <span>{team.vice || 0}</span>
                                                     </div>
-                                                    <div className="board-metric metric-silver">
-                                                        <strong>{team.vice || 0}</strong>
-                                                        <span><Trophy size={14} color="#94a3b8" fill="#94a3b8" /></span>
-                                                    </div>
-                                                    <div className="board-metric metric-bronze">
-                                                        <strong>{team.terceiro || 0}</strong>
-                                                        <span><Trophy size={14} color="#b45309" fill="#b45309" /></span>
+                                                    <div className="rv2-trophy">
+                                                        <Trophy size={12} color="#b45309" fill="#b45309" />
+                                                        <span>{team.terceiro || 0}</span>
                                                     </div>
                                                 </div>
                                             </div>
                                         ))
                                     )}
                                 </div>
-                                <div className="board-card__footer">
+                                <div className="rv2-board-card__footer">
                                     <button type="button" onClick={() => { setShowFullList(true); setTimeout(() => window.scrollTo({ top: 800, behavior: 'smooth' }), 100); }}>{copy.seeAll}</button>
                                 </div>
                             </article>
@@ -1167,7 +1211,7 @@ const Ranking = () => {
                                     {podiumOverallEntries.map((item, index) => (
                                         <article key={`overall-podium-${item.athlete.id}`} className={`ajp-podium__item is-place-${index + 1}`}>
                                             <span className="ajp-podium__place">{podiumPlaceLabel(index)}</span>
-                                            <strong className="ajp-podium__name">{item.athlete.nome}</strong>
+                                            <Link to={`/perfil-publico/${item.athlete.id}`} className="ajp-podium__name" style={{ textDecoration: 'none', color: 'inherit' }}>{item.athlete.nome}</Link>
                                             <span className="ajp-podium__meta">{item.athlete.academia || '-'}</span>
                                             <span className="ajp-podium__score">{item.athlete.pontos} {copy.points}</span>
                                         </article>
@@ -1198,12 +1242,14 @@ const Ranking = () => {
                                             )}
                                         </div>
                                         <div className={`ajp-avatar ${photoUrl ? '' : 'ajp-avatar--empty'}`}>
-                                            {photoUrl ? (
-                                                <img src={photoUrl} alt={athlete.nome || copy.eventFallback} className="ajp-avatar__img" loading="lazy" />
-                                            ) : null}
+                                            <Link to={`/perfil-publico/${athlete.id}`} style={{ display: 'block', width: '100%', height: '100%', textDecoration: 'none', color: 'inherit' }}>
+                                                {photoUrl ? (
+                                                    <img src={photoUrl} alt={athlete.nome || copy.eventFallback} className="ajp-avatar__img" loading="lazy" />
+                                                ) : null}
+                                            </Link>
                                         </div>
                                         <div className="ajp-info">
-                                            <div className="ajp-name">{athlete.nome}</div>
+                                            <Link to={`/perfil-publico/${athlete.id}`} className="ajp-name" style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>{athlete.nome}</Link>
                                             <div className="ajp-sub">
                                                 <span className="ajp-country">
                                                     <span className="ajp-flag" aria-label={`${copy.flagLabel} ${countryLabel}`}>{flagFromCountryCode(countryCode)}</span>

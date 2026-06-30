@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Setup - Davi oliveira frois como Professor</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #1a1a2e; color: #eee; padding: 40px; }
+    h1 { color: #9b59b6; }
+    .card { background: #16213e; border-radius: 12px; padding: 24px; margin: 20px 0; border: 1px solid #0f3460; }
+    button { 
+      background: #9b59b6; color: white; border: none; padding: 14px 28px; 
+      border-radius: 8px; cursor: pointer; font-size: 16px; margin: 10px 5px;
+    }
+    button:hover { background: #8e44ad; }
+    .success { background: #27ae60; }
+    .error { background: #e74c3c; }
+    #log { background: #0a0a1a; border-radius: 8px; padding: 16px; min-height: 200px; 
+           font-family: monospace; font-size: 13px; white-space: pre-wrap; margin-top: 20px; }
+    .status { padding: 12px; border-radius: 8px; margin: 10px 0; }
+    .status.ok { background: #1a5c2e; border: 1px solid #27ae60; }
+    .status.fail { background: #5c1a1a; border: 1px solid #e74c3c; }
+  </style>
+</head>
+<body>
+  <h1>⚙️ Setup: Davi oliveira frois → Professor da Templum Fight</h1>
+  
+  <div class="card">
+    <h2>📋 Configuração</h2>
+    <p><strong>Usuário:</strong> Davi oliveira frois</p>
+    <p><strong>Username:</strong> davifrois</p>
+    <p><strong>Role:</strong> Professor (Coach)</p>
+    <p><strong>Academia:</strong> Templum Fight</p>
+    <p><strong>Faixa:</strong> Roxa</p>
+  </div>
+
+  <div class="card">
+    <h2>🚀 Ações</h2>
+    <button onclick="checkData()">1. Verificar Dados Atuais</button>
+    <button onclick="setupDaviCoach()">2. ✅ Configurar Davi como Professor</button>
+    <button onclick="goToApp()">3. Abrir App</button>
+  </div>
+
+  <div id="status-area"></div>
+  <div id="log">Clique em "Verificar Dados Atuais" para começar...</div>
+
+  <!-- Carregar localforage da CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
+  
+  <script>
+    const STORAGE_KEY = 'genesis_ranking_data';
+    const log = document.getElementById('log');
+    const statusArea = document.getElementById('status-area');
+
+    function addLog(msg) {
+      log.textContent += '\n' + new Date().toLocaleTimeString() + ' - ' + msg;
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function addStatus(msg, ok) {
+      const div = document.createElement('div');
+      div.className = 'status ' + (ok ? 'ok' : 'fail');
+      div.textContent = ok ? '✅ ' + msg : '❌ ' + msg;
+      statusArea.appendChild(div);
+    }
+
+    async function getData() {
+      try {
+        let data = await localforage.getItem(STORAGE_KEY);
+        if (data) {
+          return typeof data === 'string' ? JSON.parse(data) : data;
+        }
+      } catch(e) {
+        addLog('localforage error: ' + e.message);
+      }
+      // Fallback localStorage
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    }
+
+    async function saveData(data) {
+      const serialized = JSON.stringify(data);
+      try {
+        await localforage.setItem(STORAGE_KEY, serialized);
+        addLog('✅ Salvo no localforage');
+      } catch(e) {
+        addLog('localforage save error: ' + e.message);
+      }
+      try {
+        localStorage.setItem(STORAGE_KEY, serialized);
+        addLog('✅ Salvo no localStorage');
+      } catch(e) {
+        addLog('localStorage save error: ' + e.message);
+      }
+    }
+
+    async function checkData() {
+      log.textContent = '🔍 Verificando dados...';
+      statusArea.innerHTML = '';
+      
+      const data = await getData();
+      if (!data) {
+        addLog('⚠️ Nenhum dado encontrado no storage. O app ainda não foi usado ou os dados estão vazios.');
+        addStatus('Nenhum dado no storage - abra o app primeiro, faça login e volte aqui', false);
+        return;
+      }
+      
+      addLog('✅ Dados encontrados!');
+      addLog('currentUser: ' + JSON.stringify(data.currentUser, null, 2));
+      addLog('Academias (' + (data.academies || []).length + '):');
+      (data.academies || []).forEach(a => addLog('  - ' + a.name + ' (id: ' + a.id + ', owner: ' + (a.ownerUsername || 'VAZIO') + ')'));
+      addLog('Perfis de membros (' + (data.memberProfiles || []).length + '):');
+      (data.memberProfiles || []).slice(0, 5).forEach(p => addLog('  - ' + p.fullName + ' (' + (p.role || 'sem role') + ') @ ' + p.academyName));
+      
+      const templum = (data.academies || []).find(a => a.name && a.name.toLowerCase().includes('templum'));
+      addStatus('Academia Templum Fight: ' + (templum ? templum.name + ' (ID: ' + templum.id + ')' : 'NÃO ENCONTRADA'), !!templum);
+      
+      const daviProfile = (data.memberProfiles || []).find(p => 
+        p.fullName && p.fullName.toLowerCase().includes('davi')
+      );
+      addStatus('Perfil Davi: ' + (daviProfile ? JSON.stringify(daviProfile) : 'NÃO ENCONTRADO'), !!daviProfile);
+    }
+
+    async function setupDaviCoach() {
+      log.textContent = '⚙️ Configurando Davi como Professor da Templum Fight...';
+      statusArea.innerHTML = '';
+
+      let data = await getData();
+      
+      // Se não tiver dados, criar estrutura básica
+      if (!data) {
+        addLog('⚠️ Sem dados existentes - abrindo o app primeiro é necessário para carregar os dados iniciais.');
+        addLog('Por favor: 1) Abra http://localhost:5173, 2) Faça login, 3) Volte aqui e tente novamente.');
+        addStatus('Abra o app, faça login e volte aqui', false);
+        return;
+      }
+
+      // Encontrar ou criar a academia Templum Fight
+      let academies = data.academies || [];
+      let templum = academies.find(a => a.name && a.name.toLowerCase().includes('templum'));
+      
+      if (!templum) {
+        templum = {
+          id: 'academy-1',
+          name: 'Templum Fight',
+          country: 'Brasil',
+          city: 'Belo Horizonte',
+          state: 'MG',
+          logoUrl: '',
+          createdAt: '2026-01-10T12:00:00.000Z'
+        };
+        academies.push(templum);
+        addLog('Academia Templum Fight criada (id: academy-1)');
+      }
+      
+      // Atualizar a academia com o ownerUsername/coachUsername do Davi
+      academies = academies.map(a => {
+        if (a.id === templum.id || (a.name && a.name.toLowerCase().includes('templum'))) {
+          return {
+            ...a,
+            ownerUsername: 'davifrois',
+            ownerName: 'Davi oliveira frois',
+            coachUsername: 'davifrois',
+            coachName: 'Davi oliveira frois'
+          };
+        }
+        return a;
+      });
+      addLog('Academia Templum Fight vinculada ao davifrois como professor');
+
+      // Criar/atualizar o perfil de membro do Davi
+      const memberProfiles = data.memberProfiles || [];
+      const existingIdx = memberProfiles.findIndex(p => 
+        p.accountUsername === 'davifrois' || 
+        (p.fullName && p.fullName.toLowerCase().replace(/\s+/g, ' ').trim() === 'davi oliveira frois')
+      );
+
+      const daviProfile = {
+        id: existingIdx >= 0 ? memberProfiles[existingIdx].id : 'member-davi-frois-coach-001',
+        firstName: 'Davi',
+        lastName: 'oliveira frois',
+        fullName: 'Davi oliveira frois',
+        birthDate: '',
+        age: '',
+        gender: 'Masculino',
+        accountUsername: 'davifrois',
+        email: '',
+        phone: '',
+        createdByUsername: 'davifrois',
+        createdByName: 'Davi oliveira frois',
+        academyId: templum.id,
+        academyName: templum.name,
+        country: 'Brasil',
+        city: 'Belo Horizonte',
+        belt: 'Roxa',
+        weight: '',
+        photoUrl: '',
+        coverUrl: '',
+        role: 'coach',
+        createdAt: existingIdx >= 0 ? (memberProfiles[existingIdx].createdAt || new Date().toISOString()) : new Date().toISOString()
+      };
+
+      let updatedProfiles;
+      if (existingIdx >= 0) {
+        updatedProfiles = [...memberProfiles];
+        updatedProfiles[existingIdx] = { ...memberProfiles[existingIdx], ...daviProfile };
+        addLog('Perfil existente atualizado: ' + daviProfile.fullName);
+      } else {
+        updatedProfiles = [daviProfile, ...memberProfiles];
+        addLog('Novo perfil criado: ' + daviProfile.fullName);
+      }
+
+      // Atualizar o currentUser se for davifrois
+      let currentUser = data.currentUser;
+      if (currentUser && (currentUser.username === 'davifrois' || currentUser.name === 'Davi oliveira frois')) {
+        currentUser = {
+          ...currentUser,
+          role: 'coach',
+          academyId: templum.id,
+          academyName: templum.name
+        };
+        addLog('currentUser atualizado para role: coach');
+      }
+
+      const updatedData = {
+        ...data,
+        academies,
+        memberProfiles: updatedProfiles,
+        currentUser
+      };
+
+      await saveData(updatedData);
+      
+      addStatus('Davi oliveira frois configurado como Professor da Templum Fight com faixa Roxa', true);
+      addLog('\n✅ CONCLUÍDO! Agora:');
+      addLog('1. Abra o app em http://localhost:5173');
+      addLog('2. Faça login com davifrois / davifrois324@');
+      addLog('3. Veja o perfil como Professor da Templum Fight');
+      
+      setTimeout(() => {
+        window.open('http://localhost:5173', '_blank');
+      }, 2000);
+    }
+
+    function goToApp() {
+      window.open('http://localhost:5173', '_blank');
+    }
+  </script>
+</body>
+</html>

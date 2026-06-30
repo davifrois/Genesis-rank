@@ -1,5 +1,6 @@
 import { REGISTRATION_STATUS, normalizeRegistrationStatus } from '../utils/registrationStatus';
 import { authService } from './authService';
+import localforage from 'localforage';
 
 const ENV_API_BASE_URL = ("" || '').trim();
 const API_BASE_URL = ENV_API_BASE_URL.includes('sua-url-do-ngrok') ? '' : ENV_API_BASE_URL.replace(/\/$/, '');
@@ -173,13 +174,30 @@ const buildForbiddenError = (message) => {
 };
 
 const parseErrorMessage = async (response, fallback = 'Falha ao enviar inscrição.') => {
-  const payload = await parseJsonSafe(response);
+  let text = '';
+  try {
+    text = await response.text();
+  } catch {
+    // ignore
+  }
+
+  let payload = null;
+  if (text) {
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      // ignore
+    }
+  }
+
   const traceId = resolveErrorTraceId(payload, response);
+
   if (payload?.message) return {
     message: appendTraceToMessage(payload.message, traceId),
     code: payload?.code || '',
     traceId
   };
+  
   if (typeof payload?.error === 'string' && payload.error.trim()) {
     return {
       message: appendTraceToMessage(payload.error.trim(), traceId),
@@ -187,18 +205,15 @@ const parseErrorMessage = async (response, fallback = 'Falha ao enviar inscriç�
       traceId
     };
   }
-  try {
-    const text = await response.text();
-    if (text?.trim()) {
-      return {
-        message: appendTraceToMessage(text.trim(), traceId),
-        code: payload?.code || '',
-        traceId
-      };
-    }
-  } catch {
-    // ignore parse errors
+  
+  if (text?.trim() && !text.trim().startsWith('<')) {
+    return {
+      message: appendTraceToMessage(text.trim(), traceId),
+      code: payload?.code || '',
+      traceId
+    };
   }
+  
   return {
     message: appendTraceToMessage(fallback, traceId),
     code: payload?.code || '',
@@ -221,15 +236,9 @@ const buildHttpError = async (response, fallbackMessage) => {
   return error;
 };
 
-const readPendingRegistrations = () => {
+const readPendingRegistrations = async () => {
   try {
-    const raw = localStorage.getItem(LOCAL_PENDING_REGISTRATIONS_KEY);
-    if (!raw) return [];
-    if (raw.length > MAX_PENDING_STORAGE_CHARS) {
-      localStorage.removeItem(LOCAL_PENDING_REGISTRATIONS_KEY);
-      return [];
-    }
-    const parsed = JSON.parse(raw);
+    const parsed = await localforage.getItem(LOCAL_PENDING_REGISTRATIONS_KEY);
     if (!Array.isArray(parsed)) return [];
     return parsed.filter((item) => item && typeof item === 'object');
   } catch {
@@ -237,13 +246,9 @@ const readPendingRegistrations = () => {
   }
 };
 
-const writePendingRegistrations = (items) => {
+const writePendingRegistrations = async (items) => {
   try {
-    const serialized = JSON.stringify(items);
-    if (serialized.length > MAX_PENDING_STORAGE_CHARS) {
-      return false;
-    }
-    localStorage.setItem(LOCAL_PENDING_REGISTRATIONS_KEY, serialized);
+    await localforage.setItem(LOCAL_PENDING_REGISTRATIONS_KEY, items);
     return true;
   } catch {
     return false;
@@ -258,66 +263,19 @@ const buildPendingRegistration = (payload, lastError = '', lastTraceId = '') => 
   lastTraceId
 });
 
-const sanitizePayloadForOfflineQueue = (payload) => {
-  const safePayload = payload && typeof payload === 'object' ? { ...payload } : {};
-  if (typeof safePayload.notes !== 'string' || !safePayload.notes.trim()) return safePayload;
-
-  try {
-    const parsedNotes = JSON.parse(safePayload.notes);
-    if (!parsedNotes || typeof parsedNotes !== 'object') return safePayload;
-    
-    const hasComprovante = typeof parsedNotes.comprovanteArquivoDataUrl === 'string' && parsedNotes.comprovanteArquivoDataUrl;
-    const hasProof = typeof parsedNotes.proofDataUrl === 'string' && parsedNotes.proofDataUrl;
-
-    if (!hasComprovante && !hasProof) {
-      return safePayload;
-    }
-
-    const cleanedNotes = {
-      ...parsedNotes,
-      comprovanteArquivoDataUrl: '',
-      proofDataUrl: '',
-      comprovanteOfflineRemovido: true
-    };
-    safePayload.notes = JSON.stringify(cleanedNotes);
-    return safePayload;
-  } catch {
-    return safePayload;
-  }
-};
-
-const appendPendingRegistration = (payload, lastError = '', lastTraceId = '') => {
+const appendPendingRegistration = async (payload, lastError = '', lastTraceId = '') => {
   const clientRequestId = (payload?.clientRequestId || '').toString().trim();
-  const pending = readPendingRegistrations().filter((item) => {
+  const existing = await readPendingRegistrations();
+  const pending = existing.filter((item) => {
     if (!clientRequestId) return true;
     const existingClientRequestId = (item?.payload?.clientRequestId || '').toString().trim();
     return existingClientRequestId !== clientRequestId;
   });
   const fullRecord = buildPendingRegistration(payload, lastError, lastTraceId);
-  const nextWithFullPayload = [fullRecord, ...pending].slice(0, MAX_PENDING_RECORDS);
+  const nextWithFullPayload = [fullRecord, ...pending].slice(0, 100);
 
-  if (writePendingRegistrations(nextWithFullPayload)) {
-    return fullRecord;
-  }
-
-  const sanitizedRecord = {
-    ...fullRecord,
-    payload: sanitizePayloadForOfflineQueue(payload)
-  };
-  const sanitizedPending = pending.map((item) => ({
-    ...item,
-    payload: sanitizePayloadForOfflineQueue(item?.payload)
-  }));
-  let fallback = [sanitizedRecord, ...sanitizedPending].slice(0, MAX_PENDING_RECORDS);
-
-  while (fallback.length > 0) {
-    if (writePendingRegistrations(fallback)) {
-      return sanitizedRecord;
-    }
-    fallback = fallback.slice(0, -1);
-  }
-
-  return sanitizedRecord;
+  await writePendingRegistrations(nextWithFullPayload);
+  return fullRecord;
 };
 
 const toPendingRegistrationRow = (record) => {
@@ -342,6 +300,8 @@ const toPendingRegistrationRow = (record) => {
     modalidade: payload.modalidade || '',
     clientRequestId: payload.clientRequestId || '',
     notes: payload.notes || '',
+    price: payload.price || 0,
+    price: payload.price || 0,
     status: payload.status || REGISTRATION_STATUS.PENDING_SYNC,
     createdAt: safeRecord.createdAt || new Date().toISOString(),
     athleteId: '',
@@ -385,7 +345,7 @@ const mergeRowsWithoutDuplicates = (pendingRows, remoteRows) => {
 };
 
 const flushPendingRegistrations = async () => {
-  const pending = readPendingRegistrations();
+  const pending = await readPendingRegistrations();
   if (!pending.length) return { synced: 0, pending: [] };
 
   const remaining = [];
@@ -425,7 +385,7 @@ const flushPendingRegistrations = async () => {
 
   const remainingIds = new Set(remaining.map((item) => item.id));
   const pendingAfterLoop = pending.filter((item) => remainingIds.has(item.id));
-  writePendingRegistrations(pendingAfterLoop);
+  await await writePendingRegistrations(pendingAfterLoop);
 
   if (synced > 0) {
     updateSyncDiagnostics('success');
@@ -440,8 +400,8 @@ const flushPendingRegistrations = async () => {
   return { synced, pending: pendingAfterLoop };
 };
 
-const listPendingRows = (eventId = '') => {
-  const pending = readPendingRegistrations();
+const listPendingRows = async (eventId = '') => {
+  const pending = await readPendingRegistrations();
   const rows = pending.map(toPendingRegistrationRow);
   if (!eventId) return rows;
   return rows.filter((item) => item.eventId === eventId);
@@ -464,7 +424,7 @@ export const publicRegistrationService = {
         traceId: error?.traceId || ''
       });
 
-      const pendingRecord = appendPendingRegistration(
+      const pendingRecord = await appendPendingRegistration(
         payloadWithClientRequestId,
         error?.message || DEFAULT_NETWORK_ERROR_MESSAGE,
         error?.traceId || ''
@@ -529,7 +489,7 @@ export const publicRegistrationService = {
       }
       const payload = await response.json();
       const remoteRows = Array.isArray(payload) ? payload : [];
-      const pendingRows = listPendingRows(eventId);
+      const pendingRows = await listPendingRows(eventId);
       return mergeRowsWithoutDuplicates(pendingRows, remoteRows);
     } catch (error) {
       if (isNetworkError(error) || isUnavailableHttpError(error)) {
@@ -537,7 +497,7 @@ export const publicRegistrationService = {
           message: error?.message || DEFAULT_NETWORK_ERROR_MESSAGE,
           traceId: error?.traceId || ''
         });
-        const pendingRows = listPendingRows(eventId);
+        const pendingRows = await listPendingRows(eventId);
         if (pendingRows.length) return pendingRows;
         throw new Error(DEFAULT_NETWORK_ERROR_MESSAGE);
       }
@@ -567,7 +527,7 @@ export const publicRegistrationService = {
     }
 
     if (normalizedId.startsWith('pending-')) {
-      const pending = readPendingRegistrations();
+      const pending = await readPendingRegistrations();
       const targetIndex = pending.findIndex(r => r.id === normalizedId);
       if (targetIndex >= 0) {
         const target = pending[targetIndex];
@@ -584,7 +544,7 @@ export const publicRegistrationService = {
         };
         const newPending = [...pending];
         newPending[targetIndex] = updatedRecord;
-        if (writePendingRegistrations(newPending)) {
+        if (await writePendingRegistrations(newPending)) {
           return {
             id: updatedRecord.id,
             ...updatedPayload
@@ -752,7 +712,7 @@ const scheduleNextSync = (success) => {
 
   syncTimer = setTimeout(async () => {
     if (navigator.onLine) {
-      const pending = readPendingRegistrations();
+      const pending = await readPendingRegistrations();
       if (pending.length > 0) {
         try {
           const result = await flushPendingRegistrations();
@@ -779,7 +739,7 @@ const startBackgroundSync = () => {
   window.addEventListener('online', async () => {
     if (syncTimer) clearTimeout(syncTimer);
     currentDelay = INITIAL_DELAY; // Reseta delay ao voltar online
-    const pending = readPendingRegistrations();
+    const pending = await readPendingRegistrations();
     if (pending.length > 0) {
       try {
         const result = await flushPendingRegistrations();

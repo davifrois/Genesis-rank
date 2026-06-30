@@ -820,10 +820,9 @@ select {
   content: '';
   position: absolute;
   inset: 0;
-  background: url('/hero-ranking-whatsapp-wide.jpeg') center 34% / cover no-repeat;
-  filter: grayscale(100%) contrast(114%) brightness(0.62);
-  opacity: 0.74;
-  transform: scale(1.02);
+  background: url('/mineirinho-v5.jpg') center 45% / cover no-repeat;
+  filter: grayscale(100%) brightness(1.2);
+  opacity: 0.95;
   z-index: 0;
 }
 
@@ -832,7 +831,7 @@ select {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(180deg, rgba(5, 9, 14, 0.78), rgba(5, 10, 16, 0.84)),
+    linear-gradient(180deg, rgba(5, 9, 14, 0.65), rgba(5, 10, 16, 0.72)),
     radial-gradient(circle at center 0%, rgba(255, 255, 255, 0.08), transparent 52%),
     repeating-linear-gradient(
       20deg,
@@ -13538,31 +13537,82 @@ textarea:focus-visible {
 .panel-header, .bracket-workspace__panel-header { border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important; padding-bottom: 15px !important; margin-bottom: 15px !important; }
 
 
-.registration-card-grid {
+
+
+/* OVERRIDE MENU RAPIDO HORIZONTAL E PAINEL FULL SCREEN */
+.admin-shell {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.admin-sidebar {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  flex-wrap: wrap !important;
+  padding: 0.75rem 1.15rem !important;
+  position: sticky !important;
+  top: 0px !important;
+  z-index: 100 !important;
+  width: 100% !important;
+  height: auto !important;
+}
+
+.admin-sidebar__nav {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  flex: 1 !important;
+  gap: 0.5rem !important;
+  justify-content: center !important;
+}
+
+.admin-sidebar__card {
+  display: none !important;
+}
+
+.sidebar-link {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0.5rem 0.8rem !important;
+  width: auto !important;
+}
+
+.admin-sidebar .btn-primary {
+  width: auto !important;
+}
+.registration-card-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
-  gap: 16px;
-  margin-top: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+  width: 100%;
 }
 .registration-card {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
+  background: linear-gradient(145deg, #1e2433 0%, #111622 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: all 0.3s ease;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
 }
 .registration-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.4);
+  border-color: rgba(66, 133, 244, 0.3);
 }
 .registration-card__header {
-  padding: 16px;
-  border-bottom: 1px solid var(--border-color);
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
+  align-items: center;
+  gap: 16px;
+  background: rgba(255, 255, 255, 0.02);
 }
 .registration-card__photo {
   width: 56px;
@@ -13582,16 +13632,16 @@ textarea:focus-visible {
   min-width: 0;
 }
 .registration-card__body {
-  padding: 16px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
   flex: 1;
 }
 .registration-card__section {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 .registration-card__section-row {
   display: flex;
@@ -13617,31 +13667,91 @@ textarea:focus-visible {
   font-size: 16px;
 }
 .registration-card__footer {
-  padding: 12px 16px;
-  background: var(--bg-tertiary);
-  border-top: 1px solid var(--border-color);
+  padding: 16px 20px;
+  background: rgba(0, 0, 0, 0.2);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 .registration-card__actions {
   display: flex;
-  gap: 8px;
+  gap: 12px;
+  width: 100%;
 }
 .registration-card__actions .btn {
   flex: 1;
+  display: flex;
+  align-items: center;
   justify-content: center;
-  padding: 6px 8px;
-  font-size: 12px;
+  gap: 6px;
+  padding: 10px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: 8px;
+  letter-spacing: 0.3px;
 }
-.revenue-badge {
-  display: inline-block;
-  background: rgba(34, 197, 94, 0.15);
+.registration-card__actions .btn-secondary {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  transition: all 0.2s ease;
+}
+.registration-card__actions .btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.registration-card__actions .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.registration-card__payment {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.registration-card__receipt-preview {
+  display: flex;
+  gap: 10px;
+  background: rgba(0,0,0,0.2);
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.05);
+  align-items: center;
+}
+.registration-card__receipt-thumb {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: #000;
+}
+.registration-card__receipt-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.registration-card__receipt-name {
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.registration-card__payment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+}
+.registration-card__payment-total {
   color: #22c55e;
-  border: 1px solid rgba(34, 197, 94, 0.3);
-  padding: 4px 12px;
-  border-radius: 16px;
+  font-size: 1rem;
   font-weight: 700;
-  font-size: 13px;
-  margin-top: 8px;
 }

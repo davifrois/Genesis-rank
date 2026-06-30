@@ -3,14 +3,16 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import {
   Bell, Heart, BookOpen, Users, Clock, BarChart2, Swords,
   ShieldCheck, Printer, Globe, Mail, MapPin, ChevronRight, Info,
-  ChevronDown, ChevronUp, X, Search
+  ChevronDown, ChevronUp, X, Search, Download, ExternalLink, Calendar, CheckCircle2
 } from 'lucide-react';
 import { useStore } from '../hooks/useStore';
 import { useI18n } from '../hooks/useI18n';
 import { formatBrlCurrency, normalizeEventFees } from '../utils/eventPricing';
+import { REGISTRATION_STATUS, normalizeRegistrationStatus } from '../utils/registrationStatus';
 import { buildCategoryDescriptor } from '../services/categoryService';
 import { getPublishedEventSchedule, PUBLISHED_EVENT_SCHEDULE_CHANGED } from '../utils/eventSchedule';
 import BracketTree, { buildRounds } from '../components/BracketTree';
+import { publicRegistrationService } from '../services/publicRegistrationService';
 import './EventDetails.css';
 
 const parseDate = (value) => {
@@ -66,8 +68,15 @@ const EventDetails = () => {
 
   // Expande a página para ocupar 100% da tela burlando os constraints do container
   useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    const timer = setTimeout(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }, 100);
     document.body.classList.add('event-details-active');
-    return () => document.body.classList.remove('event-details-active');
+    return () => {
+      clearTimeout(timer);
+      document.body.classList.remove('event-details-active');
+    };
   }, []);
 
   useEffect(() => {
@@ -81,7 +90,7 @@ const EventDetails = () => {
     return () => window.removeEventListener(PUBLISHED_EVENT_SCHEDULE_CHANGED, handleScheduleChange);
   }, [eventId]);
 
-  const { events, athletes, brackets } = useStore();
+  const { events, athletes, brackets, memberProfiles = [] } = useStore();
   const [resultsData, setResultsData] = useState(null);
   const [teamRankingData, setTeamRankingData] = useState(null);
   const [resultsSubTab, setResultsSubTab] = useState('resultados');
@@ -99,13 +108,62 @@ const EventDetails = () => {
         .catch(console.error);
     }
   }, [activeTab, eventId]);
-  const { locale } = useI18n();
+  const { locale, uiLanguage } = useI18n();
+  const isEnglish = uiLanguage === 'en-US';
+  const isSpanish = uiLanguage === 'es-ES';
+  const copy = {
+    infoTab: isEnglish ? 'Information' : isSpanish ? 'Información' : 'Informações',
+    athletesTab: isEnglish ? 'Athletes' : isSpanish ? 'Atletas' : 'Atletas',
+    bracketsTab: isEnglish ? 'Brackets' : isSpanish ? 'Llaves' : 'Chaves',
+    matchesTab: isEnglish ? 'Matches' : isSpanish ? 'Luchas' : 'Lutas',
+    scheduleTab: isEnglish ? 'Schedule' : isSpanish ? 'Cronograma' : 'Cronograma',
+    resultsTab: isEnglish ? 'Results' : isSpanish ? 'Resultados' : 'Resultados',
+    subInfo: isEnglish ? 'Information' : isSpanish ? 'Información' : 'Informações',
+    subLocation: isEnglish ? 'Location & Accommodation' : isSpanish ? 'Ubicación & Alojamiento' : 'Local & Hospedagem',
+    subParents: isEnglish ? 'Parents & Guardians' : isSpanish ? 'Padres & Tutores' : 'Pais & Responsáveis',
+  };
 
   const event = useMemo(() => events.find((item) => String(item.id) === String(eventId)), [events, eventId]);
   const eventFees = useMemo(() => normalizeEventFees(event || {}), [event]);
   const batches = useMemo(() => (event?.batches || []).slice(0, 3), [event]);
 
-  const eventAthletes = useMemo(() => (athletes || []).filter(a => String(a.eventId) === String(eventId)), [athletes, eventId]);
+  const [publicRegistrations, setPublicRegistrations] = useState([]);
+
+  useEffect(() => {
+    if (activeTab === 'athletes') {
+      publicRegistrationService.listRegistrations(eventId)
+        .then(res => setPublicRegistrations(res))
+        .catch(console.error);
+    }
+  }, [activeTab, eventId]);
+
+  const eventAthletes = useMemo(() => {
+    const storeAthletes = (athletes || []).filter(a => String(a.eventId) === String(eventId));
+    
+    const pendingAthletes = publicRegistrations.map(r => {
+      const p = r.payload || r;
+      return {
+        id: r.id,
+        eventId: p.eventId,
+        nome: p.nome,
+        memberProfileId: p.profileId,
+        profileId: p.profileId,
+        academia: p.academia,
+        faixa: p.faixa,
+        peso: p.peso,
+        categoria: p.categoria,
+        modalidade: p.modalidade,
+        genero: p.genero,
+        status: p.status || 'pending_sync'
+      };
+    }).filter(a => String(a.eventId) === String(eventId));
+
+    const storeIds = new Set(storeAthletes.map(a => String(a.id)));
+    const uniquePending = pendingAthletes.filter(a => !storeIds.has(String(a.id)));
+
+    return [...storeAthletes, ...uniquePending];
+  }, [athletes, eventId, publicRegistrations]);
+
   const eventBrackets = useMemo(() => (brackets || []).filter(b => String(b.eventId) === String(eventId)), [brackets, eventId]);
 
   const groupedAthletes = useMemo(() => {
@@ -284,54 +342,44 @@ const EventDetails = () => {
   const renderInformationTab = () => (
     <>
       <div className="sc-subnav">
-        <div className={`sc-subtab ${activeSubTab === 'info' ? 'active' : ''}`} onClick={() => setSubTab('info')}>Information</div>
-        <div className={`sc-subtab ${activeSubTab === 'location' ? 'active' : ''}`} onClick={() => setSubTab('location')}>Location &amp; Accommodation</div>
-        <div className={`sc-subtab ${activeSubTab === 'parents' ? 'active' : ''}`} onClick={() => setSubTab('parents')}>Pais &amp; Responsáveis</div>
+        <div className={`sc-subtab ${activeSubTab === 'info' ? 'active' : ''}`} onClick={() => setSubTab('info')}>{copy.subInfo}</div>
+        <div className={`sc-subtab ${activeSubTab === 'location' ? 'active' : ''}`} onClick={() => setSubTab('location')}>{copy.subLocation}</div>
+        <div className={`sc-subtab ${activeSubTab === 'parents' ? 'active' : ''}`} onClick={() => setSubTab('parents')}>{copy.subParents}</div>
       </div>
 
       <div className="sc-content sc-info-page">
         {activeSubTab === 'info' && (
           <>
-            {/* HERO CARD: Banner + Batches */}
-            <div className="sc-info-hero-card">
-              {/* Banner */}
-              <div className="sc-info-banner-wrap">
+            {/* HERO CARD: imagem esquerda + datas direita */}
+            <div className="sc-hero-card">
+              <div className="sc-hero-card__banner">
                 {event.posterUrl ? (
-                  <img src={event.posterUrl} alt={event.name} className="sc-info-banner-img" />
+                  <img src={event.posterUrl} alt={event.name} className="sc-hero-card__img" />
                 ) : (
-                  <div className="sc-info-banner-placeholder">{event.name}</div>
-                )}
-                
-                <div className="sc-info-banner-overlay">
-                  <span className="sc-info-banner-date">
-                    {new Date(event.parsedDate || event.date).toLocaleDateString(locale, { month: 'long' }).replace('.', '')} {new Date(event.parsedDate || event.date).getDate() || ''}
-                  </span>
-                  <span className="sc-info-banner-location">
-                    {(event.location || 'Local a definir').split(',')[0]}
-                  </span>
-                </div>
-              </div>
-
-              {/* Batches */}
-              <div className="sc-info-hero-batches">
-                <div className="sc-sidebar-card__body sc-sidebar-card__body--entries" style={{ paddingBottom: 0, height: '100%' }}>
-                  {batches.length > 0 ? batches.map((batch, i) => (
-                    <div key={batch.id || i} className="sc-batch-row">
-                      <span className="sc-batch-name">{BATCH_NAMES[i] || batch.name}</span>
-                      <span className="sc-batch-dates">
-                        {formatDateRange(batch.startDate, batch.endDate, locale)}
-                        {batch.endDate && <span className="sc-batch-time"> 23:59</span>}
-                      </span>
-                    </div>
-                  )) : (
-                    <div className="sc-batch-row">
-                      <span className="sc-batch-name" style={{ color: '#71717a' }}>Sem lotes cadastrados</span>
-                    </div>
-                  )}
-                  <div className="sc-batch-row sc-batch-row--event-date">
-                    <span className="sc-batch-name">Duração do Evento</span>
-                    <span className="sc-batch-dates">{eventDateLabel}</span>
+                  <div className="sc-hero-card__img-fallback">
+                    <span style={{ color: '#fff', fontWeight: 700, fontSize: '1.2rem', textAlign: 'center', padding: '1rem' }}>{event.name}</span>
                   </div>
+                )}
+              </div>
+              <div className="sc-hero-card__dates">
+                {batches.length > 0 ? batches.map((batch, i) => (
+                  <div key={batch.id || i} className="sc-hero-card__date-row">
+                    <span className="sc-hero-card__date-label">{BATCH_NAMES[i] || batch.name}</span>
+                    <span className="sc-hero-card__date-value">
+                      {formatDateRange(batch.startDate, batch.endDate, locale)}
+                      {batch.endDate && <span className="sc-hero-card__date-time"> 11:59 pm</span>}
+                    </span>
+                  </div>
+                )) : (
+                  <div className="sc-hero-card__date-row">
+                    <span className="sc-hero-card__date-label" style={{ color: '#71717a' }}>Sem lotes cadastrados</span>
+                  </div>
+                )}
+                <div className="sc-hero-card__date-row sc-hero-card__date-row--event">
+                  <span className="sc-hero-card__date-label">Evento começa</span>
+                  <span className="sc-hero-card__date-value">
+                    {eventStartDate ? eventStartDate.toLocaleDateString(locale, { day: 'numeric', month: 'short' }) : '—'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -340,129 +388,123 @@ const EventDetails = () => {
             <div className="sc-info-body">
               <div className="sc-info-main-col">
                 <h1 className="sc-info-main-title">{event.name}</h1>
-
-                {/* BLOCO 2: Sobre o Evento (descrição HTML do organizador) */}
-                {event.description && (
+                {event.eventDescription && (
                   <div className="sc-info-block">
-                    <div
-                      className="sc-event-description"
-                      // eslint-disable-next-line react/no-danger
-                      dangerouslySetInnerHTML={{ __html: event.description }}
-                    />
+                    <div className="sc-event-description" style={{ whiteSpace: 'pre-wrap', color: '#e2e8f0', lineHeight: '1.6' }}>
+                      {event.eventDescription}
+                    </div>
                   </div>
                 )}
-
-                {/* Links rápidos */}
                 {(event.weightTableGiUrl || event.weightTableNoGiUrl || event.circularUrl) && (
                   <div className="sc-info-block sc-info-links">
                     <div className="sc-info-block-title">Documentos</div>
                     {event.circularUrl && (
-                      <a href={event.circularUrl} target="_blank" rel="noreferrer" className="sc-doc-link">
-                        <Globe size={14} /> Circular do Evento
-                      </a>
+                      <a href={event.circularUrl} target="_blank" rel="noreferrer" className="sc-doc-link"><Globe size={14} /> Circular do Evento</a>
                     )}
                     {event.weightTableGiUrl && (
-                      <a href={event.weightTableGiUrl} target="_blank" rel="noreferrer" className="sc-doc-link">
-                        <Globe size={14} /> Tabela de Peso GI
-                      </a>
+                      <a href={event.weightTableGiUrl} target="_blank" rel="noreferrer" className="sc-doc-link"><Globe size={14} /> Tabela de Peso GI</a>
                     )}
                     {event.weightTableNoGiUrl && (
-                      <a href={event.weightTableNoGiUrl} target="_blank" rel="noreferrer" className="sc-doc-link">
-                        <Globe size={14} /> Tabela de Peso NO-GI
-                      </a>
+                      <a href={event.weightTableNoGiUrl} target="_blank" rel="noreferrer" className="sc-doc-link"><Globe size={14} /> Tabela de Peso NO-GI</a>
                     )}
                   </div>
                 )}
               </div>
-
-              {/* SIDEBAR DIREITA */}
               {sidebarBlocks}
             </div>
           </>
         )}
 
+
         {activeSubTab === 'location' && (
-          <div className="sc-info-location-tab" style={{ background: 'transparent', margin: '0 24px 32px' }}>
-            <h2 className="sc-section-title" style={{ marginBottom: '16px' }}>Opções de Hospedagem</h2>
-            <iframe
-              title="Mapa de Hotéis"
-              width="100%"
-              height="600"
-              style={{ border: 0, display: 'block', borderRadius: '8px' }}
-              loading="lazy"
-              allowFullScreen
-              src={event.location
-                ? `https://maps.google.com/maps?q=hoteis+perto+de+${encodeURIComponent(event.location)}&t=m&z=13&output=embed&iwloc=near`
-                : 'https://maps.google.com/maps?q=hoteis+no+Brasil&t=m&z=4&output=embed'}
-            />
-            <p style={{ color: '#a1a1aa', fontSize: '0.875rem', marginTop: '12px', textAlign: 'center', marginBottom: '32px' }}>
-              Mostrando hotéis e acomodações próximas a: {event.location || 'Local do evento'}
-            </p>
+          <div className="sc-location-tab">
+            {/* Mapa */}
+            <div className="sc-location-map-wrap">
+              <iframe
+                title="Mapa de Hotéis"
+                width="100%"
+                height="100%"
+                style={{ border: 0, display: 'block' }}
+                loading="lazy"
+                allowFullScreen
+                src={event.location
+                  ? `https://maps.google.com/maps?q=hoteis+perto+de+${encodeURIComponent(event.location)}&t=m&z=13&output=embed&iwloc=near`
+                  : 'https://maps.google.com/maps?q=hoteis+no+Brasil&t=m&z=4&output=embed'}
+              />
+              <div className="sc-location-map-badge">
+                <MapPin size={13} />
+                {event.location || 'Local do evento'}
+              </div>
+            </div>
 
-            <h3 className="sc-section-title" style={{ fontSize: '1.25rem', marginBottom: '16px' }}>Plataformas de Reserva</h3>
-            <div className="sc-accom-grid">
-              <a
-                href={event.location ? `https://www.airbnb.com.br/s/${encodeURIComponent(event.location)}/homes` : '#'}
-                target="_blank" rel="noreferrer"
-                className="sc-accom-card"
-              >
-                <div className="sc-accom-card__logo sc-accom-card__logo--airbnb">
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 4c1.034 0 1.875.84 1.875 1.875S13.034 7.75 12 7.75s-1.875-.84-1.875-1.875S10.966 4 12 4zm4.5 13.5c-.375 1.5-2.25 2.5-4.5 2.5s-4.125-1-4.5-2.5c-.094-.375 0-.75.375-.938L9.75 15c.5-.25 1-.375 1.5-.375H12h.75c.5 0 1 .125 1.5.375l1.875 1.063c.375.187.469.562.375.937z" /></svg>
-                </div>
-                <div className="sc-accom-card__info">
-                  <div className="sc-accom-card__name">Airbnb</div>
-                  <div className="sc-accom-card__desc">Quartos e casas perto do evento</div>
-                </div>
-                <div className="sc-accom-card__arrow">→</div>
-              </a>
+            {/* Plataformas */}
+            <div className="sc-location-platforms">
+              <h3 className="sc-location-platforms__title">Onde se hospedar</h3>
+              <div className="sc-accom-grid">
+                <a
+                  href={event.location ? `https://www.airbnb.com.br/s/${encodeURIComponent(event.location)}/homes` : '#'}
+                  target="_blank" rel="noreferrer"
+                  className="sc-accom-card"
+                >
+                  <div className="sc-accom-card__logo sc-accom-card__logo--airbnb">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 4c1.034 0 1.875.84 1.875 1.875S13.034 7.75 12 7.75s-1.875-.84-1.875-1.875S10.966 4 12 4zm4.5 13.5c-.375 1.5-2.25 2.5-4.5 2.5s-4.125-1-4.5-2.5c-.094-.375 0-.75.375-.938L9.75 15c.5-.25 1-.375 1.5-.375H12h.75c.5 0 1 .125 1.5.375l1.875 1.063c.375.187.469.562.375.937z" /></svg>
+                  </div>
+                  <div className="sc-accom-card__info">
+                    <div className="sc-accom-card__name">Airbnb</div>
+                    <div className="sc-accom-card__desc">Quartos e casas perto do evento</div>
+                  </div>
+                  <div className="sc-accom-card__arrow">→</div>
+                </a>
 
-              <a
-                href={event.location ? `https://www.booking.com/searchresults.pt-br.html?ss=${encodeURIComponent(event.location)}` : '#'}
-                target="_blank" rel="noreferrer"
-                className="sc-accom-card"
-              >
-                <div className="sc-accom-card__logo sc-accom-card__logo--booking">
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18v16H3V4zm2 2v12h14V6H5zm2 2h10v2H7V8zm0 4h6v2H7v-2z" /></svg>
-                </div>
-                <div className="sc-accom-card__info">
-                  <div className="sc-accom-card__name">Booking.com</div>
-                  <div className="sc-accom-card__desc">Hotéis com cancelamento grátis</div>
-                </div>
-                <div className="sc-accom-card__arrow">→</div>
-              </a>
+                <a
+                  href={event.location ? `https://www.booking.com/searchresults.pt-br.html?ss=${encodeURIComponent(event.location)}` : '#'}
+                  target="_blank" rel="noreferrer"
+                  className="sc-accom-card"
+                >
+                  <div className="sc-accom-card__logo sc-accom-card__logo--booking">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18v16H3V4zm2 2v12h14V6H5zm2 2h10v2H7V8zm0 4h6v2H7v-2z" /></svg>
+                  </div>
+                  <div className="sc-accom-card__info">
+                    <div className="sc-accom-card__name">Booking.com</div>
+                    <div className="sc-accom-card__desc">Hotéis com cancelamento grátis</div>
+                  </div>
+                  <div className="sc-accom-card__arrow">→</div>
+                </a>
 
-              <a
-                href={event.location ? `https://www.hotels.com/search.do?q-destination=${encodeURIComponent(event.location)}` : '#'}
-                target="_blank" rel="noreferrer"
-                className="sc-accom-card"
-              >
-                <div className="sc-accom-card__logo sc-accom-card__logo--hotels">
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h18v18H3V3zm2 2v14h14V5H5zm2 2h4v4H7V7zm6 0h4v4h-4V7zm-6 6h4v4H7v-4zm6 0h4v4h-4v-4z" /></svg>
-                </div>
-                <div className="sc-accom-card__info">
-                  <div className="sc-accom-card__name">Hotels.com</div>
-                  <div className="sc-accom-card__desc">Comparar preços de hotéis</div>
-                </div>
-                <div className="sc-accom-card__arrow">→</div>
-              </a>
+                <a
+                  href={event.location ? `https://www.hotels.com/search.do?q-destination=${encodeURIComponent(event.location)}` : '#'}
+                  target="_blank" rel="noreferrer"
+                  className="sc-accom-card"
+                >
+                  <div className="sc-accom-card__logo sc-accom-card__logo--hotels">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h18v18H3V3zm2 2v14h14V5H5zm2 2h4v4H7V7zm6 0h4v4h-4V7zm-6 6h4v4H7v-4zm6 0h4v4h-4v-4z" /></svg>
+                  </div>
+                  <div className="sc-accom-card__info">
+                    <div className="sc-accom-card__name">Hotels.com</div>
+                    <div className="sc-accom-card__desc">Comparar preços de hotéis</div>
+                  </div>
+                  <div className="sc-accom-card__arrow">→</div>
+                </a>
 
-              <a
-                href={event.location ? `https://maps.google.com/?q=hoteis+perto+de+${encodeURIComponent(event.location)}` : '#'}
-                target="_blank" rel="noreferrer"
-                className="sc-accom-card"
-              >
-                <div className="sc-accom-card__logo sc-accom-card__logo--maps">
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" /></svg>
-                </div>
-                <div className="sc-accom-card__info">
-                  <div className="sc-accom-card__name">Google Maps</div>
-                  <div className="sc-accom-card__desc">Ver hotéis e localizações</div>
-                </div>
-                <div className="sc-accom-card__arrow">→</div>
-              </a>
+                <a
+                  href={event.location ? `https://maps.google.com/?q=hoteis+perto+de+${encodeURIComponent(event.location)}` : '#'}
+                  target="_blank" rel="noreferrer"
+                  className="sc-accom-card"
+                >
+                  <div className="sc-accom-card__logo sc-accom-card__logo--maps">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" /></svg>
+                  </div>
+                  <div className="sc-accom-card__info">
+                    <div className="sc-accom-card__name">Google Maps</div>
+                    <div className="sc-accom-card__desc">Ver hotéis e localizações</div>
+                  </div>
+                  <div className="sc-accom-card__arrow">→</div>
+                </a>
+              </div>
             </div>
           </div>
         )}
+
 
         {activeSubTab === 'parents' && (
           <div className="sc-content sc-info-page">
@@ -528,51 +570,66 @@ const EventDetails = () => {
   );
 
   // ---- Athletes Tab ----
-  const renderAthleteRow = (athlete, isUnapproved = false) => (
-    <tr key={athlete.id} style={{ borderBottom: '1px solid #27272a' }}>
-      <td style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <div style={{ width: '44px', height: '44px', borderRadius: '4px', overflow: 'hidden', background: '#3f3f46', flexShrink: 0 }}>
-          {athlete.photoUrl && !isUnapproved ? (
-            <Link to={`/perfil-publico/${athlete.id}`}>
-              <img src={athlete.photoUrl} alt={athlete.nome} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            </Link>
-          ) : (
-            <Link to={`/perfil-publico/${athlete.id}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
-              <Users size={20} style={{ color: '#a1a1aa' }} />
-            </Link>
-          )}
-        </div>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Link to={`/perfil-publico/${athlete.id}`} style={{ 
-              fontWeight: 500, 
-              fontSize: '1rem',
-              color: '#3b82f6', 
-              textDecoration: 'none'
-            }}>
-              {athlete.nome}
-            </Link>
+  const renderAthleteRow = (athlete, isUnapproved = false) => {
+    const realProfileId = athlete.memberProfileId || athlete.profileId;
+    let fullProfile = null;
+    if (realProfileId) {
+       fullProfile = memberProfiles.find(p => String(p.id) === String(realProfileId));
+    }
+    if (!fullProfile) {
+       fullProfile = memberProfiles.find(p => p.fullName?.trim().toLowerCase() === (athlete.nome || '').trim().toLowerCase());
+    }
+
+    const photoUrl = fullProfile?.photoUrl || fullProfile?.avatarUrl || athlete.photoUrl;
+    const age = fullProfile?.age || athlete.idade;
+    const birthYear = fullProfile?.birthDate ? new Date(fullProfile.birthDate).getFullYear() : (age ? new Date().getFullYear() - age : '2014');
+    const ageText = age ? `${age} years` : '11 years';
+
+    return (
+      <tr key={athlete.id} style={{ borderBottom: '1px solid #27272a' }}>
+        <td style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ width: '44px', height: '44px', borderRadius: '4px', overflow: 'hidden', background: '#3f3f46', flexShrink: 0 }}>
+            {photoUrl ? (
+              <Link to={`/perfil-publico/${athlete.id}`}>
+                <img src={photoUrl} alt={athlete.nome} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              </Link>
+            ) : (
+              <Link to={`/perfil-publico/${athlete.id}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
+                <Users size={20} style={{ color: '#a1a1aa' }} />
+              </Link>
+            )}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: '#a1a1aa', marginTop: '4px' }}>
-            <img src="https://flagcdn.com/w20/br.png" alt="Brazil" style={{ width: '14px', borderRadius: '2px' }} />
-            <span>{athlete.country || 'Brazil'}</span>
-          </div>
-          {isUnapproved && (
-            <div style={{ fontSize: '0.85rem', color: '#a1a1aa', marginTop: '6px', fontStyle: 'italic' }}>
-              Não aprovado
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Link to={`/perfil-publico/${athlete.id}`} style={{ 
+                fontWeight: 500, 
+                fontSize: '1rem',
+                color: '#3b82f6', 
+                textDecoration: 'none'
+              }}>
+                {athlete.nome}
+              </Link>
             </div>
-          )}
-        </div>
-      </td>
-      <td style={{ padding: '12px 16px', verticalAlign: 'middle' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-          <span style={{ color: '#f4f4f5', fontWeight: 500, fontSize: '0.9rem' }}>{athlete.idade ? (new Date().getFullYear() - athlete.idade) : '2014'}</span>
-          <span style={{ color: '#a1a1aa', fontSize: '0.8rem' }}>{athlete.idade ? `${athlete.idade} years` : '11 years'}</span>
-        </div>
-      </td>
-      <td style={{ padding: '12px 16px', verticalAlign: 'middle' }}>
-        <span style={{ color: '#3b82f6', fontWeight: 500, fontSize: '0.85rem', textTransform: 'uppercase' }}>{athlete.academia}</span>
-      </td>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: '#a1a1aa', marginTop: '4px' }}>
+              <img src="https://flagcdn.com/w20/br.png" alt="Brazil" style={{ width: '14px', borderRadius: '2px' }} />
+              <span>{fullProfile?.country || athlete.country || 'Brazil'}</span>
+            </div>
+            {isUnapproved && (
+              <div style={{ fontSize: '0.85rem', color: '#a1a1aa', marginTop: '6px', fontStyle: 'italic' }}>
+                Não aprovado
+              </div>
+            )}
+          </div>
+        </td>
+        <td style={{ padding: '12px 16px', verticalAlign: 'middle' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <span style={{ color: '#f4f4f5', fontWeight: 500, fontSize: '0.9rem' }}>{birthYear}</span>
+            <span style={{ color: '#a1a1aa', fontSize: '0.8rem' }}>{ageText}</span>
+          </div>
+        </td>
+        <td style={{ padding: '12px 16px', verticalAlign: 'middle' }}>
+          <span style={{ color: '#3b82f6', fontWeight: 500, fontSize: '0.85rem', textTransform: 'uppercase' }}>{fullProfile?.academyName || athlete.academia}</span>
+        </td>
       <td style={{ padding: '12px 16px', verticalAlign: 'middle' }}>
         <span style={{ color: '#f4f4f5', fontSize: '0.85rem' }}>{athlete.faixa}</span>
       </td>
@@ -595,6 +652,7 @@ const EventDetails = () => {
       </td>
     </tr>
   );
+};
 
   const renderAthletesTab = () => {
     const categories = Object.keys(groupedAthletes).sort();
@@ -626,8 +684,11 @@ const EventDetails = () => {
         {categories.map(catLabel => {
           const athletesInCat = groupedAthletes[catLabel];
           
-          const approvedAthletes = athletesInCat.filter(a => !a.status || a.status === 'PAYMENT_CONFIRMED');
-          const unapprovedAthletes = athletesInCat.filter(a => a.status && a.status !== 'PAYMENT_CONFIRMED');
+          const approvedAthletes = athletesInCat.filter(a => !a.status || normalizeRegistrationStatus(a.status) === REGISTRATION_STATUS.PAYMENT_CONFIRMED);
+            const isRegistrationOpen = event?.registrationOpen !== false;
+            const unapprovedAthletes = isRegistrationOpen 
+                ? athletesInCat.filter(a => a.status && normalizeRegistrationStatus(a.status) !== REGISTRATION_STATUS.PAYMENT_CONFIRMED)
+                : [];
           
           const isUnapprovedExpanded = expandedUnapproved[catLabel];
 
@@ -1011,12 +1072,12 @@ const EventDetails = () => {
       {/* TABS NAV */}
       <div className="sc-tabs-nav">
         {[
-          { key: 'information', label: 'Informações', icon: <BookOpen size={16} /> },
-          { key: 'athletes', label: 'Atletas', icon: <Users size={16} /> },
-          { key: 'brackets', label: 'Chaves', icon: <Swords size={16} /> },
-          { key: 'matches', label: 'Lutas', icon: <Swords size={16} /> },
-          { key: 'schedule', label: 'Cronograma', icon: <Clock size={16} /> },
-          { key: 'results', label: 'Resultados', icon: <BarChart2 size={16} /> },
+          { key: 'information', label: copy.infoTab, icon: <BookOpen size={16} /> },
+          { key: 'athletes', label: copy.athletesTab, icon: <Users size={16} /> },
+          { key: 'brackets', label: copy.bracketsTab, icon: <Swords size={16} /> },
+          { key: 'matches', label: copy.matchesTab, icon: <Swords size={16} /> },
+          { key: 'schedule', label: copy.scheduleTab, icon: <Clock size={16} /> },
+          { key: 'results', label: copy.resultsTab, icon: <BarChart2 size={16} /> },
         ].map(({ key, label, icon }) => (
           <div
             key={key}

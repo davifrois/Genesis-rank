@@ -63,6 +63,33 @@ public class Event extends BaseEntity {
   @Column(name = "batches_json")
   private String batchesJson;
 
+  private LocalDate endDate;
+
+  private Integer maxAthletes;
+
+  @Column(columnDefinition = "boolean default false")
+  private Boolean closeOnCapacity = false;
+
+  @Column(length = 30)
+  private String beltRegistrationPhone;
+
+  @Lob
+  @Column(name = "event_description")
+  private String eventDescription;
+
+  @Lob
+  @Column(name = "super_fights_json")
+  private String superFightsJson;
+
+  @Column(columnDefinition = "boolean default false")
+  private Boolean superFightsPublished = false;
+
+  @Column(length = 40)
+  private String eventPhase;
+
+  @Column(columnDefinition = "boolean default true")
+  private Boolean publicPublished = true;
+
   @Column(columnDefinition = "boolean default true")
   private Boolean registrationOpen = true;
 
@@ -93,7 +120,7 @@ public class Event extends BaseEntity {
     this.location = location;
   }
 
-  public boolean isAccommodationEnabled() {
+  public Boolean getAccommodationEnabled() {
     return accommodationEnabled != null ? accommodationEnabled : false;
   }
 
@@ -181,7 +208,7 @@ public class Event extends BaseEntity {
     this.feeAbsolute = feeAbsolute;
   }
 
-  public boolean isBeltRegistrationEnabled() {
+  public Boolean getBeltRegistrationEnabled() {
     return beltRegistrationEnabled != null ? beltRegistrationEnabled : false;
   }
 
@@ -221,7 +248,7 @@ public class Event extends BaseEntity {
     this.batchesJson = batchesJson;
   }
 
-  public boolean isRegistrationOpen() {
+  public Boolean getRegistrationOpen() {
     return registrationOpen != null ? registrationOpen : true;
   }
 
@@ -229,11 +256,83 @@ public class Event extends BaseEntity {
     this.registrationOpen = registrationOpen;
   }
 
-  public boolean isInternalRegistration() {
+  public Boolean getInternalRegistration() {
     return internalRegistration != null ? internalRegistration : true;
   }
 
   public void setInternalRegistration(Boolean internalRegistration) {
     this.internalRegistration = internalRegistration;
+  }
+
+  public LocalDate getEndDate() {
+    return endDate;
+  }
+
+  public void setEndDate(LocalDate endDate) {
+    this.endDate = endDate;
+  }
+
+  public Integer getMaxAthletes() {
+    return maxAthletes;
+  }
+
+  public void setMaxAthletes(Integer maxAthletes) {
+    this.maxAthletes = maxAthletes;
+  }
+
+  public Boolean getCloseOnCapacity() {
+    return closeOnCapacity != null ? closeOnCapacity : false;
+  }
+
+  public void setCloseOnCapacity(Boolean closeOnCapacity) {
+    this.closeOnCapacity = closeOnCapacity;
+  }
+
+  public String getBeltRegistrationPhone() {
+    return beltRegistrationPhone;
+  }
+
+  public void setBeltRegistrationPhone(String beltRegistrationPhone) {
+    this.beltRegistrationPhone = beltRegistrationPhone;
+  }
+
+  public String getEventDescription() {
+    return eventDescription;
+  }
+
+  public void setEventDescription(String eventDescription) {
+    this.eventDescription = eventDescription;
+  }
+
+  public String getSuperFightsJson() {
+    return superFightsJson;
+  }
+
+  public void setSuperFightsJson(String superFightsJson) {
+    this.superFightsJson = superFightsJson;
+  }
+
+  public Boolean getSuperFightsPublished() {
+    return superFightsPublished != null ? superFightsPublished : false;
+  }
+
+  public void setSuperFightsPublished(Boolean superFightsPublished) {
+    this.superFightsPublished = superFightsPublished;
+  }
+
+  public String getEventPhase() {
+    return eventPhase;
+  }
+
+  public void setEventPhase(String eventPhase) {
+    this.eventPhase = eventPhase;
+  }
+
+  public Boolean getPublicPublished() {
+    return publicPublished != null ? publicPublished : true;
+  }
+
+  public void setPublicPublished(Boolean publicPublished) {
+    this.publicPublished = publicPublished;
   }
 }

@@ -10,6 +10,7 @@ public class EventRequest {
   @NotBlank
   private String name;
   private String date;
+  private String endDate;
   private String location;
   private Boolean accommodationEnabled;
   private String accommodationTitle;
@@ -27,6 +28,10 @@ public class EventRequest {
   private Double beltRegistrationPrice;
   private String beltRegistrationDescription;
   private List<EventBatchDto> batches;
+  private Integer maxAthletes;
+  private Boolean closeOnCapacity;
+  private String beltRegistrationPhone;
+  private String eventDescription;
   private List<SuperFightDto> superFights;
   private Boolean superFightsPublished;
   private Boolean registrationOpen;
@@ -249,5 +254,45 @@ public class EventRequest {
 
   public void setPublishedAt(String publishedAt) {
     this.publishedAt = publishedAt;
+  }
+
+  public String getEndDate() {
+    return endDate;
+  }
+
+  public void setEndDate(String endDate) {
+    this.endDate = endDate;
+  }
+
+  public Integer getMaxAthletes() {
+    return maxAthletes;
+  }
+
+  public void setMaxAthletes(Integer maxAthletes) {
+    this.maxAthletes = maxAthletes;
+  }
+
+  public Boolean getCloseOnCapacity() {
+    return closeOnCapacity;
+  }
+
+  public void setCloseOnCapacity(Boolean closeOnCapacity) {
+    this.closeOnCapacity = closeOnCapacity;
+  }
+
+  public String getBeltRegistrationPhone() {
+    return beltRegistrationPhone;
+  }
+
+  public void setBeltRegistrationPhone(String beltRegistrationPhone) {
+    this.beltRegistrationPhone = beltRegistrationPhone;
+  }
+
+  public String getEventDescription() {
+    return eventDescription;
+  }
+
+  public void setEventDescription(String eventDescription) {
+    this.eventDescription = eventDescription;
   }
 }

@@ -591,13 +591,18 @@ const TournamentRegistrationFlow = ({ event, onComplete }) => {
             const registeredModalities = new Set();
             existingRegistrations.forEach(a => {
               if (!a.modalidade) return;
-              // Split by ' & ' to handle legacy combined records
-              a.modalidade.split(' & ').forEach(m => {
-                const clean = m.trim().toUpperCase();
-                // Only block the base modality (GI / NO-GI), not absolute variants
-                if (clean === 'GI') registeredModalities.add('GI');
-                if (clean === 'NO-GI') registeredModalities.add('NO-GI');
-              });
+              // Handle old " & " format and new verbose formats from Coach Manager
+              const mUpper = a.modalidade.toUpperCase();
+              if (mUpper === 'GI' || mUpper.includes('GI (COM KIMONO)') || (mUpper.includes('GI') && !mUpper.includes('NO-GI'))) {
+                registeredModalities.add('GI');
+              }
+              if (mUpper === 'NO-GI' || mUpper.includes('NO-GI') || mUpper.includes('SEM KIMONO')) {
+                registeredModalities.add('NO-GI');
+              }
+              if (mUpper.includes('COMBO') || mUpper.includes('GI & NO-GI')) {
+                registeredModalities.add('GI');
+                registeredModalities.add('NO-GI');
+              }
             });
 
             return (

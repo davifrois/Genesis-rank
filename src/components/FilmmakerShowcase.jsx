@@ -1,5 +1,6 @@
 import React from 'react';
 import { useI18n } from '../hooks/useI18n';
+import './FilmmakerShowcase.css';
 import { Building2, Camera, Play, Sparkles, Trophy, User } from 'lucide-react';
 import filmmakerPhotographer from '../../img/filmmaker-photographer.jfif';
 import filmmakerVenue from '../../img/filmmaker-venue.jpg';
@@ -85,7 +86,7 @@ const FilmmakerShowcase = ({
   const copyByLanguage = {
     pt: {
       kicker: 'Genesis Filmmaker',
-      topMessage: 'Seu campeonato merece uma filmagem de qualidade',
+      topMessage: 'Divulgue seu trabalho e contrate profissionais',
       title: 'GENESIS FILMMAKER',
       subtitle: 'Sua jornada no tatame merece ser imortalizada.',
       ctaLabel: 'SOLICITAR ORCAMENTO VIA WHATSAPP',
@@ -148,15 +149,16 @@ const FilmmakerShowcase = ({
 
   return (
     <section className={`filmmaker-showcase ${className}`.trim()} aria-label={copy.title}>
-      <header className="filmmaker-showcase__head">
+      <div className="filmmaker-showcase__inner">
+        <div className="filmmaker-showcase__ambient" aria-hidden="true" />
+        <header className="filmmaker-showcase__head">
         <span className="filmmaker-showcase__kicker">{copy.kicker}</span>
-        <strong className="filmmaker-showcase__top-message">{copy.topMessage}</strong>
-        <h2>{title}</h2>
+        <h2>{copy.title}<br/>| PORTFOLIO</h2>
         <p>{copy.subtitle}</p>
+        <strong className="filmmaker-showcase__top-message">{copy.topMessage}</strong>
       </header>
 
       <div className="filmmaker-showcase__stage">
-        <div className="filmmaker-showcase__ambient" aria-hidden="true" />
 
         {cards.map((card) => {
           const labelDict = { hero: copy.aftermovies, entrance: copy.entrance, active: copy.highlights, athlete: copy.athlete, academy: copy.academy };
@@ -178,16 +180,21 @@ const FilmmakerShowcase = ({
                 <Play size={card.key === 'hero' ? 28 : 18} fill="currentColor" strokeWidth={1.8} />
               </span>
               <span className="filmmaker-showcase__sr-only">{translatedLabel}</span>
+              
+              <span className="filmmaker-showcase__identity">
+                <strong>{FILMMAKER_HANDLE}</strong>
+              </span>
 
               {card.key === 'hero' ? (
-                <span className="filmmaker-showcase__identity">
-                  <img src="/genesis-logo.png" alt="" aria-hidden="true" />
-                  <strong>{FILMMAKER_HANDLE}</strong>
+                <span className="filmmaker-showcase__label">
+                  <span>
+                    {translatedLabel.toUpperCase()}<br/>
+                    <small style={{ fontSize: '0.65rem', fontWeight: 500, letterSpacing: '1px', opacity: 0.8 }}>REGISTRO EPICO DAS COMPETICOES</small>
+                  </span>
                 </span>
               ) : (
                 <span className="filmmaker-showcase__label">
-                  <Icon size={14} />
-                  {translatedLabel}
+                  {translatedLabel.toUpperCase()}
                 </span>
               )}
             </a>
@@ -198,8 +205,9 @@ const FilmmakerShowcase = ({
           <a className="filmmaker-showcase__cta-button" href={whatsappLink} target="_blank" rel="noreferrer">
             {copy.ctaLabel}
           </a>
-          <small>{`${copy.creditPrefix} `}</small>
+          <small>{`${copy.creditPrefix} ${FILMMAKER_HANDLE}`}</small>
         </div>
+      </div>
       </div>
     </section>
   );

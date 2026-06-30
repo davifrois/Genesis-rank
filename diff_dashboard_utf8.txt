@@ -1,5 +1,5 @@
 ﻿diff --git a/src/pages/Dashboard.jsx b/src/pages/Dashboard.jsx
-index 1a23089..39026c2 100644
+index 1a23089..04a2f07 100644
 --- a/src/pages/Dashboard.jsx
 +++ b/src/pages/Dashboard.jsx
 @@ -1,4 +1,4 @@
@@ -8,148 +8,152 @@ index 1a23089..39026c2 100644
  import { Link, useLocation, useNavigate } from 'react-router-dom';
  import { useStore } from '../hooks/useStore';
  import {
-@@ -25,8 +25,10 @@ import {
-     Sparkles,
-     Trophy,
-     Trash2,
-+    Swords,
-     Upload,
-     UserPlus,
-+    User,
-     Users,
-     Zap
- } from 'lucide-react';
-@@ -35,6 +37,7 @@ import { extractTextFromPdfFile, parseAthletesFromText } from '../services/pdfIm
- import { buildBracketMatches } from '../services/bracketService';
- import { authService } from '../services/authService';
- import { publicRegistrationService } from '../services/publicRegistrationService';
-+import { eventAdminService } from '../services/eventAdminService';
- import { socialMediaService } from '../services/socialMediaService';
- import { motion, AnimatePresence } from 'framer-motion';
- import LoginOverlay from '../components/LoginOverlay';
-@@ -45,6 +48,7 @@ import { translateBelt, translateCategory, translateCompositeLabel, translateWei
- import { REGISTRATION_STATUS, normalizeRegistrationStatus } from '../utils/registrationStatus';
- import { extractWeightOptionsFromFile, extractWeightOptionsFromUrl } from '../services/weightTableOcrService';
- import { evaluatePasswordStrength } from '../utils/passwordStrength';
-+import { compressImage } from '../utils/imageUtils';
- 
- const ATHLETE_PAGE_SIZE_OPTIONS = [20, 40, 80];
- const MAX_NEWS_IMAGE_UPLOAD_BYTES = 8_000_000;
-@@ -106,6 +110,7 @@ const ADMIN_SECTION_ROUTES = {
-     brackets: '/admin/chaveamento',
-     schedule: '/admin/cronograma',
-     athletes: '/admin/atletas',
-+    superFights: '/admin/lutas-casadas',
-     automation: '/admin/automacoes',
-     activity: '/admin/atividade'
- };
-@@ -137,12 +142,7 @@ const resolveAdminRouteFromSection = (section, canManagePanel) => {
-     return ADMIN_SECTION_ROUTES[normalizedSection] || (canManagePanel ? ADMIN_SECTION_ROUTES.overview : ADMIN_SECTION_ROUTES.brackets);
- };
- 
--const readFileAsDataUrl = (file) => new Promise((resolve, reject) => {
--    const reader = new FileReader();
--    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
--    reader.onerror = () => reject(new Error('Falha ao ler arquivo.'));
--    reader.readAsDataURL(file);
--});
-+const readFileAsDataUrl = (file) => compressImage(file, 800, 800, 0.7);
- 
- const isDataImageUrl = (value) => /^data:image\//i.test((value || '').toString().trim());
- 
-@@ -1606,7 +1606,7 @@ const Dashboard = () => {
-                 bracketsPanel: {
-                     title: 'Chaveamento',
-                     subtitle: 'Gere chaves por categoria e aplique o p├│dio automaticamente.',
--                    workspaceTitle: '├ürea do chaveamento',
-+                    workspaceTitle: '├â┬ürea do chaveamento',
-                     workspaceSubtitle: 'Inscri├º├Áes aprovadas s├úo sincronizadas na base de atletas e ficam prontas para categoria e chave.',
-                     quickFilter: 'Filtro rapido por academia',
-                     allAcademies: 'Todas as academias',
-@@ -2031,6 +2031,15 @@ const Dashboard = () => {
-     const [draggingBracketId, setDraggingBracketId] = useState('');
-     const [dragSeedContext, setDragSeedContext] = useState({ bracketId: '', athleteId: '' });
-     const [scheduleEventId, setScheduleEventId] = useState(activeEventId || '');
-+    const [superFightsEventId, setSuperFightsEventId] = useState(activeEventId || '');
-+    const [pendingSuperFights, setPendingSuperFights] = useState([{
-+        id: crypto.randomUUID(),
-+        category: 'Adulto',
-+        athlete1Name: '', athlete1Belt: 'Branca', athlete1Academy: '',
-+        athlete2Name: '', athlete2Belt: 'Branca', athlete2Academy: '',
-+        scheduledTime: ''
-+    }]);
-+    const [autoGenerateOptions, setAutoGenerateOptions] = useState({ startTime: '18:00', intervalMins: '10' });
-     const [manualScheduleByEvent, setManualScheduleByEvent] = useState(loadManualScheduleByEvent);
+@@ -67,7 +67,9 @@ const createEventEditFormState = () => ({
+     id: '',
+     name: '',
+     date: '',
++    endDate: '',
+     location: '',
++    eventDescription: '',
+     posterUrl: '',
+     registrationUrl: '',
+     weightTableGiUrl: '',
+@@ -80,6 +82,20 @@ const createEventEditFormState = () => ({
+     feeOver15: DEFAULT_EVENT_FEES.over15,
+     feeCombo: DEFAULT_EVENT_FEES.combo,
+     feeAbsolute: DEFAULT_EVENT_FEES.absolute,
++    beltRegistrationEnabled: false,
++    beltRegistrationTitle: '',
++    beltRegistrationPrice: 0,
++    beltRegistrationDescription: '',
++    beltRegistrationPhone: '',
++    maxAthletes: '',
++    closeOnCapacity: false,
++    accommodationEnabled: false,
++    accommodationTitle: '',
++    accommodationDescription: '',
++    accommodationSearchLocation: '',
++    batches: [],
++    superFights: [],
++    superFightsPublished: false,
+     registrationOpen: true,
+     internalRegistration: true
+ });
+@@ -357,7 +373,7 @@ const parseRegistrationNotes = (value) => {
+ const parseRegistrationRecord = (item, eventMap, copy) => {
+     const source = (item && typeof item === 'object') ? item : {};
+     const notes = parseRegistrationNotes(source.notes);
+-    const totalValue = Number(notes?.totalValue || 0);
++    const totalValue = Number(notes?.totalValue ?? source.price ?? 0);
+     const proofName = notes?.comprovanteNome || '';
+     const proofFileUrl = notes?.comprovanteArquivoDataUrl || '';
+     const proofMimeType = notes?.comprovanteMimeType || '';
+@@ -2035,6 +2051,7 @@ const Dashboard = () => {
      const [scheduleDraft, setScheduleDraft] = useState(createScheduleDraftState);
      const [showScheduleTvMode, setShowScheduleTvMode] = useState(false);
-@@ -3846,11 +3855,17 @@ const Dashboard = () => {
-             }
+     const [showEventEditModal, setShowEventEditModal] = useState(false);
++    const [eventModalTab, setEventModalTab] = useState('info');
+     const [eventEditForm, setEventEditForm] = useState(createEventEditFormState);
+     const [eventEditError, setEventEditError] = useState('');
+     const [registrationCloseConfirmEvent, setRegistrationCloseConfirmEvent] = useState(null);
+@@ -2329,20 +2346,23 @@ const Dashboard = () => {
+         setEventWeightOcrProgress(0);
+         setEventPosterStoredSizeBytes(0);
+         setEventEditForm(createEventEditFormState());
++        setEventModalTab('info');
+     }, []);
  
-             if (normalizedUpdated.isPaymentConfirmed) {
-+                const matchedAthlete = athletes.find((athlete) => (
-+                    athleteMatchesRegistrationRecord(athlete, normalizedUpdated)
-+                ));
-+                if (!matchedAthlete?.id) {
-+                    addAthlete(toAthleteFromRegistration(normalizedUpdated));
+     const closeRegistrationConfirmModal = useCallback(() => {
+         setRegistrationCloseConfirmEvent(null);
+     }, []);
+ 
+-    const handleUpdateEvent = useCallback((event) => {
++    const handleUpdateEvent = useCallback(async (event) => {
+         event.preventDefault();
+         setEventEditError('');
+         try {
+-            const updated = updateEvent(eventEditForm.id, {
++            const updated = await updateEvent(eventEditForm.id, {
+                 name: eventEditForm.name,
+                 date: eventEditForm.date,
++                endDate: eventEditForm.endDate,
+                 location: eventEditForm.location,
++                eventDescription: eventEditForm.eventDescription,
+                 posterUrl: eventEditForm.posterUrl,
+                 registrationUrl: eventEditForm.registrationUrl,
+                 weightTableGiUrl: eventEditForm.weightTableGiUrl,
+@@ -2355,6 +2375,20 @@ const Dashboard = () => {
+                 feeOver15: eventEditForm.feeOver15,
+                 feeCombo: eventEditForm.feeCombo,
+                 feeAbsolute: eventEditForm.feeAbsolute,
++                beltRegistrationEnabled: eventEditForm.beltRegistrationEnabled,
++                beltRegistrationTitle: eventEditForm.beltRegistrationTitle,
++                beltRegistrationPrice: eventEditForm.beltRegistrationPrice,
++                beltRegistrationDescription: eventEditForm.beltRegistrationDescription,
++                beltRegistrationPhone: eventEditForm.beltRegistrationPhone,
++                maxAthletes: eventEditForm.maxAthletes,
++                closeOnCapacity: eventEditForm.closeOnCapacity,
++                accommodationEnabled: eventEditForm.accommodationEnabled,
++                accommodationTitle: eventEditForm.accommodationTitle,
++                accommodationDescription: eventEditForm.accommodationDescription,
++                accommodationSearchLocation: eventEditForm.accommodationSearchLocation,
++                batches: eventEditForm.batches,
++                superFights: eventEditForm.superFights,
++                superFightsPublished: eventEditForm.superFightsPublished,
+                 registrationOpen: eventEditForm.registrationOpen,
+                 internalRegistration: eventEditForm.internalRegistration
+             });
+@@ -2416,6 +2450,40 @@ const Dashboard = () => {
+         setEventPosterStoredSizeBytes(isDataImageUrl(value) ? estimateDataUrlBytes(value) : 0);
+     }, []);
+ 
++    const handleAddBatchEdit = useCallback(() => {
++        setEventEditForm((prev) => ({
++            ...prev,
++            batches: [
++                ...(prev.batches || []),
++                {
++                    id: Date.now().toString() + Math.random().toString(36).substring(2, 7),
++                    name: `Lote ${(prev.batches?.length || 0) + 1}`,
++                    startDate: '',
++                    endDate: '',
++                    feeUnder15: prev.feeUnder15 || 0,
++                    feeOver15: prev.feeOver15 || 0,
++                    feeCombo: prev.feeCombo || 0,
++                    feeAbsolute: prev.feeAbsolute || 0,
 +                }
++            ]
++        }));
++    }, []);
 +
-                 if (normalizedUpdated.eventId) {
-                     setActiveEvent(normalizedUpdated.eventId);
-                     setBracketEventId(normalizedUpdated.eventId);
-                 }
--                navigate(resolveAdminRouteFromSection('brackets', canManagePanel));
-             }
- 
-             showFeedback('success', copy.feedback.registrationStatusUpdated);
-@@ -4558,10 +4573,12 @@ const Dashboard = () => {
-     const recentLogs = logs.slice(0, 6);
- 
-     const navItems = useMemo(() => {
-+        const hasBeltEvent = events.some(e => e.beltRegistrationEnabled);
-         if (!canManagePanel) {
-             return [
-                 { id: 'brackets', label: copy.nav.brackets, icon: ClipboardList },
-                 { id: 'schedule', label: copy.nav.schedule, icon: Clock },
-+                ...(hasBeltEvent ? [{ id: 'superFights', label: 'Lutas Casadas', icon: Swords }] : []),
-                 { id: 'activity', label: copy.nav.activity, icon: Activity }
-             ];
-         }
-@@ -4572,11 +4589,12 @@ const Dashboard = () => {
-             { id: 'registrations', label: copy.nav.registrations, icon: ClipboardList, meta: publicRegistrations.length },
-             { id: 'brackets', label: copy.nav.brackets, icon: ClipboardList },
-             { id: 'schedule', label: copy.nav.schedule, icon: Clock },
-+            ...(hasBeltEvent ? [{ id: 'superFights', label: 'Lutas Casadas', icon: Swords }] : []),
-             { id: 'athletes', label: copy.nav.athletes, icon: Users, meta: athletes.length },
-             { id: 'automation', label: copy.nav.automation, icon: Zap },
-             { id: 'activity', label: copy.nav.activity, icon: Activity }
-         ];
--    }, [canManagePanel, copy.nav, events.length, news.length, publicRegistrations.length, athletes.length]);
-+    }, [canManagePanel, copy.nav, events, news.length, publicRegistrations.length, athletes.length]);
- 
-     const orderedNews = useMemo(() => (
-         [...news].sort((a, b) => {
-@@ -5423,15 +5441,17 @@ const Dashboard = () => {
-                                 const eventNameForReport = group.eventName || copy.common.noEvent;
-                                 const eventDateForReport = group.eventDate || '';
-                                 const eventLocationForReport = group.eventLocation || '';
--                                const updatedLabel = group.updatedAt
--                                    ? formatEventDateTime(group.updatedAt)
--                                    : formatEventDateTime(new Date().toISOString());
-+                                const updatedLabel = group.updatedAt ? formatEventDateTime(group.updatedAt) : formatEventDateTime(new Date().toISOString());
-+                                const totalRevenue = group.rows.filter(r => r.isPaymentConfirmed).reduce((sum, r) => sum + (r.totalValue || 0), 0);
- 
-                                 return (
-                                     <article key={group.eventId} className="registration-event-group">
-                                         <div className="registration-event-group__head">
-                                             <div>
-                                                 <div className="table-name">{eventNameForReport}</div>
-+                                                {totalRevenue > 0 && (
-+                                                    <div className="revenue-badge">Valor Total Recebido: {currencyFormatter.format(totalRevenue)}</div>
-+                                                )}
-                                                 <div className="table-meta table-meta--tight">
-                                                     {formatEventDate(eventDateForReport) || copy.eventsPanel.undefinedDate}
-                                                     {eventLocationForReport ? ` - ${eventLocationForReport}` : ''}
-@@ -5450,188 +5470,155 @@ const Dashboard = () => {
++    const handleRemoveBatchEdit = useCallback((indexToRemove) => {
++        setEventEditForm((prev) => ({
++            ...prev,
++            batches: (prev.batches || []).filter((_, idx) => idx !== indexToRemove)
++        }));
++    }, []);
++
++    const handleBatchChangeEdit = useCallback((index, field, value) => {
++        setEventEditForm((prev) => {
++            const newBatches = [...(prev.batches || [])];
++            newBatches[index] = { ...newBatches[index], [field]: value };
++            return { ...prev, batches: newBatches };
++        });
++    }, []);
++
+     const handleEventEditPosterFile = useCallback(async (event) => {
+         const file = event.target.files?.[0];
+         if (!file) return;
+@@ -4318,7 +4386,7 @@ const Dashboard = () => {
+                 || item.eventId === registrationEventFilter
+             ))
+             .filter((item) => (
+-                !registrationPendingOnly || item.isPendingSync
++                !registrationPendingOnly || item.isPendingSync || item.isPendingPaymentReview
+             ))
+             .filter((item) => {
+                 if (!term) return true;
+@@ -5450,22 +5518,7 @@ const Dashboard = () => {
                      {registrationsLoading ? (
                          <div className="panel-subtitle">{copy.registrationsPanel.refresh}...</div>
                      ) : registrationRows.length ? (
@@ -169,54 +173,21 @@ index 1a23089..39026c2 100644
 -                                </tr>
 -                            </thead>
 -                            <tbody>
--                                {registrationRows.map((item) => {
--                                    const pipelineState = registrationPipelineById.get(item.id) || {
--                                        doneSteps: [true, false, false, false],
--                                        currentStepIndex: 0
--                                    };
--                                    const pipelineSteps = [
--                                        copy.registrationsPanel.pipelineRegistered,
--                                        copy.registrationsPanel.pipelineApproved,
--                                        copy.registrationsPanel.pipelineCategory,
--                                        copy.registrationsPanel.pipelineBracket
--                                    ];
--                                    const hasCategory = Boolean(pipelineState.doneSteps?.[2]);
--                                    const hasBracket = Boolean(pipelineState.doneSteps?.[3]);
--                                    const flowIndicator = item.isPaymentError
--                                        ? { label: copy.registrationsPanel.flowStatusPaymentError, tone: 'danger' }
--                                        : item.isPaymentConfirmed
--                                            ? hasCategory && hasBracket
--                                                ? { label: copy.registrationsPanel.flowStatusDone, tone: 'success' }
--                                                : hasCategory
--                                                    ? { label: copy.registrationsPanel.flowStatusCategory, tone: 'info' }
--                                                    : { label: copy.registrationsPanel.flowStatusApproved, tone: 'pending' }
--                                            : { label: copy.registrationsPanel.flowStatusPending, tone: 'pending' };
-+                        
-+                        <div className="registration-card-grid">
-+                            {registrationRows.map((item) => {
-+                                const pipelineState = registrationPipelineById.get(item.id) || {
-+                                    doneSteps: [true, false, false, false],
-+                                    currentStepIndex: 0
-+                                };
-+                                const pipelineSteps = [
-+                                    copy.registrationsPanel.pipelineRegistered,
-+                                    copy.registrationsPanel.pipelineApproved,
-+                                    copy.registrationsPanel.pipelineCategory,
-+                                    copy.registrationsPanel.pipelineBracket
-+                                ];
-+                                const hasCategory = Boolean(pipelineState.doneSteps?.[2]);
-+                                const hasBracket = Boolean(pipelineState.doneSteps?.[3]);
-+                                const flowIndicator = item.isPaymentError
-+                                    ? { label: copy.registrationsPanel.flowStatusPaymentError, tone: 'danger' }
-+                                    : item.isPaymentConfirmed
-+                                        ? hasCategory && hasBracket
-+                                            ? { label: copy.registrationsPanel.flowStatusDone, tone: 'success' }
-+                                            : hasCategory
-+                                                ? { label: copy.registrationsPanel.flowStatusCategory, tone: 'info' }
-+                                                : { label: copy.registrationsPanel.flowStatusApproved, tone: 'pending' }
-+                                        : { label: copy.registrationsPanel.flowStatusPending, tone: 'pending' };
++                        <div className="registration-card-list">
+                                 {registrationRows.map((item) => {
+                                     const pipelineState = registrationPipelineById.get(item.id) || {
+                                         doneSteps: [true, false, false, false],
+@@ -5488,150 +5541,148 @@ const Dashboard = () => {
+                                                     ? { label: copy.registrationsPanel.flowStatusCategory, tone: 'info' }
+                                                     : { label: copy.registrationsPanel.flowStatusApproved, tone: 'pending' }
+                                             : { label: copy.registrationsPanel.flowStatusPending, tone: 'pending' };
++                                            
++                                    const isError = item.isPaymentError;
++                                    const isPending = item.isPendingSync || (!item.isPaymentConfirmed && !item.isPaymentError);
++                                    const isSuccess = item.isPaymentConfirmed;
++                                    const statusClass = isError ? 'status-error' : isPending ? 'status-pending' : 'status-success';
  
--                                    return (
+                                     return (
 -                                    <tr key={item.id}>
 -                                        <td className="athlete-photo-cell">
 -                                            {item.athletePhotoUrl ? (
@@ -226,19 +197,8 @@ index 1a23089..39026c2 100644
 -                                            )}
 -                                        </td>
 -                                        <td>
-+                                return (
-+                                <div key={item.id} className="registration-card">
-+                                    <div className="registration-card__header">
-+                                        {item.athletePhotoUrl ? (
-+                                            <img className="registration-card__photo" src={item.athletePhotoUrl} alt={item.nome || copy.registrationsPanel.tableAthlete} loading="lazy" />
-+                                        ) : (
-+                                            <div className="registration-card__photo" title={copy.registrationsPanel.noPhoto}>
-+                                                <User size={28} color="currentColor" style={{ opacity: 0.5 }} />
-+                                            </div>
-+                                        )}
-+                                        <div className="registration-card__header-info">
-                                             <div className="table-name">{item.nome}</div>
-                                             <div className="table-meta table-meta--tight">{item.academia || copy.modalAssign.noAcademy}</div>
+-                                            <div className="table-name">{item.nome}</div>
+-                                            <div className="table-meta table-meta--tight">{item.academia || copy.modalAssign.noAcademy}</div>
 -                                        </td>
 -                                        <td>
 -                                            <div className="table-name">{item.eventName}</div>
@@ -248,8 +208,14 @@ index 1a23089..39026c2 100644
 -                                            <div className="table-meta table-meta--tight">{item.modalidade || '-'}</div>
 -                                            <div className="table-meta table-meta--tight">
 -                                                {item.categoria || '-'} / {item.faixa || '-'} / {item.peso || '-'}
-+                                            <div className={`points-pill ${item.isPendingSync ? 'points-pill--warning' : item.isPaymentError ? 'points-pill--danger' : ''}`} style={{ marginTop: '4px', display: 'inline-block' }}>
-+                                                {item.statusLabel}
++                                    <div key={item.id} className={`registration-card ${statusClass}`}>
++                                        <div className="registration-card__header">
++                                            <div className="registration-card__avatar">
++                                                {item.athletePhotoUrl ? (
++                                                    <img src={item.athletePhotoUrl} alt={item.nome || copy.registrationsPanel.tableAthlete} loading="lazy" />
++                                                ) : (
++                                                    <span>{copy.registrationsPanel.noPhoto}</span>
++                                                )}
                                              </div>
 -                                        </td>
 -                                        <td>
@@ -259,60 +225,116 @@ index 1a23089..39026c2 100644
 -                                        <td>
 -                                            <div className="table-meta table-meta--tight">
 -                                                {copy.registrationsPanel.totalValue}: {currencyFormatter.format(item.totalValue || 0)}
-+                                        </div>
-+                                    </div>
-+                                    <div className="registration-card__body">
-+                                        <div className="registration-card__section-row">
-+                                            <div className="registration-card__section">
-+                                                <div className="registration-card__section-title">{copy.registrationsPanel.tableEvent}</div>
-+                                                <div className="table-name">{item.eventName}</div>
-+                                                <div className="table-meta table-meta--tight">{formatEventDate(item.eventDate)}</div>
++                                            <div className="registration-card__profile">
++                                                <div className="registration-card__name">{item.nome}</div>
++                                                <div className="registration-card__academy">{item.academia || copy.modalAssign.noAcademy}</div>
++                                                
++                                                <div className="registration-card__pipeline" role="list" aria-label={copy.registrationsPanel.tablePipeline}>
++                                                    {pipelineSteps.map((label, stepIndex) => (
++                                                        <span
++                                                            key={`${item.id}-pipeline-${stepIndex}`}
++                                                            className={`registration-card__pipeline-step ${pipelineState.doneSteps[stepIndex] ? 'is-done' : ''} ${pipelineState.currentStepIndex === stepIndex ? 'is-current' : ''}`}
++                                                            role="listitem"
++                                                            data-label={label}
++                                                        />
++                                                    ))}
++                                                </div>
                                              </div>
 -                                            <div className="table-meta table-meta--tight">
 -                                                {copy.registrationsPanel.pixKey}: {item.notes?.pixKey || '-'}
-+                                            <div className="registration-card__section" style={{ textAlign: 'right' }}>
-+                                                <div className="registration-card__section-title">{copy.registrationsPanel.tableCategory}</div>
-+                                                <div className="table-meta table-meta--tight">{item.modalidade || '-'}</div>
-+                                                <div className="table-meta table-meta--tight">
-+                                                    {item.categoria || '-'} / {item.faixa || '-'} / {item.peso || '-'}
++                                        </div>
++
++                                        <div className="registration-card__body">
++                                            <div className="registration-card__info-row">
++                                                <AlertCircle className="registration-card__info-icon" size={14} />
++                                                <div>
++                                                    <div className="registration-card__info-label">{copy.registrationsPanel.tableEvent}</div>
++                                                    <div className="registration-card__info-text">
++                                                        <strong>{item.eventName}</strong><br />
++                                                        <span style={{ fontSize: '0.8rem', color: 'var(--muted-strong)' }}>{formatEventDate(item.eventDate)}</span>
++                                                    </div>
 +                                                </div>
                                              </div>
 -                                            <div className="table-meta table-meta--tight">
 -                                                {copy.registrationsPanel.receipt}: {item.proofName || copy.registrationsPanel.noReceipt}
++
++                                            <div className="registration-card__info-row">
++                                                <CheckCircle2 className="registration-card__info-icon" size={14} />
++                                                <div>
++                                                    <div className="registration-card__info-label">{copy.registrationsPanel.tableCategory}</div>
++                                                    <div className="registration-card__info-text">
++                                                        {item.modalidade || '-'} <br/>
++                                                        <span style={{ fontSize: '0.8rem', color: 'var(--muted-strong)' }}>{item.categoria || '-'} / {item.faixa || '-'} / {item.peso || '-'}</span>
++                                                    </div>
++                                                </div>
++                                            </div>
++                                            
++                                            <div className="registration-card__info-row">
++                                                <RotateCcw className="registration-card__info-icon" size={14} />
++                                                <div style={{ flex: 1 }}>
++                                                    <div className="registration-card__info-label">{copy.registrationsPanel.tableStatus}</div>
++                                                    <div className={`points-pill ${item.isPendingSync ? 'points-pill--warning' : item.isPaymentError ? 'points-pill--danger' : ''}`} style={{ display: 'inline-flex', marginBottom: '0.3rem' }}>
++                                                        {item.statusLabel}
++                                                    </div>
++                                                    <div className={`registration-flow-indicator registration-flow-indicator--${flowIndicator.tone}`} style={{ marginTop: 0 }}>
++                                                        {flowIndicator.tone === 'success' ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
++                                                        <span>{flowIndicator.label}</span>
++                                                    </div>
++                                                    {item.syncError && (
++                                                        <div style={{ fontSize: '0.75rem', color: 'var(--danger)', marginTop: '0.3rem' }}>
++                                                            {copy.registrationsPanel.lastError}: {item.syncError}
++                                                        </div>
++                                                    )}
++                                                </div>
++                                            </div>
 +                                        </div>
-+                                        <div className="registration-card__section-row">
-+                                            <div className="registration-card__section">
-+                                                <div className="registration-card__section-title">{copy.registrationsPanel.tableContact}</div>
-+                                                <div className="table-meta table-meta--tight">{item.email || '-'}</div>
-+                                                <div className="table-meta table-meta--tight">{item.phone || '-'}</div>
++
++                                        <div className="registration-card__payment">
++                                            <div className="registration-card__payment-header">
++                                                <span>{copy.registrationsPanel.tablePayment}</span>
++                                                <span className="registration-card__payment-total">{currencyFormatter.format(item.totalValue || 0)}</span>
                                              </div>
--                                            {item.proofFileUrl && (
++                                            
++                                            {item.notes?.pixKey && (
++                                              <div style={{ fontSize: '0.85rem', color: 'var(--ink)' }}>
++                                                  <span style={{ color: 'var(--muted-strong)' }}>{copy.registrationsPanel.pixKey}:</span> {item.notes.pixKey}
++                                              </div>
++                                            )}
++
+                                             {item.proofFileUrl && (
 -                                                <div className="registration-proof-preview">
 -                                                    <div className="table-meta table-meta--tight">{copy.registrationsPanel.proofPreviewTitle}</div>
--                                                    {item.isImageProof ? (
--                                                        <img
++                                                <div className="registration-card__receipt-preview">
+                                                     {item.isImageProof ? (
+                                                         <img
 -                                                            className="registration-proof-thumb"
--                                                            src={item.proofFileUrl}
--                                                            alt={item.proofName || copy.registrationsPanel.proofPreviewTitle}
--                                                            loading="lazy"
--                                                        />
--                                                    ) : item.isPdfProof ? (
--                                                        <embed
++                                                            className="registration-card__receipt-thumb"
+                                                             src={item.proofFileUrl}
+                                                             alt={item.proofName || copy.registrationsPanel.proofPreviewTitle}
+                                                             loading="lazy"
+                                                         />
+                                                     ) : item.isPdfProof ? (
+                                                         <embed
 -                                                            className="registration-proof-thumb registration-proof-thumb--pdf"
--                                                            src={`${item.proofFileUrl}#toolbar=0&navpanes=0&scrollbar=0`}
--                                                            type="application/pdf"
--                                                        />
--                                                    ) : (
++                                                            className="registration-card__receipt-thumb registration-card__receipt-thumb--pdf"
+                                                             src={`${item.proofFileUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+                                                             type="application/pdf"
+                                                         />
+                                                     ) : (
 -                                                        <div className="registration-proof-thumb registration-proof-thumb--placeholder">
 -                                                            {copy.registrationsPanel.proofPreviewPdf}
--                                                        </div>
--                                                    )}
-+                                            <div className="registration-card__section" style={{ textAlign: 'right' }}>
-+                                                <div className="registration-card__section-title">{copy.registrationsPanel.tablePayment}</div>
-+                                                <div className="registration-card__price-badge">
-+                                                    {currencyFormatter.format(item.totalValue || 0)}
++                                                        <div className="registration-card__receipt-thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem' }}>
++                                                            PDF
+                                                         </div>
+                                                     )}
++                                                    <div className="registration-card__receipt-info">
++                                                        <div className="registration-card__receipt-name">{item.proofName || 'Comprovante'}</div>
++                                                        <button type="button" className="text-link" onClick={() => handleOpenProofFile(item)} style={{ fontSize: '0.75rem' }}>
++                                                            {copy.registrationsPanel.openReceipt}
++                                                        </button>
++                                                    </div>
                                                  </div>
--                                            )}
+                                             )}
 -                                            {item.proofFileUrl && (
 -                                                <button
 -                                                    type="button"
@@ -328,43 +350,16 @@ index 1a23089..39026c2 100644
 -                                        </td>
 -                                        <td className="registration-pipeline-cell">
 -                                            <div className="registration-pipeline" role="list" aria-label={copy.registrationsPanel.tablePipeline}>
-+                                            </div>
-+                                        </div>
-+                                        <div className="registration-card__section-row">
-+                                           <div className="registration-card__section">
-+                                                <div className="registration-card__section-title">{copy.registrationsPanel.receipt}</div>
-+                                                <div className="table-meta table-meta--tight" style={{wordBreak: 'break-all'}}>
-+                                                    {item.notes?.pixKey ? `Pix: ${item.notes.pixKey}` : '-'}
-+                                                </div>
-+                                                {item.proofFileUrl ? (
-+                                                    <button type="button" className="text-link" onClick={() => handleOpenProofFile(item)} style={{ textAlign: 'left', padding: 0 }}>
-+                                                        {copy.registrationsPanel.openReceipt}
-+                                                    </button>
-+                                                ) : (
-+                                                    <div className="table-meta table-meta--tight">{copy.registrationsPanel.noReceipt}</div>
-+                                                )}
-+                                            </div>
-+                                        </div>
-+                                        {item.notesText && (
-+                                            <div className="registration-card__section">
-+                                                <div className="registration-card__section-title">{copy.registrationsPanel.tableNotes}</div>
-+                                                <div className="table-meta table-meta--tight">{item.notesText}</div>
-+                                            </div>
-+                                        )}
-+                                        <div className="registration-card__section">
-+                                            <div className="registration-card__section-title">{copy.registrationsPanel.tablePipeline}</div>
-+                                            <div className="registration-pipeline" role="list" style={{ marginTop: '4px' }}>
-                                                 {pipelineSteps.map((label, stepIndex) => (
-                                                     <span
-                                                         key={`${item.id}-pipeline-${stepIndex}`}
-                                                         className={`registration-pipeline__step ${pipelineState.doneSteps[stepIndex] ? 'is-done' : ''} ${pipelineState.currentStepIndex === stepIndex ? 'is-current' : ''}`}
-                                                         role="listitem"
-+                                                        style={{ fontSize: '10px', padding: '2px 4px' }}
-                                                     >
-                                                         {label}
-                                                     </span>
-                                                 ))}
-                                             </div>
+-                                                {pipelineSteps.map((label, stepIndex) => (
+-                                                    <span
+-                                                        key={`${item.id}-pipeline-${stepIndex}`}
+-                                                        className={`registration-pipeline__step ${pipelineState.doneSteps[stepIndex] ? 'is-done' : ''} ${pipelineState.currentStepIndex === stepIndex ? 'is-current' : ''}`}
+-                                                        role="listitem"
+-                                                    >
+-                                                        {label}
+-                                                    </span>
+-                                                ))}
+-                                            </div>
 -                                        </td>
 -                                        <td>
 -                                            <div className={`points-pill ${item.isPendingSync ? 'points-pill--warning' : item.isPaymentError ? 'points-pill--danger' : ''}`}>
@@ -372,32 +367,37 @@ index 1a23089..39026c2 100644
 -                                            </div>
 -                                            <div className="table-meta table-meta--tight">{formatEventDate(item.createdAt)}</div>
 -                                            <div className={`registration-flow-indicator registration-flow-indicator--${flowIndicator.tone}`}>
-+                                            <div className={`registration-flow-indicator registration-flow-indicator--${flowIndicator.tone}`} style={{ marginTop: '8px' }}>
-                                                 {flowIndicator.tone === 'success' ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
-                                                 <span>{flowIndicator.label}</span>
-                                             </div>
--                                            {!item.isPendingSync && canManagePanel && (
+-                                                {flowIndicator.tone === 'success' ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
+-                                                <span>{flowIndicator.label}</span>
+-                                            </div>
++                                            
+                                             {!item.isPendingSync && canManagePanel && (
 -                                                <div className="registration-status-actions">
--                                                    <button
--                                                        type="button"
++                                                <div className="registration-card__actions">
+                                                     <button
+                                                         type="button"
 -                                                        className="btn btn-ghost registration-status-btn"
--                                                        onClick={() => handleUpdateRegistrationPaymentStatus(item, REGISTRATION_STATUS.PAYMENT_CONFIRMED)}
--                                                        disabled={registrationStatusUpdatingId === item.id || item.isPaymentConfirmed}
--                                                    >
++                                                        className="btn btn-secondary"
+                                                         onClick={() => handleUpdateRegistrationPaymentStatus(item, REGISTRATION_STATUS.PAYMENT_CONFIRMED)}
+                                                         disabled={registrationStatusUpdatingId === item.id || item.isPaymentConfirmed}
+                                                     >
 -                                                        <CheckCircle2 size={14} />
 -                                                        {copy.registrationsPanel.confirmPayment}
--                                                    </button>
--                                                    <button
--                                                        type="button"
++                                                        <CheckCircle2 size={14} /> Confirmar
+                                                     </button>
+                                                     <button
+                                                         type="button"
 -                                                        className="btn btn-ghost registration-status-btn"
--                                                        onClick={() => handleUpdateRegistrationPaymentStatus(item, REGISTRATION_STATUS.PAYMENT_ERROR)}
--                                                        disabled={registrationStatusUpdatingId === item.id || item.isPaymentError}
--                                                    >
++                                                        className="btn btn-secondary"
+                                                         onClick={() => handleUpdateRegistrationPaymentStatus(item, REGISTRATION_STATUS.PAYMENT_ERROR)}
+                                                         disabled={registrationStatusUpdatingId === item.id || item.isPaymentError}
+                                                     >
 -                                                        <AlertCircle size={14} />
 -                                                        {copy.registrationsPanel.markPaymentError}
--                                                    </button>
--                                                </div>
--                                            )}
++                                                        <AlertCircle size={14} /> Erro
+                                                     </button>
+                                                 </div>
+                                             )}
 -                                            {(item.paymentReviewNotes || item.paymentReviewedBy || item.paymentReviewedAt) && (
 -                                                <div className="registration-review-meta">
 -                                                    <div className="table-meta table-meta--tight">
@@ -419,385 +419,835 @@ index 1a23089..39026c2 100644
 -                                            )}
 -                                        </td>
 -                                    </tr>
--                                    );
--                                })}
--                            </tbody>
--                        </table>
 +                                        </div>
 +                                    </div>
-+                                    <div className="registration-card__footer">
-+                                        {!item.isPendingSync && canManagePanel && (
-+                                            <div className="registration-card__actions">
-+                                                <button
-+                                                    type="button"
-+                                                    className="btn btn-ghost registration-status-btn"
-+                                                    onClick={() => handleUpdateRegistrationPaymentStatus(item, REGISTRATION_STATUS.PAYMENT_CONFIRMED)}
-+                                                    disabled={registrationStatusUpdatingId === item.id || item.isPaymentConfirmed}
-+                                                >
-+                                                    <CheckCircle2 size={14} />
-+                                                    Confirmar
-+                                                </button>
-+                                                <button
-+                                                    type="button"
-+                                                    className="btn btn-ghost registration-status-btn"
-+                                                    onClick={() => handleUpdateRegistrationPaymentStatus(item, REGISTRATION_STATUS.PAYMENT_ERROR)}
-+                                                    disabled={registrationStatusUpdatingId === item.id || item.isPaymentError}
-+                                                >
-+                                                    <AlertCircle size={14} />
-+                                                    Erro
-+                                                </button>
-+                                            </div>
-+                                        )}
-+                                        {(item.paymentReviewNotes || item.paymentReviewedBy || item.paymentReviewedAt || item.syncError) && (
-+                                            <div className="registration-review-meta">
-+                                                {item.paymentReviewNotes && <div className="table-meta table-meta--tight">{copy.registrationsPanel.reviewNotes}: {item.paymentReviewNotes}</div>}
-+                                                {item.paymentReviewedBy && <div className="table-meta table-meta--tight">{copy.registrationsPanel.reviewedBy}: {item.paymentReviewedBy}</div>}
-+                                                {item.paymentReviewedAt && <div className="table-meta table-meta--tight">{copy.registrationsPanel.reviewedAt}: {formatEventDate(item.paymentReviewedAt)}</div>}
-+                                                {item.syncError && <div className="table-meta table-meta--tight registration-sync-error" style={{marginTop: '4px'}}>{copy.registrationsPanel.lastError}: {item.syncError}</div>}
-+                                            </div>
-+                                        )}
-+                                    </div>
-+                                </div>
-+                                );
-+                            })}
-                         </div>
-+
+                                     );
+                                 })}
+-                            </tbody>
+-                        </table>
+-                        </div>
++                            </div>
                      ) : (
                          <div className="panel-subtitle">{copy.registrationsPanel.noData}</div>
                      )}
-@@ -5640,47 +5627,6 @@ const Dashboard = () => {
-                 {activeSection === 'brackets' && (
-                 <section className="panel" id="brackets">
-                     <div className="panel-header">
--                        <div>
--                            <div className="panel-title">{copy.bracketsPanel.title}</div>
--                            <div className="panel-subtitle">{copy.bracketsPanel.subtitle}</div>
--                        </div>
--                        <div className="panel-actions">
--                            {events.length > 0 && (
--                                <select
--                                    className="input select-compact"
--                                    value={bracketEventId}
--                                    onChange={(event) => setBracketEventId(event.target.value)}
--                                    aria-label={copy.bracketsPanel.selectEventAria}
--                                >
--                                    <option value="">{copy.bracketsPanel.selectEvent}</option>
--                                    {events.map((event) => (
--                                        <option key={event.id} value={event.id}>{event.name}</option>
--                                    ))}
--                                </select>
--                            )}
--                            <select
--                                className="input select-compact"
--                                value={bracketMode}
--                                onChange={(event) => setBracketMode(event.target.value)}
--                                aria-label={copy.bracketsPanel.selectCategoryAria}
--                            >
--                                <option value="ALL">{copy.bracketsPanel.allCategories}</option>
--                                <option value="GI">{isEnglish ? 'GI (weight)' : 'GI (peso)'}</option>
--                                <option value="NO-GI">{isEnglish ? 'NO-GI (weight)' : 'NO-GI (peso)'}</option>
--                                <option value="ABS-GI">ABS GI</option>
--                                <option value="ABS-NO-GI">ABS NO-GI</option>
--                            </select>
--                            {canManagePanel && (
--                                <button
--                                    type="button"
--                                    className="btn btn-primary"
--                                    onClick={handleGenerateBrackets}
--                                    disabled={!events.length}
--                                >
--                                    <ClipboardList size={14} />
--                                    {copy.bracketsPanel.generate}
--                                </button>
--                            )}
-                             <button
-                                 type="button"
-                                 className="btn btn-secondary"
-@@ -5856,7 +5802,7 @@ const Dashboard = () => {
-                                         </div>
-                                     </div>
-                                     <div className="bracket-card__meta">
--                                        {copy.bracketsPanel.event}: {eventLabel} ┬À {copy.bracketsPanel.athletes}: {bracketAthletes.length}
-+                                        {copy.bracketsPanel.event}: {eventLabel} ÔÇó {copy.bracketsPanel.athletes}: {bracketAthletes.length}
-                                     </div>
-                                     <div className="bracket-grid">
-                                         <div className="bracket-matches">
-@@ -6200,6 +6146,260 @@ const Dashboard = () => {
-                     )}
-                 </section>
-                 )}
-+                {canManagePanel && activeSection === 'superFights' && (
-+                <section className="panel" id="superFights">
-+                    <div className="panel-header">
-+                        <div>
-+                            <div className="panel-title">Lutas Casadas</div>
-+                            <div className="panel-subtitle">Gerencie as lutas de disputa de cintur├úo.</div>
-+                        </div>
-+                    </div>
-+                    <div className="panel-content">
-+                        <div className="bracket-event-selector">
-+                            <label className="bracket-field">
-+                                <span>{copy.schedulePanel.selectEventLabel || 'Selecione o Campeonato'}</span>
-+                                <select
-+                                    className="input select-compact"
-+                                    value={superFightsEventId}
-+                                    onChange={(event) => setSuperFightsEventId(event.target.value)}
-+                                >
-+                                    <option value="">{copy.schedulePanel.selectEvent || 'Selecione'}</option>
-+                                    {events.filter(e => e.beltRegistrationEnabled).map((event) => (
-+                                        <option key={`sf-event-${event.id}`} value={event.id}>{event.name}</option>
-+                                    ))}
-+                                </select>
-+                            </label>
-+                        </div>
-+                        {!superFightsEventId && (
-+                            <div className="panel-subtitle">{copy.schedulePanel.selectEvent || 'Selecione um evento para continuar.'}</div>
-+                        )}
-+                        {superFightsEventId && (() => {
-+                            const sfEvent = events.find(e => e.id === superFightsEventId);
-+                            const superFightsList = sfEvent?.superFights || [];
-+
-+                            const BELT_OPTIONS = ['Branca', 'Cinza', 'Amarela', 'Laranja', 'Verde', 'Azul', 'Roxa', 'Marrom', 'Preta'];
-+                            const CATEGORY_OPTIONS = ['Mirim', 'Infantil', 'Infanto-Juvenil', 'Juvenil', 'Adulto', 'Master'];
-+
-+                            const handleSave = async () => {
-+                                const validFights = pendingSuperFights.filter(sf => sf.athlete1Name && sf.athlete2Name);
-+                                if (validFights.length === 0) {
-+                                    showFeedback('error', 'Preencha o nome dos atletas em pelo menos uma luta.');
-+                                    return;
-+                                }
-+                                try {
-+                                    const fightsToAdd = validFights.map(sf => ({ ...sf, id: crypto.randomUUID() }));
-+                                    const updatedPayload = { ...sfEvent, superFights: [...superFightsList, ...fightsToAdd] };
-+                                    const res = await eventAdminService.updateEvent(sfEvent.id, updatedPayload);
-+                                    if (!res.skipped) {
-+                                        showFeedback('success', fightsToAdd.length > 1 ? 'Lutas adicionadas com sucesso!' : 'Luta adicionada com sucesso!');
-+                                        updateEvent(sfEvent.id, updatedPayload);
-+                                        setPendingSuperFights([{
-+                                            id: crypto.randomUUID(),
-+                                            category: 'Adulto',
-+                                            athlete1Name: '', athlete1Belt: 'Branca', athlete1Academy: '',
-+                                            athlete2Name: '', athlete2Belt: 'Branca', athlete2Academy: '',
-+                                            scheduledTime: ''
-+                                        }]);
-+                                    }
-+                                } catch (error) {
-+                                    showFeedback('error', error.message || 'Erro ao adicionar luta.');
-+                                }
-+                            };
-+
-+                            const handleRemove = async (sfId) => {
-+                                try {
-+                                    const updatedPayload = { ...sfEvent, superFights: superFightsList.filter(sf => sf.id !== sfId) };
-+                                    const res = await eventAdminService.updateEvent(sfEvent.id, updatedPayload);
-+                                    if (!res.skipped) {
-+                                        showFeedback('success', 'Luta removida com sucesso!');
-+                                        updateEvent(sfEvent.id, updatedPayload);
-+                                    }
-+                                } catch (error) {
-+                                    showFeedback('error', error.message || 'Erro ao remover luta.');
-+                                }
-+                            };
-+
-+                            const handleAutoGenerate = async () => {
-+                                if (!autoGenerateOptions.startTime || !autoGenerateOptions.intervalMins) {
-+                                    showFeedback('error', 'Preencha o hor├írio de in├¡cio e o intervalo.');
-+                                    return;
-+                                }
-+                                
-+                                const categoryWeights = { 'Mirim': 1, 'Infantil': 2, 'Infanto-Juvenil': 3, 'Juvenil': 4, 'Adulto': 5, 'Master': 6 };
-+                                const beltWeights = { 'Branca': 0, 'Cinza': 1, 'Amarela': 2, 'Laranja': 3, 'Verde': 4, 'Azul': 5, 'Roxa': 6, 'Marrom': 7, 'Preta': 8 };
-+
-+                                const sortedList = [...superFightsList].sort((a, b) => {
-+                                    const catA = a.category || 'Adulto';
-+                                    const catB = b.category || 'Adulto';
-+                                    const isKidsA = categoryWeights[catA] < 5;
-+                                    const isKidsB = categoryWeights[catB] < 5;
-+
-+                                    if (isKidsA && !isKidsB) return -1;
-+                                    if (!isKidsA && isKidsB) return 1;
-+
-+                                    if (isKidsA && isKidsB) {
-+                                        return categoryWeights[catA] - categoryWeights[catB];
-+                                    }
-+
-+                                    // Para adultos/master: ordem de faixa decrescente (Preta -> Branca)
-+                                    const beltA = beltWeights[a.athlete1Belt || 'Branca'] || 0;
-+                                    const beltB = beltWeights[b.athlete1Belt || 'Branca'] || 0;
-+                                    return beltB - beltA;
-+                                });
-+
-+                                let [hours, mins] = autoGenerateOptions.startTime.split(':').map(Number);
-+                                let currentTime = new Date();
-+                                currentTime.setHours(hours, mins, 0, 0);
-+
-+                                const interval = parseInt(autoGenerateOptions.intervalMins, 10);
-+
-+                                const updatedList = sortedList.map(sf => {
-+                                    const h = String(currentTime.getHours()).padStart(2, '0');
-+                                    const m = String(currentTime.getMinutes()).padStart(2, '0');
-+                                    const newTime = `${h}:${m}`;
-+                                    currentTime.setMinutes(currentTime.getMinutes() + interval);
-+                                    return { ...sf, scheduledTime: newTime };
-+                                });
-+
-+                                try {
-+                                    const updatedPayload = { ...sfEvent, superFights: updatedList };
-+                                    const res = await eventAdminService.updateEvent(sfEvent.id, updatedPayload);
-+                                    if (!res.skipped) {
-+                                        showFeedback('success', 'Hor├írios gerados com sucesso!');
-+                                        updateEvent(sfEvent.id, updatedPayload);
-+                                    }
-+                                } catch (error) {
-+                                    showFeedback('error', error.message || 'Erro ao salvar hor├írios gerados.');
-+                                }
-+                            };
-+
-+                            const handleTogglePublishSuperFights = async () => {
-+                                try {
-+                                    const validFights = pendingSuperFights.filter(sf => sf.athlete1Name && sf.athlete2Name);
-+                                    const fightsToAdd = validFights.map(sf => ({ ...sf, id: crypto.randomUUID() }));
-+                                    
-+                                    const updatedPayload = { 
-+                                        ...sfEvent, 
-+                                        superFights: [...superFightsList, ...fightsToAdd],
-+                                        superFightsPublished: !sfEvent.superFightsPublished 
-+                                    };
-+                                    const res = await eventAdminService.updateEvent(sfEvent.id, updatedPayload);
-+                                    if (!res.skipped) {
-+                                        showFeedback('success', sfEvent.superFightsPublished ? 'Lutas despublicadas com sucesso!' : 'Lutas salvas e publicadas com sucesso!');
-+                                        updateEvent(sfEvent.id, updatedPayload);
-+                                        if (fightsToAdd.length > 0) {
-+                                            setPendingSuperFights([{
-+                                                id: crypto.randomUUID(),
-+                                                category: 'Adulto',
-+                                                athlete1Name: '', athlete1Belt: 'Branca', athlete1Academy: '',
-+                                                athlete2Name: '', athlete2Belt: 'Branca', athlete2Academy: '',
-+                                                scheduledTime: ''
-+                                            }]);
-+                                        }
-+                                    }
-+                                } catch (error) {
-+                                    showFeedback('error', error.message || 'Erro ao alterar visibilidade das lutas.');
-+                                }
-+                            };
-+
-+                            return (
-+                                <div className="bracket-schedule">
-+                                    <div className="bracket-schedule__controls schedule-manual-form" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', marginBottom: '20px' }}>
-+                                        {pendingSuperFights.map((fight, index) => (
-+                                            <div key={fight.id} style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', position: 'relative' }}>
-+                                                {pendingSuperFights.length > 1 && (
-+                                                    <button type="button" onClick={() => setPendingSuperFights(pendingSuperFights.filter(f => f.id !== fight.id))} style={{ position: 'absolute', top: '10px', right: '10px', background: 'transparent', border: 'none', color: '#ff4444', cursor: 'pointer' }}>├ó┼ôÔÇô</button>
-+                                                )}
-+                                                <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end' }}>
-+                                                    <label className="bracket-field" style={{ flex: 1 }}>
-+                                                        <span>Categoria da Luta</span>
-+                                                        <select className="input select-compact" value={fight.category} onChange={e => setPendingSuperFights(pendingSuperFights.map(f => f.id === fight.id ? {...f, category: e.target.value} : f))}>
-+                                                            {CATEGORY_OPTIONS.map(opt => <option key={`cat-${opt}`} value={opt}>{opt}</option>)}
-+                                                        </select>
-+                                                    </label>
-+                                                    <label className="bracket-field" style={{ flex: 1 }}>
-+                                                        <span>Hor├írio Manual (Opcional)</span>
-+                                                        <input className="input" placeholder="ex: 15:30" value={fight.scheduledTime} onChange={e => setPendingSuperFights(pendingSuperFights.map(f => f.id === fight.id ? {...f, scheduledTime: e.target.value} : f))} />
-+                                                    </label>
+@@ -6989,311 +7040,534 @@ const Dashboard = () => {
+                             initial={{ opacity: 0, y: 12 }}
+                             animate={{ opacity: 1, y: 0 }}
+                             exit={{ opacity: 0, y: 12 }}
++                            style={{ padding: 0 }}
+                         >
+-                            <div className="modal-panel">
+-                                <div className="modal-header">
+-                                    <div className="modal-title">{copy.modalEventEdit.title}</div>
+-                                    <button type="button" className="btn btn-ghost" onClick={handleCloseEditEvent}>
+-                                        {copy.common.close}
+-                                    </button>
++                            <div className="modal-panel" style={{ padding: 0, overflow: 'hidden', width: '100vw', height: '100vh', maxWidth: '100vw', maxHeight: '100vh', borderRadius: 0 }}>
++                                {/* ÔöÇÔöÇ Header ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ */}
++                                <div style={{
++                                    background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
++                                    borderBottom: '1px solid rgba(255,255,255,0.08)',
++                                    padding: '32px 40px 0 40px',
++                                }}>
++                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
++                                        <div>
++                                            <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.12em', color: 'var(--brand-primary,#00c2cb)', textTransform: 'uppercase', marginBottom: '6px' }}>
++                                                Genesis Sports ┬À Painel Admin
++                                            </div>
++                                            <div className="modal-title" style={{ fontSize: '28px', margin: 0 }}>
++                                                {copy.modalEventEdit.title}
++                                            </div>
++                                            {eventEditForm.name && (
++                                                <div style={{ fontSize: '13px', color: '#94a3b8', marginTop: '4px' }}>
++                                                    {eventEditForm.name}
 +                                                </div>
++                                            )}
++                                        </div>
++                                        <button type="button" className="btn btn-ghost" onClick={handleCloseEditEvent} style={{ alignSelf: 'flex-start' }}>
++                                            {copy.common.close}
++                                        </button>
++                                    </div>
++
++                                    {/* Tab bar */}
++                                    <div style={{ display: 'flex', gap: '4px' }}>
++                                        {[
++                                            { id: 'info', label: '­ƒôï Informa├º├Áes B├ísicas' },
++                                            { id: 'registration', label: '­ƒÆ░ Inscri├º├Áes e Valores' },
++                                            { id: 'documents', label: 'ÔÜû´©Å Tabelas e Documentos' },
++                                        ].map(tab => (
++                                            <button
++                                                key={tab.id}
++                                                type="button"
++                                                onClick={() => setEventModalTab(tab.id)}
++                                                style={{
++                                                    padding: '12px 24px',
++                                                    fontSize: '15px',
++                                                    fontWeight: eventModalTab === tab.id ? 700 : 500,
++                                                    color: eventModalTab === tab.id ? 'var(--brand-primary,#00c2cb)' : '#64748b',
++                                                    background: 'transparent',
++                                                    border: 'none',
++                                                    borderBottom: eventModalTab === tab.id ? '3px solid var(--brand-primary,#00c2cb)' : '3px solid transparent',
++                                                    borderRadius: '0',
++                                                    cursor: 'pointer',
++                                                    transition: 'all 0.15s',
++                                                    whiteSpace: 'nowrap',
++                                                }}
++                                            >
++                                                {tab.label}
++                                            </button>
++                                        ))}
++                                    </div>
+                                 </div>
++
++                                {/* ÔöÇÔöÇ Body ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ */}
+                                 {eventEditError && (
+-                                    <div className="login-error" role="alert">
++                                    <div className="login-error" role="alert" style={{ margin: '16px 32px 0 32px', borderRadius: '10px' }}>
+                                         <AlertCircle size={18} />
+                                         <p>{eventEditError}</p>
+                                     </div>
+                                 )}
++
+                                 <form onSubmit={handleUpdateEvent}>
+-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+-                                        <div>
+-                                            <label className="table-meta">{copy.modalEventEdit.eventName}</label>
+-                                            <input
+-                                                className="input"
+-                                                type="text"
+-                                                value={eventEditForm.name}
+-                                                onChange={(event) => setEventEditForm({ ...eventEditForm, name: event.target.value })}
+-                                                placeholder={copy.modalEventEdit.eventNamePlaceholder}
+-                                                required
+-                                            />
+-                                        </div>
+-                                        <div className="form-grid">
+-                                            <div>
+-                                                <label className="table-meta">{copy.modalEventEdit.date}</label>
+-                                                <input
+-                                                    className="input"
+-                                                    type="date"
+-                                                    value={eventEditForm.date}
+-                                                    onChange={(event) => setEventEditForm({ ...eventEditForm, date: event.target.value })}
+-                                                />
+-                                            </div>
+-                                            <div>
+-                                                <label className="table-meta">{copy.modalEventEdit.location}</label>
+-                                                <input
+-                                                    className="input"
+-                                                    type="text"
+-                                                    value={eventEditForm.location}
+-                                                    onChange={(event) => setEventEditForm({ ...eventEditForm, location: event.target.value })}
+-                                                    placeholder={copy.modalEventEdit.locationPlaceholder}
+-                                                />
+-                                            </div>
+-                                        </div>
+-                                        <div>
+-                                            <label className="table-meta">{copy.modalEventEdit.posterUrl}</label>
+-                                            <input
+-                                                className="input"
+-                                                type="text"
+-                                                value={eventEditForm.posterUrl}
+-                                                onChange={handleEventEditPosterUrlChange}
+-                                                placeholder={copy.modalEventEdit.posterUrlPlaceholder}
+-                                            />
+-                                        </div>
+-                                        <div>
+-                                            <label className="table-meta">{copy.modalEventEdit.posterFile}</label>
+-                                            <input
+-                                                className="input"
+-                                                type="file"
+-                                                accept="image/*"
+-                                                onChange={handleEventEditPosterFile}
+-                                            />
+-                                            <div className="table-meta table-meta--tight">{copy.modalEventEdit.posterCompressionHint}</div>
+-                                            {eventPosterStoredSizeBytes > 0 && (
+-                                                <div className="table-meta table-meta--tight">
+-                                                    {copy.modalEventEdit.posterCompressedSize}: {formatBytes(eventPosterStoredSizeBytes)}
++                                    <div style={{ padding: '32px 40px', minHeight: '520px', maxHeight: '65vh', overflowY: 'auto' }}>
++
++                                        {/* ÔöÇÔöÇ TAB 1: Informa├º├Áes B├ísicas ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ */}
++                                        {eventModalTab === 'info' && (
++                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
++                                                <div>
++                                                    <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px', display: 'block', color: '#94a3b8' }}>
++                                                        NOME DO EVENTO *
++                                                    </label>
++                                                    <input
++                                                        className="input"
++                                                        type="text"
++                                                        value={eventEditForm.name}
++                                                        onChange={(event) => setEventEditForm({ ...eventEditForm, name: event.target.value })}
++                                                        placeholder={copy.modalEventEdit.eventNamePlaceholder}
++                                                        required
++                                                        style={{ fontSize: '16px', padding: '14px 16px', fontWeight: 600 }}
++                                                    />
+                                                 </div>
+-                                            )}
+-                                        </div>
+-                                        {eventEditForm.posterUrl && (
+-                                            <div>
+-                                                <img
+-                                                    src={eventEditForm.posterUrl}
+-                                                    alt={eventEditForm.name || 'Poster preview'}
+-                                                    style={{
+-                                                        width: '100%',
+-                                                        maxHeight: '220px',
+-                                                        objectFit: 'cover',
+-                                                        borderRadius: '10px',
+-                                                        border: '1px solid var(--border)'
+-                                                    }}
+-                                                />
+-                                            </div>
+-                                        )}
+-                                        <div>
+-                                            <label className="table-meta">{copy.modalEventEdit.registrationUrl}</label>
+-                                            <input
+-                                                className="input"
+-                                                type="text"
+-                                                value={eventEditForm.registrationUrl}
+-                                                onChange={(event) => setEventEditForm({ ...eventEditForm, registrationUrl: event.target.value })}
+-                                                placeholder={copy.modalEventEdit.registrationUrlPlaceholder}
+-                                            />
+-                                        </div>
+-                                        <div className="form-grid">
+-                                            <div>
+-                                                <label className="table-meta">{copy.modalEventEdit.weightTableGiUrl}</label>
+-                                                <input
+-                                                    className="input"
+-                                                    type="text"
+-                                                    value={eventEditForm.weightTableGiUrl}
+-                                                    onChange={(event) => setEventEditForm({ ...eventEditForm, weightTableGiUrl: event.target.value })}
+-                                                    placeholder={copy.modalEventEdit.weightTableGiUrlPlaceholder}
+-                                                />
+-                                            </div>
+-                                            <div>
+-                                                <label className="table-meta">{copy.modalEventEdit.weightTableNoGiUrl}</label>
+-                                                <input
+-                                                    className="input"
+-                                                    type="text"
+-                                                    value={eventEditForm.weightTableNoGiUrl}
+-                                                    onChange={(event) => setEventEditForm({ ...eventEditForm, weightTableNoGiUrl: event.target.value })}
+-                                                    placeholder={copy.modalEventEdit.weightTableNoGiUrlPlaceholder}
+-                                                />
+-                                            </div>
+-                                        </div>
+-                                        <div>
+-                                            <label className="table-meta">{copy.modalEventEdit.circularUrl}</label>
+-                                            <input
+-                                                className="input"
+-                                                type="text"
+-                                                value={eventEditForm.circularUrl}
+-                                                onChange={(event) => setEventEditForm({ ...eventEditForm, circularUrl: event.target.value })}
+-                                                placeholder={copy.modalEventEdit.circularUrlPlaceholder}
+-                                            />
+-                                        </div>
+-                                        <div className="form-grid">
+-                                            <div>
+-                                                <label className="table-meta">{copy.modalEventEdit.weightTableGiOptions}</label>
+-                                                <div className="event-ocr-actions">
+-                                                    <button
+-                                                        type="button"
+-                                                        className="btn btn-secondary btn-sm"
+-                                                        onClick={() => handleRunWeightTableOcr('GI')}
+-                                                        disabled={Boolean(eventWeightOcrMode)}
+-                                                    >
+-                                                        {eventWeightOcrMode === 'GI'
+-                                                            ? copy.modalEventEdit.weightTableOcrRunning
+-                                                            : copy.modalEventEdit.weightTableOcrFromUrl}
+-                                                    </button>
+-                                                    <button
+-                                                        type="button"
+-                                                        className="btn btn-secondary btn-sm"
+-                                                        onClick={() => weightTableGiOcrFileRef.current?.click()}
+-                                                        disabled={Boolean(eventWeightOcrMode)}
+-                                                    >
+-                                                        {copy.modalEventEdit.weightTableOcrFromFile}
+-                                                    </button>
 +
 +                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
 +                                                    <div>
-+                                                        <label className="bracket-field" style={{ marginBottom: '8px' }}><span>Atleta 1</span></label>
-+                                                        <input className="input" placeholder="Nome" value={fight.athlete1Name} onChange={e => setPendingSuperFights(pendingSuperFights.map(f => f.id === fight.id ? {...f, athlete1Name: e.target.value} : f))} style={{ marginBottom: '8px' }} />
-+                                                        <select className="input select-compact" value={fight.athlete1Belt} onChange={e => setPendingSuperFights(pendingSuperFights.map(f => f.id === fight.id ? {...f, athlete1Belt: e.target.value} : f))} style={{ marginBottom: '8px' }}>
-+                                                            {BELT_OPTIONS.map(b => <option key={`b1-${b}`} value={b}>{b}</option>)}
-+                                                        </select>
-+                                                        <input className="input" placeholder="Academia" value={fight.athlete1Academy} onChange={e => setPendingSuperFights(pendingSuperFights.map(f => f.id === fight.id ? {...f, athlete1Academy: e.target.value} : f))} />
++                                                        <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px', display: 'block', color: '#94a3b8' }}>
++                                                            DATA DO EVENTO
++                                                        </label>
++                                                        <input
++                                                            className="input"
++                                                            type="date"
++                                                            value={eventEditForm.date}
++                                                            onChange={(event) => setEventEditForm({ ...eventEditForm, date: event.target.value })}
++                                                            style={{ fontSize: '15px' }}
++                                                        />
 +                                                    </div>
 +                                                    <div>
-+                                                        <label className="bracket-field" style={{ marginBottom: '8px' }}><span>Atleta 2</span></label>
-+                                                        <input className="input" placeholder="Nome" value={fight.athlete2Name} onChange={e => setPendingSuperFights(pendingSuperFights.map(f => f.id === fight.id ? {...f, athlete2Name: e.target.value} : f))} style={{ marginBottom: '8px' }} />
-+                                                        <select className="input select-compact" value={fight.athlete2Belt} onChange={e => setPendingSuperFights(pendingSuperFights.map(f => f.id === fight.id ? {...f, athlete2Belt: e.target.value} : f))} style={{ marginBottom: '8px' }}>
-+                                                            {BELT_OPTIONS.map(b => <option key={`b2-${b}`} value={b}>{b}</option>)}
-+                                                        </select>
-+                                                        <input className="input" placeholder="Academia" value={fight.athlete2Academy} onChange={e => setPendingSuperFights(pendingSuperFights.map(f => f.id === fight.id ? {...f, athlete2Academy: e.target.value} : f))} />
++                                                        <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px', display: 'block', color: '#94a3b8' }}>
++                                                            LOCAL / ARENA
++                                                        </label>
++                                                        <input
++                                                            className="input"
++                                                            type="text"
++                                                            value={eventEditForm.location}
++                                                            onChange={(event) => setEventEditForm({ ...eventEditForm, location: event.target.value })}
++                                                            placeholder={copy.modalEventEdit.locationPlaceholder}
++                                                            style={{ fontSize: '15px' }}
++                                                        />
 +                                                    </div>
 +                                                </div>
-+                                            </div>
-+                                        ))}
 +
-+                                        <div style={{ display: 'flex', gap: '16px', marginTop: '8px' }}>
-+                                            <button type="button" className="btn btn-secondary" onClick={() => setPendingSuperFights([...pendingSuperFights, { id: crypto.randomUUID(), category: 'Adulto', athlete1Name: '', athlete1Belt: 'Branca', athlete1Academy: '', athlete2Name: '', athlete2Belt: 'Branca', athlete2Academy: '', scheduledTime: '' }])}>
-+                                                + Adicionar Mais Lutas
-+                                            </button>
-+                                            <button type="button" className="btn btn-primary" onClick={handleSave} style={{ flex: 1 }}>
-+                                                Salvar Lutas Casadas
++                                                <div>
++                                                    <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px', display: 'block', color: '#94a3b8' }}>
++                                                        DESCRI├ç├âO DO EVENTO (Informa├º├Áes Gerais)
++                                                    </label>
++                                                    <textarea
++                                                        className="input"
++                                                        rows="4"
++                                                        value={eventEditForm.eventDescription || ''}
++                                                        onChange={(event) => setEventEditForm({ ...eventEditForm, eventDescription: event.target.value })}
++                                                        placeholder="Ex: Regras da IBJJF, premia├º├Áes especiais em dinheiro, etc..."
++                                                        style={{ fontSize: '15px', resize: 'vertical' }}
++                                                    ></textarea>
++                                                </div>
++
++                                                <div>
++                                                    <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px', display: 'block', color: '#94a3b8' }}>
++                                                        URL DA IMAGEM DO CARTAZ (opcional)
++                                                    </label>
+                                                     <input
+-                                                        ref={weightTableGiOcrFileRef}
++                                                        className="input"
++                                                        type="text"
++                                                        value={eventEditForm.posterUrl}
++                                                        onChange={handleEventEditPosterUrlChange}
++                                                        placeholder={copy.modalEventEdit.posterUrlPlaceholder}
++                                                    />
++                                                </div>
++
++                                                <div>
++                                                    <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px', display: 'block', color: '#94a3b8' }}>
++                                                        ENVIAR ARQUIVO DO CARTAZ
++                                                    </label>
++                                                    <input
++                                                        className="input"
+                                                         type="file"
+-                                                        accept=".pdf,image/*"
+-                                                        style={{ display: 'none' }}
+-                                                        onChange={(event) => handleWeightTableOcrFileChange('GI', event)}
++                                                        accept="image/*"
++                                                        onChange={handleEventEditPosterFile}
+                                                     />
++                                                    <div className="table-meta table-meta--tight">{copy.modalEventEdit.posterCompressionHint}</div>
++                                                    {eventPosterStoredSizeBytes > 0 && (
++                                                        <div className="table-meta table-meta--tight">
++                                                            {copy.modalEventEdit.posterCompressedSize}: {formatBytes(eventPosterStoredSizeBytes)}
++                                                        </div>
++                                                    )}
+                                                 </div>
+-                                                {eventWeightOcrMode === 'GI' && (
+-                                                    <div className="table-meta table-meta--tight">
+-                                                        {copy.modalEventEdit.weightTableOcrProgress(eventWeightOcrProgress)}
++
++                                                {eventEditForm.posterUrl && (
++                                                    <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', maxHeight: '280px' }}>
++                                                        <img
++                                                            src={eventEditForm.posterUrl}
++                                                            alt={eventEditForm.name || 'Poster preview'}
++                                                            style={{ width: '100%', maxHeight: '280px', objectFit: 'cover', display: 'block' }}
++                                                        />
+                                                     </div>
+                                                 )}
+-                                                <textarea
+-                                                    className="input"
+-                                                    value={eventEditForm.weightTableGiOptions}
+-                                                    onChange={(event) => setEventEditForm({ ...eventEditForm, weightTableGiOptions: event.target.value })}
+-                                                    placeholder={copy.modalEventEdit.weightTableGiOptionsPlaceholder}
+-                                                    rows={4}
+-                                                />
+                                             </div>
+-                                            <div>
+-                                                <label className="table-meta">{copy.modalEventEdit.weightTableNoGiOptions}</label>
+-                                                <div className="event-ocr-actions">
+-                                                    <button
+-                                                        type="button"
+-                                                        className="btn btn-secondary btn-sm"
+-                                                        onClick={() => handleRunWeightTableOcr('NO-GI')}
+-                                                        disabled={Boolean(eventWeightOcrMode)}
+-                                                    >
+-                                                        {eventWeightOcrMode === 'NO-GI'
+-                                                            ? copy.modalEventEdit.weightTableOcrRunning
+-                                                            : copy.modalEventEdit.weightTableOcrFromUrl}
+-                                                    </button>
+-                                                    <button
+-                                                        type="button"
+-                                                        className="btn btn-secondary btn-sm"
+-                                                        onClick={() => weightTableNoGiOcrFileRef.current?.click()}
+-                                                        disabled={Boolean(eventWeightOcrMode)}
+-                                                    >
+-                                                        {copy.modalEventEdit.weightTableOcrFromFile}
+-                                                    </button>
++                                        )}
++
++                                        {/* ÔöÇÔöÇ TAB 2: Inscri├º├Áes e Valores ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ */}
++                                        {eventModalTab === 'registration' && (
++                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
++
++                                                {/* Toggle switches */}
++                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
++                                                    {[
++                                                        {
++                                                            label: 'Inscri├º├Áes Abertas',
++                                                            desc: 'Permite que atletas se inscrevam neste campeonato.',
++                                                            key: 'registrationOpen',
++                                                            icon: '­ƒƒó',
++                                                            activeColor: '#22c55e',
++                                                        },
++                                                        {
++                                                            label: 'Inscri├º├úo pelo Sistema Genesis',
++                                                            desc: 'Usa o fluxo de pagamento interno (desabilite para redirecionar para URL externa).',
++                                                            key: 'internalRegistration',
++                                                            icon: '­ƒöù',
++                                                            activeColor: 'var(--brand-primary,#00c2cb)',
++                                                        }
++                                                    ].map(toggle => (
++                                                        <div key={toggle.key} style={{
++                                                            background: 'rgba(255,255,255,0.03)',
++                                                            border: `1px solid ${eventEditForm[toggle.key] ? toggle.activeColor + '44' : 'rgba(255,255,255,0.06)'}`,
++                                                            borderRadius: '12px',
++                                                            padding: '20px',
++                                                            cursor: 'pointer',
++                                                            transition: 'all 0.2s',
++                                                        }} onClick={() => setEventEditForm(f => ({ ...f, [toggle.key]: !f[toggle.key] }))}>
++                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
++                                                                <div>
++                                                                    <div style={{ fontSize: '15px', fontWeight: 700, color: '#e2e8f0', marginBottom: '6px' }}>
++                                                                        {toggle.icon} {toggle.label}
++                                                                    </div>
++                                                                    <div style={{ fontSize: '12px', color: '#64748b', lineHeight: 1.5 }}>
++                                                                        {toggle.desc}
++                                                                    </div>
++                                                                </div>
++                                                                {/* Toggle visual */}
++                                                                <div style={{
++                                                                    flexShrink: 0,
++                                                                    width: '46px', height: '26px',
++                                                                    borderRadius: '13px',
++                                                                    background: eventEditForm[toggle.key] ? toggle.activeColor : '#334155',
++                                                                    position: 'relative',
++                                                                    transition: 'background 0.2s',
++                                                                }}>
++                                                                    <div style={{
++                                                                        position: 'absolute',
++                                                                        top: '3px',
++                                                                        left: eventEditForm[toggle.key] ? '23px' : '3px',
++                                                                        width: '20px', height: '20px',
++                                                                        borderRadius: '50%',
++                                                                        background: '#fff',
++                                                                        transition: 'left 0.2s',
++                                                                        boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
++                                                                    }} />
++                                                                </div>
++                                                            </div>
++                                                        </div>
++                                                    ))}
++                                                </div>
++
++                                                {/* External registration URL (only when not internal) */}
++                                                {!eventEditForm.internalRegistration && (
++                                                    <div>
++                                                        <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px', display: 'block', color: '#94a3b8' }}>
++                                                            URL DE INSCRI├ç├âO EXTERNA (obrigat├│rio se modo externo)
++                                                        </label>
++                                                        <input
++                                                            className="input"
++                                                            type="text"
++                                                            value={eventEditForm.registrationUrl}
++                                                            onChange={(event) => setEventEditForm({ ...eventEditForm, registrationUrl: event.target.value })}
++                                                            placeholder={copy.modalEventEdit.registrationUrlPlaceholder}
++                                                        />
++                                                    </div>
++                                                )}
++
++                                                {/* PIX Key */}
++                                                <div>
++                                                    <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px', display: 'block', color: '#94a3b8' }}>
++                                                        CHAVE PIX (respons├ível pelo campeonato) *
++                                                    </label>
+                                                     <input
+-                                                        ref={weightTableNoGiOcrFileRef}
+-                                                        type="file"
+-                                                        accept=".pdf,image/*"
+-                                                        style={{ display: 'none' }}
+-                                                        onChange={(event) => handleWeightTableOcrFileChange('NO-GI', event)}
++                                                        className="input"
++                                                        type="text"
++                                                        value={eventEditForm.pixKey}
++                                                        onChange={(event) => setEventEditForm({ ...eventEditForm, pixKey: event.target.value })}
++                                                        placeholder={copy.modalEventEdit.pixKeyPlaceholder}
++                                                        required
++                                                        style={{ fontSize: '15px' }}
+                                                     />
+                                                 </div>
+-                                                {eventWeightOcrMode === 'NO-GI' && (
+-                                                    <div className="table-meta table-meta--tight">
+-                                                        {copy.modalEventEdit.weightTableOcrProgress(eventWeightOcrProgress)}
++
++                                                {/* Price cards */}
++                                                <div>
++                                                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#94a3b8', marginBottom: '14px', letterSpacing: '0.08em' }}>
++                                                        TABELA DE TAXAS DE INSCRI├ç├âO (R$)
+                                                     </div>
+-                                                )}
+-                                                <textarea
+-                                                    className="input"
+-                                                    value={eventEditForm.weightTableNoGiOptions}
+-                                                    onChange={(event) => setEventEditForm({ ...eventEditForm, weightTableNoGiOptions: event.target.value })}
+-                                                    placeholder={copy.modalEventEdit.weightTableNoGiOptionsPlaceholder}
+-                                                    rows={4}
+-                                                />
+-                                            </div>
+-                                        </div>
+-                                        <div>
+-                                            <label className="table-meta">{copy.modalEventEdit.pixKey}</label>
+-                                            <input
+-                                                className="input"
+-                                                type="text"
+-                                                value={eventEditForm.pixKey}
+-                                                onChange={(event) => setEventEditForm({ ...eventEditForm, pixKey: event.target.value })}
+-                                                placeholder={copy.modalEventEdit.pixKeyPlaceholder}
+-                                                required
+-                                            />
+-                                        </div>
+-                                        <div className="form-grid">
+-                                            <div>
+-                                                <label className="table-meta">{copy.modalEventEdit.feeUnder15}</label>
+-                                                <input
+-                                                    className="input"
+-                                                    type="number"
+-                                                    min="0"
+-                                                    step="0.01"
+-                                                    value={eventEditForm.feeUnder15}
+-                                                    onChange={(event) => setEventEditForm({ ...eventEditForm, feeUnder15: event.target.value })}
+-                                                    required
+-                                                />
+-                                            </div>
+-                                            <div>
+-                                                <label className="table-meta">{copy.modalEventEdit.feeOver15}</label>
+-                                                <input
+-                                                    className="input"
+-                                                    type="number"
+-                                                    min="0"
+-                                                    step="0.01"
+-                                                    value={eventEditForm.feeOver15}
+-                                                    onChange={(event) => setEventEditForm({ ...eventEditForm, feeOver15: event.target.value })}
+-                                                    required
+-                                                />
+-                                            </div>
+-                                            <div>
+-                                                <label className="table-meta">{copy.modalEventEdit.feeCombo}</label>
+-                                                <input
+-                                                    className="input"
+-                                                    type="number"
+-                                                    min="0"
+-                                                    step="0.01"
+-                                                    value={eventEditForm.feeCombo}
+-                                                    onChange={(event) => setEventEditForm({ ...eventEditForm, feeCombo: event.target.value })}
+-                                                    required
+-                                                />
++                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px' }}>
++                                                        {[
++                                                            { label: 'Sub-15 (at├® 14 anos)', key: 'feeUnder15', emoji: '­ƒºÆ', color: '#3b82f6' },
++                                                            { label: 'Adulto (15+ anos)', key: 'feeOver15', emoji: '­ƒÑï', color: '#00c2cb' },
++                                                            { label: 'Combo (Gi + No-Gi)', key: 'feeCombo', emoji: '­ƒÄ»', color: '#f59e0b' },
++                                                            { label: 'Absoluto (+valor base)', key: 'feeAbsolute', emoji: '­ƒÅå', color: '#a78bfa' },
++                                                        ].map(fee => (
++                                                            <div key={fee.key} style={{
++                                                                background: `${fee.color}11`,
++                                                                border: `1px solid ${fee.color}33`,
++                                                                borderRadius: '12px',
++                                                                padding: '16px',
++                                                            }}>
++                                                                <div style={{ fontSize: '20px', marginBottom: '8px' }}>{fee.emoji}</div>
++                                                                <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '10px', lineHeight: 1.4, fontWeight: 600 }}>
++                                                                    {fee.label}
++                                                                </div>
++                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
++                                                                    <span style={{ color: '#64748b', fontSize: '13px', fontWeight: 700 }}>R$</span>
++                                                                    <input
++                                                                        className="input"
++                                                                        type="number"
++                                                                        min="0"
++                                                                        step="0.01"
++                                                                        value={eventEditForm[fee.key]}
++                                                                        onChange={(event) => setEventEditForm({ ...eventEditForm, [fee.key]: event.target.value })}
++                                                                        required
++                                                                        style={{
++                                                                            fontSize: '20px',
++                                                                            fontWeight: 800,
++                                                                            color: fee.color,
++                                                                            background: 'transparent',
++                                                                            border: 'none',
++                                                                            borderBottom: `2px solid ${fee.color}55`,
++                                                                            borderRadius: '0',
++                                                                            padding: '4px 0',
++                                                                            width: '100%',
++                                                                        }}
++                                                                    />
++                                                                </div>
++                                                            </div>
++                                                        ))}
++                                                    </div>
++                                                </div>
++
++                                                {/* Batches (Lotes) */}
++                                                <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '24px' }}>
++                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
++                                                        <div style={{ fontSize: '16px', fontWeight: 700, color: '#e2e8f0' }}>Lotes de Inscri├º├úo</div>
++                                                        <button type="button" className="btn btn-secondary btn-sm" onClick={handleAddBatchEdit}>+ Adicionar Lote</button>
++                                                    </div>
++                                                    
++                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
++                                                        {(eventEditForm.batches || []).map((batch, index) => (
++                                                            <div key={batch.id} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', padding: '20px' }}>
++                                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
++                                                                    <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--brand-primary,#00c2cb)' }}>Lote {index + 1}</div>
++                                                                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => handleRemoveBatchEdit(index)} style={{ color: '#ef4444' }}>Remover</button>
++                                                                </div>
++                                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '20px' }}>
++                                                                    <div>
++                                                                        <label className="table-meta" style={{ fontSize: '11px', marginBottom: '6px', display: 'block' }}>Nome do Lote</label>
++                                                                        <input className="input" type="text" value={batch.name} onChange={e => handleBatchChangeEdit(index, 'name', e.target.value)} required />
++                                                                    </div>
++                                                                    <div>
++                                                                        <label className="table-meta" style={{ fontSize: '11px', marginBottom: '6px', display: 'block' }}>In├¡cio (opcional)</label>
++                                                                        <input className="input" type="datetime-local" value={batch.startDate || ''} onChange={e => handleBatchChangeEdit(index, 'startDate', e.target.value)} />
++                                                                    </div>
++                                                                    <div>
++                                                                        <label className="table-meta" style={{ fontSize: '11px', marginBottom: '6px', display: 'block' }}>Fim (opcional)</label>
++                                                                        <input className="input" type="datetime-local" value={batch.endDate || ''} onChange={e => handleBatchChangeEdit(index, 'endDate', e.target.value)} />
++                                                                    </div>
++                                                                </div>
++                                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px' }}>
++                                                                    {[
++                                                                        { label: 'Sub-15', key: 'feeUnder15', color: '#3b82f6' },
++                                                                        { label: 'Adulto', key: 'feeOver15', color: '#00c2cb' },
++                                                                        { label: 'Combo', key: 'feeCombo', color: '#f59e0b' },
++                                                                        { label: 'Absoluto', key: 'feeAbsolute', color: '#a78bfa' },
++                                                                    ].map(fee => (
++                                                                        <div key={fee.key} style={{ background: `${fee.color}11`, border: `1px solid ${fee.color}33`, borderRadius: '8px', padding: '12px' }}>
++                                                                            <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '8px', fontWeight: 600 }}>{fee.label}</div>
++                                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
++                                                                                <span style={{ color: '#64748b', fontSize: '14px', fontWeight: 700 }}>R$</span>
++                                                                                <input className="input" type="number" min="0" step="0.01" value={batch[fee.key]} onChange={e => handleBatchChangeEdit(index, fee.key, e.target.value)} required style={{ fontSize: '16px', fontWeight: 700, color: fee.color, background: 'transparent', border: 'none', borderBottom: `2px solid ${fee.color}55`, borderRadius: 0, padding: '2px 0', width: '100%' }} />
++                                                                            </div>
++                                                                        </div>
++                                                                    ))}
++                                                                </div>
++                                                            </div>
++                                                        ))}
++                                                    </div>
++                                                </div>
+                                             </div>
+-                                            <div>
+-                                                <label className="table-meta">{copy.modalEventEdit.feeAbsolute}</label>
+-                                                <input
+-                                                    className="input"
+-                                                    type="number"
+-                                                    min="0"
+-                                                    step="0.01"
+-                                                    value={eventEditForm.feeAbsolute}
+-                                                    onChange={(event) => setEventEditForm({ ...eventEditForm, feeAbsolute: event.target.value })}
+-                                                    required
+-                                                />
++                                        )}
++
++                                        {/* ÔöÇÔöÇ TAB 3: Tabelas e Documentos ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ */}
++                                        {eventModalTab === 'documents' && (
++                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
++
++                                                {/* Weight tables */}
++                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
++                                                    {/* GI */}
++                                                    <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', padding: '20px' }}>
++                                                        <div style={{ fontSize: '14px', fontWeight: 700, color: '#e2e8f0', marginBottom: '16px' }}>
++                                                            ­ƒÑï Tabela de Peso ÔÇö GI (com kimono)
++                                                        </div>
++                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
++                                                            <div>
++                                                                <label className="table-meta" style={{ fontSize: '11px', marginBottom: '6px', display: 'block' }}>URL da Tabela (imagem/PDF)</label>
++                                                                <input
++                                                                    className="input"
++                                                                    type="text"
++                                                                    value={eventEditForm.weightTableGiUrl}
++                                                                    onChange={(event) => setEventEditForm({ ...eventEditForm, weightTableGiUrl: event.target.value })}
++                                                                    placeholder={copy.modalEventEdit.weightTableGiUrlPlaceholder}
++                                                                />
++                                                            </div>
++                                                            <div>
++                                                                <label className="table-meta" style={{ fontSize: '11px', marginBottom: '6px', display: 'block' }}>
++                                                                    {copy.modalEventEdit.weightTableGiOptions}
++                                                                </label>
++                                                                <div className="event-ocr-actions" style={{ marginBottom: '8px' }}>
++                                                                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleRunWeightTableOcr('GI')} disabled={Boolean(eventWeightOcrMode)}>
++                                                                        {eventWeightOcrMode === 'GI' ? copy.modalEventEdit.weightTableOcrRunning : copy.modalEventEdit.weightTableOcrFromUrl}
++                                                                    </button>
++                                                                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => weightTableGiOcrFileRef.current?.click()} disabled={Boolean(eventWeightOcrMode)}>
++                                                                        {copy.modalEventEdit.weightTableOcrFromFile}
++                                                                    </button>
++                                                                    <input ref={weightTableGiOcrFileRef} type="file" accept=".pdf,image/*" style={{ display: 'none' }} onChange={(event) => handleWeightTableOcrFileChange('GI', event)} />
++                                                                </div>
++                                                                {eventWeightOcrMode === 'GI' && <div className="table-meta table-meta--tight">{copy.modalEventEdit.weightTableOcrProgress(eventWeightOcrProgress)}</div>}
++                                                                <textarea
++                                                                    className="input"
++                                                                    value={eventEditForm.weightTableGiOptions}
++                                                                    onChange={(event) => setEventEditForm({ ...eventEditForm, weightTableGiOptions: event.target.value })}
++                                                                    placeholder={copy.modalEventEdit.weightTableGiOptionsPlaceholder}
++                                                                    rows={5}
++                                                                />
++                                                            </div>
++                                                        </div>
++                                                    </div>
++
++                                                    {/* NO-GI */}
++                                                    <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', padding: '20px' }}>
++                                                        <div style={{ fontSize: '14px', fontWeight: 700, color: '#e2e8f0', marginBottom: '16px' }}>
++                                                            ­ƒ®│ Tabela de Peso ÔÇö NO-GI (sem kimono)
++                                                        </div>
++                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
++                                                            <div>
++                                                                <label className="table-meta" style={{ fontSize: '11px', marginBottom: '6px', display: 'block' }}>URL da Tabela (imagem/PDF)</label>
++                                                                <input
++                                                                    className="input"
++                                                                    type="text"
++                                                                    value={eventEditForm.weightTableNoGiUrl}
++                                                                    onChange={(event) => setEventEditForm({ ...eventEditForm, weightTableNoGiUrl: event.target.value })}
++                                                                    placeholder={copy.modalEventEdit.weightTableNoGiUrlPlaceholder}
++                                                                />
++                                                            </div>
++                                                            <div>
++                                                                <label className="table-meta" style={{ fontSize: '11px', marginBottom: '6px', display: 'block' }}>
++                                                                    {copy.modalEventEdit.weightTableNoGiOptions}
++                                                                </label>
++                                                                <div className="event-ocr-actions" style={{ marginBottom: '8px' }}>
++                                                                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleRunWeightTableOcr('NO-GI')} disabled={Boolean(eventWeightOcrMode)}>
++                                                                        {eventWeightOcrMode === 'NO-GI' ? copy.modalEventEdit.weightTableOcrRunning : copy.modalEventEdit.weightTableOcrFromUrl}
++                                                                    </button>
++                                                                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => weightTableNoGiOcrFileRef.current?.click()} disabled={Boolean(eventWeightOcrMode)}>
++                                                                        {copy.modalEventEdit.weightTableOcrFromFile}
++                                                                    </button>
++                                                                    <input ref={weightTableNoGiOcrFileRef} type="file" accept=".pdf,image/*" style={{ display: 'none' }} onChange={(event) => handleWeightTableOcrFileChange('NO-GI', event)} />
++                                                                </div>
++                                                                {eventWeightOcrMode === 'NO-GI' && <div className="table-meta table-meta--tight">{copy.modalEventEdit.weightTableOcrProgress(eventWeightOcrProgress)}</div>}
++                                                                <textarea
++                                                                    className="input"
++                                                                    value={eventEditForm.weightTableNoGiOptions}
++                                                                    onChange={(event) => setEventEditForm({ ...eventEditForm, weightTableNoGiOptions: event.target.value })}
++                                                                    placeholder={copy.modalEventEdit.weightTableNoGiOptionsPlaceholder}
++                                                                    rows={5}
++                                                                />
++                                                            </div>
++                                                        </div>
++                                                    </div>
++                                                </div>
++
++                                                {/* Circular */}
++                                                <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', padding: '20px' }}>
++                                                    <div style={{ fontSize: '14px', fontWeight: 700, color: '#e2e8f0', marginBottom: '16px' }}>
++                                                        ­ƒôä Circular / Regulamento do Evento
++                                                    </div>
++                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
++                                                        <div>
++                                                            <label className="table-meta" style={{ fontSize: '11px', marginBottom: '6px', display: 'block' }}>URL da Circular (PDF opcional)</label>
++                                                            <input
++                                                                className="input"
++                                                                type="text"
++                                                                value={eventEditForm.circularUrl}
++                                                                onChange={(event) => setEventEditForm({ ...eventEditForm, circularUrl: event.target.value })}
++                                                                placeholder={copy.modalEventEdit.circularUrlPlaceholder}
++                                                            />
++                                                        </div>
++                                                        <div>
++                                                            <label className="table-meta" style={{ fontSize: '11px', marginBottom: '6px', display: 'block' }}>Link de Inscri├º├úo Externa (se aplic├ível)</label>
++                                                            <input
++                                                                className="input"
++                                                                type="text"
++                                                                value={eventEditForm.registrationUrl}
++                                                                onChange={(event) => setEventEditForm({ ...eventEditForm, registrationUrl: event.target.value })}
++                                                                placeholder={copy.modalEventEdit.registrationUrlPlaceholder}
++                                                            />
++                                                        </div>
++                                                    </div>
++                                                </div>
+                                             </div>
+-                                        </div>
+-                                        <label className="checkbox-inline">
+-                                            <input
+-                                                type="checkbox"
+-                                                checked={eventEditForm.registrationOpen}
+-                                                onChange={(event) => setEventEditForm({ ...eventEditForm, registrationOpen: event.target.checked })}
+-                                            />
+-                                            <span>{copy.modalEventEdit.registrationOpen}</span>
+-                                        </label>
+-                                        <label className="checkbox-inline">
+-                                            <input
+-                                                type="checkbox"
+-                                                checked={eventEditForm.internalRegistration}
+-                                                onChange={(event) => setEventEditForm({ ...eventEditForm, internalRegistration: event.target.checked })}
+-                                            />
+-                                            <span>{copy.modalEventEdit.internalRegistration}</span>
+-                                        </label>
++                                        )}
++
+                                     </div>
+-                                    <div className="form-actions">
+-                                        <button type="button" className="btn btn-ghost" onClick={handleCloseEditEvent}>
+-                                            {copy.common.cancel}
+-                                        </button>
++
++                                    {/* ÔöÇÔöÇ Footer / Actions ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ */}
++                                    <div style={{
++                                        display: 'flex',
++                                        justifyContent: 'space-between',
++                                        alignItems: 'center',
++                                        padding: '20px 32px',
++                                        borderTop: '1px solid rgba(255,255,255,0.06)',
++                                        background: 'rgba(0,0,0,0.2)',
++                                    }}>
+                                         <button type="button" className="btn btn-danger" onClick={handleDeleteEvent}>
+                                             <Trash2 size={14} />
+                                             {copy.modalEventEdit.deleteEvent}
+                                         </button>
+-                                        <button type="submit" className="btn btn-primary">
+-                                            {copy.modalEventEdit.saveChanges}
+-                                        </button>
++                                        <div style={{ display: 'flex', gap: '10px' }}>
++                                            {eventModalTab !== 'info' && (
++                                                <button
++                                                    type="button"
++                                                    className="btn btn-ghost"
++                                                    onClick={() => setEventModalTab(eventModalTab === 'documents' ? 'registration' : 'info')}
++                                                >
++                                                    ÔåÉ Anterior
++                                                </button>
++                                            )}
++                                            {eventModalTab !== 'documents' ? (
++                                                <button
++                                                    type="button"
++                                                    className="btn btn-secondary"
++                                                    onClick={() => setEventModalTab(eventModalTab === 'info' ? 'registration' : 'documents')}
++                                                >
++                                                    Pr├│xima Aba ÔåÆ
++                                                </button>
++                                            ) : null}
++                                            <button type="submit" className="btn btn-primary" style={{ minWidth: '140px' }}>
++                                                {copy.modalEventEdit.saveChanges}
 +                                            </button>
 +                                        </div>
-+                                    </div>
-+                                    
-+                                    <div style={{ padding: '20px', background: 'rgba(0,0,0,0.1)', borderRadius: '8px', marginBottom: '20px', display: 'flex', gap: '16px', alignItems: 'flex-end' }}>
-+                                        <label className="bracket-field">
-+                                            <span>Hor├írio In├¡cio</span>
-+                                            <input type="time" className="input" value={autoGenerateOptions.startTime} onChange={e => setAutoGenerateOptions({...autoGenerateOptions, startTime: e.target.value})} />
-+                                        </label>
-+                                        <label className="bracket-field">
-+                                            <span>Intervalo (min)</span>
-+                                            <input type="number" className="input" style={{ width: '100px' }} value={autoGenerateOptions.intervalMins} onChange={e => setAutoGenerateOptions({...autoGenerateOptions, intervalMins: e.target.value})} />
-+                                        </label>
-+                                        <button type="button" className="btn btn-secondary" onClick={handleAutoGenerate}>
-+                                            Gerar Hor├írios Automaticamente
-+                                        </button>
-+                                        <button type="button" className={`btn ${sfEvent.superFightsPublished ? 'btn-danger' : 'btn-success'}`} onClick={handleTogglePublishSuperFights}>
-+                                            {sfEvent.superFightsPublished ? 'Despublicar Lutas Casadas' : 'Publicar Lutas Casadas'}
-+                                        </button>
-+                                    </div>
-+
-+                                    <div className="bracket-schedule__list">
-+                                        {superFightsList.length > 0 ? superFightsList.map((sf, index) => (
-+                                            <article key={sf.id} className="bracket-schedule__row schedule-row">
-+                                                <div className="schedule-row__drag">
-+                                                    <Swords size={16} />
-+                                                </div>
-+                                                <div className="schedule-row__time" style={{ width: '80px', flexShrink: 0 }}>
-+                                                    {sf.scheduledTime || '--:--'}
-+                                                    <div style={{ fontSize: '10px', color: '#a1a1aa', marginTop: '4px' }}>{sf.category}</div>
-+                                                </div>
-+                                                <div className="schedule-row__content" style={{ flex: 1 }}>
-+                                                    <strong>{sf.athlete1Name} <span style={{color: '#a1a1aa', fontWeight: 400}}>({sf.athlete1Belt} - {sf.athlete1Academy})</span></strong>
-+                                                    <div style={{ color: '#22c55e', fontSize: '12px', fontWeight: 'bold', margin: '4px 0' }}>VS</div>
-+                                                    <strong>{sf.athlete2Name} <span style={{color: '#a1a1aa', fontWeight: 400}}>({sf.athlete2Belt} - {sf.athlete2Academy})</span></strong>
-+                                                </div>
-+                                                <div className="schedule-row__actions">
-+                                                    <button type="button" className="btn btn-ghost" onClick={() => handleRemove(sf.id)}>
-+                                                        <Trash2 size={14} /> Remover
-+                                                    </button>
-+                                                </div>
-+                                            </article>
-+                                        )) : <div className="panel-subtitle">Nenhuma luta casada adicionada.</div>}
-+                                    </div>
-+                                </div>
-+                            );
-+                        })()}
-+                    </div>
-+                </section>
-+                )}
-                 {canManagePanel && activeSection === 'overview' && (
-                 <section className="panel">
-                     <div className="panel-header">
-@@ -6889,7 +7089,7 @@ const Dashboard = () => {
-                                     <div>
-                                         <div className="modal-title">{copy.schedulePanel.tvModeTitle}</div>
-                                         <div className="panel-subtitle">
--                                            {eventMap[scheduleEventId]?.name || copy.common.noEvent} ┬À {copy.schedulePanel.tvModeNow}: {now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
-+                                            {eventMap[scheduleEventId]?.name || copy.common.noEvent} ÔÇó {copy.schedulePanel.tvModeNow}: {now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
-                                         </div>
                                      </div>
-                                     <button type="button" className="btn btn-ghost" onClick={() => setShowScheduleTvMode(false)}>
-@@ -6915,7 +7115,7 @@ const Dashboard = () => {
-                                                 <div className="bracket-tv-mode__time">{row.startLabel} - {row.endLabel}</div>
-                                                 <div className="bracket-tv-mode__content">
-                                                     <strong>{row.title}</strong>
--                                                    <span>{row.typeLabel} ┬À {row.area || '-'}</span>
-+                                                    <span>{row.typeLabel} ÔÇó {row.area || '-'}</span>
-                                                 </div>
-                                             </div>
-                                         );
+                                 </form>
+                             </div>
+@@ -7302,6 +7576,7 @@ const Dashboard = () => {
+                 )}
+             </AnimatePresence>
+ 
++
+             <AnimatePresence>
+                 {showAddModal && (
+                     <>

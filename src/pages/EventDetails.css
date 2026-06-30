@@ -138,8 +138,10 @@ body.event-details-active .container {
 }
 
 .sc-content {
-  padding: 16px 32px;
-  max-width: 100%;
+  padding: 24px 2rem;
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .sc-info-body {
@@ -155,14 +157,114 @@ body.event-details-active .container {
   }
 }
 
-.sc-info-hero-card {
+/* ─── HERO CARD PREMIUM ─── */
+.sc-hero-card {
   display: flex;
-  background-color: #27272a;
-  border-radius: 12px;
+  flex-direction: row;
+  border-radius: 16px;
   overflow: hidden;
-  border: 1px solid #3f3f46;
+  background: #1c1c20;
+  border: 1px solid rgba(255,255,255,0.07);
   margin-bottom: 32px;
+  margin-left: -2rem;
+  margin-right: -2rem;
+  height: 380px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.45);
 }
+
+/* ─── IMAGEM GRANDE (esquerda) ─── */
+.sc-hero-card__banner {
+  position: relative;
+  flex: 0 0 75%;
+  height: 100%;
+  overflow: hidden;
+  background: #0f0f12;
+}
+
+.sc-hero-card__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  display: block;
+  transition: transform 0.5s ease;
+}
+.sc-hero-card:hover .sc-hero-card__img {
+  transform: scale(1.03);
+}
+
+.sc-hero-card__img-fallback {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(145deg, #1e293b, #0f172a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255,255,255,0.2);
+  font-size: 3rem;
+}
+
+/* ─── PAINEL DATAS (direita) ─── */
+.sc-hero-card__dates {
+  flex: 0 0 25%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: #131316;
+  border-left: 1px solid rgba(255,255,255,0.06);
+  padding: 20px 16px;
+  gap: 12px;
+}
+
+.sc-hero-card__date-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sc-hero-card__date-row--event {
+  padding-top: 16px;
+  border-top: 1px solid rgba(255,255,255,0.07);
+  margin-top: 4px;
+}
+
+.sc-hero-card__date-label {
+  font-size: 0.58rem;
+  color: #52525b;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+}
+
+.sc-hero-card__date-value {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #e4e4e7;
+  line-height: 1.3;
+}
+
+.sc-hero-card__date-time {
+  font-size: 0.75rem;
+  color: #52525b;
+  font-weight: 400;
+}
+
+@media (max-width: 768px) {
+  .sc-hero-card {
+    flex-direction: column;
+    height: auto;
+  }
+  .sc-hero-card__banner {
+    flex: none;
+    width: 100%;
+    height: 260px;
+  }
+  .sc-hero-card__dates {
+    border-left: none;
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+}
+
 
 .sc-info-hero-batches {
   width: 350px;
@@ -395,4 +497,117 @@ body.event-details-active .container {
   font-size: 1rem;
   text-align: center;
   padding: 40px 0;
+}
+
+/* ─── LOCATION TAB ─── */
+.sc-location-tab {
+  padding: 24px 0;
+}
+
+.sc-location-map-wrap {
+  position: relative;
+  width: 100%;
+  height: 360px;
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 28px;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.sc-location-map-badge {
+  position: absolute;
+  bottom: 14px;
+  left: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0,0,0,0.75);
+  backdrop-filter: blur(8px);
+  color: #e4e4e7;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 50px;
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+.sc-location-platforms__title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #f1f5f9;
+  margin: 0 0 16px 0;
+}
+
+/* ─── ACCOMMODATION CARDS ─── */
+.sc-accom-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.sc-accom-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #1c1c20;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 12px;
+  padding: 14px 16px;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.2s, border-color 0.2s, transform 0.15s;
+}
+
+.sc-accom-card:hover {
+  background: #242428;
+  border-color: rgba(59,130,246,0.35);
+  transform: translateY(-2px);
+}
+
+.sc-accom-card__logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sc-accom-card__logo--airbnb { background: rgba(255, 90, 96, 0.15); color: #ff5a60; }
+.sc-accom-card__logo--booking { background: rgba(0, 115, 230, 0.15); color: #0073e6; }
+.sc-accom-card__logo--hotels  { background: rgba(255, 165, 0, 0.15);  color: #ffa500; }
+.sc-accom-card__logo--maps    { background: rgba(52, 211, 153, 0.15); color: #34d399; }
+
+.sc-accom-card__info {
+  flex: 1;
+}
+
+.sc-accom-card__name {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #e4e4e7;
+  margin-bottom: 2px;
+}
+
+.sc-accom-card__desc {
+  font-size: 0.75rem;
+  color: #71717a;
+}
+
+.sc-accom-card__arrow {
+  font-size: 1.1rem;
+  color: #52525b;
+  transition: color 0.2s, transform 0.2s;
+}
+
+.sc-accom-card:hover .sc-accom-card__arrow {
+  color: #3b82f6;
+  transform: translateX(3px);
+}
+
+@media (max-width: 600px) {
+  .sc-accom-grid {
+    grid-template-columns: 1fr;
+  }
 }

@@ -1,11 +1,13 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useRef, useState } from 'react';
+import './Home.css';
 import { Link } from 'react-router-dom';
-import { Calendar, MapPin, Newspaper } from 'lucide-react';
+import { Calendar, MapPin, Newspaper, Trophy, Users, Star, Zap, Shield, TrendingUp } from 'lucide-react';
 import { useStore } from '../hooks/useStore';
 import { useI18n } from '../hooks/useI18n';
-import { rankAthletes } from '../services/scoringService';
+import { rankAthletes, groupAthletesByName } from '../services/scoringService';
 import { buildCategoryDescriptor } from '../services/categoryService';
 import { translateCompositeLabel } from '../utils/localeLabels';
+import FilmmakerShowcase from '../components/FilmmakerShowcase';
 
 const parseDate = (value) => {
   if (!value) return null;
@@ -42,17 +44,87 @@ const resolveCountdownLabel = (offset, copy) => {
   return `${offset} ${copy.dayLeftPlural}`;
 };
 
+// Animated counter hook
+function useCountUp(target, duration = 1500, start = false) {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    if (!start || target === 0) return;
+    let startTime = null;
+    const step = (timestamp) => {
+      if (!startTime) startTime = timestamp;
+      const progress = Math.min((timestamp - startTime) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setCount(Math.floor(eased * target));
+      if (progress < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }, [target, duration, start]);
+  return count;
+}
+
+// Medal emoji by rank
+const getMedal = (index) => {
+  if (index === 0) return '🥇';
+  if (index === 1) return '🥈';
+  if (index === 2) return '🥉';
+  return null;
+};
+
+// Initials avatar
+const getInitials = (name) => {
+  if (!name) return '?';
+  const parts = name.trim().split(' ');
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
+
+// Avatar gradient by index
+const avatarGradients = [
+  'linear-gradient(135deg, #667eea, #764ba2)',
+  'linear-gradient(135deg, #f093fb, #f5576c)',
+  'linear-gradient(135deg, #4facfe, #00f2fe)',
+  'linear-gradient(135deg, #43e97b, #38f9d7)',
+  'linear-gradient(135deg, #fa709a, #fee140)',
+  'linear-gradient(135deg, #a18cd1, #fbc2eb)',
+  'linear-gradient(135deg, #fda085, #f6d365)',
+  'linear-gradient(135deg, #84fab0, #8fd3f4)',
+];
+
 const Home = () => {
   const { athletes, events, news } = useStore();
   const { locale, uiLanguage, uiVariant } = useI18n();
+  const statsRef = useRef(null);
+  const [statsVisible, setStatsVisible] = useState(false);
+
+  // Intersection observer for scroll animations
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('home-visible');
+            if (entry.target === statsRef.current) {
+              setStatsVisible(true);
+            }
+          }
+        });
+      },
+      { threshold: 0.15 }
+    );
+
+    document.querySelectorAll('.home-animate').forEach((el) => observer.observe(el));
+    if (statsRef.current) observer.observe(statsRef.current);
+
+    return () => observer.disconnect();
+  }, []);
+
   const copyByLanguage = {
     pt: {
       heroKicker: 'Ranking ao vivo',
-      heroTitle: 'Campeonatos e ranking em um unico ambiente oficial.',
-      heroDescription:
-        'Acompanhe todos os campeonatos em um unico lugar, com inscricao direta, atualizacao transparente e visao completa do ranking oficial.',
-      heroPrimary: 'Acessar campeonato',
-      heroSecondary: 'Ver todos campeonatos',
+      heroTitle: 'Impulsionamos a performance dos maiores atletas e a infraestrutura dos eventos que movem o mundo.',
+      heroDescription: 'Campeonatos e ranking em um único ambiente oficial.',
+      heroPrimary: 'Procurar evento',
+      heroSecondary: 'Criar evento',
       heroEventsHeadline: 'Campeonatos em destaque',
       heroEventFallbackTitle: 'Campeonato oficial',
       breakingBadge: 'Inscricoes abertas',
@@ -100,15 +172,26 @@ const Home = () => {
       membershipDescription:
         'Um formulario rapido para ingressar na base oficial. Seu perfil passa a gerar historico e pontuacao a cada evento.',
       membershipButton: 'Fazer cadastro',
-      fallbackDate: 'Data a confirmar'
+      fallbackDate: 'Data a confirmar',
+      whyTitle: 'Por que a Genesis?',
+      whyKicker: 'Plataforma',
+      feature1Title: 'Ranking Transparente',
+      feature1Desc: 'Cada ponto é calculado de forma automática e auditável. Sem surpresas, sem favoritismos.',
+      feature2Title: 'Inscrição Direta',
+      feature2Desc: 'Inscreva-se nos eventos em poucos cliques, diretamente pela plataforma oficial.',
+      feature3Title: 'Histórico Completo',
+      feature3Desc: 'Acompanhe a evolução do seu desempenho ao longo de toda a temporada em um único lugar.',
+      statsAthletes: 'Atletas cadastrados',
+      statsEvents: 'Eventos registrados',
+      statsPoints: 'Pontos distribuídos',
+      statsAcademies: 'Academias filiadas',
     },
     en: {
       heroKicker: 'Live ranking',
-      heroTitle: 'Championships and ranking in a single official environment.',
-      heroDescription:
-        'Follow all tournaments in one place, with direct registration, transparent updates and complete visibility of the official ranking.',
-      heroPrimary: 'Access championship',
-      heroSecondary: 'View all championships',
+      heroTitle: 'We boost the performance of top athletes and the infrastructure of events that move the world.',
+      heroDescription: 'Championships and rankings in a single official environment.',
+      heroPrimary: 'Search event',
+      heroSecondary: 'Create event',
       heroEventsHeadline: 'Featured championships',
       heroEventFallbackTitle: 'Official championship',
       breakingBadge: 'Registration open',
@@ -156,15 +239,26 @@ const Home = () => {
       membershipDescription:
         'A quick form to join the official base. Your profile starts building history and points on each event.',
       membershipButton: 'Register now',
-      fallbackDate: 'Date TBD'
+      fallbackDate: 'Date TBD',
+      whyTitle: 'Why Genesis?',
+      whyKicker: 'Platform',
+      feature1Title: 'Transparent Ranking',
+      feature1Desc: 'Every point is calculated automatically and auditably. No surprises, no favoritism.',
+      feature2Title: 'Direct Registration',
+      feature2Desc: 'Sign up for events in a few clicks, directly on the official platform.',
+      feature3Title: 'Full History',
+      feature3Desc: 'Track your performance evolution throughout the entire season in one place.',
+      statsAthletes: 'Registered athletes',
+      statsEvents: 'Registered events',
+      statsPoints: 'Points distributed',
+      statsAcademies: 'Affiliated academies',
     },
     es: {
       heroKicker: 'Ranking en vivo',
-      heroTitle: 'Campeonatos y ranking en un unico entorno oficial.',
-      heroDescription:
-        'Siga todos los campeonatos en un solo lugar, con inscripcion directa, actualizacion transparente y vision completa del ranking oficial.',
-      heroPrimary: 'Acceder al campeonato',
-      heroSecondary: 'Ver todos los campeonatos',
+      heroTitle: 'Impulsamos el rendimiento de los mejores atletas y la infraestructura de los eventos que mueven al mundo.',
+      heroDescription: 'Campeonatos y ranking en un único entorno oficial.',
+      heroPrimary: 'Buscar evento',
+      heroSecondary: 'Crear evento',
       heroEventsHeadline: 'Campeonatos destacados',
       heroEventFallbackTitle: 'Campeonato oficial',
       breakingBadge: 'Inscripciones abiertas',
@@ -212,7 +306,19 @@ const Home = () => {
       membershipDescription:
         'Un formulario rapido para entrar en la base oficial. Su perfil comienza a generar historial y puntuacion en cada evento.',
       membershipButton: 'Registrarse',
-      fallbackDate: 'Fecha por confirmar'
+      fallbackDate: 'Fecha por confirmar',
+      whyTitle: '¿Por qué Genesis?',
+      whyKicker: 'Plataforma',
+      feature1Title: 'Ranking Transparente',
+      feature1Desc: 'Cada punto se calcula de forma automática y auditable. Sin sorpresas.',
+      feature2Title: 'Inscripción Directa',
+      feature2Desc: 'Inscríbete en eventos con pocos clics directamente en la plataforma oficial.',
+      feature3Title: 'Historial Completo',
+      feature3Desc: 'Sigue la evolución de tu rendimiento a lo largo de toda la temporada.',
+      statsAthletes: 'Atletas registrados',
+      statsEvents: 'Eventos registrados',
+      statsPoints: 'Puntos distribuidos',
+      statsAcademies: 'Academias afiliadas',
     },
     fr: {
       heroKicker: 'Classement en direct',
@@ -268,14 +374,26 @@ const Home = () => {
       membershipDescription:
         'Un formulaire rapide pour rejoindre la base officielle. Votre profil commence a generer historique et points a chaque evenement.',
       membershipButton: "S inscrire",
-      fallbackDate: 'Date a confirmer'
+      fallbackDate: 'Date a confirmer',
+      whyTitle: 'Pourquoi Genesis?',
+      whyKicker: 'Plateforme',
+      feature1Title: 'Classement transparent',
+      feature1Desc: 'Chaque point est calculé automatiquement et de façon auditable.',
+      feature2Title: 'Inscription directe',
+      feature2Desc: 'Inscrivez-vous aux événements en quelques clics sur la plateforme officielle.',
+      feature3Title: 'Historique complet',
+      feature3Desc: 'Suivez l\'évolution de vos performances tout au long de la saison.',
+      statsAthletes: 'Athlètes inscrits',
+      statsEvents: 'Événements enregistrés',
+      statsPoints: 'Points distribués',
+      statsAcademies: 'Académies affiliées',
     }
   };
   const copy = copyByLanguage[uiVariant] || copyByLanguage.pt;
 
   const topAthletes = useMemo(() => {
     if (!athletes.length) return [];
-    return rankAthletes(athletes).slice(0, 8);
+    return rankAthletes(groupAthletesByName(athletes)).slice(0, 8);
   }, [athletes]);
 
   const featuredEvents = useMemo(() => {
@@ -286,14 +404,18 @@ const Home = () => {
         ...event,
         parsedDate: parseDate(event.date)
       }))
+      .filter((event) => {
+        const time = event.parsedDate ? event.parsedDate.getTime() : 0;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return time === 0 || time >= today.getTime();
+      })
       .sort((a, b) => {
         const aTime = a.parsedDate ? a.parsedDate.getTime() : 0;
         const bTime = b.parsedDate ? b.parsedDate.getTime() : 0;
-        const aIsUpcoming = aTime > 0 && aTime >= now;
-        const bIsUpcoming = bTime > 0 && bTime >= now;
-        if (aIsUpcoming !== bIsUpcoming) return aIsUpcoming ? -1 : 1;
-        if (aIsUpcoming && bIsUpcoming) return aTime - bTime;
-        if (!aIsUpcoming && !bIsUpcoming) return bTime - aTime;
+        if (aTime && bTime) return aTime - bTime;
+        if (aTime) return -1;
+        if (bTime) return 1;
         return a.name.localeCompare(b.name);
       });
   }, [events]);
@@ -307,166 +429,229 @@ const Home = () => {
       })
       .slice(0, 3)
   ), [news]);
+
+  // Stats calculation
+  const totalPoints = useMemo(() => athletes.reduce((sum, a) => sum + (a.pontos || 0), 0), [athletes]);
+  const academiesCount = useMemo(() => new Set(athletes.map(a => a.academia).filter(Boolean)).size, [athletes]);
+
+  // Max points for progress bar
+  const maxPoints = useMemo(() => topAthletes[0]?.pontos || 1, [topAthletes]);
+
+  // Animated counters
+  const animatedAthletes = useCountUp(athletes.length, 1500, statsVisible);
+  const animatedEvents = useCountUp(events.length, 1500, statsVisible);
+  const animatedPoints = useCountUp(totalPoints, 2000, statsVisible);
+  const animatedAcademies = useCountUp(academiesCount, 1500, statsVisible);
+
   return (
-    <div className="public-page">
-      <section style={{ 
-          position: 'relative', 
-          width: '100vw', 
-          minHeight: '85vh', 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center', 
-          backgroundImage: `url('/hero-bg.jpg.jpeg')`, 
-          backgroundSize: 'cover', 
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          marginLeft: 'calc(-50vw + 50%)',
-          marginRight: 'calc(-50vw + 50%)',
-          marginTop: '-120px', // Pull up to cover the header gap
-          paddingTop: '80px', // Push content back down slightly
-          paddingBottom: '40px',
-          paddingLeft: '1rem',
-          paddingRight: '1rem'
-      }}>
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.75)' }} />
+    <div className="public-page home-improved">
+      {/* ─── HERO ─── */}
+      <section className="home-hero">
+        <div className="home-hero__overlay" />
+        {/* Animated scan lines */}
+        <div className="home-hero__scanlines" aria-hidden="true" />
         
-        <div style={{ position: 'relative', zIndex: 1, padding: '2rem', maxWidth: '1200px', width: '100%' }}>
-          <div style={{ textAlign: 'left', maxWidth: '800px' }}>
-            <h1 style={{ fontSize: '3.5rem', fontWeight: '800', lineHeight: '1.2', marginBottom: '1.5rem', color: '#ffffff' }}>
-              Impulsionamos a performance dos maiores atletas e a infraestrutura dos eventos que movem o mundo.
-            </h1>
-            <p style={{ fontSize: '1.25rem', color: 'rgba(255,255,255,0.9)', marginBottom: '2.5rem', fontWeight: '400' }}>
-              Campeonatos e ranking em um único ambiente oficial.
-            </p>
-            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-              <Link to="/eventos" style={{ backgroundColor: '#2563eb', color: '#fff', padding: '0.875rem 2rem', borderRadius: '50px', fontWeight: '600', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', transition: 'background-color 0.2s', border: '1px solid #2563eb' }}>
-                Procurar evento
-              </Link>
-              <Link to="/painel" style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)', backdropFilter: 'blur(8px)', color: '#fff', padding: '0.875rem 2rem', borderRadius: '50px', fontWeight: '600', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', transition: 'background-color 0.2s', border: '1px solid rgba(255,255,255,0.3)' }}>
-                Criar evento
-              </Link>
-            </div>
+        <div className="home-hero__content">
+          <div className="home-hero__badge home-animate">
+            <span className="home-hero__badge-dot" />
+            {copy.heroKicker}
+          </div>
+          <h1 className="home-hero__title home-animate">
+            {copy.heroTitle}
+          </h1>
+          <p className="home-hero__subtitle home-animate">
+            {copy.heroDescription}
+          </p>
+          <div className="home-hero__actions home-animate">
+            <Link to="/eventos" className="home-btn home-btn--primary">
+              {copy.heroPrimary}
+            </Link>
+            <Link to="/painel" className="home-btn home-btn--ghost">
+              {copy.heroSecondary}
+            </Link>
           </div>
         </div>
       </section>
 
-      <section className="public-section championships-main">
-        <div className="section-heading championships-main__header championships-main__header--minimal">
-          <h1 className="championships-main__minimal-title">{copy.eventsKicker}</h1>
-          <Link className="text-link" to="/eventos">{copy.fullCalendar}</Link>
+
+      {/* ─── EVENTS ─── */}
+      <section className="home-section home-animate">
+        <div className="home-section__header">
+          <div>
+            <span className="home-kicker">{copy.eventsKicker}</span>
+            <h2 className="home-section__title">{copy.eventsTitle}</h2>
+          </div>
+          <Link className="home-text-link" to="/eventos">{copy.fullCalendar}</Link>
         </div>
-        <div className="championships-main__grid">
+
+        <div className="home-events-grid">
           {featuredEvents.length ? (
             featuredEvents.map((event) => {
-              const isRegistrationOpen = event.registrationOpen !== false;
-              const eventDate = formatDate(event.parsedDate || event.date, locale, copy.fallbackDate);
               const eventLocation = event.location || copy.locationFallback;
               const daysOffset = resolveDaysOffset(event.parsedDate || event.date);
               const countdown = resolveCountdownLabel(daysOffset, copy);
+              
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              
+              const isPastDate = event.parsedDate && event.parsedDate.getTime() < today.getTime();
+              
+              let isRegistrationClosedByDate = false;
+              if (event.registrationCloseDate) {
+                const closeDate = new Date(event.registrationCloseDate);
+                if (!isNaN(closeDate.getTime())) {
+                  closeDate.setHours(23, 59, 59, 999);
+                  if (new Date() > closeDate) {
+                    isRegistrationClosedByDate = true;
+                  }
+                }
+              }
+              
+              const isOpen = event.registrationOpen !== false && !isPastDate && !isRegistrationClosedByDate;
 
               return (
-                <article className="championship-main-card" key={event.id} style={{ position: 'relative', overflow: 'hidden', height: 'auto', backgroundColor: '#fff' }}>
-                  <div className="championship-main-card__poster" style={{ position: 'relative', height: '180px', flex: '0 0 180px' }}>
+                <article className="home-event-card" key={event.id}>
+                  {/* Poster */}
+                  <div className="home-event-card__poster">
                     {event.posterUrl ? (
-                      <img src={event.posterUrl} alt={event.name || copy.eventFallback} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <img src={event.posterUrl} alt={event.name || copy.eventFallback} loading="lazy" />
                     ) : (
-                      <div className="championship-main-card__fallback" style={{ height: '100%', backgroundColor: '#1e40af' }}>
-                        <span>{event.name || copy.eventFallback}</span>
+                      <div className="home-event-card__poster-fallback">
+                        <Trophy size={40} />
                       </div>
                     )}
-                    
-                    {/* Blue gradient overlay with big Date/Location */}
-                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(to bottom, rgba(30, 64, 175, 0.8) 0%, rgba(30, 64, 175, 0.1) 100%)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', padding: '1rem', color: 'white' }}>
-                      <span style={{ fontSize: '1.8rem', fontWeight: '800', lineHeight: '1', textTransform: 'uppercase', textShadow: '1px 1px 3px rgba(0,0,0,0.3)' }}>
-                        {new Date(event.parsedDate || event.date).toLocaleDateString(locale, { month: 'long' }).replace('.', '')} {new Date(event.parsedDate || event.date).getDate() || ''}
-                      </span>
-                      <span style={{ fontSize: '1.4rem', fontWeight: '700', lineHeight: '1.2', textTransform: 'uppercase', opacity: 0.95, textShadow: '1px 1px 3px rgba(0,0,0,0.3)' }}>
-                        {eventLocation.split(',')[0]}
-                      </span>
+                    <div className="home-event-card__poster-overlay">
+                      <div className="home-event-card__date-badge">
+                        <span className="home-event-card__date-month">
+                          {event.parsedDate ? new Date(event.parsedDate).toLocaleDateString(locale, { month: 'short' }).replace('.', '').toUpperCase() : '—'}
+                        </span>
+                        <span className="home-event-card__date-day">
+                          {event.parsedDate ? new Date(event.parsedDate).getDate() : '—'}
+                        </span>
+                      </div>
+                      {event.feeOver15 && (
+                        <div className="home-event-card__price-badge">
+                          <span>Lote atual</span>
+                          <strong>R$ {parseFloat(event.feeOver15).toFixed(2).replace('.', ',')}</strong>
+                        </div>
+                      )}
                     </div>
-
-                    {/* Badge de Lote Atual (Canto Superior Direito) */}
-                    <div style={{ position: 'absolute', top: '10px', right: '10px', backgroundColor: 'rgba(71, 85, 105, 0.85)', color: '#fff', padding: '0.3rem 0.6rem', borderRadius: '4px', display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: '1.2', zIndex: 2 }}>
-                      <span style={{ fontSize: '0.55rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Lote Atual</span>
-                      <span style={{ fontSize: '0.8rem', fontWeight: '800' }}>
-                        R$ {event.feeOver15 ? parseFloat(event.feeOver15).toFixed(2).replace('.', ',') : 'Consulte'}
-                      </span>
-                    </div>
+                    {isOpen ? (
+                      <div className="home-event-card__status-badge">{copy.breakingBadge || 'Inscrições abertas'}</div>
+                    ) : (
+                      <div className="home-event-card__status-badge" style={{ background: '#e74c3c', color: '#fff', boxShadow: 'none' }}>Inscrições encerradas</div>
+                    )}
                   </div>
-                  
-                  <div className="championship-main-card__body" style={{ padding: '1.2rem 1rem 1rem', display: 'flex', flexDirection: 'column', backgroundColor: '#fff' }}>
-                    <h3 className="championship-main-card__title" style={{ fontSize: '1rem', color: '#1e40af', fontWeight: '800', marginBottom: '0.5rem', textTransform: 'uppercase', lineHeight: '1.3' }}>
-                      {event.name || copy.eventFallback}
-                    </h3>
-                    
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '1rem', color: '#475569', fontSize: '0.8rem' }}>
-                      <span>🇧🇷</span>
+
+                  {/* Body */}
+                  <div className="home-event-card__body">
+                    <h3 className="home-event-card__title">{event.name || copy.eventFallback}</h3>
+                    <div className="home-event-card__location">
+                      <MapPin size={13} />
                       <span>{eventLocation}</span>
                     </div>
-                    
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '0.8rem', color: '#94a3b8', fontSize: '0.75rem' }}>
-                      <span>{new Date(event.parsedDate || event.date).toLocaleDateString(locale, { month: 'long', day: 'numeric' })}</span>
-                      <span>{countdown}</span>
+                    <div className="home-event-card__footer">
+                      <span className="home-event-card__date-text">
+                        <Calendar size={12} />
+                        {event.parsedDate ? new Date(event.parsedDate).toLocaleDateString(locale, { day: 'numeric', month: 'long' }) : copy.fallbackDate}
+                      </span>
+                      <span className={`home-event-card__countdown ${daysOffset !== null && daysOffset <= 7 && daysOffset >= 0 ? 'home-event-card__countdown--urgent' : ''}`}>
+                        {countdown}
+                      </span>
                     </div>
                   </div>
-                  
-                  {/* Clickable Overlay */}
+
+                  {/* Link overlay */}
                   {event.internalRegistration ? (
-                    <Link to={`/eventos/${event.id}`} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10 }} aria-label={copy.accessEvent} />
+                    <Link to={`/eventos/${event.id}`} className="home-event-card__link" aria-label={copy.accessEvent} />
                   ) : (
-                    <a href={event.registrationUrl || '#'} target={event.registrationUrl ? '_blank' : undefined} rel={event.registrationUrl ? 'noreferrer' : undefined} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10 }} aria-label={copy.accessEvent} />
+                    <a href={event.registrationUrl || '#'} target={event.registrationUrl ? '_blank' : undefined} rel={event.registrationUrl ? 'noreferrer' : undefined} className="home-event-card__link" aria-label={copy.accessEvent} />
                   )}
                 </article>
               );
             })
           ) : (
-            <div className="empty-state">{copy.emptyEvents}</div>
+            <div className="home-empty">{copy.emptyEvents}</div>
           )}
         </div>
       </section>
 
-      <section className="public-section">
-        <div className="section-heading">
+      {/* ─── NEWS ─── */}
+      <section className="home-section home-animate">
+        <div className="home-section__header">
           <div>
-            <span className="section-kicker">{copy.newsKicker}</span>
-            <h2>{copy.newsTitle}</h2>
+            <span className="home-kicker">{copy.newsKicker}</span>
+            <h2 className="home-section__title">{copy.newsTitle}</h2>
           </div>
-          <Link className="text-link" to="/noticias">{copy.newsCta}</Link>
+          <Link className="home-text-link" to="/noticias">{copy.newsCta}</Link>
         </div>
-        <div className="news-grid">
-          {latestNews.length ? (
-            latestNews.map((item) => (
-              <article className="news-card" key={item.id}>
-                <div className={`news-card__cover ${item.imageUrl ? '' : 'news-card__cover--fallback'}`.trim()}>
-                  {item.imageUrl ? (
-                    <img src={item.imageUrl} alt={item.title} loading="lazy" />
+
+        {latestNews.length ? (
+          <div className="home-news-grid">
+            {/* Featured first news */}
+            {latestNews[0] && (
+              <article className="home-news-featured">
+                <div className="home-news-featured__cover">
+                  {latestNews[0].imageUrl ? (
+                    <img src={latestNews[0].imageUrl} alt={latestNews[0].title} loading="lazy" />
                   ) : (
-                    <div className="news-card__cover-fallback" aria-hidden="true">
-                      <Newspaper className="news-card__cover-fallback-icon" />
-                      <span>{copy.newsKicker}</span>
+                    <div className="home-news-featured__cover-fallback">
+                      <Newspaper size={48} />
                     </div>
                   )}
+                  <div className="home-news-featured__cover-overlay" />
+                  <span className="home-news-featured__kicker">{copy.newsKicker}</span>
                 </div>
-                <div className="news-card__meta">{formatDate(item.publishedAt || item.createdAt, locale, copy.fallbackDate)}</div>
-                <h3>{item.title}</h3>
-                <p>{item.summary}</p>
+                <div className="home-news-featured__body">
+                  <span className="home-news-featured__date">
+                    {formatDate(latestNews[0].publishedAt || latestNews[0].createdAt, locale, copy.fallbackDate)}
+                  </span>
+                  <h3 className="home-news-featured__title">{latestNews[0].title}</h3>
+                  <p className="home-news-featured__summary">{latestNews[0].summary}</p>
+                </div>
               </article>
-            ))
-          ) : (
-            <div className="empty-state">{copy.newsEmpty}</div>
-          )}
-        </div>
+            )}
+
+            {/* Smaller 2 and 3 */}
+            <div className="home-news-side">
+              {latestNews.slice(1).map((item) => (
+                <article className="home-news-side-card" key={item.id}>
+                  <div className="home-news-side-card__cover">
+                    {item.imageUrl ? (
+                      <img src={item.imageUrl} alt={item.title} loading="lazy" />
+                    ) : (
+                      <div className="home-news-side-card__cover-fallback">
+                        <Newspaper size={24} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="home-news-side-card__body">
+                    <span className="home-news-side-card__date">
+                      {formatDate(item.publishedAt || item.createdAt, locale, copy.fallbackDate)}
+                    </span>
+                    <h4 className="home-news-side-card__title">{item.title}</h4>
+                    <p className="home-news-side-card__summary">{item.summary}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="home-empty">{copy.newsEmpty}</div>
+        )}
       </section>
 
-      <section className="public-section">
-        <div className="section-heading">
+      {/* ─── TOP 10 ─── */}
+      <section className="home-section home-animate">
+        <div className="home-section__header">
           <div>
-            <span className="section-kicker">{copy.topKicker}</span>
-            <h2>{copy.topTitle}</h2>
+            <span className="home-kicker">{copy.topKicker}</span>
+            <h2 className="home-section__title">{copy.topTitle}</h2>
           </div>
-          <Link className="text-link" to="/ranking">{copy.fullRanking}</Link>
+          <Link className="home-text-link" to="/ranking">{copy.fullRanking}</Link>
         </div>
-        <div className="list-card">
+
+        <div className="home-ranking-list">
           {topAthletes.length ? (
             topAthletes.map((athlete, index) => {
               const descriptor = buildCategoryDescriptor(athlete);
@@ -474,44 +659,59 @@ const Home = () => {
                 descriptor?.label || [athlete.faixa, athlete.peso].filter(Boolean).join(' • '),
                 uiLanguage
               );
+              const medal = getMedal(index);
+              const progressPct = Math.round((athlete.pontos / maxPoints) * 100);
+
               return (
-                <div className="list-row" key={athlete.id}>
-                  <div className="list-rank">{index + 1}</div>
-                  <div>
-                    <div className="list-name">{athlete.nome || copy.athleteFallback}</div>
-                    <div className="list-meta">{athlete.academia || copy.academyFallback}{categoryLabel ? ` • ${categoryLabel}` : ''}</div>
+                <div className={`home-rank-row ${index < 3 ? 'home-rank-row--podium' : ''}`} key={athlete.id}>
+                  {/* Position */}
+                  <div className="home-rank-pos">
+                    {medal ? (
+                      <span className="home-rank-medal">{medal}</span>
+                    ) : (
+                      <span className="home-rank-number">{index + 1}</span>
+                    )}
                   </div>
-                  <div className="list-score">{athlete.pontos} {copy.pointsSuffix}</div>
+
+                  {/* Avatar */}
+                  <div
+                    className="home-rank-avatar"
+                    style={{ background: avatarGradients[index % avatarGradients.length] }}
+                  >
+                    {athlete.photoUrl ? (
+                      <img src={athlete.photoUrl} alt={athlete.nome} />
+                    ) : (
+                      <span>{getInitials(athlete.nome)}</span>
+                    )}
+                  </div>
+
+                  {/* Info + progress */}
+                  <div className="home-rank-info">
+                    <div className="home-rank-name">{athlete.nome || copy.athleteFallback}</div>
+                    <div className="home-rank-meta">{athlete.academia || copy.academyFallback}{categoryLabel ? ` • ${categoryLabel}` : ''}</div>
+                    <div className="home-rank-progress">
+                      <div className="home-rank-progress-bar" style={{ width: `${progressPct}%` }} />
+                    </div>
+                  </div>
+
+                  {/* Score */}
+                  <div className="home-rank-score">
+                    <span className="home-rank-pts">{athlete.pontos}</span>
+                    <span className="home-rank-pts-label">{copy.pointsSuffix}</span>
+                  </div>
                 </div>
               );
             })
           ) : (
-            <div className="empty-state">{copy.emptyAthletes}</div>
+            <div className="home-empty">{copy.emptyAthletes}</div>
           )}
         </div>
       </section>
 
-      <section className="public-section">
-        <div className="cta-card">
-          <div>
-            <span className="section-kicker">{copy.membershipKicker}</span>
-            <h2>{copy.membershipTitle}</h2>
-            <p>
-              {copy.membershipDescription}
-            </p>
-          </div>
-          <Link className="btn btn-primary" to="/filiacao">
-            {copy.membershipButton}
-          </Link>
-        </div>
-      </section>
+
+      <FilmmakerShowcase />
     </div>
   );
 };
 
 export default Home;
-
-
-
-
-

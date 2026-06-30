@@ -125,7 +125,22 @@ const PublicProfile = ({ profileOverride, isPreview = false }) => {
         || String(athlete.profileId || '') === String(athleteId)
         || String(athlete.memberProfileId || '') === String(athleteId)
       ));
-      if (directAthlete) return buildProfileFromAthlete(directAthlete);
+      if (directAthlete) {
+        const realProfileId = directAthlete.memberProfileId || directAthlete.profileId;
+        if (realProfileId) {
+          const realProfile = list.find((p) => String(p.id) === String(realProfileId));
+          if (realProfile) return realProfile;
+        }
+        
+        const nameMatch = list.find((p) => {
+          const pName = (p.fullName || '').trim().toLowerCase();
+          const aName = (directAthlete.nome || directAthlete.name || directAthlete.fullName || '').trim().toLowerCase();
+          return pName && aName && pName === aName;
+        });
+        if (nameMatch) return nameMatch;
+
+        return buildProfileFromAthlete(directAthlete);
+      }
       return null;
     }
 

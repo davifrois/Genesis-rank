@@ -114,6 +114,10 @@ public class EventService {
     event.setBeltRegistrationTitle(trimOrFallback(request.getBeltRegistrationTitle(), DEFAULT_BELT_REGISTRATION_TITLE));
     event.setBeltRegistrationPrice(resolveFee(request.getBeltRegistrationPrice(), 0.0));
     event.setBeltRegistrationDescription(trimOrNull(request.getBeltRegistrationDescription()));
+    event.setBeltRegistrationPhone(trimOrNull(request.getBeltRegistrationPhone()));
+    event.setMaxAthletes(request.getMaxAthletes());
+    event.setCloseOnCapacity(Boolean.TRUE.equals(request.getCloseOnCapacity()));
+    event.setEventDescription(trimOrNull(request.getEventDescription()));
     event.setBatchesJson(writeBatches(normalizeBatches(
         request.getBatches(),
         event.getFeeUnder15(),
@@ -126,6 +130,7 @@ public class EventService {
     event.setRegistrationOpen(request.getRegistrationOpen() == null ? true : request.getRegistrationOpen());
     event.setInternalRegistration(request.getInternalRegistration() == null ? true : request.getInternalRegistration());
     event.setDate(parseDate(request.getDate()));
+    event.setEndDate(parseDate(request.getEndDate()));
   }
 
   private LocalDate parseDate(String value) {
@@ -143,6 +148,7 @@ public class EventService {
     response.setName(event.getName());
     response.setLocation(event.getLocation());
     response.setDate(event.getDate() != null ? event.getDate().toString() : null);
+    response.setEndDate(event.getEndDate() != null ? event.getEndDate().toString() : null);
     response.setAccommodationEnabled(Boolean.TRUE.equals(event.getAccommodationEnabled()));
     response.setAccommodationTitle(trimOrFallback(event.getAccommodationTitle(), "Onde Ficar"));
     response.setAccommodationDescription(trimOrNull(event.getAccommodationDescription()));
@@ -158,6 +164,10 @@ public class EventService {
     response.setBeltRegistrationTitle(trimOrFallback(event.getBeltRegistrationTitle(), DEFAULT_BELT_REGISTRATION_TITLE));
     response.setBeltRegistrationPrice(resolveFee(event.getBeltRegistrationPrice(), 0.0));
     response.setBeltRegistrationDescription(trimOrNull(event.getBeltRegistrationDescription()));
+    response.setBeltRegistrationPhone(trimOrNull(event.getBeltRegistrationPhone()));
+    response.setMaxAthletes(event.getMaxAthletes());
+    response.setCloseOnCapacity(Boolean.TRUE.equals(event.getCloseOnCapacity()));
+    response.setEventDescription(trimOrNull(event.getEventDescription()));
     List<EventBatchDto> batches = resolveBatchStates(readBatches(event.getBatchesJson()), LocalDateTime.now());
     EventBatchDto activeBatch = batches.stream()
         .filter(batch -> Boolean.TRUE.equals(batch.getActive()))

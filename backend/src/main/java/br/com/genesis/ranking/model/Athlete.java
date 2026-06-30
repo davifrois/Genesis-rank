@@ -94,14 +94,14 @@ public class Athlete extends BaseEntity {
     this.genero = genero;
   }
 
-  public boolean isNoGi() { isNoGi != null ? isNoGi : false;
+  public boolean isNoGi() { return isNoGi != null ? isNoGi : false;
   }
 
   public void setNoGi(boolean noGi) {
     isNoGi = noGi;
   }
 
-  public boolean isAbsolute() { isAbsolute != null ? isAbsolute : false;
+  public boolean isAbsolute() { return isAbsolute != null ? isAbsolute : false;
   }
 
   public void setAbsolute(boolean absolute) {

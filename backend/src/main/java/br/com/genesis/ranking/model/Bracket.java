@@ -121,7 +121,7 @@ public class Bracket extends BaseEntity {
     this.appliedAt = appliedAt;
   }
 
-  public boolean isPublished() { published != null ? published : false;
+  public boolean isPublished() { return published != null ? published : false;
   }
 
   public void setPublished(Boolean published) {

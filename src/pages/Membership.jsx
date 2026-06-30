@@ -237,7 +237,7 @@ const Membership = () => {
   } = useStore();
   const currentUserRole = (currentUser?.role || '').toString().trim().toLowerCase();
   const isAdmin = currentUserRole === 'admin';
-  const isCoach = currentUserRole === 'coach' || currentUserRole === 'professor';
+  const isCoach = currentUserRole === 'coach' || currentUserRole === 'professor' || currentUserRole === 'admin';
   const isAthlete = currentUserRole === 'athlete' || currentUserRole === 'atleta';
   const canManageMembership = isAdmin || isCoach || isAthlete;
   const normalizedCurrentUsername = normalizeLookup(currentUser?.username || '');
