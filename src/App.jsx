@@ -198,6 +198,7 @@ const AppLayout = () => {
     currentUser,
     events,
     memberProfiles,
+    academies,
     deleteMemberProfile,
     eventModalOpen,
     closeEventModal,
@@ -264,7 +265,18 @@ const AppLayout = () => {
   const finalBelt = mainProfile?.belt || currentUser?.belt || 'Branca';
 
   const currentUserRole = (currentUser?.role || '').toString().trim().toLowerCase();
-  const isCoachUser = currentUserRole === 'coach' || currentUserRole === 'professor' || currentUserRole === 'admin';
+  
+  const userAcademies = useMemo(() => {
+    if (!currentUser) return [];
+    const username = (currentUser.username || '').toLowerCase();
+    return (academies || []).filter(a => {
+      return (a.ownerUsername || '').toLowerCase() === username || (a.coachUsername || '').toLowerCase() === username;
+    });
+  }, [currentUser, academies]);
+
+  const hasAcademy = userAcademies.length > 0;
+  
+  const isCoachUser = currentUserRole === 'coach' || currentUserRole === 'professor' || currentUserRole === 'admin' || hasAcademy;
   const canAccessAdmin = currentUserRole === 'admin';
   const canAccessDashboard = canAccessAdmin || currentUserRole === 'mesario';
   const isAdminRoute = location.pathname.startsWith('/admin');

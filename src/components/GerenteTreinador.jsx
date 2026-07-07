@@ -11,6 +11,7 @@ import { generatePixPayload } from '../utils/pix';
 import { compressImage } from '../utils/imageUtils';
 import { useStore } from '../hooks/useStore';
 import { resolveAthleteEventPrice } from '../utils/eventPricing';
+import { getAvailableBeltsForAge, isValidBeltForAge } from '../utils/beltRules';
 
 // ─── Categorias disponíveis ───────────────────────────────────────────────
 const FAIXAS = ['Branca', 'Cinza', 'Amarela', 'Laranja', 'Verde', 'Azul', 'Roxa', 'Marrom', 'Preta'];
@@ -125,7 +126,7 @@ const CategoryModal = ({ atleta, onClose, onChange, valorBase, valorAbsoluto, re
     onClose();
   };
 
-  const isValid = local.modalidade && local.faixa && local.categoriaEtaria && local.peso;
+  const isValid = local.modalidade && local.faixa && local.categoriaEtaria && local.peso && isValidBeltForAge(local.faixa, age);
   
   const currentPricePreview = local.modalidade?.includes('Combo') ? valorBase + valorAbsoluto : valorBase;
 
@@ -184,7 +185,7 @@ const CategoryModal = ({ atleta, onClose, onChange, valorBase, valorAbsoluto, re
         <label style={fieldStyle}>Faixa</label>
         <select value={local.faixa} onChange={e => setLocal(p => ({ ...p, faixa: e.target.value }))} style={selectStyle}>
           <option value="">Selecione</option>
-          {FAIXAS.map(f => <option key={f} value={f}>{f}</option>)}
+          {getAvailableBeltsForAge(age).map(f => <option key={f} value={f}>{f}</option>)}
         </select>
       </div>
 

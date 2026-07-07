@@ -4,7 +4,7 @@
 body.event-details-active .app-main {
   padding: 0 !important;
 }
-body.event-details-active .container {
+body.event-details-active .app-main > .container {
   max-width: 100% !important;
   padding: 0 !important;
   margin: 0 !important;

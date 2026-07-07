@@ -173,20 +173,22 @@
   }
 }
 
-.filmmaker-showcase__card--entrance {
-  grid-column: 3 / 5;
-}
+@media (min-width: 768px) {
+  .filmmaker-showcase__card--entrance {
+    grid-column: 3 / 5;
+  }
 
-.filmmaker-showcase__card--active {
-  grid-column: 3 / 5;
-}
+  .filmmaker-showcase__card--active {
+    grid-column: 3 / 5;
+  }
 
-.filmmaker-showcase__card--athlete {
-  grid-column: 3 / 4;
-}
+  .filmmaker-showcase__card--athlete {
+    grid-column: 3 / 4;
+  }
 
-.filmmaker-showcase__card--academy {
-  grid-column: 4 / 5;
+  .filmmaker-showcase__card--academy {
+    grid-column: 4 / 5;
+  }
 }
 
 @media (min-width: 1024px) {
@@ -399,4 +401,19 @@
   font-weight: 600;
   letter-spacing: 1.5px;
   text-transform: uppercase;
+}
+
+@media (max-width: 768px) {
+  .filmmaker-showcase__inner {
+    padding: 0 16px;
+  }
+  .filmmaker-showcase__head h2 {
+    font-size: 2.2rem;
+  }
+  .filmmaker-showcase__cta-button {
+    padding: 16px 24px;
+    font-size: 0.9rem;
+    text-align: center;
+    width: 100%;
+  }
 }

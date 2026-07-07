@@ -54,11 +54,19 @@ export const seedSlotsWithRankingAwareByes = (seedIds = [], bracketSize = 0) => 
     return slots;
 };
 
-export const buildBracketMatches = (seedIds, bracketSize) => {
+export const buildBracketMatches = (seedIds, bracketSize, manualSlots = null, directOrder = false) => {
     const size = nextPowerOfTwo(bracketSize, 2);
-    const slots = seedSlotsWithRankingAwareByes(seedIds, size);
-    while (slots.length < size) {
-        slots.push(null);
+    let slots;
+
+    if (manualSlots && Array.isArray(manualSlots) && manualSlots.length === size) {
+        slots = [...manualSlots];
+    } else if (directOrder) {
+        // Use seedIds directly — consecutive pairs are same-academy fights
+        slots = [...(Array.isArray(seedIds) ? seedIds : [])];
+        while (slots.length < size) slots.push(null);
+    } else {
+        slots = seedSlotsWithRankingAwareByes(seedIds, size);
+        while (slots.length < size) slots.push(null);
     }
     const matches = [];
     for (let i = 0; i < slots.length; i += 2) {

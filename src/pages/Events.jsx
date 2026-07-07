@@ -15,6 +15,7 @@ import { useI18n } from '../hooks/useI18n';
 import { countryCodeFromValue, countryLabelFromCode, flagFromCountryCode } from '../utils/countryFlags';
 import { getStartOfDayTime, parseEventDateValue, resolveEventLifecycle } from '../utils/eventLifecycle';
 import { formatBrlCurrency, resolveBatchFee } from '../utils/eventPricing';
+import jjBanner from '../assets/jj_events_banner.png';
 
 const parseDate = (value) => {
   return parseEventDateValue(value);
@@ -449,16 +450,15 @@ const Events = () => {
     return (
       <CardTag
         key={event.id}
-        style={{ background: '#fff', borderRadius: '8px', overflow: 'hidden', textDecoration: 'none', color: '#1a1a1a', display: 'flex', flexDirection: 'column', transition: 'transform 0.2s', cursor: 'pointer' }}
-        onMouseOver={e => {e.currentTarget.style.transform = 'translateY(-4px)';}}
-        onMouseOut={e => {e.currentTarget.style.transform = 'translateY(0)';}}
+        className="glass-card"
+        style={{ overflow: 'hidden', textDecoration: 'none', color: '#fff', display: 'flex', flexDirection: 'column', cursor: 'pointer' }}
         {...linkProps}
       >
         <div style={{ position: 'relative', width: '100%', height: '140px', background: '#f4f4f5' }}>
           <img src={event.posterUrl || '/header-bg-championship.jpg'} alt={event.name} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
         </div>
-        <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', flex: 1 }}>
-          <h3 style={{ fontSize: '0.8rem', fontWeight: 800, color: '#18181b', margin: '0 0 12px 0', lineHeight: 1.4, textTransform: 'uppercase' }}>
+        <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', flex: 1, background: 'rgba(20,20,24,0.4)' }}>
+          <h3 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#e2e8f0', margin: '0 0 12px 0', lineHeight: 1.4, textTransform: 'uppercase' }}>
             {event.name || copy.eventFallback}
           </h3>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.7rem', color: '#71717a', marginBottom: '16px' }}>
@@ -476,13 +476,43 @@ const Events = () => {
 
   return (
     <div style={{ minHeight: '100vh', background: 'transparent', color: '#e4e4e7', fontFamily: '"Inter", sans-serif' }}>
-      {/* Top Navigation Tabs & Filters */}
-      <div style={{ background: 'transparent', padding: '40px 20px', borderBottom: 'none' }}>
-        <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          
+
+      {/* Top Navigation Tabs & Filters — with jiu-jitsu background */}
+      <div style={{
+        position: 'relative',
+        margin: '0',
+        overflow: 'hidden',
+        borderBottom: '1px solid rgba(0,194,203,0.2)',
+      }}>
+        {/* Background image */}
+        <img
+          src={jjBanner}
+          alt=""
+          aria-hidden="true"
+          style={{
+            position: 'absolute', inset: 0, width: '100%', height: '100%',
+            objectFit: 'cover', objectPosition: 'center 40%',
+            filter: 'brightness(0.28) saturate(0.8)',
+            zIndex: 0
+          }}
+        />
+        {/* Neon teal glow top edge */}
+        <div style={{
+          position: 'absolute', top: 0, left: 0, right: 0, height: '2px',
+          background: 'linear-gradient(90deg, transparent, #00c2cb, #38f9d7, transparent)',
+          zIndex: 1
+        }} />
+        {/* Bottom fade to page background */}
+        <div style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0, height: '80px',
+          background: 'linear-gradient(to bottom, transparent, rgba(5,5,10,0.95))',
+          zIndex: 1
+        }} />
+
+        <div style={{ position: 'relative', zIndex: 2, maxWidth: '1280px', margin: '0 auto', padding: '36px 20px 32px' }}>
           {/* Pill Navigation */}
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
-            <div style={{ display: 'flex', background: 'rgba(255,255,255,0.06)', borderRadius: '40px', width: '100%', maxWidth: '600px', padding: '4px' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(10px)', borderRadius: '40px', width: '100%', maxWidth: '600px', padding: '4px', border: '1px solid rgba(255,255,255,0.1)' }}>
               {[
                 { id: 'upcoming', label: copy.upcoming },
                 { id: 'past', label: copy.past },
@@ -500,33 +530,32 @@ const Events = () => {
           </div>
 
           {/* Action Buttons */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-            <Link to="/admin/events/new" style={{ background: '#0ea5e9', color: '#fff', textDecoration: 'none', padding: '8px 16px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700 }}>Criar evento</Link>
-            <button style={{ background: '#18181b', color: '#0ea5e9', border: '1px solid #0ea5e9', padding: '8px 16px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={14} /> Academy finder</button>
-            <button style={{ background: '#0ea5e9', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700 }}>Ver mapa</button>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
+            <Link to="/admin/events/new" className="premium-btn">Criar evento</Link>
+            <button className="premium-btn" style={{ background: 'transparent', color: '#0ea5e9', border: '1px solid rgba(0,194,203,0.3)', boxShadow: 'none' }}><MapPin size={14} /> Academy finder</button>
+            <button className="premium-btn">Ver mapa</button>
           </div>
 
           {/* Search Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '12px' }}>
-            <input type="text" value={query} onChange={e => setQuery(e.target.value)} placeholder="Procurar evento..." style={{ gridColumn: 'span 4', background: '#fff', border: 'none', padding: '12px 16px', borderRadius: '4px', fontSize: '0.85rem', color: '#1a1a1a', outline: 'none' }} />
-            <select value={modeFilter} onChange={e => setModeFilter(e.target.value)} style={{ gridColumn: 'span 2', background: '#fff', border: 'none', padding: '12px 16px', borderRadius: '4px', fontSize: '0.85rem', color: '#71717a', outline: 'none', appearance: 'none' }}>
+          <div className="events-search-grid" style={{ display: 'grid', gap: '12px' }}>
+            <input type="text" value={query} onChange={e => setQuery(e.target.value)} placeholder="Procurar evento..." style={{ gridColumn: 'span 4', background: 'rgba(255,255,255,0.9)', border: 'none', padding: '12px 16px', borderRadius: '4px', fontSize: '0.85rem', color: '#1a1a1a', outline: 'none' }} />
+            <select value={modeFilter} onChange={e => setModeFilter(e.target.value)} style={{ gridColumn: 'span 2', background: 'rgba(255,255,255,0.9)', border: 'none', padding: '12px 16px', borderRadius: '4px', fontSize: '0.85rem', color: '#71717a', outline: 'none', appearance: 'none' }}>
               <option value="all">Select category</option>
               <option value="gi">{copy.gi}</option>
               <option value="nogi">{copy.noGi}</option>
             </select>
             
-            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} placeholder="Start date" style={{ gridColumn: 'span 1', background: '#fff', border: 'none', padding: '12px 16px', borderRadius: '4px', fontSize: '0.85rem', color: '#71717a', outline: 'none' }} />
-            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} placeholder="End date" style={{ gridColumn: 'span 1', background: '#fff', border: 'none', padding: '12px 16px', borderRadius: '4px', fontSize: '0.85rem', color: '#71717a', outline: 'none' }} />
-            <select style={{ gridColumn: 'span 2', background: '#fff', border: 'none', padding: '12px 16px', borderRadius: '4px', fontSize: '0.85rem', color: '#71717a', outline: 'none', appearance: 'none' }}><option>Type of game</option></select>
-            <select value={countryFilter} onChange={e => setCountryFilter(e.target.value)} style={{ gridColumn: 'span 2', background: '#fff', border: 'none', padding: '12px 16px', borderRadius: '4px', fontSize: '0.85rem', color: '#71717a', outline: 'none', appearance: 'none' }}>
+            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} placeholder="Start date" style={{ gridColumn: 'span 1', background: 'rgba(255,255,255,0.9)', border: 'none', padding: '12px 16px', borderRadius: '4px', fontSize: '0.85rem', color: '#71717a', outline: 'none' }} />
+            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} placeholder="End date" style={{ gridColumn: 'span 1', background: 'rgba(255,255,255,0.9)', border: 'none', padding: '12px 16px', borderRadius: '4px', fontSize: '0.85rem', color: '#71717a', outline: 'none' }} />
+            <select style={{ gridColumn: 'span 2', background: 'rgba(255,255,255,0.9)', border: 'none', padding: '12px 16px', borderRadius: '4px', fontSize: '0.85rem', color: '#71717a', outline: 'none', appearance: 'none' }}><option>Type of game</option></select>
+            <select value={countryFilter} onChange={e => setCountryFilter(e.target.value)} style={{ gridColumn: 'span 2', background: 'rgba(255,255,255,0.9)', border: 'none', padding: '12px 16px', borderRadius: '4px', fontSize: '0.85rem', color: '#71717a', outline: 'none', appearance: 'none' }}>
               <option value="all">Selecione paises</option>
               {countryOptions.map(code => <option value={code} key={code}>{countryLabelFromCode(code, uiLanguage)}</option>)}
             </select>
 
-            <div style={{ gridColumn: 'span 4' }}></div>
-            <select style={{ gridColumn: 'span 2', background: '#fff', border: 'none', padding: '12px 16px', borderRadius: '4px', fontSize: '0.85rem', color: '#71717a', outline: 'none', appearance: 'none' }}><option>Select season</option></select>
+            <div style={{ gridColumn: 'span 4' }} />
+            <select style={{ gridColumn: 'span 2', background: 'rgba(255,255,255,0.9)', border: 'none', padding: '12px 16px', borderRadius: '4px', fontSize: '0.85rem', color: '#71717a', outline: 'none', appearance: 'none' }}><option>Select season</option></select>
           </div>
-
         </div>
       </div>
 

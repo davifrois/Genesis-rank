@@ -31,6 +31,8 @@ export const normalizeRegistrationStatus = (value) => {
     normalized === 'PAGO'
     || normalized === 'CONFIRMADO'
     || normalized === 'PAGAMENTO_CONFIRMADO'
+    || normalized === 'APPROVED'
+    || normalized === 'PAID'
     || normalized === REGISTRATION_STATUS.PAYMENT_CONFIRMED
   ) {
     return REGISTRATION_STATUS.PAYMENT_CONFIRMED;

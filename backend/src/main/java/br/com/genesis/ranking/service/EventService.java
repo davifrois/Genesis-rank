@@ -126,7 +126,9 @@ public class EventService {
         event.getFeeAbsolute()
     )));
     event.setSuperFightsJson(writeSuperFights(request.getSuperFights()));
+    System.out.println(">>> Incoming superFightsPublished: " + request.getSuperFightsPublished());
     event.setSuperFightsPublished(Boolean.TRUE.equals(request.getSuperFightsPublished()));
+    System.out.println(">>> Entity superFightsPublished set to: " + event.getSuperFightsPublished());
     event.setRegistrationOpen(request.getRegistrationOpen() == null ? true : request.getRegistrationOpen());
     event.setInternalRegistration(request.getInternalRegistration() == null ? true : request.getInternalRegistration());
     event.setDate(parseDate(request.getDate()));

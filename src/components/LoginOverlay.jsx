@@ -419,13 +419,25 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '', initialMode = 'logi
                         event.currentTarget.style.display = 'none';
                     }}
                 />
-                {supportsLocalReset && (
+
+                {canClose && (
+                    <button type="button" className="login-close-float" onClick={onClose} aria-label={copy.close}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                )}
+
+                <div className="login-header-text">
+                    <h2>{copy.title}</h2>
+                    <p>{copy.subtitle}</p>
+                </div>
+
+                {supportsLocalReset && !resetMode && (
                     <div className="login-mode-switch" aria-label="Account access mode">
+                        <div className="login-mode-slider" style={{ transform: registerMode ? 'translateX(100%)' : 'translateX(0)' }}></div>
                         <button
                             type="button"
-                            className={!registerMode && !resetMode ? 'is-active' : ''}
+                            className={!registerMode ? 'is-active' : ''}
                             onClick={() => {
-                                setResetMode(false);
                                 handleCloseRegister();
                             }}
                         >
@@ -440,22 +452,6 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '', initialMode = 'logi
                         </button>
                     </div>
                 )}
-                <div className="login-header-row">
-                    <div className="login-header">
-                        <div className="login-brand">
-                            <ShieldCheck size={22} />
-                        </div>
-                        <div>
-                            <h2>{copy.title}</h2>
-                            <p>{copy.subtitle}</p>
-                        </div>
-                    </div>
-                    {canClose && (
-                        <button type="button" className="btn btn-ghost login-close" onClick={onClose}>
-                            {copy.close}
-                        </button>
-                    )}
-                </div>
 
                 {error && (
                     <div className="login-error" role="alert">

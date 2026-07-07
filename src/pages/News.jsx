@@ -5,6 +5,9 @@ import { useI18n } from '../hooks/useI18n';
 import { useStore } from '../hooks/useStore';
 import { socialMediaService } from '../services/socialMediaService';
 import { buildProfileShareCode } from '../utils/profileShare';
+import './News.css';
+import bgHero from '../assets/jiu_jitsu_community_bg.png';
+import defaultNewsCover from '../../img/filmmaker-venue.jpg';
 
 const INSTAGRAM_FEED_CACHE_KEY = 'genesis_public_instagram_feed_v1';
 const INSTAGRAM_FEED_CACHE_LIMIT = 10;
@@ -611,12 +614,38 @@ const News = () => {
   const selectedMentionedEvent = selectedNews ? getMentionedFutureEvent(selectedNews) : null;
 
   return (
-    <div className="public-page news-page">
-      <section className="news-portal-container">
-        <div className="news-header">
-          <span className="section-kicker">{copy.kicker}</span>
-          <h2>Genesis Newsroom</h2>
-          <p>{copy.description}</p>
+    <div className="public-page news-page" style={{ padding: 0 }}>
+      <section className="news-portal-container" style={{ paddingLeft: 'clamp(1.5rem, 4vw, 4rem)', paddingRight: 'clamp(1.5rem, 4vw, 4rem)' }}>
+        <div className="news-header" style={{ width: '100vw', marginLeft: 'calc(-50vw + 50%)', paddingLeft: 'clamp(1.5rem, 4vw, 4rem)', paddingRight: 'clamp(1.5rem, 4vw, 4rem)' }}>
+          <img
+            src={bgHero}
+            alt=""
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              objectPosition: 'center 30%',
+              opacity: 0.25,
+              pointerEvents: 'none',
+              zIndex: 0,
+              filter: 'grayscale(30%)'
+            }}
+          />
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'linear-gradient(90deg, rgba(5,7,11,0.95) 0%, rgba(5,7,11,0.7) 50%, rgba(5,7,11,0.3) 100%)',
+            pointerEvents: 'none',
+            zIndex: 1,
+          }} />
+          <div style={{ position: 'relative', zIndex: 2 }}>
+            <span className="section-kicker" style={{ color: '#00c2cb' }}>{copy.kicker}</span>
+            <h2>Genesis Newsroom</h2>
+            <p>{copy.description}</p>
+          </div>
         </div>
 
         {items.length ? (
@@ -639,15 +668,8 @@ const News = () => {
                     }
                   }}
                 >
-                  <div className={`news-image-wrapper ${featuredNews.imageUrl ? '' : 'news-image-wrapper--fallback'}`.trim()}>
-                    {featuredNews.imageUrl ? (
-                      <img src={featuredNews.imageUrl} alt={featuredNews.title} loading="lazy" />
-                    ) : (
-                      <div className="news-card__cover-fallback" aria-hidden="true">
-                        <Newspaper className="news-card__cover-fallback-icon" />
-                        <span>{copy.kicker}</span>
-                      </div>
-                    )}
+                  <div className="news-image-wrapper">
+                    <img src={featuredNews.imageUrl || defaultNewsCover} alt={featuredNews.title} loading="lazy" />
                   </div>
                   <div className="news-content-overlay">
                     <span className={`news-tag ${tag.className}`}>{tag.label}</span>
@@ -680,15 +702,8 @@ const News = () => {
                     }
                   }}
                 >
-                  <div className={`news-image-wrapper ${item.imageUrl ? '' : 'news-image-wrapper--fallback'}`.trim()}>
-                    {item.imageUrl ? (
-                      <img src={item.imageUrl} alt={item.title} loading="lazy" />
-                    ) : (
-                      <div className="news-card__cover-fallback" aria-hidden="true">
-                        <Newspaper className="news-card__cover-fallback-icon" />
-                        <span>{copy.kicker}</span>
-                      </div>
-                    )}
+                  <div className="news-image-wrapper">
+                    <img src={item.imageUrl || defaultNewsCover} alt={item.title} loading="lazy" />
                   </div>
                   <div className="news-content">
                     <span className={`news-tag ${tag.className}`}>{tag.label}</span>
@@ -795,7 +810,7 @@ const News = () => {
           )}
 
           <div
-            className={`social-feed-grid ${isSocialDragging ? 'is-dragging' : ''}`}
+            className={`social-media-grid ${isSocialDragging ? 'is-dragging' : ''}`}
             ref={socialFeedRef}
             onMouseDown={handleSocialMouseDown}
             onMouseMove={handleSocialMouseMove}
@@ -856,83 +871,43 @@ const News = () => {
                 const hasUsableCover = Boolean(baseCoverUrl) && mode !== 'failed';
                 const caption = truncateText(item.caption, 180) || copy.socialCaptionFallback;
                 return (
-                  <article className="social-post-card" key={postKey}>
+                  <a href={permalink} target="_blank" rel="noreferrer" className="social-card" key={postKey} aria-label={copy.socialOpenPost}>
                     {hasUsableCover ? (
-                      <a
-                        className="social-post-card__cover"
-                        href={permalink}
-                        target="_blank"
-                        rel="noreferrer"
-                        aria-label={copy.socialOpenPost}
-                      >
-                        <img
-                          src={coverUrl}
-                          alt=""
-                          loading="lazy"
-                          referrerPolicy="no-referrer"
-                          onLoad={() => {
-                            clearMediaRetryFlags(postKey);
-                          }}
-                          onError={() => {
-                            const nextMode = resolveNextMode(mode);
-                            setMediaRenderModeByPostKey((prev) => {
-                              const currentMode = prev[postKey] || 'direct';
-                              const computedNextMode = resolveNextMode(currentMode);
-                              if (currentMode === computedNextMode) return prev;
-                              return { ...prev, [postKey]: computedNextMode };
-                            });
-                            if (nextMode === 'failed') {
-                              clearMediaRetryFlags(postKey);
-                              return;
-                            }
-                          }}
-                        />
-                        {isRetryingMedia && (
-                          <span className="social-post-card__retry-overlay" aria-live="polite">
-                            <RefreshCcw size={14} className="is-spinning" />
-                            <span>{copy.socialRetryingMedia}</span>
-                          </span>
-                        )}
-                        {isVideo && (
-                          <span className="social-post-card__video">
-                            <PlayCircle size={18} />
-                          </span>
-                        )}
-                      </a>
+                      <img
+                        src={coverUrl}
+                        alt=""
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                        onLoad={() => clearMediaRetryFlags(postKey)}
+                        onError={() => {
+                          const nextMode = resolveNextMode(mode);
+                          setMediaRenderModeByPostKey((prev) => {
+                            const currentMode = prev[postKey] || 'direct';
+                            const computedNextMode = resolveNextMode(currentMode);
+                            if (currentMode === computedNextMode) return prev;
+                            return { ...prev, [postKey]: computedNextMode };
+                          });
+                          if (nextMode === 'failed') clearMediaRetryFlags(postKey);
+                        }}
+                      />
                     ) : (
-                      <div className="social-post-card__cover is-fallback">
-                        <div className="social-post-card__placeholder">
-                          <ImageOff size={18} />
-                          <span className={isRetryTimedOut ? 'social-post-card__placeholder-timeout' : ''}>
-                            {isRetryTimedOut ? copy.socialRetryTimeout : copy.socialImageUnavailable}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          className="social-post-card__retry"
-                          onClick={() => retrySocialMediaCover(postKey)}
-                          disabled={isRetryingMedia}
-                          aria-label={copy.socialRetryMedia}
-                        >
-                          <RefreshCcw size={14} className={isRetryingMedia ? 'is-spinning' : ''} />
-                          <span>{isRetryingMedia ? copy.socialRetryingMedia : copy.socialRetryMedia}</span>
-                        </button>
-                        {isVideo && (
-                          <span className="social-post-card__video">
-                            <PlayCircle size={18} />
-                          </span>
-                        )}
+                      <div className="social-card-fallback">
+                        <Newspaper size={48} />
+                        <span>{isRetryTimedOut ? copy.socialRetryTimeout : copy.socialImageUnavailable}</span>
                       </div>
                     )}
-                    <div className="news-card__meta">
-                      {formatDate(item.publishedAt, locale, copy.fallbackDate)}
+                    
+                    <div className="social-card__icon">
+                      {isVideo ? <PlayCircle size={24} /> : <ExternalLink size={24} />}
                     </div>
-                    <h3>{copy.socialSource}</h3>
-                    <p>{caption}</p>
-                    <a className="text-link" href={permalink} target="_blank" rel="noreferrer">
-                      {copy.socialOpenPost} <ExternalLink size={14} />
-                    </a>
-                  </article>
+
+                    <div className="social-card__overlay">
+                      <p className="social-card__caption">{caption}</p>
+                      <div className="news-meta" style={{ marginTop: '12px' }}>
+                        {formatDate(item.publishedAt, locale, copy.fallbackDate)}
+                      </div>
+                    </div>
+                  </a>
                 );
               })
             )}

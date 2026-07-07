@@ -14,6 +14,7 @@ import './About.css';
 import aboutHeroImage from '../../img/organizers-command-center.png';
 import filmmakerVenue from '../../img/filmmaker-venue.jpg';
 import placarImage from '../../img/placar.png';
+import podioImage from '../../img/Podio.jpeg';
 
 const highlights = [
   { value: '2017', label: 'Fundada em Belo Horizonte' },
@@ -119,7 +120,7 @@ const About = () => (
         </p>
       </div>
       <div className="about-tech-command-card">
-        <img src={placarImage} alt="Painel tecnologico de competicao" loading="lazy" />
+        <img src={podioImage} alt="Pódio do campeonato" loading="lazy" />
         <div>
           <ShieldCheck size={20} />
           <strong>Operacao auditavel</strong>

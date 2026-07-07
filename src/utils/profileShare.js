@@ -171,7 +171,7 @@ export const buildPublicProfileSnapshot = ({
           isAbsolute: athlete?.isAbsolute === true,
           points: Number(athlete?.pontos || 0),
           podiumPlace: podiumPlace || 0,
-          status: athlete?.status || 'PENDING'
+          status: athlete?.status || 'PAYMENT_CONFIRMED'
         });
         return acc;
       }
@@ -187,6 +187,14 @@ export const buildPublicProfileSnapshot = ({
           ? Math.min(existing.podiumPlace, podiumPlace)
           : podiumPlace;
       }
+      
+      const incomingStatus = athlete?.status || 'PAYMENT_CONFIRMED';
+      if (incomingStatus === 'PAYMENT_CONFIRMED' || incomingStatus === 'APPROVED' || incomingStatus === 'PAID' || incomingStatus === 'PAGO') {
+        existing.status = 'PAYMENT_CONFIRMED';
+      } else if (existing.status !== 'PAYMENT_CONFIRMED') {
+        existing.status = incomingStatus;
+      }
+
       return acc;
     }, new Map());
 

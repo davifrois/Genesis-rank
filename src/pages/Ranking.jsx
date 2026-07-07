@@ -11,6 +11,7 @@ import { buildFileSafeName, downloadCsv } from '../services/exportService';
 import { translateBelt, translateCompositeLabel, translateWeight } from '../utils/localeLabels';
 import { countryCodeFromAthlete, countryLabelFromAthlete, countryLabelFromCode, flagFromCountryCode } from '../utils/countryFlags';
 import './RankingV2.css';
+import './RankingAjp.css';
 
 const DEFAULT_GROUP_LIMIT = 8;
 const GROUP_PAGE_SIZE = 10;
@@ -113,7 +114,7 @@ const Ranking = () => {
     const [expandedGroups, setExpandedGroups] = useState(() => new Set());
     const [groupLimit, setGroupLimit] = useState(GROUP_PAGE_SIZE);
     const [winnersLimit, setWinnersLimit] = useState(WINNERS_PAGE_SIZE);
-    const [globalGender, setGlobalGender] = useState('ALL');
+    const [globalGender, setGlobalGender] = useState('MASCULINO');
     const [selectOpen, setSelectOpen] = useState(false);
     const copy = isEnglish
         ? {
@@ -533,8 +534,19 @@ const Ranking = () => {
             if (activeTab === 'ABS-NO-GI') return athlete.isNoGi && athlete.isAbsolute;
             if (activeTab === 'EQUIPE') return false;
             return true;
+        }).filter(athlete => {
+            const gen = (athlete.genero || athlete.sexo || '').toLowerCase().trim();
+            const isFemale = gen === 'feminino' || gen === 'f' || gen === 'female' || gen === 'mulher';
+            
+            if (globalGender === 'FEMININO') {
+                return isFemale;
+            }
+            if (globalGender === 'MASCULINO') {
+                return !isFemale;
+            }
+            return true;
         });
-    }, [activeTab, eventFilteredAthletes]);
+    }, [activeTab, eventFilteredAthletes, globalGender]);
 
     const normalizedSearch = useMemo(() => normalizeSearchTerm(deferredSearch), [deferredSearch]);
 
@@ -578,10 +590,49 @@ const Ranking = () => {
 
     const baseGroups = useMemo(() => {
         const groups = new Map();
+        
+        const tabFiltered = eventFilteredAthletes.filter((athlete) => {
+            if (activeTab === 'GI') return !athlete.isNoGi && !athlete.isAbsolute;
+            if (activeTab === 'NO-GI') return athlete.isNoGi && !athlete.isAbsolute;
+            if (activeTab === 'ABS-GI') return !athlete.isNoGi && athlete.isAbsolute;
+            if (activeTab === 'ABS-NO-GI') return athlete.isNoGi && athlete.isAbsolute;
+            if (activeTab === 'EQUIPE') return false;
+            return true;
+        });
+
+        tabFiltered.forEach((athlete) => {
+            const categoria = athlete.categoria || 'Categoria';
+            const faixa = athlete.faixa || 'Faixa';
+            const peso = athlete.peso || (athlete.isAbsolute ? 'Absoluto' : 'Peso');
+            
+            const normalizeGroupPart = (value) => ((value || '').toString().trim().toLowerCase().replace(/\s+/g, ' '));
+            const agnosticKeyParts = [categoria, faixa, peso, athlete.isAbsolute ? 'ABS' : 'STD', athlete.isNoGi ? 'NO-GI' : 'GI'];
+            const agnosticKey = agnosticKeyParts.map(normalizeGroupPart).join('::');
+            
+            if (!groups.has(agnosticKey)) {
+                const displayGender = globalGender === 'FEMININO' ? (isEnglish ? "Women's" : "Feminino") : (isEnglish ? "Men's" : "Masculino");
+                const labelParts = athlete.isAbsolute ? ['ABS', categoria, faixa, peso, displayGender] : [categoria, faixa, peso, displayGender];
+                
+                groups.set(agnosticKey, { 
+                    key: agnosticKey + '::' + globalGender.toLowerCase(),
+                    label: labelParts.join(' - '),
+                    entries: [] 
+                });
+            }
+        });
+
         filteredAthletes.forEach((athlete) => {
-            const { key, label } = buildCategoryDescriptor(athlete);
-            if (!groups.has(key)) groups.set(key, { key, label, entries: [] });
-            groups.get(key).entries.push(athlete);
+            const categoria = athlete.categoria || 'Categoria';
+            const faixa = athlete.faixa || 'Faixa';
+            const peso = athlete.peso || (athlete.isAbsolute ? 'Absoluto' : 'Peso');
+            
+            const normalizeGroupPart = (value) => ((value || '').toString().trim().toLowerCase().replace(/\s+/g, ' '));
+            const agnosticKeyParts = [categoria, faixa, peso, athlete.isAbsolute ? 'ABS' : 'STD', athlete.isNoGi ? 'NO-GI' : 'GI'];
+            const agnosticKey = agnosticKeyParts.map(normalizeGroupPart).join('::');
+            
+            if (groups.has(agnosticKey)) {
+                groups.get(agnosticKey).entries.push(athlete);
+            }
         });
 
         const grouped = [...groups.values()]
@@ -593,7 +644,7 @@ const Ranking = () => {
             .sort((a, b) => a.label.localeCompare(b.label));
 
         return grouped;
-    }, [filteredAthletes]);
+    }, [filteredAthletes, eventFilteredAthletes, activeTab, globalGender, isEnglish]);
 
     const { groupedAthletes, overallWinners } = useMemo(() => {
         if (activeTab !== 'GERAL' || isEventMode) {
@@ -897,545 +948,161 @@ const Ranking = () => {
     };
 
     return (
-        <div className={`ranking-minimal ranking-ajp ranking-clean ranking-reference-v2 ranking-v2-page ${isEventMode ? 'ranking-event-mode' : ''}`}>
-
-            {/* ---- HEADER: Título + Dropdown de Campeonato ---- */}
-            <div className="ranking-v2-topbar">
-                <h1>RANKINGS</h1>
-                <div className="rv2-custom-select-wrap">
-                    <button
-                        className="rv2-custom-select-btn"
-                        type="button"
-                        onClick={() => setSelectOpen(prev => !prev)}
-                        onBlur={() => setTimeout(() => setSelectOpen(false), 150)}
-                    >
-                        <span>{selectedEventId === 'all' ? copy.allEvents : (events.find(e => e.id === selectedEventId)?.name || copy.allEvents)}</span>
-                        <svg width="12" height="8" viewBox="0 0 12 8" fill="none"><path d="M1 1l5 5 5-5" stroke="#94a3b8" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                    </button>
-                    {selectOpen && (
-                        <div className="rv2-custom-select-panel">
-                            <div
-                                className={`rv2-custom-select-option ${selectedEventId === 'all' ? 'is-selected' : ''}`}
-                                onMouseDown={() => { setSelectedEventId('all'); setSelectOpen(false); }}
-                            >{copy.allEvents}</div>
-                            {events.map(ev => (
+        <div className="ajp-page-container">
+            {/* HEADER */}
+            <div className="ajp-header-section">
+                <div className="ajp-header-top">
+                    <h1 className="ajp-header-title">RANKINGS</h1>
+                    <div style={{ position: 'relative' }}>
+                        <button
+                            className="ajp-event-dropdown"
+                            onClick={() => setSelectOpen(!selectOpen)}
+                            onBlur={() => setTimeout(() => setSelectOpen(false), 200)}
+                        >
+                            {selectedEventId === 'all' ? copy.allEvents : (events.find(e => e.id === selectedEventId)?.name || copy.allEvents)}
+                            <ChevronDown size={14} />
+                        </button>
+                        {selectOpen && (
+                            <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: '0', background: '#333', border: '1px solid #444', borderRadius: '4px', zIndex: 10, minWidth: '100%', maxHeight: '400px', overflowY: 'auto', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.5)' }}>
                                 <div
-                                    key={ev.id}
-                                    className={`rv2-custom-select-option ${selectedEventId === ev.id ? 'is-selected' : ''}`}
-                                    onMouseDown={() => { setSelectedEventId(ev.id); setSelectOpen(false); }}
-                                >{ev.name}</div>
-                            ))}
-                        </div>
+                                    style={{ padding: '10px 16px', cursor: 'pointer', color: selectedEventId === 'all' ? '#0ea5e9' : '#fff' }}
+                                    onMouseDown={() => setSelectedEventId('all')}
+                                >
+                                    {copy.allEvents}
+                                </div>
+                                {events.map(ev => (
+                                    <div
+                                        key={ev.id}
+                                        style={{ padding: '10px 16px', cursor: 'pointer', color: selectedEventId === ev.id ? '#0ea5e9' : '#fff', borderTop: '1px solid #444' }}
+                                        onMouseDown={() => setSelectedEventId(ev.id)}
+                                    >
+                                        {ev.name}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+                
+                {/* BREADCRUMB */}
+                <div className="ajp-breadcrumb">
+                    <span>Rankings</span>
+                    <span>/</span>
+                    <span className="bc-current">
+                        {selectedEventId === 'all' ? copy.allEvents : (events.find(e => e.id === selectedEventId)?.name || copy.allEvents)}
+                    </span>
+                    {selectedEventId !== 'all' && (
+                        <>
+                            <span>/</span>
+                            <span>GENESIS ESPORTES RANKING OFICIAL</span>
+                        </>
                     )}
                 </div>
-            </div>
 
-            {/* ---- BREADCRUMB ---- */}
-            <div className="ranking-v2-breadcrumb">
-                <span>Rankings</span>
-                <span className="bc-sep">/</span>
-                <span>{selectedEventId === 'all' ? copy.allEvents : (events.find(e => e.id === selectedEventId)?.name || copy.allEvents)}</span>
-                {selectedEventId !== 'all' && (
-                    <>
-                        <span className="bc-sep">/</span>
-                        <span className="bc-tag">GENESIS ESPORTES RANKING OFICIAL</span>
-                    </>
-                )}
-            </div>
-
-            {/* ---- GENDER TOGGLE ---- */}
-            <div className="ranking-v2-gender-wrap">
-                <button
-                    type="button"
-                    className={`gender-v2-btn ${globalGender === 'MASCULINO' ? 'is-active' : ''}`}
-                    onClick={() => setGlobalGender(prev => prev === 'MASCULINO' ? 'ALL' : 'MASCULINO')}
-                >
-                    <User size={15} fill="currentColor" strokeWidth={0} /> MASCULINO
-                </button>
-                <button
-                    type="button"
-                    className={`gender-v2-btn ${globalGender === 'FEMININO' ? 'is-active' : ''}`}
-                    onClick={() => setGlobalGender(prev => prev === 'FEMININO' ? 'ALL' : 'FEMININO')}
-                >
-                    <User size={15} fill="currentColor" strokeWidth={0} /> FEMININO
-                </button>
-            </div>
-
-            {/* ---- TABS GI / NO-GI / etc. ---- */}
-            <div className="ranking-v2-tabs-wrap">
-                <div className="ranking-v2-tabs">
-                    {tabs.map((tab) => (
-                        <button
-                            key={tab.id}
-                            type="button"
-                            onClick={() => setActiveTab(tab.id)}
-                            className={`rv2-tab-btn ${activeTab === tab.id ? 'is-active' : ''}`}
-                        >
-                            {tab.label}
-                        </button>
-                    ))}
+                {/* GENDER TOGGLES */}
+                <div className="ajp-gender-toggles">
+                    <button 
+                        className={`ajp-gender-btn ${globalGender === 'MASCULINO' ? 'active' : ''}`}
+                        onClick={() => setGlobalGender('MASCULINO')}
+                    >
+                        <User size={16} />
+                        {isEnglish ? "MEN'S" : "MASCULINO"}
+                    </button>
+                    <button 
+                        className={`ajp-gender-btn ${globalGender === 'FEMININO' ? 'active' : ''}`}
+                        onClick={() => setGlobalGender('FEMININO')}
+                    >
+                        <User size={16} />
+                        {isEnglish ? "WOMEN'S" : "FEMININO"}
+                    </button>
                 </div>
             </div>
 
-            {hasBoardData && (
-                <section className="rank-boards-wrap">
-                    <div className="ranking-v2-section-head">
-                        <h2>{copy.boardsSectionTitle}</h2>
-                        <p>{copy.boardsSectionSubtitle}</p>
-                    </div>
-                    <div className="ranking-v2-board-grid">
-                        {boardAthletePanels.map((panel) => {
-                            const filteredEntries = globalGender === 'ALL'
-                                ? panel.entries
-                                : panel.entries.filter(a => (a.genero || '').toUpperCase() === globalGender);
-                            return (
-                                <article key={panel.key} className="rv2-board-card">
-                                    <div className="rv2-board-card__header">
-                                        <div className="rv2-board-card__title">
-                                            {panel.title} {modeLabel}
-                                            <span className="rv2-board-card__badge">{new Date().getFullYear()}</span>
-                                        </div>
-                                        <div className="rv2-board-card__subtitle">
-                                            Calculado pela última vez há 6 horas 🔄
-                                        </div>
-                                    </div>
-                                    <div className="rv2-board-card__list">
-                                        {filteredEntries.length === 0 ? (
-                                            <div className="rv2-board-empty">{copy.boardsNoData}</div>
-                                        ) : (
-                                            filteredEntries.map((athlete, index) => {
-                                                const metrics = athleteMetrics.get(athlete.id) || { wins: 0, podiumTotal: 0, podium1: 0, podium2: 0, podium3: 0 };
-                                                const photoUrl = resolvePhotoUrl(athlete);
-                                                const countryCode = countryCodeFromAthlete(athlete);
-                                                const countryLabel = countryLabelFromAthlete(athlete, uiLanguage);
-                                                return (
-                                                    <div key={`${panel.key}-${athlete.id}`} className="rv2-athlete-row">
-                                                        <div className="rv2-athlete-rank">{index + 1}.</div>
-                                                        <div className="rv2-athlete-avatar">
-                                                            <Link to={`/perfil-publico/${athlete.id}`} style={{ display: 'block', width: '100%', height: '100%', textDecoration: 'none', color: 'inherit' }}>
-                                                                {photoUrl ? (
-                                                                    <img src={photoUrl} alt={athlete.nome} loading="lazy" />
-                                                                ) : (
-                                                                    <span>{(athlete.nome || '?').trim().charAt(0).toUpperCase()}</span>
-                                                                )}
-                                                            </Link>
-                                                        </div>
-                                                        <div className="rv2-athlete-identity">
-                                                            <Link to={`/perfil-publico/${athlete.id}`} className="rv2-athlete-name" style={{ textDecoration: 'none', color: 'inherit' }}>{athlete.nome}</Link>
-                                                            <div className="rv2-athlete-country">
-                                                                <span>{flagFromCountryCode(countryCode)}</span>
-                                                                <span>{countryLabel || athlete.academia || '-'}</span>
-                                                            </div>
-                                                        </div>
-                                                        <div className="rv2-athlete-metrics">
-                                                            <div className="rv2-metric pts">
-                                                                <strong>{athlete.pontos}</strong>
-                                                                <span>Pontos</span>
-                                                            </div>
-                                                            <div className="rv2-metric wins">
-                                                                <strong>{metrics.wins}</strong>
-                                                                <span>Vitórias</span>
-                                                            </div>
-                                                            <div className="rv2-metric losses">
-                                                                <strong>{metrics.podiumTotal || 0}</strong>
-                                                                <span>Perdas</span>
-                                                            </div>
-                                                        </div>
-                                                        <div className="rv2-trophy-group">
-                                                            <div className="rv2-trophy">
-                                                                <Trophy size={12} color="#fbbf24" fill="#fbbf24" />
-                                                                <span>{metrics.podium1 || 0}</span>
-                                                            </div>
-                                                            <div className="rv2-trophy">
-                                                                <Trophy size={12} color="#94a3b8" fill="#94a3b8" />
-                                                                <span>{metrics.podium2 || 0}</span>
-                                                            </div>
-                                                            <div className="rv2-trophy">
-                                                                <Trophy size={12} color="#b45309" fill="#b45309" />
-                                                                <span>{metrics.podium3 || 0}</span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })
-                                        )}
-                                    </div>
-                                    <div className="rv2-board-card__footer">
-                                        <button type="button" onClick={() => { setShowFullList(true); setTimeout(() => window.scrollTo({ top: 800, behavior: 'smooth' }), 100); }}>{copy.seeAll}</button>
-                                    </div>
-                                </article>
-                            );
-                        })}
-
-                        {boardTeamPanels.map((panel) => (
-                            <article key={panel.key} className="rv2-board-card">
-                                <div className="rv2-board-card__header">
-                                    <div className="rv2-board-card__title">
-                                        {panel.title}
-                                        <span className="rv2-board-card__badge">{new Date().getFullYear()}</span>
-                                    </div>
-                                    <div className="rv2-board-card__subtitle">Calculado pela última vez há 6 horas 🔄</div>
-                                </div>
-                                <div className="rv2-board-card__list">
-                                    {panel.entries.length === 0 ? (
-                                        <div className="rv2-board-empty">{copy.boardsNoData}</div>
-                                    ) : (
-                                        panel.entries.map((team, index) => (
-                                            <div key={`${panel.key}-${team.key}`} className="rv2-athlete-row">
-                                                <div className="rv2-athlete-rank">{team.rank || index + 1}.</div>
-                                                <div className="rv2-athlete-avatar">
-                                                    <span>{(team.academy || '?').trim().charAt(0).toUpperCase()}</span>
-                                                </div>
-                                                <div className="rv2-athlete-identity">
-                                                    <div className="rv2-athlete-name">{team.academy}</div>
-                                                    <div className="rv2-athlete-country">
-                                                        <span>{flagFromCountryCode(team.countryCode)}</span>
-                                                        <span>{countryLabelFromCode(team.countryCode, uiLanguage) || team.countryCode}</span>
-                                                    </div>
-                                                </div>
-                                                <div className="rv2-athlete-metrics">
-                                                    <div className="rv2-metric pts">
-                                                        <strong>{team.points || team.pontos || 0}</strong>
-                                                        <span>Pontos</span>
-                                                    </div>
-                                                    <div className="rv2-metric wins">
-                                                        <strong>{team.wins || 0}</strong>
-                                                        <span>Vitórias</span>
-                                                    </div>
-                                                </div>
-                                                <div className="rv2-trophy-group">
-                                                    <div className="rv2-trophy">
-                                                        <Trophy size={12} color="#fbbf24" fill="#fbbf24" />
-                                                        <span>{team.campeao || 0}</span>
-                                                    </div>
-                                                    <div className="rv2-trophy">
-                                                        <Trophy size={12} color="#94a3b8" fill="#94a3b8" />
-                                                        <span>{team.vice || 0}</span>
-                                                    </div>
-                                                    <div className="rv2-trophy">
-                                                        <Trophy size={12} color="#b45309" fill="#b45309" />
-                                                        <span>{team.terceiro || 0}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                                <div className="rv2-board-card__footer">
-                                    <button type="button" onClick={() => { setShowFullList(true); setTimeout(() => window.scrollTo({ top: 800, behavior: 'smooth' }), 100); }}>{copy.seeAll}</button>
-                                </div>
-                            </article>
-                        ))}
-                    </div>
-                </section>
-            )}
-
-            {showFullList && (
-                <div className="ajp-grid">
-                    {activeTab === 'EQUIPE' ? (
-                    <section className="ajp-card ajp-card--full">
-                        <div className="ajp-card__header">
-                            <div>
-                                <div className="ajp-card__title">{copy.boardsTeamsTitle}</div>
-                                <div className="ajp-card__meta">{eventLabel}</div>
+            {/* CATEGORY GRID */}
+            <div className="ajp-category-grid" style={{ padding: '0 40px 40px', maxWidth: '1400px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(500px, 1fr))', gap: '32px' }}>
+                {groupedAthletes.map(group => {
+                    const top5 = group.entries.slice(0, 5);
+                    return (
+                        <div key={group.key} className="ajp-category-card">
+                            <div className="ajp-category-header">
+                                <h3 className="ajp-category-title">{group.label}</h3>
+                                <p className="ajp-category-subtitle">Last calculated just now</p>
                             </div>
-                            <span className="ajp-card__status">{copy.updatedNow}</span>
-                        </div>
-                        {competitionMode && activeTeamRanking.length > 0 && (
-                            <div className="ajp-podium">
-                                <div className="ajp-podium__title">{copy.podiumHighlight}</div>
-                                <div className="ajp-podium__grid">
-                                    {activeTeamRanking.slice(0, 3).map((team, index) => (
-                                        <article key={`team-podium-${team.key}`} className={`ajp-podium__item is-place-${index + 1}`}>
-                                            <span className="ajp-podium__place">{podiumPlaceLabel(index)}</span>
-                                            <strong className="ajp-podium__name">{team.academy}</strong>
-                                            <span className="ajp-podium__meta">{team.athletes} {copy.boardsAthletesSuffix}</span>
-                                            <span className="ajp-podium__score">{team.pontos} {copy.points}</span>
-                                        </article>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                        <div className="ajp-list">
-                            {activeTeamRanking.map((team, index) => {
-                                const rankPosition = team.rank || index + 1;
-                                const isPodium = competitionMode && index < 3;
-                                return (
-                                    <div key={team.key} className={`ajp-row ${isPodium ? `is-podium is-podium-${index + 1}` : ''}`}>
-                                        <div className={`ajp-rank ${index < 3 ? 'is-top' : ''}`}>
-                                            {rankPosition}
-                                            {isPodium && <span className="ajp-rank-pill">P{index + 1}</span>}
-                                        </div>
-                                        <div className="ajp-info" style={{ marginLeft: '12px' }}>
-                                            <div className="ajp-name">{team.academy}</div>
-                                            <div className="ajp-sub">
-                                                <span className="ajp-country">
-                                                    <span className="ajp-flag">{flagFromCountryCode(team.countryCode)}</span>
-                                                    {countryLabelFromCode(team.countryCode, uiLanguage) || team.countryCode}
-                                                </span>
-                                                <span>{team.athletes} {copy.boardsAthletesSuffix}</span>
-                                            </div>
-                                        </div>
-                                        <div className="ajp-metrics">
-                                            <div className="ajp-metric">
-                                                <strong>{team.pontos}</strong>
-                                                <span>{copy.points}</span>
-                                            </div>
-                                            <div className="ajp-metric ajp-metric--win">
-                                                <strong>{team.wins}</strong>
-                                                <span>{copy.wins}</span>
-                                            </div>
-                                            <div className="ajp-metric ajp-metric--podium">
-                                                <strong>{team.campeao + team.vice + team.terceiro}</strong>
-                                                <span>{copy.podiums}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </section>
-                ) : showGeneralWinners ? (
-                    <section className="ajp-card ajp-card--full">
-                        <div className="ajp-card__header">
-                            <div>
-                                <div className="ajp-card__title">{copy.overallRanking}</div>
-                                <div className="ajp-card__meta">{eventLabel}</div>
-                            </div>
-                            <span className="ajp-card__status">{copy.updatedNow}</span>
-                        </div>
-                        {competitionMode && podiumOverallEntries.length > 0 && (
-                            <div className="ajp-podium">
-                                <div className="ajp-podium__title">{copy.podiumHighlight}</div>
-                                <div className="ajp-podium__grid">
-                                    {podiumOverallEntries.map((item, index) => (
-                                        <article key={`overall-podium-${item.athlete.id}`} className={`ajp-podium__item is-place-${index + 1}`}>
-                                            <span className="ajp-podium__place">{podiumPlaceLabel(index)}</span>
-                                            <Link to={`/perfil-publico/${item.athlete.id}`} className="ajp-podium__name" style={{ textDecoration: 'none', color: 'inherit' }}>{item.athlete.nome}</Link>
-                                            <span className="ajp-podium__meta">{item.athlete.academia || '-'}</span>
-                                            <span className="ajp-podium__score">{item.athlete.pontos} {copy.points}</span>
-                                        </article>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                        <div className="ajp-list">
-                            {pagedWinners.map((item, index) => {
-                                const athlete = item.athlete;
-                                const photoUrl = resolvePhotoUrl(athlete);
-                                const countryCode = countryCodeFromAthlete(athlete);
-                                const countryLabel = countryLabelFromAthlete(athlete, uiLanguage);
-                                const podiumClass = competitionMode && index < 3 ? ` is-podium is-podium-${index + 1}` : '';
-                                const metrics = athleteMetrics.get(athlete.id) || {
-                                    wins: 0,
-                                    podium1: 0,
-                                    podium2: 0,
-                                    podium3: 0,
-                                    podiumTotal: 0
-                                };
-                                return (
-                                    <div key={`${athlete.id}-${item.label}`} className={`ajp-row${podiumClass}`}>
-                                        <div className={`ajp-rank ${index < 3 ? 'is-top' : ''}`}>
-                                            {index + 1}
-                                            {competitionMode && index < 3 && (
-                                                <span className="ajp-rank-pill">P{index + 1}</span>
-                                            )}
-                                        </div>
-                                        <div className={`ajp-avatar ${photoUrl ? '' : 'ajp-avatar--empty'}`}>
-                                            <Link to={`/perfil-publico/${athlete.id}`} style={{ display: 'block', width: '100%', height: '100%', textDecoration: 'none', color: 'inherit' }}>
-                                                {photoUrl ? (
-                                                    <img src={photoUrl} alt={athlete.nome || copy.eventFallback} className="ajp-avatar__img" loading="lazy" />
-                                                ) : null}
-                                            </Link>
-                                        </div>
-                                        <div className="ajp-info">
-                                            <Link to={`/perfil-publico/${athlete.id}`} className="ajp-name" style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>{athlete.nome}</Link>
-                                            <div className="ajp-sub">
-                                                <span className="ajp-country">
-                                                    <span className="ajp-flag" aria-label={`${copy.flagLabel} ${countryLabel}`}>{flagFromCountryCode(countryCode)}</span>
-                                                    {countryLabel}
-                                                </span>
-                                                <span>{athlete.academia}</span>
-                                                <span className={`rank-mode ${athlete.isNoGi ? 'is-nogi' : 'is-gi'}`}>
-                                                    {buildModeTag(athlete)}
-                                                </span>
-                                                <span>{translateGroupLabel(item.label)}</span>
-                                            </div>
-                                        </div>
-                                            <div className="ajp-metrics">
-                                                <div className="ajp-metric">
-                                                    <strong>{athlete.pontos}</strong>
-                                                    <span>{copy.points}</span>
-                                                </div>
-                                                <div className="ajp-metric ajp-metric--win">
-                                                    <strong>{metrics.wins}</strong>
-                                                    <span>{copy.wins}</span>
-                                                </div>
-                                                <div className="ajp-metric ajp-metric--podium">
-                                                    <strong>{metrics.podiumTotal}</strong>
-                                                    <span>{copy.podiums}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                );
-                            })}
-                        </div>
-                    </section>
-                ) : (
-                    pagedGroups.length === 0 ? (
-                        <div className="rank-empty">
-                            {isEventMode ? copy.noAthleteInEvent : copy.noAthleteInCategory}
-                        </div>
-                    ) : (
-                        pagedGroups.map((group) => (
-                            <section key={group.key || group.label} className="ajp-card">
-                                <div className="ajp-card__header">
-                                    <div>
-                                        <div className="ajp-card__title">{translateGroupLabel(group.label)}</div>
-                                        <div className="ajp-card__meta">{group.totalCount} {copy.athletes.toLowerCase()}</div>
-                                    </div>
-                                    <span className="ajp-card__status">{copy.updatedNow}</span>
-                                </div>
-                                {competitionMode && group.entries.length > 0 && (
-                                    <div className="ajp-podium">
-                                        <div className="ajp-podium__title">{copy.podiumHighlight}</div>
-                                        <div className="ajp-podium__grid">
-                                            {group.entries.slice(0, 3).map((athlete, index) => (
-                                                <article key={`group-podium-${group.key}-${athlete.id}`} className={`ajp-podium__item is-place-${index + 1}`}>
-                                                    <span className="ajp-podium__place">{podiumPlaceLabel(index)}</span>
-                                                    <strong className="ajp-podium__name">{athlete.nome}</strong>
-                                                    <span className="ajp-podium__meta">{athlete.academia || '-'}</span>
-                                                    <span className="ajp-podium__score">{athlete.pontos} {copy.points}</span>
-                                                </article>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                                <div className="ajp-list">
-                                    {group.entries.map((athlete, index) => {
-                                        const photoUrl = resolvePhotoUrl(athlete);
+                            <div className="ajp-category-body">
+                                {top5.length === 0 ? (
+                                    <div className="ajp-empty-state">Nenhum atleta na categoria.</div>
+                                ) : (
+                                    top5.map((athlete, index) => {
                                         const countryCode = countryCodeFromAthlete(athlete);
-                                        const countryLabel = countryLabelFromAthlete(athlete, uiLanguage);
-                                        const podiumClass = competitionMode && index < 3 ? ` is-podium is-podium-${index + 1}` : '';
-                                        const metrics = athleteMetrics.get(athlete.id) || {
-                                            wins: 0,
-                                            podium1: 0,
-                                            podium2: 0,
-                                            podium3: 0,
-                                            podiumTotal: 0
-                                        };
+                                        const photoUrl = resolvePhotoUrl(athlete);
+                                        const metrics = athleteMetrics.get(athlete.id) || { wins: 0, podiumTotal: 0, podium1: 0, podium2: 0, podium3: 0 };
+                                        
+                                        // Re-calculate losses manually for display
+                                        const history = Array.isArray(athlete.historico) ? athlete.historico : [];
+                                        let losses = 0;
+                                        history.forEach(item => {
+                                            if ((item?.type || '').toString().toLowerCase().trim() === 'loss') losses += 1;
+                                        });
+
                                         return (
-                                            <div key={athlete.id} className={`ajp-row${podiumClass}`}>
-                                                <div className={`ajp-rank ${index < 3 ? 'is-top' : ''}`}>
-                                                    {index + 1}
-                                                    {competitionMode && index < 3 && (
-                                                        <span className="ajp-rank-pill">P{index + 1}</span>
-                                                    )}
+                                            <Link
+                                                key={athlete.id}
+                                                to={`/perfil-publico/${athlete.id}`}
+                                                className="ajp-category-row"
+                                            >
+                                                <div className="ajp-category-rank">{index + 1}.</div>
+                                                <div className="ajp-category-avatar">
+                                                    {photoUrl ? <img src={photoUrl} alt={athlete.nome} loading="lazy" /> : <User size={24} color="#aaa" />}
                                                 </div>
-                                                <div className={`ajp-avatar ${photoUrl ? '' : 'ajp-avatar--empty'}`}>
-                                                    {photoUrl ? (
-                                                        <img src={photoUrl} alt={athlete.nome || copy.eventFallback} className="ajp-avatar__img" loading="lazy" />
-                                                    ) : null}
-                                                </div>
-                                                <div className="ajp-info">
-                                                    <div className="ajp-name">{athlete.nome}</div>
-                                                    <div className="ajp-sub">
-                                                        <span className="ajp-country">
-                                                            <span className="ajp-flag" aria-label={`${copy.flagLabel} ${countryLabel}`}>{flagFromCountryCode(countryCode)}</span>
-                                                            {countryLabel}
-                                                        </span>
-                                                        <span>{athlete.academia}</span>
-                                                        <span className={`rank-mode ${athlete.isNoGi ? 'is-nogi' : 'is-gi'}`}>
-                                                            {buildModeTag(athlete)}
-                                                        </span>
-                                                        <span>{translateAthleteBelt(athlete.faixa)} / {translateAthleteWeight(athlete.peso)}</span>
+                                                <div className="ajp-category-info">
+                                                    <div className="ajp-category-name">{athlete.nome}</div>
+                                                    <div className="ajp-category-country">
+                                                        <span>{flagFromCountryCode(countryCode)}</span>
+                                                        <span>{countryLabelFromAthlete(athlete, uiLanguage)}</span>
                                                     </div>
                                                 </div>
-                                                <div className="ajp-metrics">
-                                                    <div className="ajp-metric">
-                                                        <strong>{athlete.pontos}</strong>
-                                                        <span>{copy.points}</span>
+                                                <div className="ajp-category-stats">
+                                                    <div className="ajp-stat-col">
+                                                        <span className="ajp-stat-val blue">{athlete.pontos || 0}</span>
+                                                        <span className="ajp-stat-label">Points</span>
                                                     </div>
-                                                    <div className="ajp-metric ajp-metric--win">
-                                                        <strong>{metrics.wins}</strong>
-                                                        <span>{copy.wins}</span>
+                                                    <div className="ajp-stat-col">
+                                                        <span className="ajp-stat-val green">{metrics.wins || 0}</span>
+                                                        <span className="ajp-stat-label">Wins</span>
                                                     </div>
-                                                    <div className="ajp-metric ajp-metric--podium">
-                                                        <strong>{metrics.podiumTotal}</strong>
-                                                        <span>{copy.podiums}</span>
+                                                    <div className="ajp-stat-col">
+                                                        <span className="ajp-stat-val red">{losses || 0}</span>
+                                                        <span className="ajp-stat-label">Losses</span>
+                                                    </div>
+                                                    <div className="ajp-stat-col">
+                                                        <span className="ajp-stat-val gold">{metrics.podium1 || 0}</span>
+                                                        <span className="ajp-stat-label" style={{fontSize: '10px', marginTop: '2px'}}>🥇</span>
+                                                    </div>
+                                                    <div className="ajp-stat-col">
+                                                        <span className="ajp-stat-val silver">{metrics.podium2 || 0}</span>
+                                                        <span className="ajp-stat-label" style={{fontSize: '10px', marginTop: '2px'}}>🥈</span>
+                                                    </div>
+                                                    <div className="ajp-stat-col">
+                                                        <span className="ajp-stat-val bronze">{metrics.podium3 || 0}</span>
+                                                        <span className="ajp-stat-label" style={{fontSize: '10px', marginTop: '2px'}}>🥉</span>
                                                     </div>
                                                 </div>
-                                            </div>
+                                            </Link>
                                         );
-                                    })}
+                                    })
+                                )}
+                            </div>
+                            {group.entries.length > 5 && (
+                                <div className="ajp-category-footer">
+                                    See all
                                 </div>
-                                {group.hiddenCount > 0 && (
-                                    <div className="ajp-card__footer">
-                                        <span>+{group.hiddenCount} {copy.hiddenAthletes}</span>
-                                        <button
-                                            type="button"
-                                            className="btn btn-ghost rank-group-button"
-                                            onClick={() => toggleGroup(group.key)}
-                                        >
-                                            {copy.seeAll}
-                                            <ChevronDown size={14} />
-                                        </button>
-                                    </div>
-                                )}
-                                {group.hiddenCount <= 0 && compactView && expandedGroups.has(group.key) && !normalizedSearch && (
-                                    <div className="ajp-card__footer">
-                                        <button
-                                            type="button"
-                                            className="btn btn-ghost rank-group-button"
-                                            onClick={() => toggleGroup(group.key)}
-                                        >
-                                            {copy.collapse}
-                                            <ChevronUp size={14} />
-                                        </button>
-                                    </div>
-                                )}
-                            </section>
-                        ))
-                    )
-                )}
-                </div>
-            )}
-
-            {showFullList && activeTab === 'GERAL' && filteredWinners.length > winnersLimit && (
-                <div className="rank-more">
-                    <button
-                        type="button"
-                        className="btn btn-secondary"
-                        onClick={() => setWinnersLimit((prev) => prev + WINNERS_PAGE_SIZE)}
-                    >
-                        {copy.showMoreResults}
-                    </button>
-                </div>
-            )}
-
-            {showFullList && activeTab !== 'GERAL' && visibleGroups.length > groupLimit && !isEventMode && (
-                <div className="rank-more">
-                    <button
-                        type="button"
-                        className="btn btn-secondary"
-                        onClick={() => setGroupLimit((prev) => prev + GROUP_PAGE_SIZE)}
-                    >
-                        {copy.showMoreCategories}
-                    </button>
-                </div>
-            )}
-
-            {showFullList && (activeTab === 'EQUIPE'
-                ? activeTeamRanking.length === 0 && <div className="rank-empty">{copy.boardsNoData}</div>
-                : showGeneralWinners
-                    ? filteredWinners.length === 0 && <div className="rank-empty">{copy.noWinner}</div>
-                    : !isEventMode && searchedGroups.length === 0 && (
-                        <div className="rank-empty">{copy.noAthleteInCategory}</div>
-                    ))}
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
         </div>
     );
 };
 
 export default Ranking;
-
-

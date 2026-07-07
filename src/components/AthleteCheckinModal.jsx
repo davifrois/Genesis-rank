@@ -12,7 +12,8 @@ const AthleteCheckinModal = ({ isOpen, onClose, athlete, athleteAge, onSave }) =
     const [formData, setFormData] = useState({
         peso: '',
         categoria: '',
-        faixa: ''
+        faixa: '',
+        academia: ''
     });
 
     useEffect(() => {
@@ -20,7 +21,8 @@ const AthleteCheckinModal = ({ isOpen, onClose, athlete, athleteAge, onSave }) =
             setFormData({
                 peso: athlete.peso || '',
                 categoria: athlete.categoria || '',
-                faixa: athlete.faixa || ''
+                faixa: athlete.faixa || '',
+                academia: athlete.academia || ''
             });
         }
     }, [athlete]);
@@ -104,7 +106,20 @@ const AthleteCheckinModal = ({ isOpen, onClose, athlete, athleteAge, onSave }) =
                     <form onSubmit={handleSubmit} className="checkin-form">
                         <div className="form-info-card">
                             <p><strong>Atleta:</strong> {athlete?.nome}</p>
-                            <p><strong>Equipe:</strong> {athlete?.academia || 'Sem equipe'}</p>
+                            <p><strong>Equipe Atual:</strong> {athlete?.academia || 'Sem equipe'}</p>
+                        </div>
+
+                        <div className="form-group">
+                            <label htmlFor="academia">Academia (Equipe)</label>
+                            <input
+                                type="text"
+                                id="academia"
+                                name="academia"
+                                value={formData.academia}
+                                onChange={handleChange}
+                                className="form-control"
+                                placeholder="Nome da academia"
+                            />
                         </div>
 
                         <div className="form-group">

@@ -25,10 +25,6 @@
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  background-image: url('/hero-bg.jpg.jpeg');
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
   margin-left: calc(-50vw + 50%);
   margin-right: calc(-50vw + 50%);
   margin-top: -120px;
@@ -37,11 +33,55 @@
   padding-left: 1rem;
   padding-right: 1rem;
   overflow: hidden;
+  background: radial-gradient(circle at -10% 50%, rgba(36, 120, 255, 0.15) 0%, #000 40%);
+}
+
+.home-hero::after {
+  content: "GENESIS";
+  position: absolute;
+  top: 50%;
+  left: -8vw;
+  transform: translateY(-50%) rotate(-90deg);
+  font-size: 14vw;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.02);
+  letter-spacing: 0.2em;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 1;
+}
+
+@media (max-width: 768px) {
+  .home-hero::after {
+    display: none;
+  }
+}
+
+.home-hero::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: url('/hero-bg.jpg.jpeg');
+  background-size: cover;
+  background-position: center;
+  z-index: 0;
+}
+
+@media (min-width: 768px) {
+  .home-hero::before {
+    left: 20%;
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, black 20%);
+    mask-image: linear-gradient(to right, transparent 0%, black 20%);
+  }
 }
 
 .home-hero__overlay {
   position: absolute;
   inset: 0;
+  z-index: 1;
   background: linear-gradient(
     105deg,
     rgba(0, 0, 0, 0.88) 0%,

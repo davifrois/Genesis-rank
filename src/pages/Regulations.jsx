@@ -13,6 +13,11 @@ import {
 } from 'lucide-react';
 import { useI18n } from '../hooks/useI18n';
 import './Regulations.css';
+import scoreQueda from '../assets/score_queda.png';
+import scorePassagem from '../assets/score_passagem.png';
+import scoreMontada from '../assets/score_montada.png';
+import scoreVantagem from '../assets/score_vantagem.png';
+import heroBg from '../assets/jj_events_banner.png';
 
 const normalizeSearch = (value = '') =>
   value
@@ -63,7 +68,7 @@ const scoreRows = [
 const copyByLanguage = {
   pt: {
     kicker: 'Regulamento oficial',
-    title: 'Regras e Normas Oficiais Genesis',
+    title: 'Regras e Normas Oficiais',
     description:
       'Transparencia total para atletas, professores e organizadores. O padrao de excelencia em artes marciais.',
     searchPlaceholder: "Busque por 'Peso Leve', 'Penalidades', etc.",
@@ -326,25 +331,50 @@ const Regulations = () => {
             A pontuacao deve ser clara para atletas e equipes acompanharem o resultado da luta e o
             reflexo no ranking.
           </p>
-          <div className="regulamento-table-wrap">
-            <table className="regulamento-score-table">
-              <thead>
-                <tr>
-                  <th>Acao</th>
-                  <th>Pontuacao</th>
-                  <th>Observacao</th>
-                </tr>
-              </thead>
-              <tbody>
-                {scoreRows.map((row) => (
-                  <tr key={row.action}>
-                    <td>{row.action}</td>
-                    <td>{row.points}</td>
-                    <td>{row.note}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="scoring-grid">
+            <div className="scoring-card">
+              <div className="scoring-card__image-wrapper">
+                <img src={scoreQueda} alt="Queda" className="scoring-card__image" />
+                <div className="scoring-card__badge">+2</div>
+              </div>
+              <div className="scoring-card__content">
+                <h4>Queda, raspagem ou joelho</h4>
+                <p>Controle estabilizado por tempo suficiente para validar a posicao.</p>
+              </div>
+            </div>
+
+            <div className="scoring-card">
+              <div className="scoring-card__image-wrapper">
+                <img src={scorePassagem} alt="Passagem de guarda" className="scoring-card__image" />
+                <div className="scoring-card__badge">+3</div>
+              </div>
+              <div className="scoring-card__content">
+                <h4>Passagem de guarda</h4>
+                <p>Atleta supera a guarda e consolida controle lateral ou equivalente.</p>
+              </div>
+            </div>
+
+            <div className="scoring-card">
+              <div className="scoring-card__image-wrapper">
+                <img src={scoreMontada} alt="Montada e costas" className="scoring-card__image" />
+                <div className="scoring-card__badge">+4</div>
+              </div>
+              <div className="scoring-card__content">
+                <h4>Montada e pegada pelas costas</h4>
+                <p>Posicoes dominantes com controle claro do adversario.</p>
+              </div>
+            </div>
+
+            <div className="scoring-card">
+              <div className="scoring-card__image-wrapper">
+                <img src={scoreVantagem} alt="Vantagem" className="scoring-card__image" />
+                <div className="scoring-card__badge scoring-card__badge--vantagem">+V</div>
+              </div>
+              <div className="scoring-card__content">
+                <h4>Vantagem técnica</h4>
+                <p>Aplicada quando ha progressao real sem consolidar a pontuacao completa.</p>
+              </div>
+            </div>
           </div>
         </div>
       )
@@ -372,8 +402,18 @@ const Regulations = () => {
     <div className="public-page regulations-page">
       <div className="regulations-shell">
         <div className="regulations-main">
-          <section className="regulamento-hero" id="regulamento-hero">
-            <div className="regulamento-hero__content">
+          <section className="regulamento-hero" id="regulamento-hero" style={{
+            backgroundImage: `linear-gradient(to bottom, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.95)), url(${heroBg})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            width: '100vw',
+            marginLeft: 'calc(-50vw + 50%)',
+            padding: '80px 20px 40px',
+            display: 'flex',
+            justifyContent: 'center',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
+          }}>
+            <div className="regulamento-hero__content" style={{ width: '100%', maxWidth: '900px', margin: '0 auto' }}>
               <span className="section-kicker">{copy.kicker}</span>
               <h1>{copy.title}</h1>
               <p>{copy.description}</p>

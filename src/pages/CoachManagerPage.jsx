@@ -3,7 +3,8 @@ import { useStore } from '../hooks/useStore';
 import GerenteTreinador from '../components/GerenteTreinador';
 import LoginOverlay from '../components/LoginOverlay';
 import { Link } from 'react-router-dom';
-import { ClipboardList, ChevronLeft, Trophy, ChevronDown } from 'lucide-react';
+import { ClipboardList, ChevronLeft, Trophy, ChevronDown, CalendarX, Shield } from 'lucide-react';
+import bgHero from '../assets/jiu_jitsu_combat_bg.png';
 
 const CoachManagerPage = () => {
   const { currentUser, memberProfiles, events, academies, addAthlete } = useStore();
@@ -93,10 +94,42 @@ const CoachManagerPage = () => {
   const selectedAcademy = academies.find(a => a.id === academyId);
 
   return (
-    <div className="public-page profile-page">
+    <div className="public-page profile-page" style={{ padding: 0 }}>
       {/* Header */}
-      <section className="profile-header" style={{ paddingBottom: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+      <section className="profile-header" style={{ 
+        paddingBottom: '24px', paddingTop: '28px', paddingLeft: 'clamp(1.5rem, 4vw, 4rem)', paddingRight: 'clamp(1.5rem, 4vw, 4rem)', 
+        position: 'relative', overflow: 'hidden',
+        width: '100vw', marginLeft: 'calc(-50vw + 50%)',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
+      }}>
+        {/* Jiu-jitsu background image - full cover */}
+        <img
+          src={bgHero}
+          alt=""
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            objectPosition: 'center 30%',
+            opacity: 0.35,
+            pointerEvents: 'none',
+            zIndex: 0,
+            filter: 'grayscale(50%) contrast(120%)'
+          }}
+        />
+        {/* Gradient overlay so text stays readable */}
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'linear-gradient(90deg, rgba(10,10,14,0.95) 0%, rgba(10,10,14,0.7) 40%, rgba(10,10,14,0.2) 100%)',
+          pointerEvents: 'none',
+          zIndex: 1,
+        }} />
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', position: 'relative', zIndex: 2 }}>
           <div style={{
             width: '48px', height: '48px', borderRadius: '12px',
             background: 'linear-gradient(135deg, var(--brand-primary,#00c2cb), #009ba3)',
@@ -107,17 +140,22 @@ const CoachManagerPage = () => {
           </div>
           <div>
             <span className="section-kicker">Gestão de Inscrições</span>
-            <h1 className="profile-title" style={{ marginTop: '2px' }}>
+            <h1 className="profile-title" style={{ marginTop: '2px', textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>
               Gerente de Inscrições
             </h1>
-            <p className="profile-subtitle" style={{ marginTop: '4px' }}>
-              {selectedAcademy
-                ? `Academia: ${selectedAcademy.name}`
-                : 'Gerencie inscrições em lote dos seus alunos nos campeonatos.'}
-            </p>
+            <div style={{ 
+              display: 'inline-flex', alignItems: 'center', gap: '6px', 
+              background: 'rgba(0,194,203,0.1)', border: '1px solid rgba(0,194,203,0.3)', 
+              padding: '6px 14px', borderRadius: '30px', 
+              color: '#00c2cb', fontSize: '0.85rem', fontWeight: '600', 
+              marginTop: '10px', backdropFilter: 'blur(4px)'
+            }}>
+              <Shield size={14} />
+              {selectedAcademy ? selectedAcademy.name : 'Gerenciamento de Equipe'}
+            </div>
           </div>
         </div>
-        <div className="profile-settings-toolbar">
+        <div className="profile-settings-toolbar" style={{ position: 'relative', zIndex: 2 }}>
           <Link to="/minha-conta" className="btn btn-secondary profile-settings-toolbar__btn"
             style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <ChevronLeft size={15} /> Minha Conta
@@ -125,15 +163,15 @@ const CoachManagerPage = () => {
         </div>
       </section>
 
-      <div style={{ marginTop: '2rem', marginBottom: '5rem' }}>
+      <div style={{ marginTop: '2rem', marginBottom: '5rem', paddingLeft: 'clamp(1.5rem, 4vw, 4rem)', paddingRight: 'clamp(1.5rem, 4vw, 4rem)' }}>
         {/* Seletor de Campeonato */}
         <div style={{
-          background: 'linear-gradient(145deg, rgba(30,30,35,0.8), rgba(20,20,24,0.9))',
+          background: 'rgba(15, 23, 42, 0.6)',
           backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255,255,255,0.05)',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-          borderRadius: '20px',
-          padding: '24px 30px',
+          border: '1px solid rgba(36, 120, 255, 0.2)',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)',
+          borderRadius: '24px',
+          padding: '32px',
           marginBottom: '36px',
           display: 'flex',
           alignItems: 'center',
@@ -152,12 +190,19 @@ const CoachManagerPage = () => {
 
             {activeEvents.length === 0 ? (
               <div style={{
-                padding: '16px', borderRadius: '12px',
-                background: 'rgba(243,156,18,0.1)',
-                border: '1px solid rgba(243,156,18,0.2)',
-                color: '#f39c12', fontSize: '14px', fontWeight: '500'
+                padding: '30px', borderRadius: '16px',
+                background: 'rgba(15, 23, 42, 0.4)',
+                border: '1px dashed rgba(255,255,255,0.1)',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px',
+                textAlign: 'center'
               }}>
-                ⚠️ Nenhum campeonato com inscrições abertas no momento.
+                <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(36, 120, 255, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2478ff' }}>
+                  <CalendarX size={24} />
+                </div>
+                <div>
+                  <h3 style={{ color: '#fff', fontSize: '1.1rem', marginBottom: '4px' }}>Nenhum campeonato disponível</h3>
+                  <p style={{ color: '#888', fontSize: '0.9rem', margin: 0 }}>Aguarde a abertura oficial de novas inscrições pelos organizadores.</p>
+                </div>
               </div>
             ) : (
               <div style={{ position: 'relative' }}>

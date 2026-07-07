@@ -968,6 +968,7 @@ const CategorySelectionStep = ({ profile, event, registeredModalities = [], onCo
   });
   const [weight, setWeight] = useState('');
   const [absolute, setAbsolute] = useState(false);
+  const [acceptLiability, setAcceptLiability] = useState(false);
   const [voucher, setVoucher] = useState('');
   const weightOptions = useMemo(() => {
     const isNoGiOnly = modalities.length === 1 && modalities[0] === 'NO-GI';
@@ -1194,6 +1195,29 @@ const CategorySelectionStep = ({ profile, event, registeredModalities = [], onCo
           </label>
         </div>
 
+
+        {event.liabilityWaiver && (
+          <div className="form-group-pro" style={{ marginTop: '20px', padding: '16px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '12px' }}>
+            <h4 style={{ color: '#ef4444', marginBottom: '8px', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <AlertCircle size={16} /> Termo de Responsabilidade
+            </h4>
+            <div style={{ fontSize: '13px', color: '#e2e8f0', lineHeight: 1.5, maxHeight: '100px', overflowY: 'auto', marginBottom: '12px', padding: '8px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', whiteSpace: 'pre-wrap' }}>
+              {event.liabilityWaiver}
+            </div>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', cursor: 'pointer' }}>
+              <input 
+                type="checkbox" 
+                checked={acceptLiability} 
+                onChange={(e) => setAcceptLiability(e.target.checked)}
+                style={{ marginTop: '4px', transform: 'scale(1.2)', accentColor: '#ef4444' }}
+              />
+              <span style={{ fontSize: '14px', color: '#f8fafc' }}>
+                Li e concordo com o termo de responsabilidade para participar deste evento. *
+              </span>
+            </label>
+          </div>
+        )}
+
         <div className="registration-footer-sticky">
           <div className="total-panel">
             <div className="total-label">Total a pagar</div>
@@ -1203,7 +1227,7 @@ const CategorySelectionStep = ({ profile, event, registeredModalities = [], onCo
               {absolute ? ` + Absoluto ${formatBrlCurrency(absoluteFee)}` : ''}
             </div>
           </div>
-          <button type="submit" className="btn-confirm-pro" disabled={!weight}>
+          <button type="submit" className="btn-confirm-pro" disabled={!weight || (event.liabilityWaiver && !acceptLiability)}>
             AVANAR PARA PAGAMENTO <ChevronRight size={20} />
           </button>
         </div>

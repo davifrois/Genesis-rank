@@ -7,6 +7,7 @@ import { useI18n } from '../hooks/useI18n';
 import { rankAthletes, groupAthletesByName } from '../services/scoringService';
 import { buildCategoryDescriptor } from '../services/categoryService';
 import { translateCompositeLabel } from '../utils/localeLabels';
+import { resolveAthleteEventPrice } from '../utils/eventPricing';
 import FilmmakerShowcase from '../components/FilmmakerShowcase';
 
 const parseDate = (value) => {
@@ -529,12 +530,17 @@ const Home = () => {
                           {event.parsedDate ? new Date(event.parsedDate).getDate() : '—'}
                         </span>
                       </div>
-                      {event.feeOver15 && (
-                        <div className="home-event-card__price-badge">
-                          <span>Lote atual</span>
-                          <strong>R$ {parseFloat(event.feeOver15).toFixed(2).replace('.', ',')}</strong>
-                        </div>
-                      )}
+                      {(() => {
+                        const priceData = resolveAthleteEventPrice({ event });
+                        const displayPrice = priceData.base > 0 ? priceData.base : (event.feeOver15 || 0);
+                        if (!displayPrice) return null;
+                        return (
+                          <div className="home-event-card__price-badge">
+                            <span>{priceData.batchName || 'Lote atual'}</span>
+                            <strong>R$ {parseFloat(displayPrice).toFixed(2).replace('.', ',')}</strong>
+                          </div>
+                        );
+                      })()}
                     </div>
                     {isOpen ? (
                       <div className="home-event-card__status-badge">{copy.breakingBadge || 'Inscrições abertas'}</div>

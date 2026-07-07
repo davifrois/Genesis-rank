@@ -616,6 +616,7 @@ const normalizeAcademy = (academy) => {
         contactPhone: formatBrazilPhone(academy.contactPhone || academy.telefone || ''),
         contactEmail: normalizeTextTrimmed(academy.contactEmail || academy.email || ''),
         logoUrl: normalizeOptionalUrl(academy.logoUrl || academy.fotoUrl || academy.imageUrl || ''),
+        coverUrl: normalizeOptionalUrl(academy.coverUrl || ''),
         createdAt: normalizeTextTrimmed(academy.createdAt || '') || new Date().toISOString()
     };
 };
@@ -692,105 +693,47 @@ const resolveAcademyBucketKey = (athlete, fallbackIndex = 0) => {
     return `__solo__${normalizeId(athlete?.id) || fallbackIndex}`;
 };
 
-const buildSideSeedOrder = (entries = []) => {
-    const buckets = new Map();
-    (Array.isArray(entries) ? entries : []).forEach((athlete, index) => {
-        const bucketKey = resolveAcademyBucketKey(athlete, index);
-        const list = buckets.get(bucketKey) || [];
-        list.push(athlete);
-        buckets.set(bucketKey, list);
-    });
+/**
+ * Pairs athletes from the same academy consecutively so they fight each other
+ * in round 1 of the bracket. Athletes with no same-academy opponent get a BYE.
+ *
+ * Returns an array structured as:
+ *   [pairA1, pairA2,  pairB1, pairB2,  ...,  leftover1, leftover2, ...]
+ *
+ * When this array is fed directly to buildBracketMatches (without reordering),
+ * match 1 = pairA1 vs pairA2, match 2 = pairB1 vs pairB2, etc.
+ */
+const buildSameAcademyPairedSeeds = (entries = []) => {
+    const list = (Array.isArray(entries) ? entries : []).filter(Boolean);
+    if (list.length === 0) return [];
+    if (list.length === 1) return [list[0].id];
 
-    const seeded = [];
-    while (buckets.size > 0) {
-        const orderedKeys = [...buckets.keys()].sort((leftKey, rightKey) => {
-            const leftSize = (buckets.get(leftKey) || []).length;
-            const rightSize = (buckets.get(rightKey) || []).length;
-            return rightSize - leftSize;
-        });
-
-        const firstKey = orderedKeys[0];
-        const firstList = buckets.get(firstKey) || [];
-        const firstAthlete = firstList.shift();
-        if (firstAthlete) seeded.push(firstAthlete);
-        if (firstList.length === 0) buckets.delete(firstKey);
-
-        const secondKey = orderedKeys.find((key) => key !== firstKey && (buckets.get(key) || []).length > 0);
-        if (!secondKey) continue;
-        const secondList = buckets.get(secondKey) || [];
-        const secondAthlete = secondList.shift();
-        if (secondAthlete) seeded.push(secondAthlete);
-        if (secondList.length === 0) buckets.delete(secondKey);
-    }
-
-    return seeded;
-};
-
-const buildAcademyAwareSeeds = (entries = []) => {
-    const list = Array.isArray(entries) ? entries.filter(Boolean) : [];
-    if (list.length <= 2) return list.map((athlete) => athlete.id);
-
+    // Group by academy (largest first so biggest academy pairs appear first)
     const byAcademy = new Map();
     list.forEach((athlete, index) => {
-        const academyKey = resolveAcademyBucketKey(athlete, index);
-        const group = byAcademy.get(academyKey) || [];
+        const key = resolveAcademyBucketKey(athlete, index);
+        const group = byAcademy.get(key) || [];
         group.push(athlete);
-        byAcademy.set(academyKey, group);
+        byAcademy.set(key, group);
     });
 
-    const grouped = [...byAcademy.entries()]
-        .map(([academyKey, athletes]) => ({
-            academyKey,
-            athletes: shuffleList(athletes)
-        }))
-        .sort((a, b) => b.athletes.length - a.athletes.length);
+    const paired = [];   // Consecutive same-academy pairs
+    const leftovers = []; // Athletes with no same-academy opponent
 
-    const maxSideSize = Math.ceil(list.length / 2);
-    const left = [];
-    const right = [];
-    const leftAcademyCount = new Map();
-    const rightAcademyCount = new Map();
-
-    const pushToSide = (target, academyCounter, academyKey, athlete) => {
-        target.push(athlete);
-        academyCounter.set(academyKey, (academyCounter.get(academyKey) || 0) + 1);
-    };
-
-    grouped.forEach((group) => {
-        group.athletes.forEach((athlete) => {
-            const academyKey = group.academyKey;
-            const leftCount = leftAcademyCount.get(academyKey) || 0;
-            const rightCount = rightAcademyCount.get(academyKey) || 0;
-
-            if (left.length >= maxSideSize) {
-                pushToSide(right, rightAcademyCount, academyKey, athlete);
-                return;
+    [...byAcademy.values()]
+        .sort((a, b) => b.length - a.length) // Largest academy first
+        .forEach((athletes) => {
+            const shuffled = shuffleList(athletes);
+            for (let i = 0; i + 1 < shuffled.length; i += 2) {
+                paired.push(shuffled[i].id);
+                paired.push(shuffled[i + 1].id);
             }
-            if (right.length >= maxSideSize) {
-                pushToSide(left, leftAcademyCount, academyKey, athlete);
-                return;
-            }
-
-            if (leftCount < rightCount) {
-                pushToSide(left, leftAcademyCount, academyKey, athlete);
-                return;
-            }
-            if (rightCount < leftCount) {
-                pushToSide(right, rightAcademyCount, academyKey, athlete);
-                return;
-            }
-
-            if (left.length <= right.length) {
-                pushToSide(left, leftAcademyCount, academyKey, athlete);
-            } else {
-                pushToSide(right, rightAcademyCount, academyKey, athlete);
+            if (shuffled.length % 2 !== 0) {
+                leftovers.push(shuffled[shuffled.length - 1].id);
             }
         });
-    });
 
-    const leftSeeds = buildSideSeedOrder(left);
-    const rightSeeds = buildSideSeedOrder(right);
-    return [...leftSeeds, ...rightSeeds].map((athlete) => athlete.id);
+    return [...paired, ...leftovers];
 };
 
 const buildBracketPayloads = (athletes, eventId, mode, startingNumber) => {
@@ -811,25 +754,43 @@ const buildBracketPayloads = (athletes, eventId, mode, startingNumber) => {
 
     const ordered = [...groups.values()].sort((a, b) => a.label.localeCompare(b.label));
     let nextNumber = startingNumber;
-    const brackets = ordered.map((group) => {
-        const seedIds = buildAcademyAwareSeeds(group.entries);
-        return {
-            id: `${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
-            number: nextNumber++,
-            eventId,
-            categoryKey: group.key,
-            label: group.label,
-            mode: group.mode,
-            seedIds,
-            size: nextPowerOfTwo(seedIds.length, 2),
-            podium: {
-                goldId: '',
-                silverId: '',
-                bronzeId: ''
-            },
-            appliedAt: '',
-            createdAt: new Date().toISOString()
-        };
+    const brackets = [];
+
+    const makeBracket = (label, categoryKey, mode, seedIds) => ({
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        number: nextNumber++,
+        eventId,
+        categoryKey,
+        label,
+        mode,
+        seedIds,
+        pairingMode: 'SAME_ACADEMY',
+        size: nextPowerOfTwo(seedIds.length, 2),
+        podium: { goldId: '', silverId: '', bronzeId: '' },
+        appliedAt: '',
+        createdAt: new Date().toISOString()
+    });
+
+    ordered.forEach((group) => {
+        const seedIds = buildSameAcademyPairedSeeds(group.entries);
+
+        // Auto-split rule: if more than 16 athletes (would create a 32-slot bracket),
+        // divide into two smaller brackets labeled "(1/2)" and "(2/2)".
+        // The split always happens on a pair boundary so same-academy pairs stay together.
+        if (seedIds.length > 16) {
+            const numPairs = Math.ceil(seedIds.length / 2);
+            const leftPairCount = Math.ceil(numPairs / 2);
+            const splitIdx = Math.min(leftPairCount * 2, seedIds.length);
+
+            const part1 = seedIds.slice(0, splitIdx);
+            const part2 = seedIds.slice(splitIdx);
+
+            if (part1.length > 0) brackets.push(makeBracket(`${group.label} (1/2)`, group.key, group.mode, part1));
+            if (part2.length > 0) brackets.push(makeBracket(`${group.label} (2/2)`, group.key, group.mode, part2));
+        } else {
+            // Normal bracket — fits in 16 slots or fewer
+            brackets.push(makeBracket(group.label, group.key, group.mode, seedIds));
+        }
     });
 
     return { brackets, nextNumber };
@@ -1080,10 +1041,20 @@ const useStoreState = (loadedState) => {
             ? merged.memberProfiles
             : [daviSeedProfile, ...merged.memberProfiles];
 
+        const cleanedProfiles = seededProfiles.filter(p => {
+            if (!p || !p.fullName) return false;
+            const lowerName = p.fullName.toLowerCase().trim();
+            // Keep only the real athletes you mentioned wanting
+            if (lowerName === 'davi frois') return true;
+            if (lowerName === 'davi oliveira frois') return true;
+            if (lowerName === 'julia machado') return true;
+            return false;
+        });
+
         return {
             ...merged,
             academies: seededAcademies,
-            memberProfiles: seededProfiles,
+            memberProfiles: cleanedProfiles,
             rankHistory: ensureRankHistory(normalizedAthletes, merged.rankHistory)
         };
     });
@@ -1091,6 +1062,22 @@ const useStoreState = (loadedState) => {
 
     const [eventResults, setEventResults] = useState([]);
     const [uiState, setUiState] = useState({ eventModalOpen: false });
+
+    useEffect(() => {
+        // FORCE CLEANUP AFTER HOT RELOAD
+        setData(prev => {
+            const nextProfiles = prev.memberProfiles.filter(p => {
+                if (!p || !p.fullName) return false;
+                const lowerName = p.fullName.toLowerCase().trim();
+                if (lowerName === 'davi frois') return true;
+                if (lowerName === 'davi oliveira frois') return true;
+                if (lowerName === 'julia machado') return true;
+                return false;
+            });
+            if (nextProfiles.length === prev.memberProfiles.length) return prev;
+            return { ...prev, memberProfiles: nextProfiles };
+        });
+    }, []);
 
     useEffect(() => {
         const timeout = setTimeout(() => {
@@ -1221,15 +1208,17 @@ const useStoreState = (loadedState) => {
         const payloadOwnerUsername = normalizeTextTrimmed(payload.ownerUsername || '').toLowerCase();
         const existingByOwner = !existingById && payloadOwnerUsername
             ? data.academies.find((academy) => (
-                normalizeTextTrimmed(academy.ownerUsername || '').toLowerCase() === payloadOwnerUsername
+                normalizeTextTrimmed(academy.ownerUsername || '').toLowerCase() === payloadOwnerUsername ||
+                (academy.assistantUsernames || []).includes(payloadOwnerUsername)
             ))
             : null;
 
         const targetAcademy = existingById || existingByOwner || null;
         const targetOwnerUsername = normalizeTextTrimmed(targetAcademy?.ownerUsername || '').toLowerCase();
+        const targetAssistants = targetAcademy?.assistantUsernames || [];
 
         if (currentRole === 'coach' && currentUsername && targetAcademy) {
-            if (targetOwnerUsername && targetOwnerUsername !== currentUsername) {
+            if (targetOwnerUsername && targetOwnerUsername !== currentUsername && !targetAssistants.includes(currentUsername)) {
                 addLog({
                     type: 'ERROR',
                     action: 'ADD_ACADEMY',
@@ -1239,12 +1228,16 @@ const useStoreState = (loadedState) => {
             }
         }
 
+        const newAssistant = payload.assistantUsername ? normalizeTextTrimmed(payload.assistantUsername).toLowerCase() : null;
+        const mergedAssistants = [...new Set([...targetAssistants, ...(newAssistant ? [newAssistant] : [])])];
+
         const normalized = normalizeAcademy({
             ...payload,
             id: targetAcademy?.id || payload.id || `academy-${Date.now()}`,
-            ownerUsername: currentRole === 'coach' && currentUsername
+            ownerUsername: currentRole === 'coach' && currentUsername && !targetOwnerUsername
                 ? currentUsername
                 : (payloadOwnerUsername || targetOwnerUsername || ''),
+            assistantUsernames: mergedAssistants,
             createdAt: targetAcademy?.createdAt || payload.createdAt || new Date().toISOString()
         });
 
@@ -1359,7 +1352,8 @@ const useStoreState = (loadedState) => {
 
             const academyRecord = data.academies.find((item) => item.id === academyId);
             const ownerUsername = normalizeTextTrimmed(academyRecord?.ownerUsername || '').toLowerCase();
-            const ownsAcademy = ownerUsername === currentUsername;
+            const assistantUsernames = academyRecord?.assistantUsernames || [];
+            const ownsAcademy = ownerUsername === currentUsername || assistantUsernames.includes(currentUsername);
             const orphanAcademy = !ownerUsername;
             if (!ownsAcademy && !orphanAcademy) {
                 addLog({
@@ -1453,10 +1447,11 @@ const useStoreState = (loadedState) => {
         const currentRole = normalizeTextTrimmed(data.currentUser?.role || '').toLowerCase();
         const currentUsername = normalizeTextTrimmed(data.currentUser?.username || '').toLowerCase();
         if (currentRole === 'coach' && currentUsername) {
-            const ownsAcademy = data.academies.some((academy) => (
-                academy.id === existing.academyId
-                && normalizeTextTrimmed(academy.ownerUsername || '').toLowerCase() === currentUsername
-            ));
+            const ownsAcademy = data.academies.some((academy) => {
+                const owner = normalizeTextTrimmed(academy.ownerUsername || '').toLowerCase();
+                const assistants = academy.assistantUsernames || [];
+                return academy.id === existing.academyId && (owner === currentUsername || assistants.includes(currentUsername));
+            });
             const createdByCoach = normalizeTextTrimmed(existing.createdByUsername || '').toLowerCase() === currentUsername;
             if (!ownsAcademy && !createdByCoach) {
                 addLog({
@@ -1726,7 +1721,7 @@ const useStoreState = (loadedState) => {
                 current.internalRegistration ?? true
             ),
             superFights: Array.isArray(updates?.superFights) ? updates.superFights : current.superFights || [],
-            superFightsPublished: updates?.superFightsPublished ?? current.superFightsPublished ?? false
+            superFightsPublished: updates?.superFightsPublished ?? current.superFightsPublished ?? false,
         };
 
         setData(prev => ({
@@ -2148,6 +2143,27 @@ const useStoreState = (loadedState) => {
         });
     };
 
+    const setBracketManualSlots = (bracketId, manualSlots) => {
+        const normalizedBracketId = normalizeId(bracketId);
+        if (!normalizedBracketId) return;
+
+        setData((prev) => ({
+            ...prev,
+            brackets: prev.brackets.map((bracket) => {
+                if (normalizeId(bracket.id) !== normalizedBracketId) return bracket;
+                
+                const validSlots = Array.isArray(manualSlots) 
+                    ? manualSlots.map(id => id ? normalizeId(id) : null)
+                    : null;
+
+                return {
+                    ...bracket,
+                    manualSlots: validSlots
+                };
+            })
+        }));
+    };
+
     const applyBracketPodium = (bracketId) => {
         const bracket = data.brackets.find((item) => item.id === bracketId);
         if (!bracket) {
@@ -2346,6 +2362,7 @@ const useStoreState = (loadedState) => {
         generateBrackets,
         setBracketPodium,
         setBracketSeedOrder,
+        setBracketManualSlots,
         applyBracketPodium,
         clearAthletes,
         importAthletes,

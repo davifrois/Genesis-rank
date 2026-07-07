@@ -8,6 +8,7 @@ import { useI18n } from '../hooks/useI18n';
 import { authService } from '../services/authService';
 import { formatBrazilPhone } from '../utils/phone';
 import { evaluatePasswordStrength } from '../utils/passwordStrength';
+import { getAvailableBeltsForAge, isValidBeltForAge } from '../utils/beltRules';
 import {
   buildProfileShareCode,
   buildPublicProfileSnapshot,
@@ -16,6 +17,18 @@ import {
 import { compressImage } from '../utils/imageUtils';
 
 const BELT_OPTIONS = ['Branca', 'Cinza', 'Amarela', 'Laranja', 'Verde', 'Azul', 'Roxa', 'Marrom', 'Preta'];
+
+const WEIGHT_OPTIONS = [
+  'Galo',
+  'Pluma',
+  'Pena',
+  'Leve',
+  'Médio',
+  'Meio-Pesado',
+  'Pesado',
+  'Super Pesado',
+  'Pesadíssimo'
+];
 
 const createForm = () => ({
   firstName: '',
@@ -271,6 +284,19 @@ const Settings = () => {
   }, [currentUser, currentProfile, resolvedProfileAcademyId]);
 
   const age = useMemo(() => calculateAgeFromBirthDate(form.birthDate), [form.birthDate]);
+
+  useEffect(() => {
+    if (form.belt && age !== '') {
+      if (!isValidBeltForAge(form.belt, age)) {
+        setForm(prev => ({ ...prev, belt: '' }));
+      }
+    }
+  }, [age, form.belt]);
+
+  const availableBelts = useMemo(() => {
+    return age === '' ? BELT_OPTIONS : getAvailableBeltsForAge(age);
+  }, [age]);
+
   const accountPasswordStrength = useMemo(
     () => evaluatePasswordStrength(accountPassword, locale),
     [accountPassword, locale]
@@ -825,14 +851,19 @@ const Settings = () => {
                   <label>Faixa atual</label>
                   <select className="profile-input profile-input--dark" value={form.belt} onChange={(event) => setForm((previous) => ({ ...previous, belt: event.target.value }))}>
                     <option value="">Selecione a faixa</option>
-                    {BELT_OPTIONS.map((belt) => (
+                    {getAvailableBeltsForAge(age).map((belt) => (
                       <option key={belt} value={belt}>{belt}</option>
                     ))}
                   </select>
                 </div>
                 <div className="profile-field">
                   <label>Peso / divisao</label>
-                  <input className="profile-input profile-input--dark" value={form.weight} onChange={(event) => setForm((previous) => ({ ...previous, weight: event.target.value }))} />
+                  <select className="profile-input profile-input--dark" value={form.weight} onChange={(event) => setForm((previous) => ({ ...previous, weight: event.target.value }))}>
+                    <option value="">Selecione o peso</option>
+                    {WEIGHT_OPTIONS.map((weight) => (
+                      <option key={weight} value={weight}>{weight}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="profile-field profile-field--full">
                   <label>Historico de faixa</label>

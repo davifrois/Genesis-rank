@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { Activity, Calendar, Medal, Search, ShieldCheck, Trophy, UserPlus, Users } from 'lucide-react';
 import { useStore } from '../hooks/useStore';
 import { useI18n } from '../hooks/useI18n';
+import './AthletesAjp.css';
+import bgImage from '../assets/jiu_jitsu_community_bg.png';
 import { resolveEventLifecycle } from '../utils/eventLifecycle';
 import { buildProfileShareCode, resolveProfileAthleteRows } from '../utils/profileShare';
 import { coachNotificationService } from '../services/coachNotificationService';
@@ -174,6 +176,9 @@ const Athletes = () => {
   const isEnglish = uiVariant === 'en';
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [showAllGold, setShowAllGold] = useState(false);
+  const [showAllWinRate, setShowAllWinRate] = useState(false);
+  const [showAllActive, setShowAllActive] = useState(false);
   const [seasonFilter, setSeasonFilter] = useState('2026');
   const [genderFilter, setGenderFilter] = useState('all');
   const [countryFilter, setCountryFilter] = useState('all');
@@ -425,12 +430,13 @@ const Athletes = () => {
     }
   };
 
-  const renderTopList = (items, type) => {
+  const renderTopList = (items, type, isExpanded, onToggle) => {
+    const displayedItems = isExpanded ? items : items.slice(0, 5);
     const title = type === 'gold'
-      ? 'Most Gold Medals'
+      ? (isEnglish ? 'Most Gold Medals' : 'Mais Medalhas de Ouro')
       : type === 'winrate'
-        ? 'Best Win/Loss Difference'
-        : 'Most Active Athlete';
+        ? (isEnglish ? 'Best Win/Loss Difference' : 'Melhor Aproveitamento')
+        : (isEnglish ? 'Most Active Athlete' : 'Atletas Mais Ativos');
 
     const emptyText = isEnglish
       ? 'No athlete data yet.'
@@ -442,10 +448,10 @@ const Athletes = () => {
           <h3>{title}</h3>
         </header>
         <div className="athlete-community-column__body">
-          {items.length === 0 ? (
+          {displayedItems.length === 0 ? (
             <div className="empty-state">{emptyText}</div>
           ) : (
-            items.map((item, index) => {
+            displayedItems.map((item, index) => {
               const profile = item.profile || {};
               const shareCode = buildProfileShareCode({
                 profileId: profile.id,
@@ -478,238 +484,104 @@ const Athletes = () => {
               );
             })
           )}
+          {items.length > 5 && (
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '15px' }}>
+              <button 
+                  onClick={onToggle}
+                  style={{ 
+                      backgroundColor: 'transparent', 
+                      border: '1px solid #444', 
+                      color: '#fff', 
+                      padding: '6px 20px', 
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '0.8rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '1px',
+                      transition: 'all 0.2s',
+                      width: '100%'
+                  }}
+                  onMouseOver={(e) => e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)'}
+                  onMouseOut={(e) => e.target.style.backgroundColor = 'transparent'}
+              >
+                  {isExpanded ? (isEnglish ? 'Show Less' : 'Mostrar Menos') : (isEnglish ? 'Show More' : 'Mostrar Mais')}
+              </button>
+            </div>
+          )}
         </div>
       </article>
     );
   };
 
   return (
-    <div className="public-page athlete-community-page">
-      <div className="ranking-page-header-new">
-        <h1>{isEnglish ? 'Genesis Athlete Community' : 'Comunidade de Atletas Genesis'}</h1>
+    <div className="public-page athlete-community-page" style={{ padding: 0 }}>
+      {/* HEADER SECTION */}
+      <div className="athletes-ajp-header-section" style={{ 
+          backgroundImage: `linear-gradient(to bottom, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.8)), url(${bgImage})`,
+          width: '100vw',
+          marginLeft: 'calc(-50vw + 50%)'
+        }}>
+        <div className="athletes-ajp-header-inner">
+        <h1 className="athletes-ajp-title">
+          {isEnglish ? 'ATHLETES COMMUNITY' : 'COMUNIDADE DE ATLETAS'}
+        </h1>
+        
+        <div className="athletes-ajp-filters-row">
+          <input
+            type="search"
+            className="athletes-ajp-input"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder={isEnglish ? 'Search...' : 'Pesquisar...'}
+          />
+          <select className="athletes-ajp-select" value={countryFilter} onChange={(event) => setCountryFilter(event.target.value)}>
+            <option value="all">{isEnglish ? 'Select country' : 'Selecione o país'}</option>
+            {Array.from(new Set(memberProfiles.map(p => p.country).filter(Boolean))).sort().map(c => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+          <select className="athletes-ajp-select" value={beltFilter} onChange={(event) => setBeltFilter(event.target.value)}>
+            <option value="all">{isEnglish ? '- Continent -' : '- Continente -'}</option>
+          </select>
+          <select className="athletes-ajp-select" value={academyFilter} onChange={(event) => setAcademyFilter(event.target.value)}>
+            <option value="all">{isEnglish ? 'Academy' : 'Academia'}</option>
+            {availableAcademies.map(a => (
+              <option key={a.id} value={a.id}>{a.name}</option>
+            ))}
+          </select>
+          <select className="athletes-ajp-select" value={genderFilter} onChange={(event) => setGenderFilter(event.target.value)}>
+            <option value="all">{isEnglish ? '- Gender -' : '- Gênero -'}</option>
+            <option value="Masculino">{isEnglish ? "Men's" : "Masculino"}</option>
+            <option value="Feminino">{isEnglish ? "Women's" : "Feminino"}</option>
+          </select>
+          
+          <button className="athletes-ajp-btn-filter" onClick={() => {}}>
+            {isEnglish ? 'FILTER' : 'FILTRAR'}
+          </button>
+          <button className="athletes-ajp-btn-share" onClick={() => {
+            navigator.clipboard.writeText(window.location.href);
+            alert(isEnglish ? 'Link copied!' : 'Link copiado!');
+          }}>
+            {isEnglish ? 'SHARE TOPLIST' : 'COMPARTILHAR'}
+          </button>
+        </div>
+        </div>
       </div>
 
-      <section className="public-section athlete-community-filters">
-        <div className="filter-bar">
-          <div className="ranking-tabs community-ranking-tabs" aria-label="Temporada do ranking">
-            <button
-              type="button"
-              className={`tab-btn ${seasonFilter === '2026' ? 'active' : ''}`}
-              onClick={() => setSeasonFilter('2026')}
-            >
-              Season 2026
-            </button>
-            <button
-              type="button"
-              className={`tab-btn ${seasonFilter === 'all' ? 'active' : ''}`}
-              onClick={() => setSeasonFilter('all')}
-            >
-              All Time
-            </button>
-          </div>
-          <div className="search-input">
-            <Search size={16} />
-            <input
-              type="search"
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder={isEnglish ? 'Search athlete...' : 'Pesquisar atleta por nome...'}
-            />
-          </div>
-          <select className="input" value={genderFilter} onChange={(event) => setGenderFilter(event.target.value)}>
-            <option value="all">{isEnglish ? 'All genders' : 'Todos os generos'}</option>
-            <option value="Masculino">Masculino</option>
-            <option value="Feminino">Feminino</option>
-          </select>
-          <select className="input" value={countryFilter} onChange={(event) => setCountryFilter(event.target.value)}>
-            <option value="all">{isEnglish ? 'All countries' : 'Todos os países'}</option>
-            {countryOptions.map((country) => (
-              <option key={country} value={country}>{country}</option>
-            ))}
-          </select>
-          <select className="input" value={beltFilter} onChange={(event) => setBeltFilter(event.target.value)}>
-            <option value="all">{isEnglish ? 'All belts' : 'Todas as faixas'}</option>
-            {BELT_OPTIONS.map((belt) => (
-              <option key={belt} value={belt}>{belt}</option>
-            ))}
-          </select>
-          <select className="input" value={academyFilter} onChange={(event) => setAcademyFilter(event.target.value)}>
-            <option value="all">{isEnglish ? 'All academies' : 'Todas as academias'}</option>
-            {academyOptions.map((academyName) => (
-              <option key={academyName} value={academyName}>{academyName}</option>
-            ))}
-          </select>
-        </div>
-      </section>
-
-      <section className="public-section community-ranking-section">
-        <div className="section-heading">
-          <div>
-            <span className="section-kicker">{isEnglish ? 'Official community ranking' : 'Ranking oficial da comunidade'}</span>
-            <h2>{searchTerm.trim() ? (isEnglish ? 'Search result with real position' : 'Resultado com posicao real') : 'Top 100 atletas'}</h2>
-          </div>
-          <span className="community-ranking-count">
-            {searchTerm.trim()
-              ? `${rankingTableRows.length} ${isEnglish ? 'result(s)' : 'resultado(s)'}`
-              : `100 / ${rankedCommunityRows.length}`}
-          </span>
-        </div>
-
-        <div className="ranking-table-wrapper community-ranking-table-wrapper">
-          <table className="ranking-table community-ranking-table">
-            <thead>
-              <tr>
-                <th style={{ width: '80px' }}>Rank</th>
-                <th>Athlete</th>
-                <th style={{ width: '120px', textAlign: 'right' }}>Points</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rankingTableRows.length === 0 ? (
-                <tr className="rank-row">
-                  <td colSpan={3} className="community-ranking-empty">
-                    {isEnglish ? 'No athlete found with current filters.' : 'Nenhum atleta encontrado com os filtros atuais.'}
-                  </td>
-                </tr>
-              ) : (
-                rankingTableRows.map((item) => {
-                  const profile = item.profile || {};
-                  const shareCode = buildProfileShareCode({
-                    profileId: profile.id,
-                    fullName: profile.fullName,
-                    academyName: profile.academyName,
-                    birthDate: profile.birthDate
-                  });
-                  const country = profile.country || 'Brasil';
-
-                  return (
-                    <tr className={`rank-row ${searchTerm.trim() ? 'searched-highlight' : ''}`} key={`rank-table-${profile.id}`}>
-                      <td className={`rank-number ${item.rank === 1 ? 'font-gold' : ''}`}>{item.rank}</td>
-                      <td className="athlete-cell">
-                        <Link className="athlete-avatar" to={`/perfil-publico?codigo=${encodeURIComponent(shareCode)}`}>
-                          {profile.photoUrl ? <img src={profile.photoUrl} alt={profile.fullName || 'Atleta'} loading="lazy" /> : getInitials(profile.fullName)}
-                        </Link>
-                        <div className="athlete-info">
-                          <Link className="athlete-name" to={`/perfil-publico?codigo=${encodeURIComponent(shareCode)}`}>
-                            {profile.fullName || (isEnglish ? 'Athlete' : 'Atleta')}
-                          </Link>
-                          <span className="athlete-team">
-                            {flagFromCountry(country)} {profile.academyName || (isEnglish ? 'No academy' : 'Sem academia')}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="rank-points">{item.totalPoints.toLocaleString(locale)} pts</td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section className="public-section athlete-community-highlights">
-        <div className="section-heading">
-          <div>
-            <span className="section-kicker">{isEnglish ? 'Top Athletes - Last 100 Days' : 'Top atletas - últimos 100 dias'}</span>
-            <h2>{isEnglish ? 'Community Highlights' : 'Comunidade em destaque'}</h2>
-          </div>
-        </div>
+      {/* TOP ATHLETES SECTION */}
+      <section className="athletes-ajp-top-section">
+        <h2 className="athletes-ajp-top-title">
+          {isEnglish ? 'TOP ATHLETES' : 'PRINCIPAIS ATLETAS'} <span className="muted">{isEnglish ? 'LAST 100 DAYS' : 'ÚLTIMOS 100 DIAS'}</span>
+        </h2>
+        
         <div className="athlete-community-columns">
-          {renderTopList(topGold, 'gold')}
-          {renderTopList(topWinRate, 'winrate')}
-          {renderTopList(topActive, 'active')}
+          {renderTopList(topGold, 'gold', showAllGold, () => setShowAllGold(!showAllGold))}
+          {renderTopList(topWinRate, 'winrate', showAllWinRate, () => setShowAllWinRate(!showAllWinRate))}
+          {renderTopList(topActive, 'active', showAllActive, () => setShowAllActive(!showAllActive))}
         </div>
       </section>
 
-      <section className="public-section">
-        <div className="section-heading">
-          <div>
-            <span className="section-kicker">{isEnglish ? 'Public athlete cards' : 'Vitrine pública de atletas'}</span>
-            <h2>{filteredAthletes.length} {isEnglish ? 'athletes found' : 'atletas encontrados'}</h2>
           </div>
-        </div>
-
-        <div className="athlete-community-grid">
-          {filteredAthletes.length === 0 ? (
-            <div className="empty-state">
-              {isEnglish
-                ? 'No athlete found with current filters.'
-                : 'Nenhum atleta encontrado com os filtros atuais.'}
-            </div>
-          ) : (
-            filteredAthletes.map((item) => {
-              const profile = item.profile || {};
-              const shareCode = buildProfileShareCode({
-                profileId: profile.id,
-                fullName: profile.fullName,
-                academyName: profile.academyName,
-                birthDate: profile.birthDate
-              });
-
-              return (
-                <article className="athlete-community-card" key={profile.id}>
-                  <div className="athlete-community-card__head">
-                    <div className="athlete-community-card__avatar">
-                      {profile.photoUrl ? <img src={profile.photoUrl} alt={profile.fullName || 'Atleta'} loading="lazy" /> : getInitials(profile.fullName)}
-                    </div>
-                    <div>
-                      <h3>{profile.fullName || (isEnglish ? 'Athlete' : 'Atleta')}</h3>
-                      <p>{profile.academyName || (isEnglish ? 'No academy' : 'Sem academia')}</p>
-                    </div>
-                    <span className={`athlete-community-status ${
-                      normalizeLookup(profile.joinStatus || 'approved') === 'pending'
-                        ? 'is-pending'
-                        : normalizeLookup(profile.joinStatus || 'approved') === 'rejected'
-                          ? 'is-rejected'
-                          : 'is-approved'
-                    }`}>
-                      {normalizeLookup(profile.joinStatus || 'approved') === 'pending'
-                        ? (isEnglish ? 'Pending coach approval' : 'Aguardando professor')
-                        : normalizeLookup(profile.joinStatus || 'approved') === 'rejected'
-                          ? (isEnglish ? 'Rejected' : 'Recusado')
-                          : (isEnglish ? 'Approved' : 'Aprovado')}
-                    </span>
-                  </div>
-
-                  <div className="athlete-community-card__meta">
-                    <span><Trophy size={14} /> {item.recentGold} {isEnglish ? 'gold (100d)' : 'ouro (100d)'}</span>
-                    <span><Medal size={14} /> {item.podiums} {isEnglish ? 'podiums' : 'pódios'}</span>
-                    <span><Activity size={14} /> {item.winRate}% win rate</span>
-                    <span><Users size={14} /> {item.eventsCount} {isEnglish ? 'events' : 'eventos'}</span>
-                  </div>
-
-                  <div className="athlete-community-card__tags">
-                    {profile.belt ? <span className="tag">{profile.belt}</span> : null}
-                    {profile.country ? <span className="tag">{profile.country}</span> : null}
-                    {profile.city ? <span className="tag">{profile.city}</span> : null}
-                    {profile.age !== '' && profile.age !== undefined && profile.age !== null ? (
-                      <span className="tag">{profile.age} {isEnglish ? 'years' : 'anos'}</span>
-                    ) : null}
-                  </div>
-
-                  <div className="athlete-community-card__events">
-                    {item.upcomingEvents.length === 0 ? (
-                      <small>{isEnglish ? 'No upcoming events linked.' : 'Sem próximos eventos vinculados.'}</small>
-                    ) : item.upcomingEvents.map((event) => (
-                      <small key={`event-${profile.id}-${event.id}`}>
-                        <Calendar size={12} /> {event.name} - {formatDate(event.date, locale)}
-                      </small>
-                    ))}
-                  </div>
-
-                  <Link className="btn btn-secondary" to={`/perfil-publico?codigo=${encodeURIComponent(shareCode)}`}>
-                    {isEnglish ? 'Open public profile' : 'Abrir perfil público'}
-                  </Link>
-                </article>
-              );
-            })
-          )}
-        </div>
-      </section>
-
-    </div>
-
   );
 };
 

@@ -26,7 +26,7 @@ import filmmakerPhotographer from '../../img/filmmaker-photographer.jfif';
 import filmmakerVenue from '../../img/filmmaker-venue.jpg';
 import jjfaLogo from '../../img/JJFA.png';
 import openSarzedoLogo from '../../img/Open sarzedo.jpg';
-import organizersHero from '../../img/organizers-command-center-new.png';
+import organizersHero from '../assets/organizadores-novo.jpg';
 import placarImage from '../../img/placar.png';
 import {
   buildFilmmakerWhatsappLink,

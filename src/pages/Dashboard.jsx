@@ -88,6 +88,9 @@ const createEventEditFormState = () => ({
     beltRegistrationDescription: '',
     beltRegistrationPhone: '',
     maxAthletes: '',
+    prizesDescription: '',
+    liabilityWaiver: '',
+    mapIframeUrl: '',
     closeOnCapacity: false,
     accommodationEnabled: false,
     accommodationTitle: '',
@@ -2316,17 +2319,9 @@ const Dashboard = () => {
         setEventWeightOcrProgress(0);
         const posterUrl = eventItem.posterUrl || '';
         setEventEditForm({
-            id: eventItem.id,
-            name: eventItem.name || '',
-            date: eventItem.date || '',
-            location: eventItem.location || '',
+            ...createEventEditFormState(),
+            ...eventItem,
             posterUrl,
-            registrationUrl: eventItem.registrationUrl || '',
-            weightTableGiUrl: eventItem.weightTableGiUrl || '',
-            weightTableNoGiUrl: eventItem.weightTableNoGiUrl || '',
-            circularUrl: eventItem.circularUrl || '',
-            weightTableGiOptions: eventItem.weightTableGiOptions || '',
-            weightTableNoGiOptions: eventItem.weightTableNoGiOptions || '',
             pixKey: eventItem.pixKey || DEFAULT_EVENT_PIX_KEY,
             feeUnder15: eventItem.feeUnder15 ?? DEFAULT_EVENT_FEES.under15,
             feeOver15: eventItem.feeOver15 ?? DEFAULT_EVENT_FEES.over15,
@@ -2381,6 +2376,9 @@ const Dashboard = () => {
                 beltRegistrationDescription: eventEditForm.beltRegistrationDescription,
                 beltRegistrationPhone: eventEditForm.beltRegistrationPhone,
                 maxAthletes: eventEditForm.maxAthletes,
+                prizesDescription: eventEditForm.prizesDescription,
+                liabilityWaiver: eventEditForm.liabilityWaiver,
+                mapIframeUrl: eventEditForm.mapIframeUrl,
                 closeOnCapacity: eventEditForm.closeOnCapacity,
                 accommodationEnabled: eventEditForm.accommodationEnabled,
                 accommodationTitle: eventEditForm.accommodationTitle,
@@ -3330,6 +3328,18 @@ const Dashboard = () => {
                     'ABS-GI': 'ABS GI',
                     'ABS-NO-GI': 'ABS NO-GI'
                 };
+
+                addNews({
+                    title: `Chaveamento liberado: ${eventMeta?.name || 'Campeonato'}`,
+                    summary: `As chaves da modalidade ${modeLabelMap[bracketMode] || bracketMode} foram geradas e estão disponíveis. Confira seus confrontos!`,
+                    body: `Atletas, o sistema acaba de processar os chaveamentos da modalidade **${modeLabelMap[bracketMode] || bracketMode}** para o evento **${eventMeta?.name || 'Campeonato'}**.\n\nAcessem a aba do campeonato para verificar a estrutura das lutas e confirmar o seu primeiro adversário. Boa sorte no tatame!`,
+                    category: 'eventos',
+                    tags: ['chaveamento', 'eventos'],
+                    imageUrl: eventMeta?.flyerUrl || eventMeta?.coverUrl || '',
+                    status: 'published',
+                    publishedAt: new Date().toISOString()
+                });
+
                 await generateBracketsPDF(result.brackets || [], athletes, {
                     eventName: eventMeta?.name || copy.bracketsPanel.event,
                     eventDate: eventMeta?.date || '',
@@ -3342,7 +3352,7 @@ const Dashboard = () => {
         } catch (err) {
             showFeedback('error', err?.message || copy.feedback.bracketGenerateFail);
         }
-    }, [canManagePanel, bracketEventId, bracketMode, brackets, events, generateBrackets, athletes, showFeedback, copy.feedback, copy.bracketsPanel.event, isEnglish, setBracketOrderByEvent]);
+    }, [canManagePanel, bracketEventId, bracketMode, brackets, events, generateBrackets, athletes, showFeedback, copy.feedback, copy.bracketsPanel.event, isEnglish, setBracketOrderByEvent, addNews]);
 
     const handleExportBracketsPdf = useCallback(async () => {
         if (!orderedFilteredBrackets.length) {
@@ -3420,6 +3430,18 @@ const Dashboard = () => {
                 totalDurationLabel: formatDurationLabel(manualScheduleData.totalDurationMinutes, isEnglish),
                 estimatedEnd: manualScheduleData.estimatedEndLabel
             });
+
+            addNews({
+                title: `Cronograma oficial: ${eventMeta?.name || 'Campeonato'}`,
+                summary: `O cronograma oficial de lutas foi publicado! Veja os horários das suas disputas.`,
+                body: `O cronograma com os horários de lutas e chamadas para o evento **${eventMeta?.name || 'Campeonato'}** acaba de ser gerado pelo organizador.\n\nPedimos que todos os atletas fiquem atentos à área de concentração pelo menos 30 minutos antes do horário previsto para a sua categoria. O evento fluirá de acordo com essa previsão.`,
+                category: 'eventos',
+                tags: ['cronograma', 'eventos'],
+                imageUrl: eventMeta?.flyerUrl || eventMeta?.coverUrl || '',
+                status: 'published',
+                publishedAt: new Date().toISOString()
+            });
+
             showFeedback('success', copy.feedback.schedulePdfSaved);
         } catch (err) {
             showFeedback('error', err?.message || copy.feedback.schedulePdfFail);
@@ -7189,6 +7211,19 @@ const Dashboard = () => {
                                                         placeholder="Ex: Regras da IBJJF, premiações especiais em dinheiro, etc..."
                                                         style={{ fontSize: '15px', resize: 'vertical' }}
                                                     ></textarea>
+                                                </div>
+
+                                                <div>
+                                                    <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px', display: 'block', color: '#94a3b8' }}>
+                                                        LOCAL NO MAPA (URL Iframe do Google Maps - opcional)
+                                                    </label>
+                                                    <input
+                                                        className="input"
+                                                        type="text"
+                                                        value={eventEditForm.mapIframeUrl || ''}
+                                                        onChange={(event) => setEventEditForm({ ...eventEditForm, mapIframeUrl: event.target.value })}
+                                                        placeholder="Ex: https://www.google.com/maps/embed?pb=..."
+                                                    />
                                                 </div>
 
                                                 <div>

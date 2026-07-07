@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Image, Plus, Trash2, UserRound } from 'lucide-react';
+import { Image, Plus, Trash2, UserRound, Building } from 'lucide-react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { useI18n } from '../hooks/useI18n';
 import { useStore } from '../hooks/useStore';
@@ -9,6 +9,7 @@ import { authService } from '../services/authService';
 import { formatBrazilPhone } from '../utils/phone';
 import { evaluatePasswordStrength } from '../utils/passwordStrength';
 import { compressImage } from '../utils/imageUtils';
+import '../membership.css';
 
 const createAcademyForm = () => ({
   name: '',
@@ -20,11 +21,18 @@ const createAcademyForm = () => ({
   contactPhone: '',
   contactEmail: '',
   logoUrl: '',
+  coverUrl: '',
+  biography: '',
   coachName: '',
   coachUsername: '',
   coachPassword: '',
   coachPasswordConfirm: '',
-  coachEmail: ''
+  coachEmail: '',
+  assistantName: '',
+  assistantUsername: '',
+  assistantPassword: '',
+  assistantPasswordConfirm: '',
+  assistantEmail: ''
 });
 
 const createAthleteForm = () => ({
@@ -53,10 +61,23 @@ const createCoachSignupForm = () => ({
   state: '',
   contactPhone: '',
   contactEmail: '',
-  logoUrl: ''
+  logoUrl: '',
+  biography: ''
 });
 
 const BELT_OPTIONS = ['Branca', 'Cinza', 'Amarela', 'Laranja', 'Verde', 'Azul', 'Roxa', 'Marrom', 'Preta'];
+
+const WEIGHT_OPTIONS = [
+  'Galo',
+  'Pluma',
+  'Pena',
+  'Leve',
+  'Médio',
+  'Meio-Pesado',
+  'Pesado',
+  'Super Pesado',
+  'Pesadíssimo'
+];
 
 const BELT_GUIDE = {
   Branca: {
@@ -270,6 +291,7 @@ const Membership = () => {
       academyEmail: 'E-mail',
       academyLogo: 'Foto/logo da academia',
       academyLogoUrl: 'URL da foto (opcional)',
+      academyBiography: 'Biografia / Descrição da academia',
       athleteName: 'Nome do atleta *',
       athleteLastName: 'Sobrenome',
       athleteEmail: 'E-mail',
@@ -342,7 +364,7 @@ const Membership = () => {
       coachSignupContinue: 'Continuar',
       coachSignupBack: 'Voltar',
       coachCredentialsTitle: 'Credenciais do professor',
-      coachCredentialsHint: 'Etapa obrigatoria: crie o acesso do professor para concluir o cadastro da academia.',
+      coachCredentialsHint: 'Se a academia for nova, crie o acesso do professor principal. Se já existe, você pode pular esta etapa.',
       coachCredentialsCreated: 'Academia salva e login de professor criado com sucesso.',
       coachCredentialsLinked: 'Academia salva e professor vinculado com sucesso.',
       coachCredentialsPasswordRequired: 'Informe uma senha forte para o professor (8 caracteres, maiuscula, minuscula, numero e simbolo).',
@@ -380,6 +402,7 @@ const Membership = () => {
       academyEmail: 'Email',
       academyLogo: 'Academy logo',
       academyLogoUrl: 'Logo URL (optional)',
+      academyBiography: 'Academy biography / description',
       athleteName: 'Athlete name *',
       athleteLastName: 'Surname',
       athleteEmail: 'Email',
@@ -452,7 +475,7 @@ const Membership = () => {
       coachSignupContinue: 'Continue',
       coachSignupBack: 'Back',
       coachCredentialsTitle: 'Coach credentials',
-      coachCredentialsHint: 'Required step: create coach access to finish academy registration.',
+      coachCredentialsHint: 'If the academy is new, create the main coach access. If it exists, you can skip this step.',
       coachCredentialsCreated: 'Academy saved and coach login created successfully.',
       coachCredentialsLinked: 'Academy saved and coach linked successfully.',
       coachCredentialsPasswordRequired: 'Enter a strong coach password (8 characters, uppercase, lowercase, number, and symbol).',
@@ -490,6 +513,7 @@ const Membership = () => {
       academyEmail: 'Correo',
       academyLogo: 'Logo de la academia',
       academyLogoUrl: 'URL del logo (opcional)',
+      academyBiography: 'Biografía / Descripción de la academia',
       athleteName: 'Nombre del atleta *',
       athleteLastName: 'Apellido',
       athleteEmail: 'Correo',
@@ -562,7 +586,7 @@ const Membership = () => {
       coachSignupContinue: 'Continuar',
       coachSignupBack: 'Volver',
       coachCredentialsTitle: 'Credenciales del profesor',
-      coachCredentialsHint: 'Paso obligatorio: cree el acceso del profesor para completar el registro de la academia.',
+      coachCredentialsHint: 'Si la academia es nueva, cree el acceso del profesor principal. Si ya existe, puede omitir este paso.',
       coachCredentialsCreated: 'Academia guardada y login del profesor creado con exito.',
       coachCredentialsLinked: 'Academia guardada y profesor vinculado con exito.',
       coachCredentialsPasswordRequired: 'Ingrese una contrasena fuerte para el profesor (8 caracteres, mayuscula, minuscula, numero y simbolo).',
@@ -600,6 +624,7 @@ const Membership = () => {
       academyEmail: 'E-mail',
       academyLogo: 'Logo de l academie',
       academyLogoUrl: 'URL du logo (optionnel)',
+      academyBiography: 'Biographie / Description de l academie',
       athleteName: 'Nom de l athlete *',
       athleteLastName: 'Nom de famille',
       athleteEmail: 'E-mail',
@@ -672,7 +697,7 @@ const Membership = () => {
       coachSignupContinue: 'Continuer',
       coachSignupBack: 'Retour',
       coachCredentialsTitle: 'Identifiants professeur',
-      coachCredentialsHint: 'Etape obligatoire: creez l acces du professeur pour finaliser l inscription de l academie.',
+      coachCredentialsHint: 'Si l academie est nouvelle, creez l acces de l entraineur principal. Si elle existe, vous pouvez ignorer cette etape.',
       coachCredentialsCreated: 'Academie enregistree et login professeur cree avec succes.',
       coachCredentialsLinked: 'Academie enregistree et professeur lie avec succes.',
       coachCredentialsPasswordRequired: 'Saisissez un mot de passe professeur fort (8 caracteres, majuscule, minuscule, chiffre et symbole).',
@@ -722,12 +747,7 @@ const Membership = () => {
     || !normalizeUsername(coachSignupForm.coachUsername || '')
     || !(coachSignupForm.coachName || '').toString().trim()
   );
-  const isAdminAcademySubmitDisabled = isAdmin && academySignupStep === 2 && (
-    !academyCoachPasswordStrength.isStrong
-    || academyForm.coachPassword !== academyForm.coachPasswordConfirm
-    || !normalizeUsername(academyForm.coachUsername || '')
-    || !(academyForm.coachName || '').toString().trim()
-  );
+  const isAdminAcademySubmitDisabled = isAdmin && academySignupStep === 2 && false;
 
   const coachOwnedAcademies = useMemo(() => {
     if (!isCoach) return [];
@@ -807,6 +827,14 @@ const Membership = () => {
     calculateAgeFromBirthDate(athleteForm.birthDate)
   ), [athleteForm.birthDate]);
 
+  const eligibleAssistants = useMemo(() => {
+    let list = memberProfiles;
+    if (editingAcademyId) {
+      list = memberProfiles.filter(m => m.academyId === editingAcademyId);
+    }
+    return list.filter(m => m.accountUsername !== academyForm.ownerUsername && m.fullName);
+  }, [memberProfiles, editingAcademyId, academyForm.ownerUsername]);
+
   const selectedBeltGuide = useMemo(() => (
     BELT_GUIDE[athleteForm.belt] || null
   ), [athleteForm.belt]);
@@ -840,7 +868,9 @@ const Membership = () => {
       ownerUsername: primaryAcademy.ownerUsername || coachUsername,
       contactPhone: primaryAcademy.contactPhone || '',
       contactEmail: primaryAcademy.contactEmail || coachEmail,
-      logoUrl: primaryAcademy.logoUrl || ''
+      logoUrl: primaryAcademy.logoUrl || '',
+      coverUrl: primaryAcademy.coverUrl || '',
+      biography: primaryAcademy.biography || ''
     });
   }, [coachOwnedAcademies, currentUser?.name, currentUser?.username, isCoach, membershipView]);
 
@@ -903,6 +933,17 @@ const Membership = () => {
       setAcademyForm((prev) => ({ ...prev, logoUrl: imageData }));
     } catch (err) {
       setAcademyError(err?.message || copy.academyFail);
+    }
+  };
+
+  const handleAcademyCoverFile = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const imageData = await fileToDataUrl(file);
+      setAcademyForm((prev) => ({ ...prev, coverUrl: imageData }));
+    } catch (err) {
+      setAcademyError(err?.message || 'Erro ao processar imagem da capa.');
     }
   };
 
@@ -1015,7 +1056,8 @@ const Membership = () => {
         ownerUsername: normalizeUsername(coachUser?.username || coachUsername),
         contactPhone: coachSignupForm.contactPhone || '',
         contactEmail: coachSignupForm.contactEmail || fallbackCoachEmail,
-        logoUrl: coachSignupForm.logoUrl || ''
+        logoUrl: coachSignupForm.logoUrl || '',
+        biography: coachSignupForm.biography || ''
       });
 
       try {
@@ -1053,7 +1095,8 @@ const Membership = () => {
         ownerUsername: savedAcademy?.ownerUsername || normalizeUsername(coachUser?.username || coachUsername),
         contactPhone: savedAcademy?.contactPhone || coachSignupForm.contactPhone || '',
         contactEmail: savedAcademy?.contactEmail || coachSignupForm.contactEmail || fallbackCoachEmail,
-        logoUrl: savedAcademy?.logoUrl || coachSignupForm.logoUrl || ''
+        logoUrl: savedAcademy?.logoUrl || coachSignupForm.logoUrl || '',
+        coverUrl: savedAcademy?.coverUrl || coachSignupForm.coverUrl || ''
       });
       setAthleteForm((prev) => ({
         ...prev,
@@ -1083,41 +1126,24 @@ const Membership = () => {
     return true;
   };
 
-  const validateAdminAcademyCoachStep = () => {
-    const currentUsername = normalizeUsername(currentUser?.username || '');
-    const coachName = (academyForm.coachName || '').toString().trim();
-    const coachUsername = normalizeUsername(academyForm.coachUsername || '');
-    const coachPassword = (academyForm.coachPassword || '').toString();
-    const coachPasswordConfirm = (academyForm.coachPasswordConfirm || '').toString();
 
-    if (!coachName) {
-      setAcademyError(copy.coachSignupNameRequired || copy.coachSignupError);
-      return false;
-    }
-    if (!coachUsername) {
-      setAcademyError(copy.coachSignupUsernameRequired || copy.coachSignupError);
-      return false;
-    }
-    if (currentUsername && coachUsername === currentUsername) {
-      setAcademyError(copy.coachCredentialsMustBeDifferent || copy.coachSignupError);
-      return false;
-    }
-    if (!academyCoachPasswordStrength.isStrong) {
-      setAcademyError(academyCoachPasswordStrength.message || copy.coachCredentialsPasswordRequired || copy.coachSignupPasswordMin);
-      return false;
-    }
-    if (coachPassword !== coachPasswordConfirm) {
-      setAcademyError(copy.coachSignupPasswordMismatch || copy.coachSignupError);
-      return false;
-    }
-
-    return true;
-  };
 
   const handleAdminAcademyContinue = () => {
     setAcademyFeedback('');
     setAcademyError('');
     if (!validateAdminAcademyStepOne()) return;
+
+    // Pre-fill coach credentials with the logged-in user's data (only if still empty)
+    const loggedUsername = (currentUser?.username || '').toString().trim().toLowerCase();
+    const loggedName = (currentUser?.name || '').toString().trim();
+    const loggedEmail = isValidEmail(currentUser?.username || '') ? currentUser.username : (currentUser?.email || '');
+    setAcademyForm((prev) => ({
+      ...prev,
+      coachUsername: prev.coachUsername || loggedUsername,
+      coachName: prev.coachName || loggedName,
+      coachEmail: prev.coachEmail || loggedEmail,
+    }));
+
     setAcademySignupStep(2);
   };
 
@@ -1126,18 +1152,9 @@ const Membership = () => {
     setAcademyFeedback('');
     setAcademyError('');
 
-    if (isAdmin && academySignupStep === 1) {
-      handleAdminAcademyContinue();
-      return;
-    }
-
     if (isAdmin) {
       if (!validateAdminAcademyStepOne()) {
         setAcademySignupStep(1);
-        return;
-      }
-      if (!validateAdminAcademyCoachStep()) {
-        setAcademySignupStep(2);
         return;
       }
     }
@@ -1153,13 +1170,16 @@ const Membership = () => {
         city: academyForm.city || '',
         state: academyForm.state || '',
         contactPhone: academyForm.contactPhone || '',
-        logoUrl: academyForm.logoUrl || ''
+        logoUrl: academyForm.logoUrl || '',
+        coverUrl: academyForm.coverUrl || '',
+        biography: academyForm.biography || ''
       };
 
       let ownerName = (academyForm.ownerName || '').toString().trim();
       let ownerUsername = normalizeUsername(academyForm.ownerUsername || '');
       let contactEmail = (academyForm.contactEmail || '').toString().trim();
       let coachCreated = false;
+      let assistantUsernamePayload = '';
 
       if (isCoach) {
         ownerName = ownerName || currentName || '';
@@ -1171,38 +1191,23 @@ const Membership = () => {
         const coachPassword = (academyForm.coachPassword || '').toString();
         const coachEmail = (academyForm.coachEmail || '').toString().trim();
 
-        if (currentUsername && coachUsername === currentUsername) {
-          throw new Error(copy.coachCredentialsMustBeDifferent || copy.coachSignupError);
-        }
-
-        try {
-          const createdCoach = await authService.createAdminUser({
-            username: coachUsername,
-            password: coachPassword,
-            name: coachName || coachUsername,
-            role: 'coach'
-          });
-          ownerUsername = normalizeUsername(createdCoach?.username || coachUsername);
-          ownerName = (createdCoach?.name || coachName || ownerName || '').toString().trim();
-          coachCreated = true;
-        } catch (error) {
-          const errorMessage = (error?.message || '').toString();
-          const normalizedError = normalizeLookup(errorMessage);
-          const alreadyExists = normalizedError.includes('ja cadastrado')
-            || normalizedError.includes('ja existe')
-            || normalizedError.includes('already exists')
-            || normalizedError.includes('already registered');
-
-          if (alreadyExists) {
-            throw new Error(copy.coachCredentialsUsernameTaken || copy.coachCredentialsExistingInvalid || copy.coachSignupError);
+        if (coachUsername) {
+          if (currentUsername && coachUsername === currentUsername) {
+            throw new Error(copy.coachCredentialsMustBeDifferent || copy.coachSignupError);
           }
-          throw error;
+          ownerUsername = coachUsername;
+          ownerName = coachName || coachUsername;
+
+          if (coachEmail) {
+            contactEmail = coachEmail;
+          } else if (!contactEmail && isValidEmail(coachUsername)) {
+            contactEmail = coachUsername;
+          }
         }
 
-        if (coachEmail) {
-          contactEmail = coachEmail;
-        } else if (!contactEmail && isValidEmail(coachUsername)) {
-          contactEmail = coachUsername;
+        const assistantUsernameInput = normalizeUsername(academyForm.assistantUsername || '');
+        if (assistantUsernameInput) {
+            assistantUsernamePayload = assistantUsernameInput;
         }
       }
 
@@ -1211,6 +1216,7 @@ const Membership = () => {
         id: isCoach ? (editingAcademyId || undefined) : undefined,
         ownerName,
         ownerUsername,
+        assistantUsername: assistantUsernamePayload || undefined,
         contactEmail
       });
 
@@ -1226,7 +1232,9 @@ const Membership = () => {
           ownerUsername: savedAcademy?.ownerUsername || currentUsername,
           contactPhone: savedAcademy?.contactPhone || academyForm.contactPhone || '',
           contactEmail: savedAcademy?.contactEmail || academyForm.contactEmail || fallbackCoachEmail,
-          logoUrl: savedAcademy?.logoUrl || academyForm.logoUrl || ''
+          logoUrl: savedAcademy?.logoUrl || academyForm.logoUrl || '',
+          coverUrl: savedAcademy?.coverUrl || academyForm.coverUrl || '',
+          biography: savedAcademy?.biography || academyForm.biography || ''
         });
         setAthleteForm((prev) => ({
           ...prev,
@@ -1401,7 +1409,8 @@ const Membership = () => {
         ownerUsername: academy.ownerUsername || (currentUser?.username || '').toString().trim().toLowerCase(),
         contactPhone: academy.contactPhone || '',
         contactEmail: academy.contactEmail || '',
-        logoUrl: academy.logoUrl || ''
+        logoUrl: academy.logoUrl || '',
+        coverUrl: academy.coverUrl || ''
       });
     } else {
       setAcademyForm(createAcademyForm());
@@ -1531,13 +1540,16 @@ const Membership = () => {
                         onChange={(event) => setCoachSignupForm((prev) => ({ ...prev, contactEmail: event.target.value }))}
                       />
                     </div>
+
                     <div className="profile-field profile-field--full">
-                      <label>{copy.academyLogoUrl}</label>
-                      <input
+                      <label>{copy.academyBiography || 'Biografia / Descrição da academia'}</label>
+                      <textarea
                         className="profile-input profile-input--dark"
-                        value={coachSignupForm.logoUrl}
-                        onChange={(event) => setCoachSignupForm((prev) => ({ ...prev, logoUrl: event.target.value }))}
-                        placeholder="https://..."
+                        rows={4}
+                        value={coachSignupForm.biography}
+                        onChange={(event) => setCoachSignupForm((prev) => ({ ...prev, biography: event.target.value }))}
+                        placeholder="Conte um pouco sobre a história, filosofia e diferenciais da sua academia..."
+                        style={{ resize: 'vertical', minHeight: '100px' }}
                       />
                     </div>
                   </div>
@@ -1682,11 +1694,29 @@ const Membership = () => {
 
   return (
     <div className="public-page profile-page membership-page membership-page--dense-cards">
-      <section className="profile-header">
-        <div>
-          <span className="section-kicker">{headerKicker}</span>
-          <h1 className="profile-title">{headerTitle}</h1>
-          <p className="profile-subtitle">{headerSubtitle}</p>
+      <section className={`profile-header ${isDedicatedAcademyArea ? 'is-dark' : ''}`} style={isDedicatedAcademyArea ? { 
+          display: 'flex', 
+          alignItems: 'center', 
+          backgroundColor: '#05050a',
+          backgroundImage: 'linear-gradient(rgba(5, 5, 10, 0.5), rgba(5, 5, 10, 0.5)), url(/images/jiujitsu-professor-3.png)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center 40%',
+          backgroundRepeat: 'no-repeat',
+          padding: '4rem 0',
+          marginTop: 'calc(-1 * clamp(2.4rem, 3.4vw, 3.2rem))',
+          borderRadius: '0',
+          borderBottom: '1px solid rgba(255,255,255,0.05)',
+          overflow: 'hidden',
+          position: 'relative',
+          marginBottom: '2rem',
+          width: '100vw',
+          marginLeft: 'calc(-50vw + 50%)'
+        } : {}}>
+
+        <div style={{ position: 'relative', zIndex: 1, maxWidth: '1200px', margin: '0 auto', width: '100%', padding: '0 2rem' }}>
+          <span className="section-kicker" style={isDedicatedAcademyArea ? { backgroundColor: 'rgba(0,194,203,0.15)', color: '#00c2cb', textShadow: '0 2px 4px rgba(0,0,0,0.8)' } : {}}>{headerKicker}</span>
+          <h1 className="profile-title" style={isDedicatedAcademyArea ? { color: '#fff', fontSize: '2.4rem', marginBottom: '0.8rem', marginTop: '1rem', lineHeight: 1.1, textShadow: '0 2px 8px rgba(0,0,0,0.9)' } : {}}>{headerTitle}</h1>
+          <p className="profile-subtitle" style={isDedicatedAcademyArea ? { color: '#d1d5db', fontSize: '1.1rem', margin: 0, textShadow: '0 2px 6px rgba(0,0,0,0.9)', maxWidth: '600px' } : {}}>{headerSubtitle}</p>
         </div>
       </section>
 
@@ -1698,7 +1728,7 @@ const Membership = () => {
         </section>
       )}
 
-      {!isAthlete && !isDedicatedAcademyArea && (
+      {!isAthlete && !isDedicatedAcademyArea && false && (
         <section className="membership-mode">
           <button
             type="button"
@@ -1720,6 +1750,7 @@ const Membership = () => {
       <section className="membership-block">
         <div className="membership-block__header">
           <span className="section-kicker">
+            <Building size={12} />
             {membershipView === 'academy' ? copy.academyBlockKicker : copy.athleteBlockKicker}
           </span>
           <h2 className="membership-block__title">
@@ -1728,16 +1759,8 @@ const Membership = () => {
           <p className="profile-subtitle">
             {membershipView === 'academy' ? copy.academyBlockSubtitle : copy.athleteBlockSubtitle}
           </p>
-          {isCoach && (
-            <p className="profile-note profile-note--dark" style={{ marginTop: '0.4rem' }}>
-              {copy.coachScopeNote}
-            </p>
-          )}
-          {isCoach && membershipView === 'academy' && (
-            <p className="profile-note profile-note--dark" style={{ marginTop: '0.4rem' }}>
-              Area do professor: visualize os alunos da sua academia, cadastre novos alunos e mantenha os dados da equipe.
-            </p>
-          )}
+
+
         </div>
       </section>
 
@@ -1778,10 +1801,25 @@ const Membership = () => {
                       <small>{copy.coachSignupStepTwoTitle}</small>
                     </span>
                   </button>
+                  <button
+                    type="button"
+                    className={`onboarding-step ${academySignupStep === 3 ? 'is-active' : ''}`}
+                    onClick={() => setAcademySignupStep(3)}
+                  >
+                    <span className="onboarding-step__index">3</span>
+                    <span>
+                      <strong>Etapa 3</strong>
+                      <small>Auxiliar (Opcional)</small>
+                    </span>
+                  </button>
                 </div>
 
                 <p className="profile-note profile-note--dark">
-                  {academySignupStep === 1 ? copy.coachSignupStepOneHint : copy.coachCredentialsHint}
+                  {academySignupStep === 1 
+                     ? copy.coachSignupStepOneHint 
+                     : academySignupStep === 2 
+                        ? 'Vincule o usuário (login) do professor principal a esta academia.' 
+                        : 'Vincule o usuário (login) do professor auxiliar que ajudará na gestão da academia.'}
                 </p>
               </>
             )}
@@ -1850,14 +1888,16 @@ const Membership = () => {
                       onChange={(event) => setAcademyForm((prev) => ({ ...prev, contactEmail: event.target.value }))}
                     />
                   </div>
+
                   <div className="profile-field profile-field--full">
-                    <label>{copy.academyLogoUrl}</label>
-                    <input
+                    <label>{copy.academyBiography || 'Biografia / Descrição da academia'}</label>
+                    <textarea
                       className="profile-input profile-input--dark"
-                      type="url"
-                      value={academyForm.logoUrl}
-                      onChange={(event) => setAcademyForm((prev) => ({ ...prev, logoUrl: event.target.value }))}
-                      placeholder="https://..."
+                      rows={4}
+                      value={academyForm.biography}
+                      onChange={(event) => setAcademyForm((prev) => ({ ...prev, biography: event.target.value }))}
+                      placeholder="Conte um pouco sobre a história, filosofia e diferenciais da sua academia..."
+                      style={{ resize: 'vertical', minHeight: '100px' }}
                     />
                   </div>
                 </div>
@@ -1874,18 +1914,128 @@ const Membership = () => {
                     </div>
                   )}
                 </div>
+
+                <div className="profile-upload-row" style={{ marginTop: '1rem' }}>
+                  <label className="profile-file-btn">
+                    <Image size={14} />
+                    Capa da Academia
+                    <input type="file" accept="image/*" onChange={handleAcademyCoverFile} />
+                  </label>
+                  {academyForm.coverUrl && (
+                    <div className="profile-image-preview" style={{ width: '100px', height: '50px', borderRadius: '4px', overflow: 'hidden' }}>
+                      <img src={academyForm.coverUrl} alt="Capa da academia" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    </div>
+                  )}
+                </div>
               </>
             )}
+
+            {/* ── PROFESSORES AUXILIARES (Coach & Admin view) ──────────── */}
+            {(() => {
+              // Find the relevant academy for both coach and admin
+              const currentAcademy = isCoach
+                ? (coachOwnedAcademies[0] || null)
+                : (editingAcademyId
+                    ? academies.find(a => String(a.id) === String(editingAcademyId))
+                    : academies.find(a => a.name === academyForm.name));
+
+              const assistantUsernames = (currentAcademy?.assistantUsernames || [])
+                .map(u => u.toLowerCase());
+
+              const assistantMembers = memberProfiles.filter(m =>
+                assistantUsernames.includes((m.accountUsername || '').toLowerCase())
+              );
+
+              if (assistantMembers.length === 0) return null;
+
+              return (
+                <div style={{
+                  marginTop: '1.5rem',
+                  borderTop: '1px solid rgba(255,255,255,0.08)',
+                  paddingTop: '1.25rem'
+                }}>
+                  <p style={{
+                    fontSize: '0.68rem',
+                    fontWeight: 800,
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase',
+                    color: '#9ca3af',
+                    marginBottom: '0.85rem'
+                  }}>
+                    Professores Auxiliares ({assistantMembers.length})
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                    {assistantMembers.map((m) => {
+                      const initials = (m.fullName || m.accountUsername || '?')
+                        .split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
+                      return (
+                        <div key={m.id || m.accountUsername} style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.85rem',
+                          padding: '0.75rem 1rem',
+                          background: 'rgba(255,255,255,0.04)',
+                          border: '1px solid rgba(255,255,255,0.08)',
+                          borderRadius: '12px',
+                          position: 'relative',
+                          overflow: 'hidden'
+                        }}>
+                          <div style={{
+                            position: 'absolute', left: 0, top: 0, bottom: 0,
+                            width: '3px',
+                            background: 'linear-gradient(to bottom, #a855f7, #c084fc)',
+                            borderRadius: '3px 0 0 3px'
+                          }} />
+                          {m.photoUrl ? (
+                            <img src={m.photoUrl} alt={m.fullName} style={{
+                              width: 40, height: 40, borderRadius: '10px',
+                              objectFit: 'cover',
+                              border: '1.5px solid rgba(168,85,247,0.3)',
+                              flexShrink: 0
+                            }} />
+                          ) : (
+                            <div style={{
+                              width: 40, height: 40, borderRadius: '10px',
+                              background: 'linear-gradient(135deg, #a855f7, #7c3aed)',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: '0.78rem', fontWeight: 800, color: '#fff',
+                              flexShrink: 0
+                            }}>{initials}</div>
+                          )}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <strong style={{ display: 'block', fontSize: '0.88rem', color: '#f9fafb', fontWeight: 700 }}>
+                              {m.fullName || m.accountUsername}
+                            </strong>
+                            <span style={{ fontSize: '0.72rem', color: '#9ca3af' }}>
+                              {m.accountUsername && `@${m.accountUsername}`}
+                              {m.email && ` · ${m.email}`}
+                            </span>
+                          </div>
+                          <span style={{
+                            fontSize: '0.62rem', fontWeight: 700,
+                            letterSpacing: '0.1em', textTransform: 'uppercase',
+                            color: '#c084fc',
+                            background: 'rgba(168,85,247,0.12)',
+                            border: '1px solid rgba(168,85,247,0.25)',
+                            padding: '3px 10px', borderRadius: '20px'
+                          }}>Auxiliar</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
 
             {isAdmin && academySignupStep === 2 && (
               <div className="profile-fields">
                 <div className="profile-field">
-                  <label>{copy.coachSignupUsername}</label>
+                  <label>{copy.coachSignupUsername} (Opcional)</label>
                   <input
                     className="profile-input profile-input--dark"
                     value={academyForm.coachUsername}
                     onChange={(event) => setAcademyForm((prev) => ({ ...prev, coachUsername: event.target.value }))}
-                    required
                   />
                 </div>
                 <div className="profile-field">
@@ -1894,7 +2044,6 @@ const Membership = () => {
                     className="profile-input profile-input--dark"
                     value={academyForm.coachName}
                     onChange={(event) => setAcademyForm((prev) => ({ ...prev, coachName: event.target.value }))}
-                    required
                   />
                 </div>
                 <div className="profile-field profile-field--full">
@@ -1906,31 +2055,58 @@ const Membership = () => {
                     onChange={(event) => setAcademyForm((prev) => ({ ...prev, coachEmail: event.target.value }))}
                   />
                 </div>
+              </div>
+            )}
+
+            {isAdmin && academySignupStep === 3 && (
+              <div className="profile-fields">
+                {eligibleAssistants.length > 0 && (
+                  <div className="profile-field profile-field--full" style={{ marginBottom: '1rem' }}>
+                    <label style={{ color: '#00c2cb' }}>Selecionar integrante da academia (Preenchimento rápido)</label>
+                    <select
+                      className="profile-input profile-input--dark"
+                      value={eligibleAssistants.some(m => m.fullName === academyForm.assistantName) ? eligibleAssistants.find(m => m.fullName === academyForm.assistantName).id : ''}
+                      onChange={(event) => {
+                        const selectedId = event.target.value;
+                        const selectedMember = eligibleAssistants.find(m => String(m.id) === String(selectedId));
+                        setAcademyForm(prev => ({
+                          ...prev,
+                          assistantUsername: selectedMember ? (selectedMember.accountUsername || '') : '',
+                          assistantName: selectedMember ? selectedMember.fullName : '',
+                          assistantEmail: selectedMember ? (selectedMember.email || '') : ''
+                        }));
+                      }}
+                    >
+                      <option value="">-- Ou preencha os dados manualmente abaixo --</option>
+                      {eligibleAssistants.map(m => (
+                        <option key={m.id} value={m.id}>{m.fullName} {m.accountUsername ? `(${m.accountUsername})` : ''}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div className="profile-field">
-                  <label>{copy.coachSignupPassword}</label>
+                  <label>Usuário de login (Auxiliar)</label>
                   <input
                     className="profile-input profile-input--dark"
-                    type="password"
-                    minLength={8}
-                    value={academyForm.coachPassword}
-                    onChange={(event) => setAcademyForm((prev) => ({ ...prev, coachPassword: event.target.value }))}
-                    required
+                    value={academyForm.assistantUsername}
+                    onChange={(event) => setAcademyForm((prev) => ({ ...prev, assistantUsername: event.target.value }))}
                   />
-                  {academyForm.coachPassword ? (
-                    <small className={`password-strength password-strength--${academyCoachPasswordStrength.level}`}>
-                      {academyCoachPasswordStrength.message}
-                    </small>
-                  ) : null}
                 </div>
                 <div className="profile-field">
-                  <label>{copy.coachSignupPasswordConfirm}</label>
+                  <label>Nome do professor auxiliar</label>
                   <input
                     className="profile-input profile-input--dark"
-                    type="password"
-                    minLength={8}
-                    value={academyForm.coachPasswordConfirm}
-                    onChange={(event) => setAcademyForm((prev) => ({ ...prev, coachPasswordConfirm: event.target.value }))}
-                    required
+                    value={academyForm.assistantName}
+                    onChange={(event) => setAcademyForm((prev) => ({ ...prev, assistantName: event.target.value }))}
+                  />
+                </div>
+                <div className="profile-field profile-field--full">
+                  <label>E-mail (Auxiliar)</label>
+                  <input
+                    className="profile-input profile-input--dark"
+                    type="email"
+                    value={academyForm.assistantEmail}
+                    onChange={(event) => setAcademyForm((prev) => ({ ...prev, assistantEmail: event.target.value }))}
                   />
                 </div>
               </div>
@@ -1940,21 +2116,30 @@ const Membership = () => {
             <div className="profile-actions-row">
               {isAdmin ? (
                 <>
-                  {academySignupStep === 1 ? (
-                    <button type="submit" className="btn btn-primary">
+                  {academySignupStep === 1 && (
+                    <button type="button" className="btn btn-primary" onClick={() => setAcademySignupStep(2)}>
                       {copy.coachSignupContinue}
                     </button>
-                  ) : (
+                  )}
+                  {academySignupStep === 2 && (
                     <>
                       <button type="button" className="btn btn-secondary" onClick={() => setAcademySignupStep(1)}>
                         {copy.coachSignupBack}
                       </button>
-                      <button type="submit" className="btn btn-primary" disabled={isAdminAcademySubmitDisabled}>
-                        <Plus size={14} />
-                        {copy.saveAcademy}
+                      <button type="button" className="btn btn-primary" onClick={() => setAcademySignupStep(3)}>
+                        {copy.coachSignupContinue}
                       </button>
                     </>
                   )}
+                  {academySignupStep === 3 && (
+                    <button type="button" className="btn btn-secondary" onClick={() => setAcademySignupStep(2)}>
+                      {copy.coachSignupBack}
+                    </button>
+                  )}
+                  <button type="submit" className="btn btn-primary" disabled={isAdminAcademySubmitDisabled} style={{ marginLeft: 'auto' }}>
+                    <Plus size={14} />
+                    {copy.saveAcademy}
+                  </button>
                   <button type="button" className="btn btn-secondary" onClick={handleClearAcademyForm}>
                     {copy.clear}
                   </button>
@@ -1975,7 +2160,7 @@ const Membership = () => {
         </form>
         )}
 
-        {(membershipView === 'athlete' || showCoachAthleteManagementInsideAcademy) && (
+        {false && (
         <form className="profile-card profile-card--dark" onSubmit={handleSaveAthlete}>
           <div className="profile-card__header profile-card__header--dark">
             <h2>{copy.athleteSection}</h2>
@@ -2016,12 +2201,16 @@ const Membership = () => {
               </div>
               <div className="profile-field">
                 <label>{copy.athleteWeight}</label>
-                <input
+                <select
                   className="profile-input profile-input--dark"
                   value={athleteForm.weight}
                   onChange={(event) => setAthleteForm((prev) => ({ ...prev, weight: event.target.value }))}
-                  placeholder={copy.weightExamplePlaceholder}
-                />
+                >
+                  <option value="">Selecione o peso</option>
+                  {WEIGHT_OPTIONS.map((weight) => (
+                    <option key={weight} value={weight}>{weight}</option>
+                  ))}
+                </select>
               </div>
               <div className="profile-field">
                 <label>{copy.athleteEmail}</label>
@@ -2166,7 +2355,7 @@ const Membership = () => {
         )}
       </section>
 
-      {(showAcademyListSection || showAthleteListSection) && (
+      {false && (
       <section className="profile-grid profile-grid--membership-lists is-single">
         {showAcademyListSection && (
         <div className="profile-card profile-card--dark">

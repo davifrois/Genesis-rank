@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { rankAthletes } from './scoringService';
-import { nextPowerOfTwo } from './bracketService';
+import { nextPowerOfTwo, seedSlotsWithRankingAwareByes } from './bracketService';
 
 const BRAND_PRIMARY = [11, 52, 84];
 const BRAND_SECONDARY = [24, 96, 152];
@@ -432,19 +432,59 @@ export const generateBracketsPDF = async (brackets, athletes, options = {}) => {
         doc.setTextColor(30, 40, 50);
         doc.text(`Chave ${bracket.number || '-'}`, 12, 38);
 
-        const size = nextPowerOfTwo(bracket.seedIds?.length || 0, 2);
-        const seeds = Array.from({ length: size }, (_, slotIndex) => {
-            const athleteId = bracket.seedIds?.[slotIndex];
-            const athlete = athleteId ? athletesMap.get(athleteId) : null;
-            if (!athlete) {
-                return { name: 'BYE', academy: '', athleteId: null };
+        // Always use the actual bracket size (power of two of how many athletes are registered)
+        const size = nextPowerOfTwo((bracket.seedIds || []).filter(Boolean).length || 2, 2);
+        const sideSize = size / 2;
+        let leftAthleteIds;
+        let rightAthleteIds;
+
+        if (bracket.manualSlots && Array.isArray(bracket.manualSlots) && bracket.manualSlots.length === size) {
+            // Check that the manual layout is actually balanced (not broken from a buggy drag)
+            const leftCount  = bracket.manualSlots.slice(0, sideSize).filter(Boolean).length;
+            const rightCount = bracket.manualSlots.slice(sideSize).filter(Boolean).length;
+            const total = leftCount + rightCount;
+            const isBalanced = total === 0 || (leftCount / total < 0.8 && rightCount / total < 0.8);
+
+            if (isBalanced) {
+                // User intentionally arranged slots — respect the layout
+                leftAthleteIds  = bracket.manualSlots.slice(0, sideSize);
+                rightAthleteIds = bracket.manualSlots.slice(sideSize);
             }
-            return {
-                name: athlete?.nome || 'Atleta',
-                academy: athlete?.academia || 'Sem academia',
-                athleteId: athlete.id
+            // If not balanced, fall through to auto-split below
+        }
+
+        if (!leftAthleteIds) {
+            // Auto-split: take valid athlete IDs, split half left / half right
+            // Split on a pair boundary so consecutive pairs always stay together on the same side
+            const allIds = (bracket.seedIds || []).filter(Boolean);
+            const totalAthletes = allIds.length;
+
+            // Round the split index UP to the nearest even number so we never break a pair
+            const halfRaw = Math.ceil(totalAthletes / 2);
+            const splitIdx = halfRaw % 2 === 0 ? halfRaw : halfRaw + 1; // next even
+
+            const leftIds  = allIds.slice(0, Math.min(splitIdx, totalAthletes));
+            const rightIds = allIds.slice(leftIds.length);
+
+            // Place each half at consecutive slots starting at index 0
+            // so slot[0] vs slot[1] = first fight, slot[2] vs slot[3] = second fight, etc.
+            const placeConsecutive = (ids, slots) => {
+                const result = new Array(slots).fill(null);
+                ids.forEach((id, i) => { if (i < slots) result[i] = id || null; });
+                return result;
             };
-        });
+
+            leftAthleteIds  = placeConsecutive(leftIds,  sideSize);
+            rightAthleteIds = placeConsecutive(rightIds, sideSize);
+        }
+
+        const toSeedEntry = (id) => {
+            const athlete = id ? athletesMap.get(id) : null;
+            if (!athlete) return { name: 'BYE', academy: '', athleteId: null };
+            return { name: athlete?.nome || 'Atleta', academy: athlete?.academia || 'Sem academia', athleteId: athlete.id };
+        };
+
+        const seeds = [...leftAthleteIds, ...rightAthleteIds].map(toSeedEntry);
 
         const topMargin = 48; // Adjusted for taller header
         const footerPadding = 4;
@@ -1372,8 +1412,7 @@ export const generateSchedulePDF = async (rows = [], options = {}) => {
                 `${row.start} - ${row.end}`,
                 row.category || row.label,
                 row.belt || '-',
-                row.gender || '-',
-                row.area || row.bracketNumber || '-'
+                row.gender || '-'
             ]));
 
         runAutoTable(doc, {
@@ -1381,19 +1420,22 @@ export const generateSchedulePDF = async (rows = [], options = {}) => {
                 'HORARIO',
                 'CATEGORIA',
                 'FAIXA',
-                'GENERO',
-                'AREA'
+                'GENERO'
             ]],
             body: tableBody,
             startY: cursorY,
             ...createTableTheme({
                 0: { halign: 'center', cellWidth: 34, fontStyle: 'bold' },
-                1: { cellWidth: 78, fontStyle: 'bold' },
+                1: { cellWidth: 98, fontStyle: 'bold' },
                 2: { halign: 'center', cellWidth: 30 },
-                3: { halign: 'center', cellWidth: 28 },
-                4: { halign: 'center', cellWidth: 20, fontStyle: 'bold' }
+                3: { halign: 'center', cellWidth: 28 }
             }),
-            margin: { left: 12, right: 12, top: 36, bottom: 18 }
+            styles: {
+                lineColor: [209, 213, 219],
+                lineWidth: 0.15,
+                cellPadding: 2.6
+            },
+            margin: { left: 10, right: 10, top: 36, bottom: 18 }
         });
 
         const finalY = (doc.lastAutoTable?.finalY || cursorY) + 6;

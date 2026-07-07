@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import {
   Trophy, ShieldCheck, Medal, Target, MapPin, Calendar,
@@ -11,7 +11,9 @@ import {
   buildPublicProfileSnapshot,
   decodePublicProfileSnapshot
 } from '../utils/profileShare';
+import { normalizeRegistrationStatus, REGISTRATION_STATUS } from '../utils/registrationStatus';
 import AthleteCheckinModal from '../components/AthleteCheckinModal';
+import { publicRegistrationService } from '../services/publicRegistrationService';
 import './PublicProfile.css';
 
 /* ── helpers ─────────────────────────────────────────────── */
@@ -98,8 +100,54 @@ const podiumPublicLabel = (place) => {
 
 const PublicProfile = ({ profileOverride, isPreview = false }) => {
   const {
-    memberProfiles = [], athletes = [], events = [], academies = [], brackets = [], currentUser, generateBrackets
+    memberProfiles = [], athletes = [], events = [], academies = [], brackets = [], currentUser, generateBrackets, updateAthlete
   } = useStore() || {};
+
+  const [realtimeRegistrations, setRealtimeRegistrations] = useState([]);
+
+  useEffect(() => {
+    // Busca as inscrições reais da base de dados publicRegistrations
+    // para sobrepor/curar os status dos atletas se tiver algo travado no cache
+    const fetchRegistrations = async () => {
+      try {
+        const regs = await publicRegistrationService.listRegistrations();
+        setRealtimeRegistrations(regs);
+      } catch (err) {
+        console.warn('Silent fail fetching public registrations in profile', err);
+      }
+    };
+    fetchRegistrations();
+  }, []);
+
+  // Auto-heal local athletes when realtimeRegistrations load
+  useEffect(() => {
+    if (!realtimeRegistrations.length || !athletes.length || typeof updateAthlete !== 'function') return;
+
+    const approvedRegs = realtimeRegistrations.filter(r => normalizeRegistrationStatus(r.status) === REGISTRATION_STATUS.PAYMENT_CONFIRMED);
+    if (!approvedRegs.length) return;
+
+    let healedCount = 0;
+    athletes.forEach(a => {
+        const currentStatus = normalizeRegistrationStatus(a.status);
+        if (currentStatus === REGISTRATION_STATUS.PENDING || currentStatus === REGISTRATION_STATUS.PENDING_SYNC) {
+            
+            const isApproved = approvedRegs.some(r => {
+                const rName = normalizeProfileLookup(r.nome || r.name || '');
+                const aName = normalizeProfileLookup(a.nome || a.name || '');
+                return rName === aName && String(r.eventId || '') === String(a.eventId || '');
+            });
+
+            if (isApproved) {
+                updateAthlete(a.id, { status: REGISTRATION_STATUS.PAYMENT_CONFIRMED });
+                healedCount++;
+            }
+        }
+    });
+
+    if (healedCount > 0) {
+        console.info(`[PublicProfile] Auto-healed ${healedCount} stuck athlete(s) to PAYMENT_CONFIRMED.`);
+    }
+  }, [realtimeRegistrations, athletes, updateAthlete]);
 
   const [isCheckinModalOpen, setIsCheckinModalOpen] = useState(false);
   const [selectedAthleteForCheckin, setSelectedAthleteForCheckin] = useState(null);
@@ -582,9 +630,9 @@ const PublicProfile = ({ profileOverride, isPreview = false }) => {
                     </div>
 
                     <div className="pp-champ__tags">
-                      {(!row.status || row.status === 'PAYMENT_CONFIRMED') && <span className="pp-tag" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e', borderColor: 'rgba(34,197,94,0.3)', fontWeight: 600 }}>✅ Confirmado</span>}
-                      {row.status === 'PAYMENT_ERROR' && <span className="pp-tag" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)', fontWeight: 600 }}>⚠️ Pendente</span>}
-                      {(row.status === 'PENDING' || row.status === 'PENDING_SYNC') && <span className="pp-tag" style={{ background: 'rgba(234,179,8,0.1)', color: '#eab308', borderColor: 'rgba(234,179,8,0.3)', fontWeight: 600 }}>⏳ Confirmando pagamento</span>}
+                      {(!row.status || normalizeRegistrationStatus(row.status) === REGISTRATION_STATUS.PAYMENT_CONFIRMED) && <span className="pp-tag" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e', borderColor: 'rgba(34,197,94,0.3)', fontWeight: 600 }}>✅ Confirmado</span>}
+                      {normalizeRegistrationStatus(row.status) === REGISTRATION_STATUS.PAYMENT_ERROR && <span className="pp-tag" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)', fontWeight: 600 }}>⚠️ Pendente</span>}
+                      {(normalizeRegistrationStatus(row.status) === REGISTRATION_STATUS.PENDING || normalizeRegistrationStatus(row.status) === REGISTRATION_STATUS.PENDING_SYNC) && <span className="pp-tag" style={{ background: 'rgba(234,179,8,0.1)', color: '#eab308', borderColor: 'rgba(234,179,8,0.3)', fontWeight: 600 }}>⏳ Confirmando pagamento</span>}
 
                       {row.category  && <span className="pp-tag">{row.category}</span>}
                       {row.modality  && <span className="pp-tag pp-tag--mod">{row.modality}</span>}
