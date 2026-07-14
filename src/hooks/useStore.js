@@ -398,6 +398,7 @@ const normalizeBracket = (bracket) => {
             silverId: normalizeId(podium.silverId),
             bronzeId: normalizeId(podium.bronzeId)
         },
+        matchResults: bracket.matchResults || {},
         appliedAt: bracket.appliedAt || '',
         createdAt: bracket.createdAt || new Date().toISOString()
     };
@@ -1084,19 +1085,16 @@ const useStoreState = (loadedState) => {
             const payload = { ...data, schemaVersion: STORAGE_VERSION };
             const serialized = JSON.stringify(payload);
             
-            localforage.setItem(STORAGE_KEY, serialized).catch(err => {
-                if (err && err.name === 'QuotaExceededError') {
-                    alert('Erro: Limite de armazenamento atingido no IndexedDB! As alterações não foram salvas. Por favor, remova imagens antigas.');
-                }
+            fetch((import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '') + '/api/data', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: serialized
+            }).catch(err => {
+                console.error('Falha ao sincronizar com o backend:', err);
+                try {
+                    localStorage.setItem(STORAGE_KEY, serialized);
+                } catch {}
             });
-
-            try {
-                localStorage.setItem(STORAGE_KEY, serialized);
-            } catch {}
-
-            try {
-                localStorage.setItem(STORAGE_BACKUP_KEY, serialized);
-            } catch {}
         }, 250);
 
         return () => clearTimeout(timeout);
@@ -2164,7 +2162,24 @@ const useStoreState = (loadedState) => {
         }));
     };
 
-    const applyBracketPodium = (bracketId) => {
+    const finalizeMatch = (bracketId, matchId, winnerId, scoreA, scoreB, loserId) => {
+        setData(prev => ({
+            ...prev,
+            brackets: prev.brackets.map(b => {
+                if (b.id !== bracketId) return b;
+                return {
+                    ...b,
+                    matchResults: {
+                        ...(b.matchResults || {}),
+                        [matchId]: { winnerId, loserId, scoreA, scoreB, timestamp: new Date().toISOString() }
+                    }
+                };
+            })
+        }));
+        addLog({ type: 'INFO', action: 'FINALIZE_MATCH', details: `Luta finalizada na chave.` });
+    };
+
+    const applyBracketPodium = (bracketId, podiumOverride = null) => {
         const bracket = data.brackets.find((item) => item.id === bracketId);
         if (!bracket) {
             addLog({ type: 'ERROR', action: 'APPLY_BRACKET', details: `Chave ${bracketId} não encontrada.` });
@@ -2176,7 +2191,7 @@ const useStoreState = (loadedState) => {
             return { ok: false, message: 'Chave sem atletas cadastrados.' };
         }
 
-        const podium = bracket.podium || {};
+        const podium = podiumOverride || bracket.podium || {};
         const positions = {
             goldId: podium.goldId || '',
             silverId: podium.silverId || '',
@@ -2363,6 +2378,7 @@ const useStoreState = (loadedState) => {
         setBracketPodium,
         setBracketSeedOrder,
         setBracketManualSlots,
+        finalizeMatch,
         applyBracketPodium,
         clearAthletes,
         importAthletes,
@@ -2381,17 +2397,14 @@ export const StoreProvider = ({ children }) => {
         (async () => {
             let parsed = null;
             try {
-                const storedForage = await localforage.getItem(STORAGE_KEY);
-                parsed = typeof storedForage === 'string' ? JSON.parse(storedForage) : storedForage;
-            } catch (e) { console.error('LocalForage read error', e); }
-
-            if (!parsed) {
-                parsed = loadStoredPayload();
-                if (parsed) {
-                    try {
-                        await localforage.setItem(STORAGE_KEY, JSON.stringify(parsed));
-                    } catch (e) {}
+                const response = await fetch((import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '') + '/api/data');
+                if (response.ok) {
+                    parsed = await response.json();
                 }
+            } catch (e) { console.error('API read error', e); }
+
+            if (!parsed || !parsed.schemaVersion) {
+                parsed = loadStoredPayload();
             }
 
             if (!mounted) return;

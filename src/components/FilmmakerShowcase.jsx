@@ -153,7 +153,7 @@ const FilmmakerShowcase = ({
         <div className="filmmaker-showcase__ambient" aria-hidden="true" />
         <header className="filmmaker-showcase__head">
         <span className="filmmaker-showcase__kicker">{copy.kicker}</span>
-        <h2>{copy.title}<br/>| PORTFOLIO</h2>
+        <h2>{copy.title}<br/>PORTIFOLIO</h2>
         <p>{copy.subtitle}</p>
         <strong className="filmmaker-showcase__top-message">{copy.topMessage}</strong>
       </header>

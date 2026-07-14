@@ -54,28 +54,103 @@ export const seedSlotsWithRankingAwareByes = (seedIds = [], bracketSize = 0) => 
     return slots;
 };
 
-export const buildBracketMatches = (seedIds, bracketSize, manualSlots = null, directOrder = false) => {
-    const size = nextPowerOfTwo(bracketSize, 2);
+export const buildBracketMatches = (seedIds, bracketSize, manualSlots = null, directOrder = false, matchResults = {}) => {
+    const validSeeds = Array.isArray(seedIds) ? seedIds.filter(Boolean) : [];
+    if (!manualSlots && !directOrder && validSeeds.length === 3 && (!bracketSize || bracketSize <= 4)) {
+        const A = validSeeds[0];
+        const B = validSeeds[1];
+        const C = validSeeds[2];
+
+        const m1Id = 'm-1';
+        const winner1 = matchResults[m1Id] ? matchResults[m1Id].winnerId : `__winner_${m1Id}__`;
+        const loser1 = matchResults[m1Id] ? matchResults[m1Id].loserId : `__loser_${m1Id}__`;
+
+        const m2Id = 'm-2';
+        const winner2 = matchResults[m2Id] ? matchResults[m2Id].winnerId : `__winner_${m2Id}__`;
+
+        const m3Id = 'm-3';
+
+        return [
+            { id: m1Id, slotA: B, slotB: C, stage: 'SEMI-FINAL 1' },
+            { id: m2Id, slotA: A, slotB: loser1, stage: 'SEMI-FINAL 2' },
+            { id: m3Id, slotA: winner1, slotB: winner2, stage: 'FINAL' }
+        ];
+    }
+
+    const size = nextPowerOfTwo(bracketSize || seedIds.length, 2);
     let slots;
 
     if (manualSlots && Array.isArray(manualSlots) && manualSlots.length === size) {
         slots = [...manualSlots];
     } else if (directOrder) {
-        // Use seedIds directly — consecutive pairs are same-academy fights
         slots = [...(Array.isArray(seedIds) ? seedIds : [])];
         while (slots.length < size) slots.push(null);
     } else {
         slots = seedSlotsWithRankingAwareByes(seedIds, size);
         while (slots.length < size) slots.push(null);
     }
+    
+    const getStageName = (matchesInRound) => {
+        if (matchesInRound === 1) return 'FINAL';
+        if (matchesInRound === 2) return 'SEMI-FINAL';
+        if (matchesInRound === 4) return 'QUARTAS DE FINAL';
+        if (matchesInRound === 8) return 'OITAVAS DE FINAL';
+        return 'ELIMINATÓRIAS';
+    };
+
     const matches = [];
+    let matchCounter = 1;
+    let currentRoundMatches = [];
+    const firstRoundCount = slots.length / 2;
+
+    // First round
     for (let i = 0; i < slots.length; i += 2) {
+        const id = `m-${matchCounter++}`;
+        currentRoundMatches.push(id);
         matches.push({
-            id: `m-${i / 2 + 1}`,
+            id,
             slotA: slots[i] || null,
-            slotB: slots[i + 1] || null
+            slotB: slots[i + 1] || null,
+            stage: getStageName(firstRoundCount)
         });
     }
+
+    // Subsequent rounds
+    while (currentRoundMatches.length > 1) {
+        const nextRoundMatches = [];
+        const nextRoundCount = currentRoundMatches.length / 2;
+        
+        for (let i = 0; i < currentRoundMatches.length; i += 2) {
+            const m1 = currentRoundMatches[i];
+            const m2 = currentRoundMatches[i+1];
+            
+            const winner1 = matchResults[m1] ? matchResults[m1].winnerId : `__winner_${m1}__`;
+            const winner2 = matchResults[m2] ? matchResults[m2].winnerId : `__winner_${m2}__`;
+
+            if (nextRoundCount === 1) {
+                const loser1 = matchResults[m1] ? matchResults[m1].loserId : `__loser_${m1}__`;
+                const loser2 = matchResults[m2] ? matchResults[m2].loserId : `__loser_${m2}__`;
+                const thirdPlaceId = `m-${matchCounter++}`;
+                matches.push({
+                    id: thirdPlaceId,
+                    slotA: loser1,
+                    slotB: loser2,
+                    stage: 'DISPUTA 3º LUGAR'
+                });
+            }
+
+            const id = `m-${matchCounter++}`;
+            nextRoundMatches.push(id);
+            matches.push({
+                id,
+                slotA: winner1,
+                slotB: winner2,
+                stage: getStageName(nextRoundCount)
+            });
+        }
+        currentRoundMatches = nextRoundMatches;
+    }
+
     return matches;
 };
 
@@ -178,7 +253,7 @@ export const buildMultistagePreview = (seedIds = []) => {
     return [...groupMatches, ...knockout];
 };
 
-export const buildMatchesByFormat = (format, seedIds = [], bracketSize = 0) => {
+export const buildMatchesByFormat = (format, seedIds = [], bracketSize = 0, matchResults = {}) => {
     const normalizedFormat = (format || BRACKET_FORMAT.SINGLE).toString().trim().toUpperCase();
     if (normalizedFormat === BRACKET_FORMAT.ROUND_ROBIN) {
         return buildRoundRobinMatches(seedIds);
@@ -192,5 +267,5 @@ export const buildMatchesByFormat = (format, seedIds = [], bracketSize = 0) => {
     if (normalizedFormat === BRACKET_FORMAT.MULTISTAGE) {
         return buildMultistagePreview(seedIds);
     }
-    return buildBracketMatches(seedIds, bracketSize);
+    return buildBracketMatches(seedIds, bracketSize, null, false, matchResults);
 };

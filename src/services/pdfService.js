@@ -57,7 +57,9 @@ const loadImage = (src) => new Promise((resolve, reject) => {
         return;
     }
     const img = new Image();
-    img.crossOrigin = 'anonymous';
+    if (src && !src.startsWith('data:')) {
+        img.crossOrigin = 'anonymous';
+    }
     img.onload = () => resolve(img);
     img.onerror = () => reject(new Error('Falha ao carregar imagem.'));
     img.src = src;

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 3,
+  "athletes": [],
+  "events": [],
+  "news": [],
+  "academies": [],
+  "memberProfiles": [],
+  "activeEventId": null,
+  "logs": [],
+  "notifications": [],
+  "rankHistory": {},
+  "brackets": [],
+  "nextBracketNumber": 1,
+  "currentUser": null
+}

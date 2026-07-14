@@ -1,5 +1,5 @@
 .genesis-footer {
-  background-color: #121212;
+  background-color: #141414;
   color: #ffffff;
   font-family: inherit;
   padding-top: 64px;
@@ -74,14 +74,14 @@
 .genesis-footer-title {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #e5a539;
+  color: #ffffff;
   text-transform: uppercase;
   margin: 0 0 4px 0;
   letter-spacing: 0.5px;
 }
 
 .genesis-footer-col a {
-  color: #a0a0a0;
+  color: #e0e0e0;
   text-decoration: none;
   font-size: 0.9rem;
   font-weight: 500;

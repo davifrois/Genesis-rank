@@ -1,5 +1,6 @@
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { useStore } from '../hooks/useStore';
 import {
     Activity,
@@ -28,7 +29,15 @@ import {
     Upload,
     UserPlus,
     Users,
-    Zap
+    DollarSign,
+    TrendingUp,
+    Zap,
+    Send,
+    Swords,
+    Plus,
+    X,
+    Eye,
+    EyeOff
 } from 'lucide-react';
 import { generateBracketsPDF, generateRankingPDF, generateSchedulePDF } from '../services/pdfService';
 import { extractTextFromPdfFile, parseAthletesFromText } from '../services/pdfImportService';
@@ -45,6 +54,7 @@ import { translateBelt, translateCategory, translateCompositeLabel, translateWei
 import { REGISTRATION_STATUS, normalizeRegistrationStatus } from '../utils/registrationStatus';
 import { extractWeightOptionsFromFile, extractWeightOptionsFromUrl } from '../services/weightTableOcrService';
 import { evaluatePasswordStrength } from '../utils/passwordStrength';
+import { savePublishedEventSchedule } from '../utils/eventSchedule';
 
 const ATHLETE_PAGE_SIZE_OPTIONS = [20, 40, 80];
 const MAX_NEWS_IMAGE_UPLOAD_BYTES = 8_000_000;
@@ -126,7 +136,8 @@ const ADMIN_SECTION_ROUTES = {
     schedule: '/admin/cronograma',
     athletes: '/admin/atletas',
     automation: '/admin/automacoes',
-    activity: '/admin/atividade'
+    activity: '/admin/atividade',
+    superfights: '/admin/lutas-casadas'
 };
 
 const ADMIN_ROUTE_TO_SECTION = {
@@ -884,7 +895,8 @@ const Dashboard = () => {
                     schedule: 'Schedule',
                     athletes: 'Athletes',
                     automation: 'Automation',
-                    activity: 'Activity'
+                    activity: 'Activity',
+                    superfights: 'Super Fights'
                 },
                 common: {
                     close: 'Close',
@@ -1297,12 +1309,18 @@ const Dashboard = () => {
                     title: 'New athlete',
                     fullName: 'Full name',
                     fullNamePlaceholder: 'Ex: Rodrigo Cavaca',
+                    gender: 'Gender',
+                    genderMale: 'Male',
+                    genderFemale: 'Female',
                     event: 'Event',
                     noEvent: 'No event',
                     graduation: 'Graduation',
+                    age: 'Age',
+                    agePlaceholder: 'Ex: 25',
                     weight: 'Weight',
                     absoluteWeightPlaceholder: 'Absolute',
                     weightPlaceholder: 'Ex: Feather',
+                    selectWeight: 'Select...',
                     category: 'Category',
                     categoryPlaceholder: 'Ex: Adult',
                     categoryType: 'Category type',
@@ -1452,7 +1470,8 @@ const Dashboard = () => {
                     schedule: 'Cronograma',
                     athletes: 'Atletas',
                     automation: 'Automações',
-                    activity: 'Atividade'
+                    activity: 'Atividade',
+                    superfights: 'Luta Casada'
                 },
                 common: {
                     close: 'Fechar',
@@ -1865,12 +1884,18 @@ const Dashboard = () => {
                     title: 'Novo atleta',
                     fullName: 'Nome completo',
                     fullNamePlaceholder: 'Ex: Rodrigo Cavaca',
+                    gender: 'Gênero',
+                    genderMale: 'Masculino',
+                    genderFemale: 'Feminino',
                     event: 'Evento',
                     noEvent: 'Sem evento',
                     graduation: 'Graduação',
+                    age: 'Idade',
+                    agePlaceholder: 'Ex: 25',
                     weight: 'Peso',
                     absoluteWeightPlaceholder: 'Absoluto',
                     weightPlaceholder: 'Ex: Pena',
+                    selectWeight: 'Selecione...',
                     category: 'Categoria',
                     categoryPlaceholder: 'Ex: Adulto',
                     categoryType: 'Tipo de categoria',
@@ -2070,7 +2095,9 @@ const Dashboard = () => {
     const [instagramFeedStatus, setInstagramFeedStatus] = useState(loadInstagramFeedStatus);
     const [newAthlete, setNewAthlete] = useState({
         nome: '',
+        genero: 'Masculino',
         faixa: 'Branca',
+        idade: '',
         peso: '',
         categoria: 'Adulto',
         academia: '',
@@ -2109,6 +2136,8 @@ const Dashboard = () => {
     const [userEditError, setUserEditError] = useState('');
     const [userEditSuccess, setUserEditSuccess] = useState('');
     const [userEditLoading, setUserEditLoading] = useState(false);
+    const [userEditPassword, setUserEditPassword] = useState('');
+    const [superfightForm, setSuperfightForm] = useState(null);
     const [userDeleteLoadingId, setUserDeleteLoadingId] = useState('');
     const [panelUsers, setPanelUsers] = useState([]);
     const [panelUsersLoading, setPanelUsersLoading] = useState(false);
@@ -3400,17 +3429,41 @@ const Dashboard = () => {
 
         const eventMeta = events.find((event) => event.id === scheduleEventId);
 
-        const scheduleRows = manualScheduleData.rows.map((row, index) => ({
-            order: index + 1,
-            bracketNumber: row.area || '-',
-            label: row.notes ? `${row.title} - ${row.notes}` : row.title,
-            mode: row.typeLabel,
-            participants: row.type === 'FIGHT' ? 2 : 0,
-            fightCount: row.type === 'FIGHT' ? 1 : 0,
-            startLabel: row.startLabel,
-            endLabel: row.endLabel,
-            durationLabel: formatDurationLabel(row.durationMinutes, isEnglish)
-        }));
+        const scheduleRows = manualScheduleData.rows.map((row, index) => {
+            const titleStr = (row.title || '').toString();
+            const lowerTitle = titleStr.toLowerCase();
+            let belt = '-';
+            let gender = '-';
+
+            if (lowerTitle.includes('branca/cinza') || lowerTitle.includes('branca / cinza')) belt = 'Branca/Cinza';
+            else if (lowerTitle.includes('branca')) belt = 'Branca';
+            else if (lowerTitle.includes('cinza')) belt = 'Cinza';
+            else if (lowerTitle.includes('amarela')) belt = 'Amarela';
+            else if (lowerTitle.includes('laranja')) belt = 'Laranja';
+            else if (lowerTitle.includes('verde')) belt = 'Verde';
+            else if (lowerTitle.includes('azul')) belt = 'Azul';
+            else if (lowerTitle.includes('roxa')) belt = 'Roxa';
+            else if (lowerTitle.includes('marrom')) belt = 'Marrom';
+            else if (lowerTitle.includes('preta')) belt = 'Preta';
+
+            if (lowerTitle.includes('masculino')) gender = 'Masculino';
+            else if (lowerTitle.includes('feminino')) gender = 'Feminino';
+
+            return {
+                order: index + 1,
+                bracketNumber: row.area || '-',
+                label: row.notes ? `${row.title} - ${row.notes}` : row.title,
+                mode: row.typeLabel,
+                participants: row.type === 'FIGHT' ? 2 : 0,
+                fightCount: row.type === 'FIGHT' ? 1 : 0,
+                startLabel: row.startLabel,
+                endLabel: row.endLabel,
+                durationLabel: formatDurationLabel(row.durationMinutes, isEnglish),
+                category: titleStr,
+                belt,
+                gender
+            };
+        });
 
         try {
             const normalizedLayout = (layoutMode || '').toString().trim().toLowerCase();
@@ -3428,7 +3481,44 @@ const Dashboard = () => {
                 areaCount: Math.max(1, manualScheduleData.areaCount || 1),
                 totalFights: manualScheduleData.totalFights,
                 totalDurationLabel: formatDurationLabel(manualScheduleData.totalDurationMinutes, isEnglish),
-                estimatedEnd: manualScheduleData.estimatedEndLabel
+                estimatedEnd: manualScheduleData.estimatedEndLabel,
+                posterUrl: eventMeta?.posterUrl || eventMeta?.imageUrl || eventMeta?.flyerUrl || undefined,
+                logoUrl: eventMeta?.logoUrl || undefined
+            });
+
+            showFeedback('success', copy.feedback.schedulePdfSaved);
+        } catch (err) {
+            showFeedback('error', err?.message || copy.feedback.schedulePdfFail);
+        }
+    }, [
+        manualScheduleData,
+        events,
+        scheduleEventId,
+        isEnglish,
+        showFeedback,
+        copy.feedback,
+        copy.bracketsPanel.event
+    ]);
+
+    const handlePublishSchedule = useCallback(() => {
+        if (!scheduleEventId) {
+            showFeedback('error', isEnglish ? 'Select an event first.' : 'Selecione um evento primeiro.');
+            return;
+        }
+
+        if (!manualScheduleData.rows || manualScheduleData.rows.length === 0) {
+            showFeedback('error', copy.feedback.noScheduleForPdf);
+            return;
+        }
+
+        const eventMeta = events.find((event) => event.id === scheduleEventId);
+
+        try {
+            savePublishedEventSchedule(scheduleEventId, {
+                eventName: eventMeta?.name || copy.bracketsPanel.event,
+                eventDate: eventMeta?.date || '',
+                eventLocation: eventMeta?.location || '',
+                rows: manualScheduleData.rows
             });
 
             addNews({
@@ -3437,14 +3527,14 @@ const Dashboard = () => {
                 body: `O cronograma com os horários de lutas e chamadas para o evento **${eventMeta?.name || 'Campeonato'}** acaba de ser gerado pelo organizador.\n\nPedimos que todos os atletas fiquem atentos à área de concentração pelo menos 30 minutos antes do horário previsto para a sua categoria. O evento fluirá de acordo com essa previsão.`,
                 category: 'eventos',
                 tags: ['cronograma', 'eventos'],
-                imageUrl: eventMeta?.flyerUrl || eventMeta?.coverUrl || '',
+                imageUrl: eventMeta?.posterUrl || eventMeta?.imageUrl || eventMeta?.flyerUrl || '',
                 status: 'published',
                 publishedAt: new Date().toISOString()
             });
 
-            showFeedback('success', copy.feedback.schedulePdfSaved);
+            showFeedback('success', isEnglish ? 'Schedule published successfully!' : 'Cronograma publicado com sucesso!');
         } catch (err) {
-            showFeedback('error', err?.message || copy.feedback.schedulePdfFail);
+            showFeedback('error', err?.message || (isEnglish ? 'Failed to publish schedule.' : 'Falha ao publicar cronograma.'));
         }
     }, [
         manualScheduleData,
@@ -3577,6 +3667,7 @@ const Dashboard = () => {
         setUserEditRole(normalizedRole);
         setUserEditError('');
         setUserEditSuccess('');
+        setUserEditPassword('');
         setShowUserEditModal(true);
     }, [canManagePanel, copy.feedback.accessDeniedAdmin, showFeedback, normalizePanelRole]);
 
@@ -3588,6 +3679,7 @@ const Dashboard = () => {
         setUserEditRole('coach');
         setUserEditError('');
         setUserEditSuccess('');
+        setUserEditPassword('');
     }, []);
 
     const handleUserEditSubmit = useCallback(async (event) => {
@@ -3612,9 +3704,17 @@ const Dashboard = () => {
             setUserEditError(isEnglish ? 'Please provide username.' : 'Informe o usuario.');
             return;
         }
+        if (userEditPassword && userEditPassword.length < 6) {
+            setUserEditError(isEnglish ? 'Password must be at least 6 characters.' : 'A senha deve ter pelo menos 6 caracteres.');
+            return;
+        }
 
         setUserEditLoading(true);
         try {
+            if (userEditPassword && authService.supportsPasswordReset && authService.supportsPasswordReset()) {
+                await authService.resetPassword(normalizedUsername, userEditPassword);
+            }
+
             const updated = authService.updateAdminUser
                 ? await authService.updateAdminUser({
                     id: userEditId || normalizedUsername,
@@ -4591,6 +4691,16 @@ const Dashboard = () => {
         const activeAthletes = athletes.filter((athlete) => Boolean((athlete.eventId || '').toString().trim())).length;
         const averagePoints = athletes.length ? Math.round(totalPoints / athletes.length) : 0;
 
+        let valorArrecadado = 0;
+        athletes.forEach(athlete => {
+            if (athlete.eventId) {
+                const event = events.find(e => e.id === athlete.eventId);
+                if (event) {
+                    valorArrecadado += Number(event.feeOver15 || 0);
+                }
+            }
+        });
+
         const academyMap = athletes.reduce((acc, athlete) => {
             const key = athlete.academia || copy.modalAssign.noAcademy;
             if (!acc[key]) acc[key] = { count: 0, points: 0 };
@@ -4605,9 +4715,10 @@ const Dashboard = () => {
             totalPoints,
             averagePoints,
             activeAthletes,
-            topAcademy
+            topAcademy,
+            valorArrecadado
         };
-    }, [athletes, copy.modalAssign.noAcademy]);
+    }, [athletes, events, copy.modalAssign.noAcademy]);
 
     const eventStats = useMemo(() => (
         events.map((event) => {
@@ -4683,6 +4794,7 @@ const Dashboard = () => {
             { id: 'registrations', label: copy.nav.registrations, icon: ClipboardList, meta: publicRegistrations.length },
             { id: 'brackets', label: copy.nav.brackets, icon: ClipboardList },
             { id: 'schedule', label: copy.nav.schedule, icon: Clock },
+            { id: 'superfights', label: copy.nav.superfights, icon: Swords },
             { id: 'athletes', label: copy.nav.athletes, icon: Users, meta: athletes.length },
             { id: 'automation', label: copy.nav.automation, icon: Zap },
             { id: 'activity', label: copy.nav.activity, icon: Activity }
@@ -5194,40 +5306,178 @@ const Dashboard = () => {
                 )}
 
                 {canManagePanel && activeSection === 'overview' && (
-                <section className="stats-grid">
-                    <div className="stat-card stat-card--focus">
-                        <div className="stat-card__icon">
-                            <Users size={18} />
+                <div style={{ position: 'relative', minHeight: '800px' }}>
+                    {/* Background Orbs Effect */}
+                    <div style={{ position: 'absolute', top: '-5%', left: '-5%', width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(56,189,248,0.1) 0%, rgba(0,0,0,0) 70%)', filter: 'blur(60px)', zIndex: 0, borderRadius: '50%' }}></div>
+                    <div style={{ position: 'absolute', bottom: '-5%', right: '-5%', width: '400px', height: '400px', background: 'radial-gradient(circle, rgba(168,85,247,0.1) 0%, rgba(0,0,0,0) 70%)', filter: 'blur(60px)', zIndex: 0, borderRadius: '50%' }}></div>
+                    
+                    <div style={{ position: 'relative', zIndex: 1 }}>
+                        <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '32px' }}>
+                    {/* Inscritos */}
+                    <div style={{ background: 'linear-gradient(135deg, rgba(56,189,248,0.1) 0%, rgba(14,165,233,0.05) 100%)', border: '1px solid rgba(56,189,248,0.2)', borderRadius: '16px', padding: '24px', position: 'relative', overflow: 'hidden', backdropFilter: 'blur(12px)', transition: 'transform 0.2s', cursor: 'default' }}>
+                        <div style={{ position: 'absolute', top: '-10%', right: '-10%', width: '100px', height: '100px', background: 'rgba(56,189,248,0.1)', borderRadius: '50%', filter: 'blur(30px)' }}></div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(56,189,248,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8' }}>
+                                <Users size={20} />
+                            </div>
+                            <div style={{ color: '#94a3b8', fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{copy.stats.enrolled}</div>
                         </div>
-                        <div className="stat-card__value">{athletes.length}</div>
-                        <div className="stat-card__label">{copy.stats.enrolled}</div>
-                        <div className="stat-card__trend">{totals.activeAthletes} {copy.stats.activeTrend}</div>
+                        <div style={{ fontSize: '36px', fontWeight: 800, color: '#f8fafc', marginBottom: '8px', lineHeight: 1 }}>{athletes.length}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#38bdf8', fontSize: '13px', fontWeight: 500 }}>
+                            <TrendingUp size={14} />
+                            <span>{totals.activeAthletes} {copy.stats.activeTrend}</span>
+                        </div>
                     </div>
-                    <div className="stat-card stat-card--focus">
-                        <div className="stat-card__icon">
-                            <Trophy size={18} />
+
+                    {/* Valor Arrecadado */}
+                    <div style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.1) 0%, rgba(5,150,105,0.05) 100%)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '16px', padding: '24px', position: 'relative', overflow: 'hidden', backdropFilter: 'blur(12px)', transition: 'transform 0.2s', cursor: 'default' }}>
+                        <div style={{ position: 'absolute', top: '-10%', right: '-10%', width: '100px', height: '100px', background: 'rgba(16,185,129,0.1)', borderRadius: '50%', filter: 'blur(30px)' }}></div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(16,185,129,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981' }}>
+                                <DollarSign size={20} />
+                            </div>
+                            <div style={{ color: '#94a3b8', fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Valor Arrecadado</div>
                         </div>
-                        <div className="stat-card__value">{totals.totalPoints}</div>
-                        <div className="stat-card__label">{copy.stats.totalPoints}</div>
-                        <div className="stat-card__trend">{copy.stats.average} {totals.averagePoints} pts</div>
+                        <div style={{ fontSize: '32px', fontWeight: 800, color: '#10b981', marginBottom: '8px', lineHeight: 1 }}>
+                            R$ {(totals.valorArrecadado || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#10b981', fontSize: '13px', fontWeight: 500 }}>
+                            <Activity size={14} />
+                            <span>Baseado nas inscrições</span>
+                        </div>
                     </div>
-                    <div className="stat-card stat-card--focus">
-                        <div className="stat-card__icon">
-                            <Zap size={18} />
+
+                    {/* Eventos */}
+                    <div style={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.1) 0%, rgba(147,51,234,0.05) 100%)', border: '1px solid rgba(168,85,247,0.2)', borderRadius: '16px', padding: '24px', position: 'relative', overflow: 'hidden', backdropFilter: 'blur(12px)', transition: 'transform 0.2s', cursor: 'default' }}>
+                        <div style={{ position: 'absolute', top: '-10%', right: '-10%', width: '100px', height: '100px', background: 'rgba(168,85,247,0.1)', borderRadius: '50%', filter: 'blur(30px)' }}></div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(168,85,247,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a855f7' }}>
+                                <Zap size={20} />
+                            </div>
+                            <div style={{ color: '#94a3b8', fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{copy.stats.registeredEvents}</div>
                         </div>
-                        <div className="stat-card__value">{events.length}</div>
-                        <div className="stat-card__label">{copy.stats.registeredEvents}</div>
-                        <div className="stat-card__trend">{copy.stats.centralizedControl}</div>
+                        <div style={{ fontSize: '36px', fontWeight: 800, color: '#f8fafc', marginBottom: '8px', lineHeight: 1 }}>{events.length}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#a855f7', fontSize: '13px', fontWeight: 500 }}>
+                            <Monitor size={14} />
+                            <span>{copy.stats.centralizedControl}</span>
+                        </div>
                     </div>
-                    <div className="stat-card stat-card--secondary">
-                        <div className="stat-card__icon">
-                            <Activity size={18} />
+
+                    {/* Pontos Totais */}
+                    <div style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.1) 0%, rgba(217,119,6,0.05) 100%)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '16px', padding: '24px', position: 'relative', overflow: 'hidden', backdropFilter: 'blur(12px)', transition: 'transform 0.2s', cursor: 'default' }}>
+                        <div style={{ position: 'absolute', top: '-10%', right: '-10%', width: '100px', height: '100px', background: 'rgba(245,158,11,0.1)', borderRadius: '50%', filter: 'blur(30px)' }}></div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(245,158,11,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f59e0b' }}>
+                                <Trophy size={20} />
+                            </div>
+                            <div style={{ color: '#94a3b8', fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{copy.stats.totalPoints}</div>
                         </div>
-                        <div className="stat-card__value">{logs.length}</div>
-                        <div className="stat-card__label">{copy.stats.records}</div>
-                        <div className="stat-card__trend">{copy.stats.continuousMonitoring}</div>
+                        <div style={{ fontSize: '36px', fontWeight: 800, color: '#f8fafc', marginBottom: '8px', lineHeight: 1 }}>{totals.totalPoints}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#f59e0b', fontSize: '13px', fontWeight: 500 }}>
+                            <TrendingUp size={14} />
+                            <span>{copy.stats.average} {totals.averagePoints} pts</span>
+                        </div>
                     </div>
                 </section>
+                {/* INÍCIO NOVOS WIDGETS TECNOLÓGICOS */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '24px', marginBottom: '32px' }}>
+                    
+                    {/* COLUNA ESQUERDA: Gráfico e Anel */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                        {/* Neon Chart */}
+                        <div style={{ background: 'linear-gradient(180deg, rgba(15,23,42,0.6) 0%, rgba(15,23,42,0.9) 100%)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '16px', padding: '24px', position: 'relative', overflow: 'hidden', backdropFilter: 'blur(12px)' }}>
+                            <div style={{ position: 'absolute', top: 0, left: '20%', width: '60%', height: '1px', background: 'linear-gradient(90deg, transparent, rgba(56,189,248,0.5), transparent)' }}></div>
+                            <h3 style={{ margin: '0 0 24px 0', fontSize: '16px', fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Activity size={18} color="#38bdf8" />
+                                Crescimento do Sistema
+                            </h3>
+                            <div style={{ width: '100%', height: '220px' }}>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={[
+                                        { name: 'Seg', atletas: Math.floor(athletes.length * 0.4) },
+                                        { name: 'Ter', atletas: Math.floor(athletes.length * 0.5) },
+                                        { name: 'Qua', atletas: Math.floor(athletes.length * 0.6) },
+                                        { name: 'Qui', atletas: Math.floor(athletes.length * 0.75) },
+                                        { name: 'Sex', atletas: Math.floor(athletes.length * 0.9) },
+                                        { name: 'Sab', atletas: athletes.length }
+                                    ]}>
+                                        <defs>
+                                            <linearGradient id="colorNeon" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.4}/>
+                                                <stop offset="95%" stopColor="#38bdf8" stopOpacity={0}/>
+                                            </linearGradient>
+                                        </defs>
+                                        <XAxis dataKey="name" stroke="#475569" fontSize={12} tickLine={false} axisLine={false} />
+                                        <YAxis stroke="#475569" fontSize={12} tickLine={false} axisLine={false} />
+                                        <Tooltip 
+                                            contentStyle={{ background: 'rgba(15,23,42,0.9)', border: '1px solid rgba(56,189,248,0.3)', borderRadius: '8px', color: '#f8fafc' }}
+                                            itemStyle={{ color: '#38bdf8' }}
+                                        />
+                                        <Area type="monotone" dataKey="atletas" stroke="#38bdf8" strokeWidth={3} fillOpacity={1} fill="url(#colorNeon)" />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+
+                        {/* Anel de Progresso */}
+                        <div style={{ background: 'linear-gradient(180deg, rgba(15,23,42,0.6) 0%, rgba(15,23,42,0.9) 100%)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '16px', padding: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backdropFilter: 'blur(12px)' }}>
+                            <div>
+                                <h3 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: 700, color: '#f8fafc' }}>Meta de Inscritos</h3>
+                                <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8' }}>Faltam {Math.max(0, 100 - athletes.length)} para a meta do mês.</p>
+                            </div>
+                            <div style={{ position: 'relative', width: '80px', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <svg width="80" height="80" viewBox="0 0 80 80">
+                                    <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="6" />
+                                    <circle cx="40" cy="40" r="34" fill="none" stroke="#10b981" strokeWidth="6" strokeDasharray="213" strokeDashoffset={213 - (213 * Math.min(100, athletes.length) / 100)} strokeLinecap="round" style={{ transformOrigin: 'center', transform: 'rotate(-90deg)', transition: 'stroke-dashoffset 1s ease-out' }} />
+                                </svg>
+                                <div style={{ position: 'absolute', fontSize: '18px', fontWeight: 800, color: '#10b981' }}>{Math.min(100, athletes.length)}%</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* COLUNA DIREITA: Feed e Insights */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                        
+                        {/* IA Insights */}
+                        <div style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(79,70,229,0.05) 100%)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '16px', padding: '20px', position: 'relative', overflow: 'hidden' }}>
+                            <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: '#6366f1' }}></div>
+                            <h3 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: 700, color: '#a5b4fc', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <Sparkles size={16} />
+                                System Insight
+                            </h3>
+                            <p style={{ margin: 0, fontSize: '13px', color: '#e0e7ff', lineHeight: 1.5 }}>
+                                A academia <strong style={{ color: '#fff' }}>{totals.topAcademy ? totals.topAcademy[0] : 'Indefinida'}</strong> lidera as inscrições no momento com <strong style={{ color: '#fff' }}>{totals.topAcademy ? totals.topAcademy[1].count : 0}</strong> atletas!
+                            </p>
+                        </div>
+
+                        {/* Live Feed Tracker */}
+                        <div style={{ flex: 1, background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', backdropFilter: 'blur(12px)' }}>
+                            <h3 style={{ margin: '0 0 16px 0', fontSize: '14px', fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '12px' }}>
+                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981', animation: 'pulse 2s infinite' }}></div>
+                                Live Activity
+                            </h3>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', maxHeight: '250px', paddingRight: '4px' }} className="custom-scrollbar">
+                                {logs.slice(0, 5).map(log => (
+                                    <div key={log.id} style={{ display: 'flex', gap: '12px', fontSize: '12px' }}>
+                                        <div style={{ color: '#64748b', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
+                                            {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </div>
+                                        <div style={{ color: '#cbd5e1', lineHeight: 1.4 }}>
+                                            {log.action}
+                                        </div>
+                                    </div>
+                                ))}
+                                {logs.length === 0 && (
+                                    <div style={{ color: '#64748b', fontSize: '12px', fontStyle: 'italic', textAlign: 'center', padding: '20px 0' }}>Sem atividades recentes</div>
+                                )}
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+                {/* FIM NOVOS WIDGETS TECNOLÓGICOS */}
+                    </div>
+                </div>
                 )}
                 {canManagePanel && activeSection === 'events' && (
                 <section className="panel" id="events">
@@ -6097,6 +6347,16 @@ const Dashboard = () => {
                             )}
                             <button
                                 type="button"
+                                className="btn btn-primary"
+                                onClick={handlePublishSchedule}
+                                disabled={!manualScheduleData.rows.length}
+                                style={{ background: '#00c2cb', borderColor: '#00c2cb' }}
+                            >
+                                <Send size={14} />
+                                {isEnglish ? 'Publish' : 'Publicar'}
+                            </button>
+                            <button
+                                type="button"
                                 className="btn btn-secondary"
                                 onClick={() => handleExportSchedulePdf('table')}
                                 disabled={!manualScheduleData.rows.length}
@@ -6789,6 +7049,277 @@ const Dashboard = () => {
                     </div>
                 </section>
                 )}
+                {/* ── LUTAS CASADAS (SUPERFIGHTS) ─────── */}
+                {canManagePanel && activeSection === 'superfights' && (() => {
+                    const activeEvent = events.find(e => e.id === activeEventId);
+                    if (!activeEvent) {
+                        return (
+                            <div style={{ padding: '24px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+                                    <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#f8fafc', margin: 0 }}>
+                                        <Swords size={24} style={{ color: '#ef4444', marginRight: '8px' }} />
+                                        Gestão de Lutas Casadas
+                                    </h2>
+                                    <select 
+                                        className="input" 
+                                        value={activeEventId || ''} 
+                                        onChange={(e) => setActiveEvent(e.target.value)}
+                                        style={{ minWidth: '300px', background: '#0f172a', border: '1px solid #334155' }}
+                                    >
+                                        <option value="">Selecione o Campeonato</option>
+                                        {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
+                                    </select>
+                                </div>
+                                <div className="empty-state" style={{ padding: '48px', textAlign: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', marginTop: '24px' }}>
+                                    <AlertCircle size={48} style={{ color: '#94a3b8', margin: '0 auto 16px' }} />
+                                    <h3 style={{ margin: '0 0 8px 0', color: '#f8fafc' }}>Nenhum Campeonato Selecionado</h3>
+                                    <p style={{ color: '#94a3b8', margin: '0 0 24px 0' }}>Selecione um campeonato na lista acima para gerenciar as lutas casadas.</p>
+                                </div>
+                            </div>
+                        );
+                    }
+                    if (!activeEvent.superFightsPublished) {
+                        return (
+                            <div className="empty-state">
+                                <div className="empty-state__icon">
+                                    <AlertCircle size={48} />
+                                </div>
+                                
+                                <h3>Lutas Casadas Desativadas</h3>
+                                <p>Este evento não possui a funcionalidade de lutas casadas ativa. Ative em 'Eventos' &gt; Editar Evento &gt; Inscrições e Valores.</p>
+                                <button 
+                                    className="btn btn-primary" 
+                                    style={{ marginTop: '16px' }}
+                                    onClick={() => {
+                                        updateEvent(activeEvent.id, {
+                                            ...activeEvent,
+                                            superFightsPublished: true
+                                        }).then(() => showFeedback('success', 'Lutas Casadas ativadas com sucesso!'));
+                                    }}
+                                >
+                                    Ativar Lutas Casadas Agora
+                                </button>
+
+                            </div>
+                        );
+                    }
+
+                    const fights = activeEvent.superFights || [];
+
+                    return (
+                        <div className="superfights-container" style={{ padding: '24px', animation: 'fadeIn 0.4s ease' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+                                    <div>
+                                        <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#f8fafc', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <Swords size={24} style={{ color: '#ef4444' }} />
+                                            Gestão de Lutas Casadas
+                                        </h2>
+                                    </div>
+                                    <select 
+                                        className="input" 
+                                        value={activeEventId || ''} 
+                                        onChange={(e) => setActiveEvent(e.target.value)}
+                                        style={{ minWidth: '300px', background: '#0f172a', border: '1px solid #334155' }}
+                                    >
+                                        <option value="">Selecione o Campeonato</option>
+                                        {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
+                                    </select>
+                                </div>
+                                <button className="btn btn-primary" onClick={() => {
+                                    setSuperfightForm({
+                                        id: '',
+                                        scheduledTime: '',
+                                        fighter1: { name: '', academy: '', belt: 'Branca', photo: '' },
+                                        fighter2: { name: '', academy: '', belt: 'Branca', photo: '' },
+                                        status: 'pending',
+                                        published: false
+                                    });
+                                }}>
+                                    <Plus size={18} /> Nova Luta
+                                </button>
+                            </div>
+
+                            {fights.length === 0 ? (
+                                <div className="empty-state" style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '12px' }}>
+                                    <div className="empty-state__icon">
+                                        <Swords size={48} />
+                                    </div>
+                                    <h3>Nenhuma Luta Casada</h3>
+                                    <p>Clique no botão acima para adicionar a primeira luta.</p>
+                                </div>
+                            ) : (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '20px' }}>
+                                    {fights.map((fight, i) => (
+                                        <div key={fight.id || i} style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '12px', padding: '16px' }}>
+                                            
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                    <span style={{ fontSize: '12px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '4px 8px', borderRadius: '4px', fontWeight: 600 }}>LUTA PRINCIPAL</span>
+                                                    {!fight.published && <span style={{ fontSize: '12px', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', padding: '4px 8px', borderRadius: '4px', fontWeight: 600 }}>RASCUNHO</span>}
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                    <button onClick={() => {
+                                                        const updatedEvent = { ...activeEvent };
+                                                        const fightIndex = updatedEvent.superFights.findIndex(f => f.id === fight.id);
+                                                        if (fightIndex >= 0) {
+                                                            updatedEvent.superFights[fightIndex] = { ...fight, published: !fight.published };
+                                                            updateEvent(activeEvent.id, updatedEvent);
+                                                        }
+                                                    }} style={{ background: fight.published ? 'rgba(34, 197, 94, 0.1)' : 'rgba(56, 189, 248, 0.1)', border: fight.published ? '1px solid rgba(34, 197, 94, 0.2)' : '1px solid rgba(56, 189, 248, 0.2)', color: fight.published ? '#22c55e' : '#38bdf8', padding: '4px 12px', borderRadius: '4px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }} title={fight.published ? "Despublicar luta" : "Publicar luta"}>
+                                                        {fight.published ? <Eye size={14} /> : <EyeOff size={14} />}
+                                                        {fight.published ? 'Publicado' : 'Publicar'}
+                                                    </button>
+                                                    <button onClick={() => setSuperfightForm(fight)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}><Pencil size={16} /></button>
+                                                    <button onClick={() => {
+                                                        if (window.confirm('Excluir luta casada?')) {
+                                                            const updatedEvent = { ...activeEvent };
+                                                            updatedEvent.superFights = updatedEvent.superFights.filter(f => f.id !== fight.id);
+                                                            updateEvent(activeEvent.id, updatedEvent);
+                                                        }
+                                                    }} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer' }}><Trash2 size={16} /></button>
+                                                </div>
+                                            </div>
+                                            
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                {/* Atleta 1 */}
+                                                <div style={{ textAlign: 'center', flex: 1 }}>
+                                                    <img src={fight.fighter1?.photo} alt={fight.fighter1?.name} style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', border: '3px solid #334155', marginBottom: '8px' }} onError={(e) => e.target.src = 'https://via.placeholder.com/80?text=FOTO'} />
+                                                    <div style={{ fontWeight: 600, color: '#f8fafc', fontSize: '14px' }}>{fight.fighter1?.name}</div>
+                                                    <div style={{ fontSize: '12px', color: '#94a3b8' }}>{fight.fighter1?.academy}</div>
+                                                    <div style={{ fontSize: '12px', color: '#38bdf8', marginTop: '4px' }}>{fight.fighter1?.belt}</div>
+                                                </div>
+                                                
+                                                <div style={{ fontWeight: 'bold', fontSize: '24px', color: '#64748b', fontStyle: 'italic', padding: '0 16px' }}>VS</div>
+                                                
+                                                {/* Atleta 2 */}
+                                                <div style={{ textAlign: 'center', flex: 1 }}>
+                                                    <img src={fight.fighter2?.photo} alt={fight.fighter2?.name} style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', border: '3px solid #334155', marginBottom: '8px' }} onError={(e) => e.target.src = 'https://via.placeholder.com/80?text=FOTO'} />
+                                                    <div style={{ fontWeight: 600, color: '#f8fafc', fontSize: '14px' }}>{fight.fighter2?.name}</div>
+                                                    <div style={{ fontSize: '12px', color: '#94a3b8' }}>{fight.fighter2?.academy}</div>
+                                                    <div style={{ fontSize: '12px', color: '#38bdf8', marginTop: '4px' }}>{fight.fighter2?.belt}</div>
+                                                </div>
+                                            </div>
+
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    );
+                })()}
+
+                {canManagePanel && activeSection === 'automation' && (
+                <section className="panel" id="automation">
+                    <div className="panel-header">
+                        <div>
+                            <div className="panel-title">{copy.automation.title}</div>
+                            <div className="panel-subtitle">{copy.automation.subtitle}</div>
+                        </div>
+                        <span className="tag">{copy.automation.fast}</span>
+                    </div>
+                    <div className="import-panel import-panel--admin">
+                        <div>
+                            <strong>{copy.automation.importFromPdf}</strong>
+                            <span>{copy.automation.importDescription}</span>
+                        </div>
+                        <div className="import-actions">
+                            {events.length > 0 && (
+                                <select value={importEventId} onChange={(event) => setImportEventId(event.target.value)}>
+                                    <option value="">{copy.common.noEvent}</option>
+                                    {events.map((event) => (
+                                        <option key={event.id} value={event.id}>{event.name}</option>
+                                    ))}
+                                </select>
+                            )}
+                            <select value={importMode} onChange={(event) => setImportMode(event.target.value)}>
+                                <option value="GI">GI</option>
+                                <option value="NO-GI">NO-GI</option>
+                            </select>
+                            <label className="import-button">
+                                <Upload size={14} />
+                                {copy.automation.importPdf}
+                                <input
+                                    ref={importInputRef}
+                                    type="file"
+                                    accept=".pdf,.txt"
+                                    onChange={handleImportFile}
+                                />
+                            </label>
+                        </div>
+                        {(importStatus || importError) && (
+                            <div className={`import-status ${importError ? 'is-error' : ''}`}>
+                                {importError || importStatus}
+                            </div>
+                        )}
+                        {importDebug && (
+                            <div className="import-debug">
+                                <div className="import-debug__title">{copy.automation.debugPreview}</div>
+                                <pre>{importDebug}</pre>
+                            </div>
+                        )}
+                    </div>
+                    <div className="action-grid cyber-action-grid">
+                        <div className="action-card cyber-card">
+                            <strong>Roleta Neon (Sorteio)</strong>
+                            <span>Sorteie ganhadores interagindo com a plateia em modo tela cheia.</span>
+                            <div className="action-card__footer">
+                                <button type="button" className="btn btn-primary" onClick={() => setShowRouletteModal(true)}>
+                                    <Zap size={14} />
+                                    Abrir Roleta
+                                </button>
+                                <span className="tag cyber-tag">NOVO</span>
+                            </div>
+                        </div>
+                        <div className="action-card cyber-card">
+                            <strong>Backup Inteligente</strong>
+                            <span>Faça o download de todos os atletas, eventos e chaves.</span>
+                            <div className="action-card__footer">
+                                <button type="button" className="btn btn-ghost" onClick={handleBackupData}>
+                                    <Download size={14} />
+                                    Exportar JSON
+                                </button>
+                                <span className="tag cyber-tag">SEGURO</span>
+                            </div>
+                        </div>
+                        <div className="action-card cyber-card">
+                            <strong>Modo Telão</strong>
+                            <span>Esconde distrações para transmitir as chaves na TV.</span>
+                            <div className="action-card__footer">
+                                <button type="button" className="btn btn-ghost" onClick={handleToggleFullscreen}>
+                                    <Monitor size={14} />
+                                    Fullscreen
+                                </button>
+                                <span className="tag">F11</span>
+                            </div>
+                        </div>
+                        <div className="action-card cyber-card">
+                            <strong>{copy.automation.clearAthletes}</strong>
+                            <span>{copy.automation.clearAthletesDesc}</span>
+                            <div className="action-card__footer">
+                                <button type="button" className="btn btn-danger" onClick={handleClearAthletes}>
+                                    <AlertCircle size={14} />
+                                    {copy.automation.clearAll}
+                                </button>
+                                <span className="tag danger-tag">{copy.automation.caution}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="panel-header" style={{ marginTop: '1.8rem' }}>
+                        <div>
+                            <div className="panel-title">{copy.automation.keyboardTitle}</div>
+                            <div className="panel-subtitle">{copy.automation.keyboardSubtitle}</div>
+                        </div>
+                    </div>
+                    <div className="shortcut-list">
+                        <span className="shortcut-pill">{copy.automation.shortcutNewAthlete}</span>
+                        <span className="shortcut-pill">{copy.automation.shortcutImport}</span>
+                        <span className="shortcut-pill">{copy.automation.shortcutExport}</span>
+                        <span className="shortcut-pill">{copy.automation.shortcutLogs}</span>
+                    </div>
+                </section>
+                )}
                 {activeSection === 'activity' && (
                 <section className="panel" id="activity">
                     {canManagePanel && (
@@ -7277,6 +7808,13 @@ const Dashboard = () => {
                                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                                                     {[
                                                         {
+                                                            label: 'Lutas Casadas',
+                                                            desc: 'Ativa o painel de Lutas Casadas para este evento.',
+                                                            key: 'superFightsPublished',
+                                                            icon: '🗡️',
+                                                            activeColor: '#ef4444',
+                                                        },
+                                                        {
                                                             label: 'Inscrições Abertas',
                                                             desc: 'Permite que atletas se inscrevam neste campeonato.',
                                                             key: 'registrationOpen',
@@ -7657,131 +8195,173 @@ const Dashboard = () => {
                                     </button>
                                 </div>
                                 <form onSubmit={handleAddAthlete}>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                        <div>
-                                            <label className="table-meta">{copy.modalAthlete.fullName}</label>
-                                            <input
-                                                className="input"
-                                                required
-                                                type="text"
-                                                placeholder={copy.modalAthlete.fullNamePlaceholder}
-                                                value={newAthlete.nome}
-                                                onChange={(event) => setNewAthlete({ ...newAthlete, nome: event.target.value })}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="table-meta">{copy.modalAthlete.event}</label>
-                                            <select
-                                                className="input"
-                                                value={newAthlete.eventId}
-                                                onChange={(event) => setNewAthlete({ ...newAthlete, eventId: event.target.value })}
-                                            >
-                                                <option value="">{copy.modalAthlete.noEvent}</option>
-                                                {events.map((event) => (
-                                                    <option key={event.id} value={event.id}>{event.name}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div className="form-grid">
-                                            <div>
-                                                <label className="table-meta">{copy.modalAthlete.graduation}</label>
-                                                <select
-                                                    className="input"
-                                                    value={newAthlete.faixa}
-                                                    onChange={(event) => setNewAthlete({ ...newAthlete, faixa: event.target.value })}
-                                                >
-                                                    {['Branca', 'Cinza', 'Laranja', 'Verde', 'Azul', 'Roxa', 'Marrom', 'Preta', 'Branca/Cinza'].map((faixa) => (
-                                                        <option key={faixa} value={faixa}>{localizeBelt(faixa, faixa)}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label className="table-meta">{copy.modalAthlete.weight}</label>
-                                                <input
-                                                    className="input"
-                                                    type="text"
-                                                    placeholder={newAthlete.isAbsolute ? copy.modalAthlete.absoluteWeightPlaceholder : copy.modalAthlete.weightPlaceholder}
-                                                    value={newAthlete.peso}
-                                                    disabled={newAthlete.isAbsolute}
-                                                    onChange={(event) => setNewAthlete({ ...newAthlete, peso: event.target.value })}
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="table-meta">{copy.modalAthlete.category}</label>
-                                                <input
-                                                    className="input"
-                                                    type="text"
-                                                    placeholder={copy.modalAthlete.categoryPlaceholder}
-                                                    value={newAthlete.categoria}
-                                                    onChange={(event) => setNewAthlete({ ...newAthlete, categoria: event.target.value })}
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="table-meta">{copy.modalAthlete.categoryType}</label>
-                                                <select
-                                                    className="input"
-                                                    value={newAthlete.isAbsolute ? 'ABS' : 'PESO'}
-                                                    onChange={(event) => {
-                                                        const isAbsolute = event.target.value === 'ABS';
-                                                        setNewAthlete((prev) => ({
-                                                            ...prev,
-                                                            isAbsolute,
-                                                            peso: isAbsolute
-                                                                ? (prev.peso || copy.modalAthlete.absoluteWeightPlaceholder)
-                                                                : (prev.peso === copy.modalAthlete.absoluteWeightPlaceholder ? '' : prev.peso)
-                                                        }));
-                                                    }}
-                                                >
-                                                    <option value="PESO">{copy.modalAthlete.typeWeight}</option>
-                                                    <option value="ABS">{copy.modalAthlete.typeAbsolute}</option>
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label className="table-meta">{copy.modalAthlete.modality}</label>
-                                                <select
-                                                    className="input"
-                                                    value={newAthlete.isNoGi ? 'NO-GI' : 'GI'}
-                                                    onChange={(event) => setNewAthlete({
-                                                        ...newAthlete,
-                                                        isNoGi: event.target.value === 'NO-GI'
-                                                    })}
-                                                >
-                                                    <option value="GI">{copy.modalAthlete.modalityGi}</option>
-                                                    <option value="NO-GI">{copy.modalAthlete.modalityNoGi}</option>
-                                                </select>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginTop: '0.5rem' }}>
+                                        
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', background: 'rgba(255, 255, 255, 0.02)', padding: '1.25rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                                            <h4 style={{ fontSize: '1.05rem', fontWeight: 600, color: 'var(--text-color)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                <Users size={18} style={{ color: 'var(--primary-color)' }} /> 
+                                                {isEnglish ? 'Personal Information' : 'Dados Pessoais'}
+                                            </h4>
+                                            
+                                            <div className="form-grid">
+                                                <div style={{ gridColumn: '1 / -1' }}>
+                                                    <label className="table-meta">{copy.modalAthlete.fullName}</label>
+                                                    <input
+                                                        className="input"
+                                                        required
+                                                        type="text"
+                                                        placeholder={copy.modalAthlete.fullNamePlaceholder}
+                                                        value={newAthlete.nome}
+                                                        onChange={(event) => setNewAthlete({ ...newAthlete, nome: event.target.value })}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="table-meta">{copy.modalAthlete.gender}</label>
+                                                    <select
+                                                        className="input"
+                                                        value={newAthlete.genero || 'Masculino'}
+                                                        onChange={(event) => setNewAthlete({ ...newAthlete, genero: event.target.value })}
+                                                    >
+                                                        <option value="Masculino">{copy.modalAthlete.genderMale}</option>
+                                                        <option value="Feminino">{copy.modalAthlete.genderFemale}</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="table-meta">{copy.modalAthlete.country}</label>
+                                                    <input
+                                                        className="input"
+                                                        type="text"
+                                                        placeholder={copy.modalAthlete.countryPlaceholder}
+                                                        value={newAthlete.pais || ''}
+                                                        onChange={(event) => setNewAthlete({ ...newAthlete, pais: event.target.value })}
+                                                    />
+                                                </div>
+                                                <div style={{ gridColumn: '1 / -1' }}>
+                                                    <label className="table-meta">{copy.modalAthlete.photoUrl}</label>
+                                                    <input
+                                                        className="input"
+                                                        type="url"
+                                                        placeholder="https://..."
+                                                        value={newAthlete.photoUrl || ''}
+                                                        onChange={(event) => setNewAthlete({ ...newAthlete, photoUrl: event.target.value })}
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
-                                        <div>
-                                            <label className="table-meta">{copy.modalAthlete.teamAcademy}</label>
-                                            <input
-                                                className="input"
-                                                required
-                                                type="text"
-                                                placeholder={copy.modalAthlete.teamAcademyPlaceholder}
-                                                value={newAthlete.academia}
-                                                onChange={(event) => setNewAthlete({ ...newAthlete, academia: event.target.value })}
-                                            />
-                                        </div>
-                                        <div className="form-grid">
-                                            <div>
-                                                <label className="table-meta">{copy.modalAthlete.country}</label>
-                                                <input
-                                                    className="input"
-                                                    type="text"
-                                                    placeholder={copy.modalAthlete.countryPlaceholder}
-                                                    value={newAthlete.pais || ''}
-                                                    onChange={(event) => setNewAthlete({ ...newAthlete, pais: event.target.value })}
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="table-meta">{copy.modalAthlete.photoUrl}</label>
-                                                <input
-                                                    className="input"
-                                                    type="url"
-                                                    placeholder="https://..."
-                                                    value={newAthlete.photoUrl || ''}
-                                                    onChange={(event) => setNewAthlete({ ...newAthlete, photoUrl: event.target.value })}
-                                                />
+
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', background: 'rgba(255, 255, 255, 0.02)', padding: '1.25rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                                            <h4 style={{ fontSize: '1.05rem', fontWeight: 600, color: 'var(--text-color)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                <Trophy size={18} style={{ color: 'var(--primary-color)' }} /> 
+                                                {isEnglish ? 'Registration Data' : 'Dados da Inscrição'}
+                                            </h4>
+                                            
+                                            <div className="form-grid">
+                                                <div style={{ gridColumn: '1 / -1' }}>
+                                                    <label className="table-meta">{copy.modalAthlete.event}</label>
+                                                    <select
+                                                        className="input"
+                                                        value={newAthlete.eventId}
+                                                        onChange={(event) => setNewAthlete({ ...newAthlete, eventId: event.target.value })}
+                                                    >
+                                                        <option value="">{copy.modalAthlete.noEvent}</option>
+                                                        {events.map((event) => (
+                                                            <option key={event.id} value={event.id}>{event.name}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <div style={{ gridColumn: '1 / -1' }}>
+                                                    <label className="table-meta">{copy.modalAthlete.teamAcademy}</label>
+                                                    <input
+                                                        className="input"
+                                                        required
+                                                        type="text"
+                                                        placeholder={copy.modalAthlete.teamAcademyPlaceholder}
+                                                        value={newAthlete.academia}
+                                                        onChange={(event) => setNewAthlete({ ...newAthlete, academia: event.target.value })}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="table-meta">{copy.modalAthlete.graduation}</label>
+                                                    <select
+                                                        className="input"
+                                                        value={newAthlete.faixa}
+                                                        onChange={(event) => setNewAthlete({ ...newAthlete, faixa: event.target.value })}
+                                                    >
+                                                        {['Branca', 'Cinza', 'Laranja', 'Verde', 'Azul', 'Roxa', 'Marrom', 'Preta', 'Branca/Cinza'].map((faixa) => (
+                                                            <option key={faixa} value={faixa}>{localizeBelt(faixa, faixa)}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="table-meta">{copy.modalAthlete.modality}</label>
+                                                    <select
+                                                        className="input"
+                                                        value={newAthlete.isNoGi ? 'NO-GI' : 'GI'}
+                                                        onChange={(event) => setNewAthlete({
+                                                            ...newAthlete,
+                                                            isNoGi: event.target.value === 'NO-GI'
+                                                        })}
+                                                    >
+                                                        <option value="GI">{copy.modalAthlete.modalityGi}</option>
+                                                        <option value="NO-GI">{copy.modalAthlete.modalityNoGi}</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="table-meta">{copy.modalAthlete.categoryType}</label>
+                                                    <select
+                                                        className="input"
+                                                        value={newAthlete.isAbsolute ? 'ABS' : 'PESO'}
+                                                        onChange={(event) => {
+                                                            const isAbsolute = event.target.value === 'ABS';
+                                                            setNewAthlete((prev) => ({
+                                                                ...prev,
+                                                                isAbsolute,
+                                                                peso: isAbsolute
+                                                                    ? (prev.peso || copy.modalAthlete.absoluteWeightPlaceholder)
+                                                                    : (prev.peso === copy.modalAthlete.absoluteWeightPlaceholder ? '' : prev.peso)
+                                                            }));
+                                                        }}
+                                                    >
+                                                        <option value="PESO">{copy.modalAthlete.typeWeight}</option>
+                                                        <option value="ABS">{copy.modalAthlete.typeAbsolute}</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="table-meta">{copy.modalAthlete.age}</label>
+                                                    <input
+                                                        className="input"
+                                                        type="number"
+                                                        min="0"
+                                                        placeholder={copy.modalAthlete.agePlaceholder}
+                                                        value={newAthlete.idade}
+                                                        onChange={(event) => setNewAthlete({ ...newAthlete, idade: event.target.value })}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="table-meta">{copy.modalAthlete.weight}</label>
+                                                    <select
+                                                        className="input"
+                                                        value={newAthlete.isAbsolute ? 'Absoluto' : newAthlete.peso}
+                                                        disabled={newAthlete.isAbsolute}
+                                                        onChange={(event) => setNewAthlete({ ...newAthlete, peso: event.target.value })}
+                                                    >
+                                                        <option value="">{copy.modalAthlete.selectWeight}</option>
+                                                        {newAthlete.isAbsolute && <option value="Absoluto">{copy.modalAthlete.absoluteWeightPlaceholder}</option>}
+                                                        {['Galo', 'Pluma', 'Pena', 'Leve', 'Médio', 'Meio-Pesado', 'Pesado', 'Super-Pesado', 'Pesadíssimo'].map((pesoOp) => (
+                                                            <option key={pesoOp} value={pesoOp}>{pesoOp}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="table-meta">{copy.modalAthlete.category}</label>
+                                                    <input
+                                                        className="input"
+                                                        type="text"
+                                                        placeholder={copy.modalAthlete.categoryPlaceholder}
+                                                        value={newAthlete.categoria}
+                                                        onChange={(event) => setNewAthlete({ ...newAthlete, categoria: event.target.value })}
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -8164,14 +8744,34 @@ const Dashboard = () => {
                                                 <option value="mesario">{copy.activity.roleMesario}</option>
                                             </select>
                                         </div>
+                                        <div>
+                                            <label className="table-meta">{isEnglish ? 'New Password (Optional)' : 'Nova Senha (Opcional)'}</label>
+                                            <input
+                                                className="input"
+                                                type="password"
+                                                minLength={6}
+                                                placeholder={isEnglish ? 'Leave blank to keep current' : 'Deixe em branco para manter a atual'}
+                                                value={userEditPassword}
+                                                onChange={(event) => setUserEditPassword(event.target.value)}
+                                            />
+                                        </div>
                                     </div>
-                                    <div className="form-actions">
-                                        <button type="button" className="btn btn-ghost" onClick={closeUserEditModal}>
-                                            {copy.common.cancel}
+                                    <div className="form-actions" style={{ justifyContent: 'space-between' }}>
+                                        <button
+                                            type="button"
+                                            className="btn btn-danger"
+                                            onClick={() => handleDeletePanelUser({ id: userEditId, username: userEditUsername, name: userEditName })}
+                                        >
+                                            {isEnglish ? 'Delete User' : 'Excluir usuário'}
                                         </button>
-                                        <button type="submit" className="btn btn-primary" disabled={userEditLoading}>
-                                            {isEnglish ? 'Save changes' : 'Salvar alteracoes'}
-                                        </button>
+                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                            <button type="button" className="btn btn-ghost" onClick={closeUserEditModal}>
+                                                {copy.common.cancel}
+                                            </button>
+                                            <button type="submit" className="btn btn-primary" disabled={userEditLoading}>
+                                                {isEnglish ? 'Save changes' : 'Salvar alteracoes'}
+                                            </button>
+                                        </div>
                                     </div>
                                 </form>
                             </div>
@@ -8266,6 +8866,233 @@ const Dashboard = () => {
                                         {copy.eventsPanel.closeRegistrationConfirmAction}
                                     </button>
                                 </div>
+                            </div>
+                        </motion.div>
+                    </>
+                )}
+            </AnimatePresence>
+            {/* SUPERFIGHT MODAL */}
+            <AnimatePresence>
+                {superfightForm && (
+                    <>
+                        <motion.div
+                            className="modal-backdrop"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setSuperfightForm(null)}
+                        />
+                        <motion.div
+                            className="modal-card modal-card--lg"
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            style={{ maxWidth: '1000px', width: '95%' }}
+                        >
+                            <div className="modal-panel" style={{ padding: '0', overflow: 'hidden', width: '100%', maxWidth: 'none' }}>
+                                {/* Beautiful Gradient Header */}
+                                <div style={{ background: 'linear-gradient(90deg, #1e293b 0%, #0f172a 100%)', padding: '24px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div>
+                                        <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <Swords size={24} style={{ color: '#ef4444' }} />
+                                            {superfightForm.id ? 'Editar Luta Casada' : 'Nova Luta Casada'}
+                                        </div>
+                                        <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginTop: '4px' }}>Configure os atletas do evento principal</div>
+                                    </div>
+                                    <button type="button" className="btn btn-icon" onClick={() => setSuperfightForm(null)} style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '50%', width: '40px', height: '40px' }}>
+                                        <X size={20} />
+                                    </button>
+                                </div>
+                                <form style={{ padding: '40px 32px' }} onSubmit={(e) => {
+                                    e.preventDefault();
+                                    const event = events.find(ev => ev.id === activeEventId);
+                                    if(!event) return;
+                                    const sf = [...(event.superFights || [])];
+                                    if(superfightForm.id) {
+                                        const idx = sf.findIndex(f => f.id === superfightForm.id);
+                                        if(idx >= 0) sf[idx] = superfightForm;
+                                    } else {
+                                        sf.push({ ...superfightForm, id: Date.now().toString() });
+                                    }
+                                    updateEvent(event.id, { ...event, superFights: sf }).then(() => {
+                                        showFeedback('success', 'Luta casada salva com sucesso!');
+                                        setSuperfightForm(null);
+                                    }).catch(err => {
+                                        showFeedback('error', 'Falha ao salvar luta casada.');
+                                    });
+                                }}>
+                                    {/* HORÁRIO DA LUTA */}
+                                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
+                                        <div style={{ background: 'rgba(255,255,255,0.03)', padding: '16px 24px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                            <div style={{ color: '#94a3b8', fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <Clock size={18} style={{ color: '#22c55e' }} />
+                                                Horário Agendado:
+                                            </div>
+                                            <input 
+                                                type="time" 
+                                                className="input" 
+                                                style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', padding: '8px 12px', fontSize: '1.1rem', color: '#f8fafc', fontWeight: 700, borderRadius: '8px' }}
+                                                value={superfightForm.scheduledTime || ''}
+                                                onChange={e => setSuperfightForm(f => ({...f, scheduledTime: e.target.value}))}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: 'flex', flexDirection: 'row', gap: '32px', marginBottom: '32px', position: 'relative' }}>
+                                        {/* VS Badge in the center */}
+                                        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 10, background: '#0f172a', border: '2px solid rgba(255,255,255,0.1)', borderRadius: '50%', width: '60px', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '1.2rem', color: '#f8fafc', boxShadow: '0 8px 16px rgba(0,0,0,0.5)' }}>
+                                            VS
+                                        </div>
+
+                                        {/* Lutador 1 (Vermelho) */}
+                                        <div style={{ flex: 1, minWidth: '0', background: 'linear-gradient(180deg, rgba(239, 68, 68, 0.05) 0%, rgba(255,255,255,0.01) 100%)', padding: '24px', borderRadius: '16px', border: '1px solid rgba(239, 68, 68, 0.2)', position: 'relative', overflow: 'hidden' }}>
+                                            <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: '#ef4444' }}></div>
+                                            <h4 style={{ margin: '0 0 24px 0', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.1rem' }}>
+                                                <div style={{ background: '#ef4444', color: '#fff', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 800 }}>CANTO VERMELHO</div>
+                                            </h4>
+                                            
+                                            {/* Photo Upload Area */}
+                                            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
+                                                <label style={{ cursor: 'pointer', position: 'relative', display: 'block', width: '140px', height: '140px', borderRadius: '50%', border: '3px solid #ef4444', overflow: 'hidden', background: '#0f172a', boxShadow: '0 8px 16px rgba(239, 68, 68, 0.2)' }}>
+                                                    {superfightForm.fighter1.photo ? (
+                                                        <img src={superfightForm.fighter1.photo} alt="Fighter 1" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                    ) : (
+                                                        <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>
+                                                            <Upload size={24} style={{ marginBottom: '4px', color: '#ef4444' }} />
+                                                            <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase' }}>Subir Foto</span>
+                                                        </div>
+                                                    )}
+                                                    <input 
+                                                        type="file" 
+                                                        accept="image/*" 
+                                                        style={{ display: 'none' }} 
+                                                        onChange={async (e) => {
+                                                            if (e.target.files && e.target.files[0]) {
+                                                                try {
+                                                                    const compressed = await compressImageFileWithConstraints(e.target.files[0], { maxWidth: 600, maxHeight: 600 });
+                                                                    setSuperfightForm(f => ({...f, fighter1: {...f.fighter1, photo: compressed.dataUrl}}));
+                                                                } catch (err) {
+                                                                    showFeedback('error', 'Falha ao processar imagem.');
+                                                                }
+                                                            }
+                                                        }}
+                                                    />
+                                                </label>
+                                            </div>
+
+                                            <div style={{ marginBottom: '16px' }}>
+                                                <label className="table-meta">Nome do Atleta *</label>
+                                                <input className="input" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)', padding: '12px 16px', fontSize: '15px' }} required value={superfightForm.fighter1.name} onChange={e => setSuperfightForm(f => ({...f, fighter1: {...f.fighter1, name: e.target.value}}))} placeholder="Ex: João Silva" />
+                                            </div>
+                                            <div style={{ marginBottom: '16px' }}>
+                                                <label className="table-meta">Academia / Equipe *</label>
+                                                <input className="input" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)', padding: '12px 16px', fontSize: '15px' }} required value={superfightForm.fighter1.academy} onChange={e => setSuperfightForm(f => ({...f, fighter1: {...f.fighter1, academy: e.target.value}}))} placeholder="Ex: Gracie Barra" />
+                                            </div>
+                                            <div>
+                                                <label className="table-meta">Faixa *</label>
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+                                                    {['Branca', 'Cinza', 'Amarela', 'Laranja', 'Verde', 'Azul', 'Roxa', 'Marrom', 'Preta'].map(belt => (
+                                                        <button 
+                                                            key={belt}
+                                                            type="button"
+                                                            onClick={() => setSuperfightForm(f => ({...f, fighter1: {...f.fighter1, belt}}))}
+                                                            style={{
+                                                                padding: '6px 12px',
+                                                                borderRadius: '8px',
+                                                                fontSize: '12px',
+                                                                fontWeight: 600,
+                                                                border: superfightForm.fighter1.belt === belt ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.1)',
+                                                                background: superfightForm.fighter1.belt === belt ? 'rgba(239, 68, 68, 0.2)' : 'rgba(0,0,0,0.3)',
+                                                                color: superfightForm.fighter1.belt === belt ? '#f8fafc' : '#94a3b8',
+                                                                cursor: 'pointer',
+                                                                transition: 'all 0.2s'
+                                                            }}
+                                                        >
+                                                            {belt}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Lutador 2 (Azul) */}
+                                        <div style={{ flex: 1, minWidth: '0', background: 'linear-gradient(180deg, rgba(56, 189, 248, 0.05) 0%, rgba(255,255,255,0.01) 100%)', padding: '24px', borderRadius: '16px', border: '1px solid rgba(56, 189, 248, 0.2)', position: 'relative', overflow: 'hidden' }}>
+                                            <div style={{ position: 'absolute', top: 0, right: 0, width: '4px', height: '100%', background: '#38bdf8' }}></div>
+                                            <h4 style={{ margin: '0 0 24px 0', color: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px', fontSize: '1.1rem' }}>
+                                                <div style={{ background: '#38bdf8', color: '#fff', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 800 }}>CANTO AZUL</div>
+                                            </h4>
+                                            
+                                            {/* Photo Upload Area */}
+                                            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
+                                                <label style={{ cursor: 'pointer', position: 'relative', display: 'block', width: '140px', height: '140px', borderRadius: '50%', border: '3px solid #38bdf8', overflow: 'hidden', background: '#0f172a', boxShadow: '0 8px 16px rgba(56, 189, 248, 0.2)' }}>
+                                                    {superfightForm.fighter2.photo ? (
+                                                        <img src={superfightForm.fighter2.photo} alt="Fighter 2" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                    ) : (
+                                                        <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>
+                                                            <Upload size={24} style={{ marginBottom: '4px', color: '#38bdf8' }} />
+                                                            <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase' }}>Subir Foto</span>
+                                                        </div>
+                                                    )}
+                                                    <input 
+                                                        type="file" 
+                                                        accept="image/*" 
+                                                        style={{ display: 'none' }} 
+                                                        onChange={async (e) => {
+                                                            if (e.target.files && e.target.files[0]) {
+                                                                try {
+                                                                    const compressed = await compressImageFileWithConstraints(e.target.files[0], { maxWidth: 600, maxHeight: 600 });
+                                                                    setSuperfightForm(f => ({...f, fighter2: {...f.fighter2, photo: compressed.dataUrl}}));
+                                                                } catch (err) {
+                                                                    showFeedback('error', 'Falha ao processar imagem.');
+                                                                }
+                                                            }
+                                                        }}
+                                                    />
+                                                </label>
+                                            </div>
+
+                                            <div style={{ marginBottom: '16px' }}>
+                                                <label className="table-meta">Nome do Atleta *</label>
+                                                <input className="input" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)', padding: '12px 16px', fontSize: '15px' }} required value={superfightForm.fighter2.name} onChange={e => setSuperfightForm(f => ({...f, fighter2: {...f.fighter2, name: e.target.value}}))} placeholder="Ex: Carlos Santos" />
+                                            </div>
+                                            <div style={{ marginBottom: '16px' }}>
+                                                <label className="table-meta">Academia / Equipe *</label>
+                                                <input className="input" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)', padding: '12px 16px', fontSize: '15px' }} required value={superfightForm.fighter2.academy} onChange={e => setSuperfightForm(f => ({...f, fighter2: {...f.fighter2, academy: e.target.value}}))} placeholder="Ex: Nova União" />
+                                            </div>
+                                            <div>
+                                                <label className="table-meta">Faixa *</label>
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+                                                    {['Branca', 'Cinza', 'Amarela', 'Laranja', 'Verde', 'Azul', 'Roxa', 'Marrom', 'Preta'].map(belt => (
+                                                        <button 
+                                                            key={belt}
+                                                            type="button"
+                                                            onClick={() => setSuperfightForm(f => ({...f, fighter2: {...f.fighter2, belt}}))}
+                                                            style={{
+                                                                padding: '6px 12px',
+                                                                borderRadius: '8px',
+                                                                fontSize: '12px',
+                                                                fontWeight: 600,
+                                                                border: superfightForm.fighter2.belt === belt ? '1px solid #38bdf8' : '1px solid rgba(255,255,255,0.1)',
+                                                                background: superfightForm.fighter2.belt === belt ? 'rgba(56, 189, 248, 0.2)' : 'rgba(0,0,0,0.3)',
+                                                                color: superfightForm.fighter2.belt === belt ? '#f8fafc' : '#94a3b8',
+                                                                cursor: 'pointer',
+                                                                transition: 'all 0.2s'
+                                                            }}
+                                                        >
+                                                            {belt}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '24px' }}>
+                                        <button type="button" className="btn btn-ghost" onClick={() => setSuperfightForm(null)}>Cancelar</button>
+                                        <button type="submit" className="btn btn-primary" style={{ padding: '0 32px' }}>
+                                            <CheckCircle2 size={18} /> Salvar Luta Casada
+                                        </button>
+                                    </div>
+                                </form>
                             </div>
                         </motion.div>
                     </>

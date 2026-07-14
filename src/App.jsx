@@ -10,14 +10,17 @@ import {
   LogOut,
   Mail,
   MapPin,
+  Menu,
   Phone,
   Settings,
   Trophy,
   User,
   Users,
+  X,
   Youtube,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
+import './components/MobileHeader.css';
 import About from './pages/About';
 import Athletes from './pages/Athletes';
 import Teams from './pages/Teams';
@@ -39,6 +42,8 @@ import EventRegistration from './pages/EventRegistration';
 import SettingsPage from './pages/Settings';
 import AcademyRegistration from './pages/AcademyRegistration';
 import CoachManagerPage from './pages/CoachManagerPage';
+import Scoreboard from './pages/Scoreboard';
+import ScoreboardDisplay from './pages/ScoreboardDisplay';
 import { useStore } from './hooks/useStore';
 import { useI18n } from './hooks/useI18n';
 import LoginOverlay from './components/LoginOverlay';
@@ -214,6 +219,8 @@ const AppLayout = () => {
 
   const [eventSuccess, setEventSuccess] = useState('');
   const [showLogin, setShowLogin] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showMobileUserMenu, setShowMobileUserMenu] = useState(false);
   
   const linkedProfiles = useMemo(() => {
     if (!currentUser || !memberProfiles) return [];
@@ -286,6 +293,7 @@ const AppLayout = () => {
   const isAboutRoute = location.pathname.startsWith('/institucional');
   const isRegulationsRoute = location.pathname.startsWith('/regulamento');
   const isRankingRoute = location.pathname.startsWith('/ranking');
+  const isAthletesRoute = location.pathname.startsWith('/atletas');
   const { language, setLanguage, currentLanguage, languages, uiLanguage } = useI18n();
   const isEnglish = uiLanguage === 'en-US';
   const isSpanish = uiLanguage === 'es-ES';
@@ -1307,6 +1315,14 @@ const AppLayout = () => {
 
         <div className="topbar-main">
           <div className="container topbar-main__inner">
+            <button
+              className="mobile-menu-toggle"
+              type="button"
+              onClick={() => setIsMobileMenuOpen(true)}
+              aria-label="Abrir menu"
+            >
+              <Menu size={28} />
+            </button>
             <nav className="main-nav">
               <div className="main-nav__group">
                 {navLeft.map(renderNavItem)}
@@ -1330,12 +1346,226 @@ const AppLayout = () => {
                 {navRight.map(renderNavItem)}
               </div>
             </nav>
+            {currentUser && (
+              <div className="mobile-user-menu-wrapper">
+                <button 
+                  type="button" 
+                  className="mobile-user-toggle" 
+                  onClick={() => setShowMobileUserMenu(!showMobileUserMenu)}
+                >
+                  <div className="mobile-user-avatar">
+                    {finalAvatar ? (
+                      <img src={finalAvatar} alt="" />
+                    ) : (
+                      <span>{finalName.charAt(0).toUpperCase()}</span>
+                    )}
+                  </div>
+                </button>
+                
+                {showMobileUserMenu && (
+                  <>
+                    <div className="mobile-user-menu-overlay" onClick={() => setShowMobileUserMenu(false)} />
+                    <div className="mobile-user-dropdown-panel utility-dropdown__panel--account">
+                      <div className="account-dropdown-header">
+                        <div className="account-dropdown-avatar">
+                          {finalAvatar ? (
+                            <img src={finalAvatar} alt="" />
+                          ) : (
+                            <span>{(finalName).charAt(0).toUpperCase()}</span>
+                          )}
+                        </div>
+                        <div className="account-dropdown-info">
+                          <strong>{finalName}</strong>
+                          <small>{finalBelt}</small>
+                        </div>
+                      </div>
+                      
+                      <div className="account-dropdown-group" onClick={() => setShowMobileUserMenu(false)}>
+                        {accountItems.map(renderAccountItem)}
+                      </div>
+                      
+                      {otherProfiles.length > 0 && (
+                        <div className="account-dropdown-linked" onClick={() => setShowMobileUserMenu(false)}>
+                          <div className="linked-label">PERFIS LIGADOS</div>
+                          {otherProfiles.map(profile => (
+                            <Link to={`/minha-conta?profileId=${profile.id}`} key={profile.id} className="linked-profile" style={{ marginBottom: otherProfiles.length > 1 ? '8px' : 0 }}>
+                              <div className="account-dropdown-avatar account-dropdown-avatar--small">
+                                {profile.photoUrl || profile.avatarUrl ? (
+                                  <img src={profile.photoUrl || profile.avatarUrl} alt="" />
+                                ) : (
+                                  <span>{(profile.fullName || 'U').charAt(0).toUpperCase()}</span>
+                                )}
+                              </div>
+                              <span>{profile.fullName}</span>
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+            {!currentUser && (
+              <button
+                type="button"
+                className="mobile-user-toggle"
+                onClick={() => setShowLogin(true)}
+              >
+                <LogIn size={20} />
+              </button>
+            )}
           </div>
         </div>
       </header>
 
-      <main className={`app-main ${isAdminRoute ? 'app-main--admin' : ''} ${(isEventsRoute || isOrganizersRoute || isAboutRoute || isRegulationsRoute || isRankingRoute) ? 'app-main--full' : ''}`}>
-        <div className={`container ${isAdminRoute ? 'container--admin' : ''} ${isHomeRoute ? 'container--home' : ''} ${(isEventsRoute || isOrganizersRoute || isAboutRoute || isRegulationsRoute || isRankingRoute) ? 'container--full' : ''}`}>
+      {/* MOBILE DRAWER */}
+      <div className={`mobile-drawer ${isMobileMenuOpen ? 'is-open' : ''}`}>
+        <div className="mobile-drawer__overlay" onClick={() => setIsMobileMenuOpen(false)} />
+        <div className="mobile-drawer__content">
+          <div className="mobile-drawer__header">
+            <Link to="/" className="brand-block" onClick={() => setIsMobileMenuOpen(false)}>
+              <div className="brand-mark">
+                {logoReady ? (
+                  <img
+                    src="/genesis-logo.png"
+                    alt="Genesis Esportes"
+                    className="brand-logo"
+                    onError={() => setLogoReady(false)}
+                  />
+                ) : (
+                  <Trophy size={24} />
+                )}
+              </div>
+              <div className="brand-title">Genesis</div>
+            </Link>
+            <button
+              className="mobile-drawer__close"
+              onClick={() => setIsMobileMenuOpen(false)}
+              aria-label="Fechar menu"
+            >
+              <X size={24} />
+            </button>
+          </div>
+          <div className="mobile-drawer__body">
+            <div className="mobile-drawer__main-nav">
+              {navLeft.map((item) => (
+                item.items ? (
+                  <details key={item.label} className="mobile-nav-details">
+                    <summary className="main-nav-link">{item.label}</summary>
+                    <div className="mobile-nav-dropdown">
+                      {item.items.map(sub => (
+                        <Link 
+                          key={sub.label} 
+                          to={sub.path || '#'} 
+                          className="mobile-sub-link"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                          {sub.label}
+                        </Link>
+                      ))}
+                    </div>
+                  </details>
+                ) : (
+                  <Link
+                    key={item.label}
+                    to={item.path || (item.activePaths && item.activePaths[0]) || '/'}
+                    className="main-nav-link"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    {item.label}
+                  </Link>
+                )
+              ))}
+              {navRight.map((item) => (
+                item.items ? (
+                  <details key={item.label} className="mobile-nav-details">
+                    <summary className="main-nav-link">{item.label}</summary>
+                    <div className="mobile-nav-dropdown">
+                      {item.items.map(sub => (
+                        <Link 
+                          key={sub.label} 
+                          to={sub.path || '#'} 
+                          className="mobile-sub-link"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                          {sub.label}
+                        </Link>
+                      ))}
+                    </div>
+                  </details>
+                ) : (
+                  <Link
+                    key={item.label}
+                    to={item.path || (item.activePaths && item.activePaths[0]) || '/'}
+                    className="main-nav-link"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    {item.label}
+                  </Link>
+                )
+              ))}
+            </div>
+            <div className="mobile-drawer__divider" />
+            <div className="mobile-drawer__utility-nav">
+              {utilityLinks.map((link) => (
+                <Link
+                  key={link.label}
+                  to={link.path}
+                  className="mobile-utility-link"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  {link.label}
+                </Link>
+              ))}
+              {supportItems.map((link, idx) => (
+                <Link
+                  key={`support-${idx}`}
+                  to={link.path}
+                  className="mobile-utility-link"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </div>
+            
+            <div className="mobile-drawer__language">
+              <span className="mobile-drawer__language-label">{copy.utility.language}</span>
+              <div className="mobile-drawer__language-options">
+                {languages.map((item) => (
+                  <button
+                    key={item.id}
+                    className={`mobile-language-btn ${language === item.id ? 'is-active' : ''}`}
+                    onClick={() => {
+                      setLanguage(item.id);
+                      setIsMobileMenuOpen(false);
+                    }}
+                  >
+                    {item.flagImages?.[0] && <img src={item.flagImages[0]} alt="" />}
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mobile-drawer__social">
+              <a href="https://www.instagram.com/genesis_esportes/" target="_blank" rel="noreferrer">
+                <Instagram size={20} />
+              </a>
+              <a href="https://www.facebook.com/genesis.tatames" target="_blank" rel="noreferrer">
+                <Facebook size={20} />
+              </a>
+              <a href="https://www.youtube.com/channel/UCg9eEbos83Rw4S6fzT4peVA" target="_blank" rel="noreferrer">
+                <Youtube size={20} />
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <main className={`app-main ${isAdminRoute ? 'app-main--admin' : ''} ${(isEventsRoute || isOrganizersRoute || isAboutRoute || isRegulationsRoute || isRankingRoute || isAthletesRoute) ? 'app-main--full' : ''}`}>
+        <div className={`container ${isAdminRoute ? 'container--admin' : ''} ${isHomeRoute ? 'container--home' : ''} ${(isEventsRoute || isOrganizersRoute || isAboutRoute || isRegulationsRoute || isRankingRoute || isAthletesRoute) ? 'container--full' : ''}`}>
           <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}
@@ -1346,6 +1576,8 @@ const AppLayout = () => {
             >
               <Routes location={location}>
                 <Route path="/" element={<Home />} />
+                <Route path="/placar" element={<Scoreboard />} />
+                <Route path="/placar/display" element={<ScoreboardDisplay />} />
                 <Route
                   path="/admin/*"
                   element={canAccessDashboard ? <Dashboard /> : <Navigate to="/ranking" replace />}

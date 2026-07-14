@@ -568,12 +568,12 @@ const Events = () => {
         </div>
 
         {isLoading ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
             {[1,2,3,4,5,6,7,8].map(i => <div key={i} style={{ height: '240px', background: '#27272a', borderRadius: '8px' }} />)}
           </div>
         ) : (
           filteredEvents.length > 0 ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
               {filteredEvents.map(event => renderEventCard(event))}
             </div>
           ) : (

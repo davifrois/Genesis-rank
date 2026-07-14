@@ -199,7 +199,31 @@ const Athletes = () => {
   const athleteCommunityRows = useMemo(() => {
     const profiles = (Array.isArray(memberProfiles) ? memberProfiles : [])
       .filter((profile) => (profile.fullName || '').toString().trim().length > 0);
-    return profiles
+
+    const existingNames = new Set(profiles.map(p => normalizeLookup(p.fullName)));
+    const virtualProfiles = new Map();
+
+    (Array.isArray(athletes) ? athletes : []).forEach(athlete => {
+      const normName = normalizeLookup(athlete.nome);
+      if (!normName || existingNames.has(normName)) return;
+
+      if (!virtualProfiles.has(normName)) {
+        virtualProfiles.set(normName, {
+          id: 'virtual-' + (athlete.id || normName),
+          fullName: athlete.nome,
+          academyName: athlete.equipe || '',
+          belt: athlete.faixa || '',
+          country: athlete.countryCode || 'Brasil',
+          gender: athlete.sexo || '',
+          isVirtual: true,
+          photoUrl: athlete.foto || ''
+        });
+      }
+    });
+
+    const allProfiles = [...profiles, ...virtualProfiles.values()];
+
+    return allProfiles
       .map((profile) => resolveProfileMetrics({ profile, athletes, eventsById }))
       .sort((left, right) => {
         if (right.recentGold !== left.recentGold) return right.recentGold - left.recentGold;
@@ -518,8 +542,8 @@ const Athletes = () => {
       {/* HEADER SECTION */}
       <div className="athletes-ajp-header-section" style={{ 
           backgroundImage: `linear-gradient(to bottom, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.8)), url(${bgImage})`,
-          width: '100vw',
-          marginLeft: 'calc(-50vw + 50%)'
+          width: '100%',
+          margin: 0
         }}>
         <div className="athletes-ajp-header-inner">
         <h1 className="athletes-ajp-title">

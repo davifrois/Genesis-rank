@@ -325,18 +325,20 @@ const PublicProfile = ({ profileOverride, isPreview = false }) => {
     return result;
   }, [athletes, brackets, matchedProfileAthletes, profile]);
 
-  /* 3 – wins / losses from athletes store */
-  const { totalWins, totalLosses } = useMemo(() => {
-    if (!profile) return { totalWins: 0, totalLosses: 0 };
+  /* 3 – wins / losses from athletes store and brackets */
+  const { totalWins, totalLosses, totalRegisteredEvents } = useMemo(() => {
+    if (!profile) return { totalWins: 0, totalLosses: 0, totalRegisteredEvents: 0 };
+    
+    let w = 0;
+    let l = 0;
+    
+    // Contar vitórias/derrotas das chaves (brackets) geradas
     const fightsFromBrackets = [...fightHistoryByEvent.values()].flat();
-    if (fightsFromBrackets.length) {
-      return {
-        totalWins: fightsFromBrackets.filter((fight) => fight.result === 'WIN').length,
-        totalLosses: fightsFromBrackets.filter((fight) => fight.result === 'LOSS').length
-      };
-    }
+    w += fightsFromBrackets.filter((fight) => fight.result === 'WIN').length;
+    l += fightsFromBrackets.filter((fight) => fight.result === 'LOSS').length;
+
+    // Contar vitórias/derrotas inseridas manualmente no histórico
     const needle = (profile.fullName || '').toLowerCase().trim();
-    let w = 0, l = 0;
     matchedProfileAthletes
       .filter((a) => {
         const n = (a.nome || '').toLowerCase().trim();
@@ -346,7 +348,15 @@ const PublicProfile = ({ profileOverride, isPreview = false }) => {
         if (h.type === 'win') w++;
         if (h.type === 'loss') l++;
       }));
-    return { totalWins: w, totalLosses: l };
+
+    // Contar em quantos eventos diferentes o atleta está inscrito
+    const uniqueEvents = new Set(
+      matchedProfileAthletes
+        .map(a => String(a.eventId || ''))
+        .filter(id => id && id !== 'undefined')
+    );
+
+    return { totalWins: w, totalLosses: l, totalRegisteredEvents: uniqueEvents.size };
   }, [profile, fightHistoryByEvent, matchedProfileAthletes]);
 
   /* 4 – academy */
@@ -396,7 +406,7 @@ const PublicProfile = ({ profileOverride, isPreview = false }) => {
   const countryFlag = flagFromCountryCode(countryCodeFromValue(profile.country || 'Brasil', 'BR'));
   const totalGold    = summary.podium1   || 0;
   const totalPodiums = summary.totalPodiums || 0;
-  const totalEvents  = summary.eventsFought || rows.length;
+  const totalEvents  = totalRegisteredEvents > 0 ? totalRegisteredEvents : (summary.eventsFought || rows.length);
   const fights       = totalWins + totalLosses;
   const winRate      = fights > 0 ? Math.round((totalWins / fights) * 100) : 0;
   const allFightRows = rows.flatMap((row) => row.fights || []);
@@ -409,10 +419,7 @@ const PublicProfile = ({ profileOverride, isPreview = false }) => {
 
   const stats = [
     { icon: <Calendar size={16}/>, val: totalEvents, label: 'Eventos' },
-    { icon: <Trophy   size={16}/>, val: totalGold,   label: 'Ouros', gold: true },
-    { icon: <Medal    size={16}/>, val: totalPodiums, label: 'Pódios' },
     { icon: <TrendingUp size={16}/>, val: totalWins, label: 'Vitórias', win: true },
-    { icon: <Swords   size={16}/>, val: totalLosses, label: 'Derrotas', loss: true },
     { icon: <Target   size={16}/>, val: `${winRate}%`, label: 'Win Rate' },
   ];
 

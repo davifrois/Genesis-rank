@@ -1,0 +1,20 @@
+[
+  {
+    "username": "simone",
+    "password": "simone123",
+    "name": "Simone",
+    "role": "admin"
+  },
+  {
+    "username": "davifrois",
+    "password": "davifrois324@",
+    "name": "Davi oliveira frois",
+    "role": "admin"
+  },
+  {
+    "username": "mesario1",
+    "password": "mesario123",
+    "name": "Mesario 1",
+    "role": "mesario"
+  }
+]

@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import './About.css';
 import aboutHeroImage from '../../img/organizers-command-center.png';
-import filmmakerVenue from '../../img/filmmaker-venue.jpg';
+import trabalhoImage from '../../img/trabalho.jpeg.jpeg';
 import placarImage from '../../img/placar.png';
 import podioImage from '../../img/Podio.jpeg';
 
@@ -84,10 +84,9 @@ const About = () => (
       <div className="about-tech-hero__shade" aria-hidden="true" />
       <div className="about-tech-hero__content">
         <span className="about-tech-kicker">Sobre a Genesis</span>
-        <h1>Tecnologia, operacao e credibilidade para campeonatos de Jiu-Jitsu.</h1>
+        <h1>Transformando a paixão por Jiu-Jitsu em grandes campeonatos.</h1>
         <p>
-          A Genesis Esportes une gestao esportiva, sistema digital e execucao presencial para
-          transformar campeonatos em experiencias mais organizadas, profissionais e mensuraveis.
+          Desde 2017, transformamos a paixão por competições em grandes eventos. Somos especialistas em planejar e executar o seu campeonato com excelência, tendo como nosso maior compromisso a valorização do atleta e o fortalecimento do esporte.
         </p>
         <div className="about-tech-hero__actions">
           <Link className="about-tech-button about-tech-button--primary" to="/organizadores">
@@ -121,6 +120,7 @@ const About = () => (
       </div>
       <div className="about-tech-command-card">
         <img src={podioImage} alt="Pódio do campeonato" loading="lazy" />
+        <span className="about-image-credit">foto: agencia photoland</span>
         <div>
           <ShieldCheck size={20} />
           <strong>Operacao auditavel</strong>
@@ -147,14 +147,14 @@ const About = () => (
 
     <section className="about-tech-split">
       <div className="about-tech-split__media">
-        <img src={filmmakerVenue} alt="Evento de jiu-jitsu organizado pela Genesis" loading="lazy" />
+        <img src={trabalhoImage} alt="Evento de jiu-jitsu organizado pela Genesis" loading="lazy" />
+        <span className="about-image-credit">foto: agencia photoland</span>
       </div>
       <div className="about-tech-split__content">
         <span className="about-tech-kicker">Nossa missao</span>
-        <h2>Entregar campeonatos mais previsiveis, transparentes e bem apresentados.</h2>
+        <h2>Movidos pela paixão e pelo compromisso com cada atleta.</h2>
         <p>
-          Prestamos servicos de alto padrao para organizadores, federacoes, academias e atletas,
-          assegurando planejamento confiavel, execucao eficiente e gestao clara em cada etapa.
+          Nosso amor pelo esporte vai além dos negócios: ele está na satisfação de cada atleta que compete em nossos eventos de ponta. O sorriso estampado no rosto de cada pessoa e a entrega incondicional da nossa equipe mostram que somos movidos por algo maior. Fazemos o que amamos para entregar o melhor para você.
         </p>
         <ul>
           {values.map((value) => (

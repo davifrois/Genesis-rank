@@ -662,7 +662,26 @@
   overflow: hidden;
 }
 
-/* ─── RANKING TOP 10 ─── */
+/* ─── RANKINGS ─── */
+.home-ranking-grid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 3rem;
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .home-ranking-grid {
+    grid-template-columns: 1fr;
+    gap: 3rem;
+  }
+}
+
+.home-ranking-col {
+  display: flex;
+  flex-direction: column;
+}
+
 .home-ranking-list {
   display: flex;
   flex-direction: column;
@@ -671,60 +690,102 @@
 
 .home-rank-row {
   display: grid;
-  grid-template-columns: 48px 44px 1fr auto;
+  grid-template-columns: 50px 48px 1fr auto;
   align-items: center;
-  gap: 1rem;
-  padding: 0.85rem 1.2rem;
-  background: rgba(24, 24, 27, 0.4);
-  border: 1px solid rgba(255,255,255,0.05);
-  border-radius: 12px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  gap: 1.2rem;
+  padding: 1rem 1.5rem;
+  background: rgba(15, 20, 35, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  border-radius: 16px;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2), inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+  margin-bottom: 0.8rem;
+  position: relative;
+  overflow: hidden;
 }
+
+.home-rank-row::before {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%;
+  width: 50%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+  transition: left 0.6s ease;
+}
+
+.home-rank-row:hover::before {
+  left: 100%;
+}
+
 .home-rank-row:hover {
-  background: rgba(39, 39, 42, 0.6);
-  border-color: rgba(59, 130, 246, 0.3);
-  transform: translateX(4px) translateY(-2px);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  background: rgba(20, 25, 45, 0.6);
+  border-color: rgba(59, 130, 246, 0.4);
+  transform: translateY(-3px) scale(1.01);
+  box-shadow: 0 15px 30px -5px rgba(0, 0, 0, 0.4), 0 0 20px rgba(59, 130, 246, 0.15), inset 0 0 0 1px rgba(59, 130, 246, 0.2);
 }
+
 .home-rank-row--podium {
-  background: linear-gradient(90deg, rgba(37, 99, 235, 0.1) 0%, rgba(24, 24, 27, 0.4) 100%);
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0.1) 0%, rgba(15, 20, 35, 0.4) 100%);
   border-color: rgba(59, 130, 246, 0.2);
-  border-left: 3px solid #3b82f6;
+  border-left: 4px solid #3b82f6;
 }
-.home-rank-row--podium:nth-child(1) { border-left-color: #fbbf24; background: linear-gradient(90deg, rgba(251, 191, 36, 0.1) 0%, rgba(24, 24, 27, 0.4) 100%); border-color: rgba(251, 191, 36, 0.2); }
-.home-rank-row--podium:nth-child(2) { border-left-color: #9ca3af; background: linear-gradient(90deg, rgba(156, 163, 175, 0.1) 0%, rgba(24, 24, 27, 0.4) 100%); border-color: rgba(156, 163, 175, 0.2); }
-.home-rank-row--podium:nth-child(3) { border-left-color: #d97706; background: linear-gradient(90deg, rgba(217, 119, 6, 0.1) 0%, rgba(24, 24, 27, 0.4) 100%); border-color: rgba(217, 119, 6, 0.2); }
+
+.home-rank-row--podium:nth-child(1) { border-left-color: #fbbf24; background: linear-gradient(90deg, rgba(251, 191, 36, 0.15) 0%, rgba(15, 20, 35, 0.4) 100%); border-color: rgba(251, 191, 36, 0.3); box-shadow: 0 4px 20px rgba(251, 191, 36, 0.1); }
+.home-rank-row--podium:nth-child(2) { border-left-color: #9ca3af; background: linear-gradient(90deg, rgba(156, 163, 175, 0.15) 0%, rgba(15, 20, 35, 0.4) 100%); border-color: rgba(156, 163, 175, 0.3); box-shadow: 0 4px 20px rgba(156, 163, 175, 0.1); }
+.home-rank-row--podium:nth-child(3) { border-left-color: #d97706; background: linear-gradient(90deg, rgba(217, 119, 6, 0.15) 0%, rgba(15, 20, 35, 0.4) 100%); border-color: rgba(217, 119, 6, 0.3); box-shadow: 0 4px 20px rgba(217, 119, 6, 0.1); }
 
 .home-rank-pos {
   display: flex;
   align-items: center;
   justify-content: center;
+  background: rgba(255, 255, 255, 0.03);
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
+
+.home-rank-row--podium:nth-child(1) .home-rank-pos { background: rgba(251, 191, 36, 0.1); border-color: rgba(251, 191, 36, 0.2); }
+.home-rank-row--podium:nth-child(2) .home-rank-pos { background: rgba(156, 163, 175, 0.1); border-color: rgba(156, 163, 175, 0.2); }
+.home-rank-row--podium:nth-child(3) .home-rank-pos { background: rgba(217, 119, 6, 0.1); border-color: rgba(217, 119, 6, 0.2); }
+
 .home-rank-medal {
-  font-size: 1.8rem;
+  font-size: 1.6rem;
   line-height: 1;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.5));
 }
+
 .home-rank-number {
-  font-size: 1.1rem;
-  font-weight: 800;
-  color: rgba(255,255,255,0.4);
+  font-size: 1.2rem;
+  font-weight: 900;
+  color: #a1a1aa;
+  font-family: 'Inter', sans-serif;
 }
 
 .home-rank-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.85rem;
-  font-weight: 700;
+  font-size: 1rem;
+  font-weight: 800;
   color: #fff;
   flex-shrink: 0;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  transition: transform 0.3s ease;
 }
+
+.home-rank-row:hover .home-rank-avatar {
+  transform: scale(1.05);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
 .home-rank-avatar img {
   width: 100%;
   height: 100%;
@@ -734,56 +795,82 @@
 .home-rank-info {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 0.3rem;
   min-width: 0;
 }
+
 .home-rank-name {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: #e2e8f0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #f8fafc;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  letter-spacing: -0.01em;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
 }
+
 .home-rank-meta {
-  font-size: 0.75rem;
-  color: rgba(255,255,255,0.35);
+  font-size: 0.8rem;
+  color: #94a3b8;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-weight: 500;
 }
+
 .home-rank-progress {
-  height: 3px;
-  background: rgba(255,255,255,0.06);
-  border-radius: 2px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
   overflow: hidden;
-  margin-top: 0.3rem;
+  margin-top: 0.5rem;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.5);
 }
+
 .home-rank-progress-bar {
   height: 100%;
-  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
-  border-radius: 2px;
-  transition: width 1s ease;
+  background: linear-gradient(90deg, #3b82f6, #60a5fa, #a78bfa);
+  border-radius: 4px;
+  transition: width 1.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 0 10px rgba(96, 165, 250, 0.5);
 }
+
+.home-rank-row--podium:nth-child(1) .home-rank-progress-bar { background: linear-gradient(90deg, #fbbf24, #fcd34d); box-shadow: 0 0 10px rgba(251, 191, 36, 0.5); }
+.home-rank-row--podium:nth-child(2) .home-rank-progress-bar { background: linear-gradient(90deg, #9ca3af, #d1d5db); box-shadow: 0 0 10px rgba(156, 163, 175, 0.5); }
+.home-rank-row--podium:nth-child(3) .home-rank-progress-bar { background: linear-gradient(90deg, #d97706, #f59e0b); box-shadow: 0 0 10px rgba(217, 119, 6, 0.5); }
+
 
 .home-rank-score {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 0;
+  gap: 0.1rem;
   flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 8px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
+
 .home-rank-pts {
-  font-size: 1.1rem;
-  font-weight: 800;
-  color: #60a5fa;
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: #3b82f6;
   line-height: 1;
+  text-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
 }
+
+.home-rank-row--podium:nth-child(1) .home-rank-pts { color: #fbbf24; text-shadow: 0 0 15px rgba(251, 191, 36, 0.4); }
+.home-rank-row--podium:nth-child(2) .home-rank-pts { color: #9ca3af; text-shadow: 0 0 15px rgba(156, 163, 175, 0.4); }
+.home-rank-row--podium:nth-child(3) .home-rank-pts { color: #d97706; text-shadow: 0 0 15px rgba(217, 119, 6, 0.4); }
+
 .home-rank-pts-label {
-  font-size: 0.65rem;
-  color: rgba(255,255,255,0.3);
+  font-size: 0.7rem;
+  color: #64748b;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
+  font-weight: 700;
 }
 
 /* ─── WHY GENESIS ─── */

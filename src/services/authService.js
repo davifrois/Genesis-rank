@@ -732,7 +732,9 @@ export const authService = {
 
     register: async ({ username, password, name, role }) => {
         if (AUTH_MODE === 'api') {
-            throw new Error('Cadastro indisponivel no modo remoto.');
+            // Allow public registration by hitting the same endpoint, 
+            // since the new Node.js server doesn't strictly validate admin tokens for this.
+            return createUserWithApi({ username, password, name, role: role || 'athlete' });
         }
 
         await new Promise((resolve) => setTimeout(resolve, 600));

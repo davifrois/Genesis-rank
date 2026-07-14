@@ -274,8 +274,8 @@
     align-items: center; /* Center horizontally */
     justify-content: flex-end;
     min-height: 250px;
-    width: 100vw;
-    margin-left: calc(-50vw + 50%);
+    width: 100%;
+    margin-left: 0;
 }
 
 .athletes-ajp-title {
@@ -383,11 +383,17 @@
 
 /* Ensure 3 columns grid matches Image 1 */
 .athlete-community-columns {
+    max-width: 1240px;
+    margin: 0 auto;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 20px;
-    max-width: 1200px;
-    margin: 0 auto;
+}
+
+@media (max-width: 900px) {
+    .athlete-community-columns {
+        grid-template-columns: 1fr;
+    }
 }
 
 .athlete-community-column__head h3 {

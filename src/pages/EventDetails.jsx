@@ -833,7 +833,7 @@ const EventDetails = () => {
                 >
                   <td style={{ padding: '16px 20px' }}>
                     <div style={{ fontWeight: 500, fontSize: '0.95rem', color: '#f4f4f5' }}>{bracket.label}</div>
-                    <div style={{ color: '#a1a1aa', fontSize: '0.85rem', marginTop: '4px' }}>{bracket.size || bracket.seedIds?.length || 0} participants</div>
+                    <div style={{ color: '#a1a1aa', fontSize: '0.85rem', marginTop: '4px' }}>{bracket.seedIds?.filter(id => id && !id.startsWith('placeholder-') && id.toUpperCase() !== 'BYE').length || 0} participants</div>
                   </td>
                   <td style={{ padding: '16px 20px', fontWeight: 500, color: '#e4e4e7', fontSize: '0.9rem' }}>
                     {bracket.liveMatches?.[0]?.scheduledAt || 'A definir'}
@@ -915,7 +915,7 @@ const EventDetails = () => {
   );
 
   const renderMatchesTab = () => {
-    const superFightsList = event.superFights || [];
+    const superFightsList = (event.superFights || []).filter(f => f.published);
     
     if (superFightsList.length === 0 || !event.superFightsPublished) {
       return (

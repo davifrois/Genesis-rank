@@ -1,7 +1,7 @@
 import React, { useMemo, useEffect, useRef, useState } from 'react';
 import './Home.css';
 import { Link } from 'react-router-dom';
-import { Calendar, MapPin, Newspaper, Trophy, Users, Star, Zap, Shield, TrendingUp } from 'lucide-react';
+import { Calendar, MapPin, Newspaper, Trophy, Users, Star, Zap, Shield, TrendingUp, X } from 'lucide-react';
 import { useStore } from '../hooks/useStore';
 import { useI18n } from '../hooks/useI18n';
 import { rankAthletes, groupAthletesByName } from '../services/scoringService';
@@ -92,10 +92,11 @@ const avatarGradients = [
 ];
 
 const Home = () => {
-  const { athletes, events, news } = useStore();
+  const { athletes, events, news, academies } = useStore();
   const { locale, uiLanguage, uiVariant } = useI18n();
   const statsRef = useRef(null);
   const [statsVisible, setStatsVisible] = useState(false);
+  const [selectedNews, setSelectedNews] = useState(null);
 
   // Intersection observer for scroll animations
   useEffect(() => {
@@ -144,8 +145,9 @@ const Home = () => {
       lastOfficial: 'Ultima atualizacao oficial',
       followEvolution: 'Acompanhe a evolucao',
       exploreRanking: 'Explorar ranking',
-      topKicker: 'Top 10',
+      topKicker: 'TOP 5',
       topTitle: 'Os atletas mais consistentes da temporada.',
+      topAcademiesTitle: 'Top Equipes da Temporada',
       fullRanking: 'Ver ranking completo',
       athleteFallback: 'Atleta',
       academyFallback: 'Sem academia',
@@ -211,8 +213,9 @@ const Home = () => {
       lastOfficial: 'Last official update',
       followEvolution: 'Track ranking movement',
       exploreRanking: 'Explore ranking',
-      topKicker: 'Top 10',
+      topKicker: 'TOP 5',
       topTitle: 'Most consistent athletes this season.',
+      topAcademiesTitle: 'Top Teams this Season',
       fullRanking: 'View full ranking',
       athleteFallback: 'Athlete',
       academyFallback: 'No academy',
@@ -278,8 +281,9 @@ const Home = () => {
       lastOfficial: 'Ultima actualizacion oficial',
       followEvolution: 'Siga la evolucion',
       exploreRanking: 'Explorar ranking',
-      topKicker: 'Top 10',
+      topKicker: 'TOP 5',
       topTitle: 'Los atletas mas consistentes de la temporada.',
+      topAcademiesTitle: 'Mejores Equipos de la Temporada',
       fullRanking: 'Ver ranking completo',
       athleteFallback: 'Atleta',
       academyFallback: 'Sin academia',
@@ -312,7 +316,7 @@ const Home = () => {
       whyKicker: 'Plataforma',
       feature1Title: 'Ranking Transparente',
       feature1Desc: 'Cada punto se calcula de forma automática y auditable. Sin sorpresas.',
-      feature2Title: 'Inscripción Directa',
+      feature2Title: 'Inscrição Directa',
       feature2Desc: 'Inscríbete en eventos con pocos clics directamente en la plataforma oficial.',
       feature3Title: 'Historial Completo',
       feature3Desc: 'Sigue la evolución de tu rendimiento a lo largo de toda la temporada.',
@@ -346,8 +350,9 @@ const Home = () => {
       lastOfficial: 'Derniere mise a jour officielle',
       followEvolution: 'Suivre l evolution',
       exploreRanking: 'Explorer le classement',
-      topKicker: 'Top 10',
+      topKicker: 'TOP 5',
       topTitle: 'Les athletes les plus reguliers de la saison.',
+      topAcademiesTitle: 'Meilleures Équipes de la Saison',
       fullRanking: 'Voir le classement complet',
       athleteFallback: 'Athlete',
       academyFallback: 'Sans academie',
@@ -394,8 +399,24 @@ const Home = () => {
 
   const topAthletes = useMemo(() => {
     if (!athletes.length) return [];
-    return rankAthletes(groupAthletesByName(athletes)).slice(0, 8);
+    return rankAthletes(groupAthletesByName(athletes)).slice(0, 5);
   }, [athletes]);
+
+  const topAcademies = useMemo(() => {
+    if (!athletes.length) return [];
+    const academyMap = {};
+    athletes.forEach(a => {
+      const name = a.academia || copy.academyFallback || 'Independente';
+      academyMap[name] = (academyMap[name] || 0) + (a.pontos || 0);
+    });
+    return Object.entries(academyMap)
+      .map(([name, pontos]) => {
+        const academyData = (academies || []).find(ac => ac.name === name);
+        return { name, pontos, logoUrl: academyData?.logoUrl };
+      })
+      .sort((a, b) => b.pontos - a.pontos)
+      .slice(0, 5);
+  }, [athletes, academies, copy.academyFallback]);
 
   const featuredEvents = useMemo(() => {
     if (!events.length) return [];
@@ -467,9 +488,9 @@ const Home = () => {
             <Link to="/eventos" className="home-btn home-btn--primary">
               {copy.heroPrimary}
             </Link>
-            <Link to="/painel" className="home-btn home-btn--ghost">
+            <a href="https://wa.me/553193383014?text=Ol%C3%A1%2C%20tudo%20bem%3F%20Estou%20planejando%20criar%20um%20campeonato%20utilizando%20a%20plataforma%20de%20voc%C3%AAs%20e%20gostaria%20de%20tirar%20algumas%20d%C3%BAvidas.%20Poderiam%20me%20fornecer%20mais%20informa%C3%A7%C3%B5es%20sobre%20as%20ferramentas%20dispon%C3%ADveis%20para%20gerenciamento%20de%20chaves%2C%20inscri%C3%A7%C3%B5es%20e%20suporte%20ao%20evento%3F" target="_blank" rel="noopener noreferrer" className="home-btn home-btn--ghost">
               {copy.heroSecondary}
-            </Link>
+            </a>
           </div>
         </div>
       </section>
@@ -596,7 +617,7 @@ const Home = () => {
           <div className="home-news-grid">
             {/* Featured first news */}
             {latestNews[0] && (
-              <article className="home-news-featured">
+              <article className="home-news-featured" onClick={() => setSelectedNews(latestNews[0])} style={{ cursor: 'pointer' }}>
                 <div className="home-news-featured__cover">
                   {latestNews[0].imageUrl ? (
                     <img src={latestNews[0].imageUrl} alt={latestNews[0].title} loading="lazy" />
@@ -621,7 +642,7 @@ const Home = () => {
             {/* Smaller 2 and 3 */}
             <div className="home-news-side">
               {latestNews.slice(1).map((item) => (
-                <article className="home-news-side-card" key={item.id}>
+                <article className="home-news-side-card" key={item.id} onClick={() => setSelectedNews(item)} style={{ cursor: 'pointer' }}>
                   <div className="home-news-side-card__cover">
                     {item.imageUrl ? (
                       <img src={item.imageUrl} alt={item.title} loading="lazy" />
@@ -647,75 +668,172 @@ const Home = () => {
         )}
       </section>
 
-      {/* ─── TOP 10 ─── */}
+      {/* ─── RANKINGS (ATHLETES + ACADEMIES) ─── */}
       <section className="home-section home-animate">
-        <div className="home-section__header">
-          <div>
-            <span className="home-kicker">{copy.topKicker}</span>
-            <h2 className="home-section__title">{copy.topTitle}</h2>
-          </div>
-          <Link className="home-text-link" to="/ranking">{copy.fullRanking}</Link>
-        </div>
+        <div className="home-ranking-grid">
+          
+          {/* COLUMN 1: TOP ATHLETES */}
+          <div className="home-ranking-col">
+            <div className="home-section__header">
+              <div>
+                <span className="home-kicker">{copy.topKicker}</span>
+                <h2 className="home-section__title">{copy.topTitle}</h2>
+              </div>
+              <Link className="home-text-link" to="/ranking">{copy.fullRanking}</Link>
+            </div>
 
-        <div className="home-ranking-list">
-          {topAthletes.length ? (
-            topAthletes.map((athlete, index) => {
-              const descriptor = buildCategoryDescriptor(athlete);
-              const categoryLabel = translateCompositeLabel(
-                descriptor?.label || [athlete.faixa, athlete.peso].filter(Boolean).join(' • '),
-                uiLanguage
-              );
-              const medal = getMedal(index);
-              const progressPct = Math.round((athlete.pontos / maxPoints) * 100);
+            <div className="home-ranking-list">
+              {topAthletes.length ? (
+                topAthletes.map((athlete, index) => {
+                  const descriptor = buildCategoryDescriptor(athlete);
+                  const categoryLabel = translateCompositeLabel(
+                    descriptor?.label || [athlete.faixa, athlete.peso].filter(Boolean).join(' • '),
+                    uiLanguage
+                  );
+                  const medal = getMedal(index);
+                  const progressPct = Math.round((athlete.pontos / maxPoints) * 100);
 
-              return (
-                <div className={`home-rank-row ${index < 3 ? 'home-rank-row--podium' : ''}`} key={athlete.id}>
-                  {/* Position */}
-                  <div className="home-rank-pos">
-                    {medal ? (
-                      <span className="home-rank-medal">{medal}</span>
-                    ) : (
-                      <span className="home-rank-number">{index + 1}</span>
-                    )}
-                  </div>
+                  return (
+                    <div className={`home-rank-row ${index < 3 ? 'home-rank-row--podium' : ''}`} key={athlete.id || index}>
+                      <div className="home-rank-pos">
+                        {medal ? (
+                          <span className="home-rank-medal">{medal}</span>
+                        ) : (
+                          <span className="home-rank-number">{index + 1}</span>
+                        )}
+                      </div>
 
-                  {/* Avatar */}
-                  <div
-                    className="home-rank-avatar"
-                    style={{ background: avatarGradients[index % avatarGradients.length] }}
-                  >
-                    {athlete.photoUrl ? (
-                      <img src={athlete.photoUrl} alt={athlete.nome} />
-                    ) : (
-                      <span>{getInitials(athlete.nome)}</span>
-                    )}
-                  </div>
+                      <div
+                        className="home-rank-avatar"
+                        style={{ background: avatarGradients[index % avatarGradients.length] }}
+                      >
+                        {athlete.photoUrl ? (
+                          <img src={athlete.photoUrl} alt={athlete.nome} />
+                        ) : (
+                          <span>{getInitials(athlete.nome)}</span>
+                        )}
+                      </div>
 
-                  {/* Info + progress */}
-                  <div className="home-rank-info">
-                    <div className="home-rank-name">{athlete.nome || copy.athleteFallback}</div>
-                    <div className="home-rank-meta">{athlete.academia || copy.academyFallback}{categoryLabel ? ` • ${categoryLabel}` : ''}</div>
-                    <div className="home-rank-progress">
-                      <div className="home-rank-progress-bar" style={{ width: `${progressPct}%` }} />
+                      <div className="home-rank-info">
+                        <div className="home-rank-name">{athlete.nome || copy.athleteFallback}</div>
+                        <div className="home-rank-meta">{athlete.academia || copy.academyFallback}{categoryLabel ? ` • ${categoryLabel}` : ''}</div>
+                        <div className="home-rank-progress">
+                          <div className="home-rank-progress-bar" style={{ width: `${progressPct}%` }} />
+                        </div>
+                      </div>
+
+                      <div className="home-rank-score">
+                        <span className="home-rank-pts">{athlete.pontos}</span>
+                        <span className="home-rank-pts-label">{copy.pointsSuffix}</span>
+                      </div>
                     </div>
-                  </div>
+                  );
+                })
+              ) : (
+                <div className="home-empty">{copy.emptyAthletes}</div>
+              )}
+            </div>
+          </div>
 
-                  {/* Score */}
-                  <div className="home-rank-score">
-                    <span className="home-rank-pts">{athlete.pontos}</span>
-                    <span className="home-rank-pts-label">{copy.pointsSuffix}</span>
-                  </div>
-                </div>
-              );
-            })
-          ) : (
-            <div className="home-empty">{copy.emptyAthletes}</div>
-          )}
+          {/* COLUMN 2: TOP ACADEMIES */}
+          <div className="home-ranking-col">
+            <div className="home-section__header">
+              <div>
+                <span className="home-kicker">TOP 5</span>
+                <h2 className="home-section__title">{copy.topAcademiesTitle}</h2>
+              </div>
+            </div>
+
+            <div className="home-ranking-list">
+              {topAcademies.length ? (
+                topAcademies.map((academy, index) => {
+                  const medal = getMedal(index);
+                  const maxAcademyPoints = topAcademies[0]?.pontos || 1;
+                  const progressPct = Math.round((academy.pontos / maxAcademyPoints) * 100);
+
+                  return (
+                    <div className={`home-rank-row home-academy-row ${index < 3 ? 'home-rank-row--podium' : ''}`} key={academy.name || index}>
+                      <div className="home-rank-pos">
+                        {medal ? (
+                          <span className="home-rank-medal">{medal}</span>
+                        ) : (
+                          <span className="home-rank-number">{index + 1}</span>
+                        )}
+                      </div>
+
+                      <div
+                        className="home-rank-avatar home-academy-avatar"
+                      >
+                        {academy.logoUrl ? (
+                          <img src={academy.logoUrl} alt={academy.name} />
+                        ) : (
+                          <Shield size={24} color="#fff" />
+                        )}
+                      </div>
+
+                      <div className="home-rank-info">
+                        <div className="home-rank-name">{academy.name}</div>
+                        <div className="home-rank-meta">Academia / Equipe</div>
+                        <div className="home-rank-progress">
+                          <div className="home-rank-progress-bar" style={{ width: `${progressPct}%` }} />
+                        </div>
+                      </div>
+
+                      <div className="home-rank-score">
+                        <span className="home-rank-pts">{academy.pontos}</span>
+                        <span className="home-rank-pts-label">{copy.pointsSuffix}</span>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="home-empty">Sem dados de equipes</div>
+              )}
+            </div>
+          </div>
+
         </div>
       </section>
 
-
       <FilmmakerShowcase />
+
+      {/* News Modal */}
+      {selectedNews && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }} onClick={() => setSelectedNews(null)}>
+          <div style={{ backgroundColor: '#09090b', borderRadius: '16px', width: '100%', maxWidth: '700px', border: '1px solid #27272a', boxShadow: '0 0 40px rgba(59, 130, 246, 0.1), 0 0 0 1px rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', maxHeight: '90vh', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+            <div style={{ position: 'relative' }}>
+              {selectedNews.imageUrl ? (
+                <img src={selectedNews.imageUrl} alt={selectedNews.title} style={{ width: '100%', height: '300px', objectFit: 'cover', display: 'block' }} />
+              ) : (
+                <div style={{ width: '100%', height: '200px', backgroundColor: '#18181b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3f3f46' }}>
+                  <Newspaper size={64} />
+                </div>
+              )}
+              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(9,9,11,0) 50%, rgba(9,9,11,1) 100%)' }} />
+              <button onClick={() => setSelectedNews(null)} style={{ position: 'absolute', top: '24px', right: '24px', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', cursor: 'pointer', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', zIndex: 10 }}>
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div style={{ padding: '32px', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                <span style={{ backgroundColor: '#2563eb', color: 'white', padding: '4px 10px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                  Notícias
+                </span>
+                <span style={{ color: '#a1a1aa', fontSize: '0.85rem' }}>
+                  {formatDate(selectedNews.publishedAt || selectedNews.createdAt, locale, copy.fallbackDate)}
+                </span>
+              </div>
+              <h2 style={{ color: '#fff', fontSize: '1.8rem', fontWeight: 800, lineHeight: 1.2, marginBottom: '24px', letterSpacing: '-0.02em' }}>
+                {selectedNews.title}
+              </h2>
+              <div style={{ color: '#d4d4d8', fontSize: '1.05rem', lineHeight: 1.7, whiteSpace: 'pre-line' }}>
+                {selectedNews.body || selectedNews.summary || 'Conteúdo da notícia indisponível.'}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
