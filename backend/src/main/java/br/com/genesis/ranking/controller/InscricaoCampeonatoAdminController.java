@@ -18,13 +18,16 @@ import br.com.genesis.ranking.dto.RegistrationDetailsUpdateRequest;
 @RequestMapping("/api/admin/registrations")
 @Validated
 @PreAuthorize("hasRole('ADMIN')")
-public class AdminRegistrationController {
+// Controlador de Administração de Inscrições de Campeonato
+// Este controlador gerencia as inscrições dos atletas (ex: atualizar status, pagamentos) por parte do admin.
+public class InscricaoCampeonatoAdminController {
   private final PublicRegistrationService registrationService;
 
-  public AdminRegistrationController(PublicRegistrationService registrationService) {
+  public InscricaoCampeonatoAdminController(PublicRegistrationService registrationService) {
     this.registrationService = registrationService;
   }
 
+  // Atualiza o status de pagamento de uma inscrição (ex: marcar como pago)
   @PatchMapping("/{registrationId}/payment")
   public PublicRegistrationResponse updatePaymentStatus(
       @PathVariable String registrationId,
@@ -33,6 +36,7 @@ public class AdminRegistrationController {
     return registrationService.updatePaymentStatus(registrationId, request);
   }
 
+  // Atualiza os detalhes de uma inscrição (ex: mudança de categoria, peso, faixa)
   @PatchMapping("/{registrationId}/details")
   public PublicRegistrationResponse updateRegistrationDetails(
       @PathVariable String registrationId,

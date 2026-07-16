@@ -760,7 +760,9 @@ const toMemberProfileFromRegistration = (registration, currentUser) => {
     };
 };
 
-const Dashboard = () => {
+// ─── Componente Principal do Painel de Controle ────────────────────────────────
+// Este componente centraliza a gestão de eventos, inscrições, equipes e atletas.
+const PainelDeControle = () => {
     const {
         athletes,
         addAthlete,
@@ -9110,7 +9112,7 @@ const Dashboard = () => {
     );
 };
 
-export default Dashboard;
+export default PainelDeControle;
 
 
 

@@ -10,8 +10,8 @@ import { generateFilteredRankingPDF } from '../services/pdfService';
 import { buildFileSafeName, downloadCsv } from '../services/exportService';
 import { translateBelt, translateCompositeLabel, translateWeight } from '../utils/localeLabels';
 import { countryCodeFromAthlete, countryLabelFromAthlete, countryLabelFromCode, flagFromCountryCode } from '../utils/countryFlags';
-import './RankingV2.css';
-import './RankingAjp.css';
+import './RankGeralV2.css';
+import './RankGeralAjp.css';
 
 const DEFAULT_GROUP_LIMIT = 8;
 const GROUP_PAGE_SIZE = 10;
@@ -94,7 +94,9 @@ const photoUrlFromAthlete = (athlete) => (
     || ''
 );
 
-const Ranking = () => {
+// Página de Rank Geral
+// Componente responsável por exibir a classificação geral dos atletas.
+const RankGeral = () => {
     const { athletes, events, activeEventId, memberProfiles, currentUser } = useStore();
     const { uiLanguage } = useI18n();
     const isEnglish = uiLanguage === 'en-US';
@@ -1105,4 +1107,4 @@ const Ranking = () => {
     );
 };
 
-export default Ranking;
+export default RankGeral;

@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Trophy } from 'lucide-react';
-import './RankingCard.css';
+import './CardRank.css';
 
-const RankingCard = ({ athlete, rank, photoUrl, flagIcon, pointsLabel, winsLabel, lossesLabel, wins, losses }) => {
+// Componente de Cartão de Rank
+// Exibe a foto, nome, posição e estatísticas de um atleta específico no ranking.
+const CardRank = ({ athlete, rank, photoUrl, flagIcon, pointsLabel, winsLabel, lossesLabel, wins, losses }) => {
     const [brightness, setBrightness] = useState(1);
 
     const handleSliderChange = (e) => {
@@ -70,4 +72,4 @@ const RankingCard = ({ athlete, rank, photoUrl, flagIcon, pointsLabel, winsLabel
     );
 };
 
-export default RankingCard;
+export default CardRank;

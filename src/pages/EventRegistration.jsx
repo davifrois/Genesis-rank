@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useStore } from '../hooks/useStore';
-import TournamentRegistrationFlow from '../components/TournamentRegistrationFlow';
+import InscricaoCampeonatoFluxo from '../components/InscricaoCampeonatoFluxo';
 import { resolveEventLifecycle } from '../utils/eventLifecycle';
 import { publicRegistrationService } from '../services/publicRegistrationService';
 
@@ -67,7 +67,7 @@ const EventRegistration = () => {
 
   return (
     <div className="container--event-pro">
-      <TournamentRegistrationFlow
+      <InscricaoCampeonatoFluxo
         event={event}
         onComplete={() => {
           console.log('Inscricao finalizada com sucesso!');

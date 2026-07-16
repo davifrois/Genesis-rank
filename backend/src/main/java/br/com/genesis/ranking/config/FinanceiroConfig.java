@@ -6,7 +6,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-public class StripeConfig {
+// Configuração Financeira
+// Configura as chaves e a integração inicial com os provedores de pagamento (como o Stripe).
+public class FinanceiroConfig {
 
     @Value("${app.stripe.api-key:sk_test_placeholder}")
     private String stripeApiKey;

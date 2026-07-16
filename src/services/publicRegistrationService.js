@@ -480,9 +480,18 @@ export const publicRegistrationService = {
     }
   },
 
+  // ========================================== //
+  // TODO: DEV STRIPE - CHAMADA DE CHECKOUT 
+  // ========================================== //
+  // Caro desenvolvedor, esta função é chamada pelo botão "Pagar Inscrição via Stripe".
+  // Ela faz um POST para o seu backend Java enviando os IDs das inscrições geradas, 
+  // o nome do atleta e o valor total (amount).
+  // O backend (no FinanceiroController) irá retornar um JSON no formato { "url": "https://checkout.stripe.com/..." }.
+  // Você não precisa mexer nesta função se não quiser alterar a estrutura, pois ela já repassa tudo para o backend.
   createCheckoutSession: async ({ registrationIds, athleteName, amount }) => {
     try {
-      const response = await fetch(buildApiUrl('/api/public/checkout'), {
+      // Modificamos a rota para apontar para o FinanceiroController
+      const response = await fetch(buildApiUrl('/api/webhooks/payment/checkout'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

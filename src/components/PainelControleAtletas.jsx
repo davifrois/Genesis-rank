@@ -7,7 +7,7 @@ import {
     RotateCcw, Trash2, Filter, Settings
 } from 'lucide-react';
 import AthleteCheckinModal from './AthleteCheckinModal';
-import './AdminAthleteManager.css';
+import './PainelControleAtletas.css';
 
 // ─── Toast interno ────────────────────────────────────────────────
 let _setToast = null;
@@ -108,7 +108,9 @@ function InlineCell({ value, onSave, type = 'text', options = [], placeholder = 
 }
 
 // ─── Componente principal ──────────────────────────────────────────
-export default function AdminAthleteManager() {
+// Este componente é o painel de controle principal para gerenciar os atletas.
+// Ele permite buscar, filtrar, realizar pesagem rápida e editar informações de atletas inscritos.
+export default function PainelControleAtletas() {
     const {
         athletes,
         events,
@@ -270,12 +272,14 @@ export default function AdminAthleteManager() {
     };
 
     // ─── Pesagem ─────────────────────────────────────────────────
+    // Aprova a pesagem do atleta (status passa para OK)
     const handleWeighOk = (id) => {
         saveField(id, 'pesoOk', true);
         toast('PESO OK ✓', 'success');
         setWeightSuggest(null);
     };
 
+    // Reprova a pesagem do atleta (status falhou, atleta desclassificado do peso)
     const handleWeighFail = (athlete) => {
         saveField(athlete.id, 'pesoOk', false);
         // Sugerir categorias de peso acima
@@ -323,6 +327,7 @@ export default function AdminAthleteManager() {
     };
 
     // ─── Remove ───────────────────────────────────────────────────
+    // Remove/Deleta a inscrição do atleta do sistema
     const handleRemove = (athlete) => {
         if (!window.confirm(`Remover "${athlete.nome}" permanentemente? Isso apagará todos os dados.`)) return;
         removeAthlete(athlete.id);

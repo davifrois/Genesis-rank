@@ -25,32 +25,38 @@ import jakarta.validation.Valid;
 @RestController
 @RequestMapping("/api/events")
 @Validated
-public class EventController {
+// Controlador de Criação de Eventos
+// Este controlador gerencia as requisições HTTP para listar, criar, editar e excluir eventos.
+public class CriacaoEventoController {
   private final EventService eventService;
   private final BracketService bracketService;
 
-  public EventController(EventService eventService, BracketService bracketService) {
+  public CriacaoEventoController(EventService eventService, BracketService bracketService) {
     this.eventService = eventService;
     this.bracketService = bracketService;
   }
 
+  // Lista todos os eventos cadastrados no sistema
   @GetMapping
   public List<EventResponse> listEvents() {
     return eventService.listAll();
   }
 
+  // Cria um novo evento recebendo os dados via requisição
   @PostMapping
   @PreAuthorize("hasRole('ADMIN')")
   public EventResponse createEvent(@Valid @RequestBody EventRequest request) {
     return eventService.create(request);
   }
 
+  // Atualiza os dados de um evento existente com base no seu ID
   @PutMapping("/{id}")
   @PreAuthorize("hasRole('ADMIN')")
   public EventResponse updateEvent(@PathVariable String id, @Valid @RequestBody EventRequest request) {
     return eventService.update(id, request);
   }
 
+  // Exclui/deleta um evento do sistema com base no seu ID
   @DeleteMapping("/{id}")
   @PreAuthorize("hasRole('ADMIN')")
   public void deleteEvent(@PathVariable String id) {

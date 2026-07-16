@@ -45,7 +45,9 @@ const detectMode = (athlete) => (
   athlete?.isNoGi ? 'NO-GI' : 'GI'
 );
 
-const TeamRanking = () => {
+// Página de Ranking de Equipes
+// Este componente exibe o ranking focado em academias/equipes.
+const RankEquipes = () => {
   const { athletes, events, activeEventId } = useStore();
   const { uiLanguage } = useI18n();
   const isEnglish = uiLanguage === 'en-US';
@@ -575,6 +577,6 @@ const TeamRanking = () => {
   );
 };
 
-export default TeamRanking;
+export default RankEquipes;
 
 

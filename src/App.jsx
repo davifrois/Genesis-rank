@@ -26,7 +26,7 @@ import About from './pages/About';
 import Athletes from './pages/Athletes';
 import Teams from './pages/Teams';
 import TeamProfile from './pages/TeamProfile';
-import Dashboard from './pages/Dashboard';
+import PainelDeControle from './pages/PainelDeControle';
 import Events from './pages/Events';
 import EventDetails from './pages/EventDetails';
 import EventReports from './pages/EventReports';
@@ -37,8 +37,8 @@ import News from './pages/News';
 import Organizers from './pages/Organizers';
 import PublicProfile from './pages/PublicProfile';
 import Regulations from './pages/Regulations';
-import Ranking from './pages/Ranking';
-import TeamRanking from './pages/TeamRanking';
+import RankGeral from './pages/RankGeral';
+import RankEquipes from './pages/RankEquipes';
 import EventRegistration from './pages/EventRegistration';
 import SettingsPage from './pages/Settings';
 import AcademyRegistration from './pages/AcademyRegistration';
@@ -1608,7 +1608,7 @@ const AppLayout = () => {
                 
                 <Route
                   path="/admin/*"
-                  element={canAccessDashboard ? <Dashboard /> : <Navigate to="/ranking" replace />}
+                  element={canAccessDashboard ? <PainelDeControle /> : <Navigate to="/ranking" replace />}
                 />
                 <Route path="/institucional" element={<About />} />
                 <Route path="/organizadores" element={<Organizers />} />
@@ -1618,8 +1618,8 @@ const AppLayout = () => {
                 <Route path="/eventos/:eventId/inscricao" element={<EventRegistration />} />
                 <Route path="/perfil-publico" element={<PublicProfile />} />
                 <Route path="/perfil-publico/:athleteId" element={<PublicProfile />} />
-                <Route path="/ranking" element={<Ranking />} />
-                <Route path="/ranking-equipes" element={<TeamRanking />} />
+                <Route path="/ranking" element={<RankGeral />} />
+                <Route path="/ranking-equipes" element={<RankEquipes />} />
                 <Route path="/atletas" element={<Athletes />} />
                 <Route path="/equipes" element={<Teams />} />
                 <Route path="/equipe/:academyId" element={<TeamProfile />} />
