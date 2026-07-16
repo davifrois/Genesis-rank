@@ -74,6 +74,10 @@ const NEWS_IMAGE_MIN_QUALITY = 0.5;
 const NEWS_IMAGE_MAX_ATTEMPTS = 8;
 
 const createEventEditFormState = () => ({
+    // ========================================== //
+    //  GESTÃO DE CAMPEONATOS E EVENTOS (ADMIN)   //
+    // ========================================== //
+    // Estado inicial para o formulário de criação/edição de eventos pelo Organizador.
     id: '',
     name: '',
     date: '',
@@ -127,6 +131,10 @@ const normalizeAdminPath = (pathname) => {
     return normalized || '/admin';
 };
 
+// ========================================== //
+//  SISTEMA DE NAVEGAÇÃO DO PAINEL ADMIN      //
+// ========================================== //
+// Define as rotas internas para Gestão de Inscrições, Financeiro, Chaveamento, etc.
 const ADMIN_SECTION_ROUTES = {
     overview: '/admin/visao-geral',
     events: '/admin/eventos',

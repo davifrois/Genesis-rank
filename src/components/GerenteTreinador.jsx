@@ -462,7 +462,11 @@ const AtletaRow = ({ atleta, selecionado, onToggle, onCategoria, onCheckin, onVa
   );
 };
 
-// ─── Modal de Checkout PIX ─────────────────────────────────────────────
+// ========================================== //
+//  MODAL DE CHECKOUT PIX E COMPROVANTE       //
+// ========================================== //
+// Este componente lida com a geração do pagamento (QR Code Pix)
+// para a equipe toda em lote.
 const PixCheckoutModal = ({ onConfirm, onCancel, total, isLoading, error }) => {
   const [proofFile, setProofFile] = useState(null);
   const [proofError, setProofError] = useState('');

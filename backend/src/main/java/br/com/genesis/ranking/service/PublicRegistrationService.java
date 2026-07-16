@@ -228,6 +228,12 @@ public class PublicRegistrationService {
     return toResponse(saved, athleteId);
   }
 
+  public EventRegistration getRegistrationById(String registrationId) {
+    String normalizedRegistrationId = clean(registrationId);
+    if (normalizedRegistrationId.isBlank()) return null;
+    return registrationRepository.findById(normalizedRegistrationId).orElse(null);
+  }
+
   public EventRegistration approveRegistration(String registrationId, String transactionId) {
     String normalizedRegistrationId = clean(registrationId);
     if (normalizedRegistrationId.isBlank()) {

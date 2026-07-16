@@ -92,7 +92,7 @@ const avatarGradients = [
 ];
 
 const Home = () => {
-  const { athletes, events, news, academies } = useStore();
+  const { athletes, events, news, academies, favoriteEvents = [] } = useStore();
   const { locale, uiLanguage, uiVariant } = useI18n();
   const statsRef = useRef(null);
   const [statsVisible, setStatsVisible] = useState(false);
@@ -420,19 +420,43 @@ const Home = () => {
 
   const featuredEvents = useMemo(() => {
     if (!events.length) return [];
-    const now = new Date().getTime();
+    
     return [...events]
       .map((event) => ({
         ...event,
         parsedDate: parseDate(event.date)
       }))
       .filter((event) => {
-        const time = event.parsedDate ? event.parsedDate.getTime() : 0;
+        // Exclude explicitly closed events
+        if (event.registrationOpen === false) return false;
+        
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        return time === 0 || time >= today.getTime();
+        
+        // Exclude past events
+        const isPastDate = event.parsedDate && event.parsedDate.getTime() < today.getTime();
+        if (isPastDate) return false;
+        
+        // Exclude events past their registration close date
+        let isRegistrationClosedByDate = false;
+        if (event.registrationCloseDate) {
+          const closeDate = new Date(event.registrationCloseDate);
+          if (!isNaN(closeDate.getTime())) {
+            closeDate.setHours(23, 59, 59, 999);
+            if (new Date() > closeDate) {
+              isRegistrationClosedByDate = true;
+            }
+          }
+        }
+        if (isRegistrationClosedByDate) return false;
+        
+        return true;
       })
       .sort((a, b) => {
+        const aFav = favoriteEvents.includes(a.id) ? 1 : 0;
+        const bFav = favoriteEvents.includes(b.id) ? 1 : 0;
+        if (aFav !== bFav) return bFav - aFav; // Favoritados primeiro
+
         const aTime = a.parsedDate ? a.parsedDate.getTime() : 0;
         const bTime = b.parsedDate ? b.parsedDate.getTime() : 0;
         if (aTime && bTime) return aTime - bTime;
@@ -440,7 +464,7 @@ const Home = () => {
         if (bTime) return 1;
         return a.name.localeCompare(b.name);
       });
-  }, [events]);
+  }, [events, favoriteEvents]);
 
   const latestNews = useMemo(() => (
     [...news]

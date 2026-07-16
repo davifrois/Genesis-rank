@@ -105,7 +105,12 @@ const normalizePayload = (payload = {}) => ({
   publishedAt: (payload.publishedAt || '').toString().trim() || null
 });
 
+// ========================================== //
+//  SERVIÇO DE ADMINISTRAÇÃO DE EVENTOS       //
+// ========================================== //
+// Funções para criar e atualizar eventos no backend (apenas para Organizadores).
 export const eventAdminService = {
+  // Cria um novo evento/campeonato chamando a API
   createEvent: async (payload) => {
     let { headers, token } = await buildAuthHeaders();
     if (!token) {

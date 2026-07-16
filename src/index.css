@@ -4306,12 +4306,12 @@ select {
 
 .login-card {
   width: min(440px, 100%);
-  background: rgba(17, 24, 39, 0.75);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  background: rgba(10, 14, 23, 0.85);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
   border-radius: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 40px rgba(59, 130, 246, 0.1), 0 25px 50px -12px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   padding: 2.5rem 2.2rem;
   position: relative;
   overflow: hidden;

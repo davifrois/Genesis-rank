@@ -1,5 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Image, Lock, Save, ShieldCheck, UserRound } from 'lucide-react';
+import { 
+  User, Mail, Phone, MapPin, Building2, Medal, 
+  Calendar, Info, AlertTriangle, CheckCircle, 
+  Settings as SettingsIcon, LogOut, Camera, Share2, Copy, Trash2, Lock, Image, Save, UserRound, ScanLine, Trophy
+} from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
+import AthleteDigitalCard from '../components/AthleteDigitalCard';
+import { z } from 'zod';
 import { Link, useNavigate } from 'react-router-dom';
 import LoginOverlay from '../components/LoginOverlay';
 import AcademySelect from '../components/AcademySelect';
@@ -55,18 +62,23 @@ const createForm = () => ({
   beltHistory: ''
 });
 
+const profileSchema = z.object({
+  firstName: z.string().trim().min(1, 'Informe o primeiro nome.'),
+  lastName: z.string().trim().min(1, 'Informe o sobrenome.'),
+  email: z.string().trim().email('Informe um e-mail válido.'),
+  gender: z.string().min(1, 'Selecione o gênero.'),
+  academyId: z.string().min(1, 'Selecione a academia.')
+});
+
 const fileToDataUrl = (file) => compressImage(file, 800, 800, 0.7);
 
-const copyTextToClipboard = async (value) => {
-  const text = (value || '').toString();
-  if (!text.trim()) return false;
-
-  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+const copyTextToClipboard = async (text) => {
+  if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
     try {
       await navigator.clipboard.writeText(text);
       return true;
-    } catch {
-      // Fallback below
+    } catch (e) {
+      // Fallback
     }
   }
 
@@ -82,7 +94,7 @@ const copyTextToClipboard = async (value) => {
     const success = document.execCommand('copy');
     document.body.removeChild(textarea);
     return success;
-  } catch {
+  } catch (e) {
     return false;
   }
 };
@@ -166,6 +178,8 @@ const Settings = () => {
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState('');
   const [passwordLoading, setPasswordLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showDigitalCard, setShowDigitalCard] = useState(false);
 
   const currentProfile = useMemo(() => {
     if (!currentUser) return null;
@@ -177,7 +191,7 @@ const Settings = () => {
     const compactUserName = compactLookup(currentUser.name || '');
     const compactUsername = compactLookup(currentUser.username || '');
 
-    const scoredMatches = memberProfiles.map((profile) => {
+    const scoredMatches = (memberProfiles || []).map((profile) => {
       const profileFullName = normalizeLookup(profile.fullName || '');
       const profileCompactName = compactLookup(profile.fullName || '');
       const profileEmail = normalizeLookup(profile.email || '');
@@ -243,7 +257,7 @@ const Settings = () => {
   const resolvedProfileAcademyId = useMemo(() => {
     if (!currentProfile) return '';
     if (currentProfile.academyId) return currentProfile.academyId;
-    const match = academies.find((academy) => (
+    const match = (academies || []).find((academy) => (
       normalizeLookup(academy.name) === normalizeLookup(currentProfile.academyName || '')
     ));
     return match?.id || '';
@@ -285,6 +299,18 @@ const Settings = () => {
 
   const age = useMemo(() => calculateAgeFromBirthDate(form.birthDate), [form.birthDate]);
 
+  const recommendedEvents = useMemo(() => {
+    const now = new Date();
+    return (events || []).filter(e => {
+      if (e.status === 'completed' || e.status === 'past') return false;
+      if (e.date) {
+        const eventDate = new Date(e.date);
+        if (!isNaN(eventDate) && eventDate < now) return false;
+      }
+      return true;
+    }).slice(0, 2);
+  }, [events]);
+
   useEffect(() => {
     if (form.belt && age !== '') {
       if (!isValidBeltForAge(form.belt, age)) {
@@ -303,7 +329,7 @@ const Settings = () => {
   );
 
   const selectedAcademy = useMemo(
-    () => academies.find((academy) => academy.id === form.academyId) || null,
+    () => (academies || []).find((academy) => academy.id === form.academyId) || null,
     [academies, form.academyId]
   );
 
@@ -425,19 +451,32 @@ const Settings = () => {
     }
   };
 
-  const handleSubmit = (event) => {
+  // ========================================== //
+  //  LÓGICA DE SALVAMENTO DE PERFIL (ATLETA)   //
+  // ========================================== //
+  // Esta função lida com a submissão do formulário de Configurações,
+  // validando e enviando os dados do Atleta para o servidor.
+  const handleSubmit = async (event) => {
     event.preventDefault();
+    if (isSaving) return;
     setError('');
     setSuccess('');
+    setIsSaving(true);
+
+    try {
+      profileSchema.parse(form);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        setIsSaving(false);
+        return setError(err.errors[0].message);
+      }
+      setIsSaving(false);
+      return setError('Erro ao validar os dados do formulário.');
+    }
 
     const firstName = (form.firstName || '').trim();
     const lastName = (form.lastName || '').trim();
     const fullName = buildFullName(firstName, form.middleName, lastName);
-    if (!firstName) return setError('Informe o primeiro nome.');
-    if (!lastName) return setError('Informe o sobrenome.');
-    if (!/\S+@\S+\.\S+/.test((form.email || '').trim())) return setError('Informe um e-mail valido.');
-    if (!form.gender) return setError('Selecione o genero.');
-    if (!form.academyId) return setError('Selecione a academia.');
 
     try {
       addMemberProfile({
@@ -475,6 +514,8 @@ const Settings = () => {
       setSuccess('Perfil do atleta atualizado com sucesso.');
     } catch (submitError) {
       setError(submitError?.message || 'Nao foi possivel atualizar seu perfil.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -607,6 +648,10 @@ const Settings = () => {
 
 
       <section className="profile-settings-layout">
+        {/* ========================================== */}
+        {/*  FORMULÁRIO DE CRIAÇÃO / EDIÇÃO DE PERFIL  */}
+        {/* ========================================== */}
+        {/* Onde o atleta preenche seus dados (faixa, peso, academia) */}
         <form className="profile-settings-main" onSubmit={handleSubmit}>
           <article className="profile-card profile-card--dark">
             <div className="profile-card__header profile-card__header--dark">
@@ -877,9 +922,9 @@ const Settings = () => {
           {success && <div className="profile-success">{success}</div>}
 
           <div className="profile-actions-row">
-            <button type="submit" className="btn btn-primary">
+            <button type="submit" className="btn btn-primary" disabled={isSaving}>
               <Save size={14} />
-              Salvar alteracoes
+              {isSaving ? 'Salvando...' : 'Salvar alteracoes'}
             </button>
             <button type="button" className="btn btn-secondary" onClick={handleReset}>
               <UserRound size={14} />
@@ -914,8 +959,45 @@ const Settings = () => {
                   <strong>{form.email || '-'}</strong>
                 </div>
               </div>
+              <div className="profile-actions-row" style={{ marginTop: '20px' }}>
+                <button type="button" className="btn btn-primary" style={{ width: '100%', background: 'linear-gradient(135deg, #0f172a 0%, #334155 100%)', border: '1px solid #475569', boxShadow: '0 4px 14px rgba(0,0,0,0.4)' }} onClick={() => setShowDigitalCard(true)}>
+                  <ScanLine size={16} />
+                  Gerar Carteirinha Digital
+                </button>
+              </div>
             </div>
           </article>
+
+          {recommendedEvents.length > 0 && (
+            <article className="profile-card profile-card--dark" style={{ border: '1px solid rgba(0, 194, 203, 0.3)', background: 'rgba(0, 194, 203, 0.03)' }}>
+              <div className="profile-card__header profile-card__header--dark" style={{ borderBottom: '1px solid rgba(0, 194, 203, 0.1)' }}>
+                <h2 style={{ color: '#00c2cb', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Trophy size={16} /> Recomendado para Você
+                </h2>
+              </div>
+              <div className="profile-card__body">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {recommendedEvents.map(event => (
+                    <div key={event.id} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '12px', padding: '16px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff', marginBottom: '4px' }}>
+                        {event.name}
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
+                        <MapPin size={12} /> {event.location || event.city || 'Local a definir'}
+                      </div>
+                      <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.8)', marginBottom: '16px', lineHeight: 1.4 }}>
+                        As inscrições para o <strong>{event.name}</strong> estão abertas para a sua categoria 
+                        <span style={{ color: '#00c2cb', fontWeight: 600 }}> ({form.belt || 'Branca'} / {form.weight || 'Absoluto'})</span>.
+                      </div>
+                      <Link to={`/inscricao/${event.id}`} className="btn btn-primary" style={{ width: '100%', padding: '8px', fontSize: '0.9rem' }}>
+                        Inscrever-se Agora
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </article>
+          )}
 
           <article className="profile-card profile-card--dark">
             <div className="profile-card__header profile-card__header--dark">
@@ -976,6 +1058,17 @@ const Settings = () => {
           </article>
         </aside>
       </section>
+
+      <AnimatePresence>
+        {showDigitalCard && (
+          <AthleteDigitalCard 
+            profile={{ ...currentProfile, ...form, fullName: buildFullName(form.firstName, form.middleName, form.lastName) }} 
+            academyName={selectedAcademy?.name} 
+            profileUrl={currentProfile?.id ? `${window.location.origin}/perfil-publico?codigo=${btoa(JSON.stringify({ athleteId: currentProfile.id }))}` : window.location.origin} 
+            onClose={() => setShowDigitalCard(false)} 
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

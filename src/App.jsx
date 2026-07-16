@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
+import { z } from 'zod';
 import {
   AlertCircle,
   ChevronDown,
@@ -44,6 +45,8 @@ import AcademyRegistration from './pages/AcademyRegistration';
 import CoachManagerPage from './pages/CoachManagerPage';
 import Scoreboard from './pages/Scoreboard';
 import ScoreboardDisplay from './pages/ScoreboardDisplay';
+import PaymentSuccess from './pages/PaymentSuccess';
+import PaymentCancel from './pages/PaymentCancel';
 import { useStore } from './hooks/useStore';
 import { useI18n } from './hooks/useI18n';
 import LoginOverlay from './components/LoginOverlay';
@@ -219,6 +222,7 @@ const AppLayout = () => {
 
   const [eventSuccess, setEventSuccess] = useState('');
   const [showLogin, setShowLogin] = useState(false);
+  const [loginInitialMode, setLoginInitialMode] = useState('login');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showMobileUserMenu, setShowMobileUserMenu] = useState(false);
   
@@ -239,20 +243,25 @@ const AppLayout = () => {
     const username = (currentUser.username || '').toLowerCase();
     const currentName = (currentUser.name || '').toLowerCase();
 
-    let best = null;
-    let bestScore = 0;
+    let best = linkedProfiles[0]; // Fallback para o primeiro perfil
+    let bestScore = -1;
 
     linkedProfiles.forEach(p => {
       let score = 0;
-      if ((p.fullName || '').toLowerCase() === currentName) score += 5;
+      const pName = (p.fullName || '').toLowerCase();
+      
+      if (pName === currentName) score += 5;
+      else if (pName.includes(currentName) || currentName.includes(pName)) score += 2;
+      
       if ((p.email || '').toLowerCase() === username) score += 3;
+      
       if (score > bestScore) {
         bestScore = score;
         best = p;
       }
     });
 
-    return bestScore > 0 ? best : null;
+    return best;
   }, [currentUser, linkedProfiles]);
 
   const otherProfiles = useMemo(() => {
@@ -920,10 +929,28 @@ const AppLayout = () => {
     });
   };
 
+  const eventSchema = z.object({
+    name: z.string().trim().min(1, 'O nome do evento é obrigatório.'),
+    date: z.string().trim().min(1, 'A data do evento é obrigatória.'),
+    location: z.string().trim().min(1, 'O local do evento é obrigatório.')
+  });
+
   const handleCreateEvent = async (event) => {
     event.preventDefault();
     setEventError('');
     setEventSuccess('');
+    
+    // Prevent double submit (assuming there's a saving state or we can just return early if already in progress)
+    if (document.getElementById('save-event-button')?.disabled) return;
+
+    try {
+      eventSchema.parse(eventForm);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return setEventError(err.errors[0].message);
+      }
+      return setEventError('Erro ao validar os dados do evento.');
+    }
 
     try {
       const savedEvent = await addEvent(eventForm);
@@ -1108,8 +1135,8 @@ const AppLayout = () => {
         { label: copy.accountMenu.logout, onClick: logout, icon: LogOut }
       ]
     : [
-        { label: copy.accountMenu.login, onClick: () => setShowLogin(true), icon: LogIn },
-        { label: copy.accountMenu.register, path: '/filiacao', icon: User }
+        { label: copy.accountMenu.login, onClick: () => { setLoginInitialMode('login'); setShowLogin(true); }, icon: LogIn },
+        { label: copy.accountMenu.register, onClick: () => { setLoginInitialMode('register'); setShowLogin(true); }, icon: User }
       ];
 
   const renderAccountItem = (item) => {
@@ -1410,7 +1437,7 @@ const AppLayout = () => {
               <button
                 type="button"
                 className="mobile-user-toggle"
-                onClick={() => setShowLogin(true)}
+                onClick={() => { setLoginInitialMode('login'); setShowLogin(true); }}
               >
                 <LogIn size={20} />
               </button>
@@ -1578,6 +1605,7 @@ const AppLayout = () => {
                 <Route path="/" element={<Home />} />
                 <Route path="/placar" element={<Scoreboard />} />
                 <Route path="/placar/display" element={<ScoreboardDisplay />} />
+                
                 <Route
                   path="/admin/*"
                   element={canAccessDashboard ? <Dashboard /> : <Navigate to="/ranking" replace />}
@@ -1603,6 +1631,8 @@ const AppLayout = () => {
                 <Route path="/configuracoes" element={<SettingsPage />} />
                 <Route path="/regulamento" element={<Regulations />} />
                 <Route path="/noticias" element={<News />} />
+                <Route path="/payment/success" element={<PaymentSuccess />} />
+                <Route path="/payment/cancel" element={<PaymentCancel />} />
               </Routes>
             </motion.div>
           </AnimatePresence>
@@ -1695,7 +1725,7 @@ const AppLayout = () => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <LoginOverlay onClose={() => setShowLogin(false)} onSuccess={() => setShowLogin(false)} />
+            <LoginOverlay initialMode={loginInitialMode} onClose={() => setShowLogin(false)} onSuccess={() => setShowLogin(false)} />
           </motion.div>
         )}
       </AnimatePresence>

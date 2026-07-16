@@ -17,6 +17,7 @@
     "dompurify": "^3.4.7",
     "express": "^5.2.1",
     "framer-motion": "^12.23.26",
+    "html2canvas": "^1.4.1",
     "jspdf": "^3.0.4",
     "jspdf-autotable": "^5.0.2",
     "localforage": "^1.10.0",

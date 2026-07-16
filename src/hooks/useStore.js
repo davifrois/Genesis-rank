@@ -9,6 +9,12 @@ import { nextPowerOfTwo, shuffleList } from "/src/services/bracketService.js";
 import { normalizeEventFees, resolveEventPixKey } from "/src/utils/eventPricing.js";
 import { formatBrazilPhone } from "/src/utils/phone.js";
 
+// ========================================== //
+//  GERENCIAMENTO GLOBAL DE ESTADO (CACHE)    //
+// ========================================== //
+// Este hook gerencia todo o estado "Global" offline-first do app
+// utilizando LocalForage, garantindo persistência mesmo se o 
+// navegador for fechado.
 const STORAGE_KEY = 'genesis_ranking_data';
 const STORAGE_BACKUP_KEY = 'genesis_ranking_data_backup_v1';
 const LEGACY_STORAGE_KEYS = [
@@ -228,6 +234,8 @@ const initialData = {
     brackets: [],
     nextBracketNumber: 1,
     currentUser: null,
+    favoriteEvents: [],
+    subscribedEvents: [],
 };
 
 const sanitizeHistoryItem = (item) => {
@@ -2338,6 +2346,32 @@ const useStoreState = (loadedState) => {
 
     const clearEventResults = () => setEventResults([]);
 
+    const toggleFavoriteEvent = (eventId) => {
+        setData(prev => {
+            const currentFavorites = prev.favoriteEvents || [];
+            const isFavorited = currentFavorites.includes(eventId);
+            return {
+                ...prev,
+                favoriteEvents: isFavorited
+                    ? currentFavorites.filter(id => id !== eventId)
+                    : [...currentFavorites, eventId]
+            };
+        });
+    };
+
+    const toggleEventSubscription = (eventId) => {
+        setData(prev => {
+            const currentSubs = prev.subscribedEvents || [];
+            const isSubscribed = currentSubs.includes(eventId);
+            return {
+                ...prev,
+                subscribedEvents: isSubscribed
+                    ? currentSubs.filter(id => id !== eventId)
+                    : [...currentSubs, eventId]
+            };
+        });
+    };
+
     return {
         athletes: data.athletes,
         events: data.events,
@@ -2384,7 +2418,11 @@ const useStoreState = (loadedState) => {
         importAthletes,
         addLog,
         clearNotifications,
-        clearEventResults
+        clearEventResults,
+        favoriteEvents: data.favoriteEvents || [],
+        subscribedEvents: data.subscribedEvents || [],
+        toggleFavoriteEvent,
+        toggleEventSubscription
     };
 };
 

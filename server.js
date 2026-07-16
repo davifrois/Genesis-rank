@@ -19,7 +19,7 @@ const usersPath = path.join(__dirname, 'users.json');
 // Default initial state
 const defaultUsers = [
     { username: 'simone', password: 'simone123', name: 'Simone', role: 'admin' },
-    { username: 'davifrois', password: 'davifrois324@', name: 'Davi oliveira frois', role: 'admin' },
+    { username: 'davifrois', password: 'Davifrois324@', name: 'Davi oliveira frois', role: 'admin' },
     { username: 'mesario1', password: 'mesario123', name: 'Mesario 1', role: 'mesario' }
 ];
 
@@ -96,6 +96,65 @@ app.post('/api/auth/login', (req, res) => {
         },
         lastLogin: new Date().toISOString()
     });
+});
+
+app.post('/api/auth/reset-password', (req, res) => {
+    const { username, newPassword } = req.body;
+    const users = readUsers();
+    const normalizedUsername = (username || '').toLowerCase().trim();
+    
+    const userIndex = users.findIndex(u => u.username.toLowerCase() === normalizedUsername);
+    if (userIndex === -1) {
+        return res.status(404).json({ message: 'Usuário não encontrado.' });
+    }
+    
+    users[userIndex].password = newPassword;
+    writeUsers(users);
+    
+    res.json({ success: true, message: 'Senha atualizada com sucesso.' });
+});
+
+app.post('/api/events', (req, res) => {
+    const event = req.body;
+    const db = readDb();
+    
+    if (!event.name) {
+        return res.status(400).json({ message: 'Nome do evento é obrigatório.' });
+    }
+    
+    const existing = db.events.find(e => e.name.toLowerCase() === event.name.toLowerCase());
+    if (existing) {
+        return res.status(400).json({ message: 'Já existe um evento com este nome.' });
+    }
+    
+    if (!event.id) event.id = Date.now().toString();
+    db.events.push(event);
+    writeDb(db);
+    
+    res.json(event);
+});
+
+app.put('/api/events/:eventId', (req, res) => {
+    const { eventId } = req.params;
+    const updates = req.body;
+    const db = readDb();
+    
+    const index = db.events.findIndex(e => e.id === eventId);
+    if (index === -1) {
+        return res.status(404).json({ message: 'Evento não encontrado.' });
+    }
+    
+    if (updates.name && updates.name.toLowerCase() !== db.events[index].name.toLowerCase()) {
+        const existing = db.events.find(e => e.name.toLowerCase() === updates.name.toLowerCase() && e.id !== eventId);
+        if (existing) {
+            return res.status(400).json({ message: 'Já existe um evento com este nome.' });
+        }
+    }
+    
+    db.events[index] = { ...db.events[index], ...updates };
+    writeDb(db);
+    
+    res.json(db.events[index]);
 });
 
 app.get('/api/admin/users', (req, res) => {

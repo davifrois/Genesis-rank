@@ -2,10 +2,14 @@ package br.com.genesis.ranking.controller;
 
 import br.com.genesis.ranking.model.EventRegistration;
 import br.com.genesis.ranking.service.PublicRegistrationService;
+import com.stripe.exception.SignatureVerificationException;
+import com.stripe.model.Event;
+import com.stripe.model.checkout.Session;
+import com.stripe.net.Webhook;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/webhooks/payment")
@@ -14,44 +18,55 @@ public class PaymentWebhookController {
 
     private final PublicRegistrationService publicRegistrationService;
 
+    @Value("${app.stripe.webhook-secret:whsec_placeholder}")
+    private String endpointSecret;
+
     public PaymentWebhookController(PublicRegistrationService publicRegistrationService) {
         this.publicRegistrationService = publicRegistrationService;
     }
 
-    /**
-     * Endpoint genérico para receber webhooks de pagamento.
-     * Quando um gateway de pagamento (MercadoPago, Asaas, etc.) confirmar o PIX,
-     * ele fará um POST aqui.
-     */
     @PostMapping
-    public ResponseEntity<String> handlePaymentWebhook(@RequestBody Map<String, Object> payload) {
+    public ResponseEntity<String> handleStripeWebhook(
+            @RequestBody String payload,
+            @RequestHeader("Stripe-Signature") String sigHeader) {
+        
+        Event event;
         try {
-            // Em uma integração real, aqui extraímos o ID da transação e validamos a assinatura do gateway.
-            // Exemplo genérico: o gateway nos manda um campo 'transactionId' e 'status'.
-            String transactionId = payload.containsKey("transactionId") ? payload.get("transactionId").toString() : null;
-            String status = payload.containsKey("status") ? payload.get("status").toString() : null;
-            
-            // Para testes: vamos assumir que passamos o ID da inscrição como 'clientRequestId' ou 'registrationId'
-            String registrationId = payload.containsKey("registrationId") ? payload.get("registrationId").toString() : null;
-
-            if (registrationId != null && "APPROVED".equalsIgnoreCase(status)) {
-                // Atualiza o status da inscrição para confirmado.
-                EventRegistration registration = publicRegistrationService.approveRegistration(registrationId, transactionId);
-                
-                if (registration != null) {
-                    System.out.println("Webhook: Inscrição " + registrationId + " aprovada com sucesso via transação: " + transactionId);
-                } else {
-                    System.err.println("Webhook: Inscrição " + registrationId + " não encontrada para aprovação.");
-                }
-            } else {
-                System.out.println("Webhook: Recebido status '" + status + "' para transação '" + transactionId + "'. Nenhuma ação de aprovação tomada.");
-            }
-
-            return ResponseEntity.ok("Webhook processado com sucesso");
-
+            event = Webhook.constructEvent(payload, sigHeader, endpointSecret);
+        } catch (SignatureVerificationException e) {
+            System.err.println("Webhook Signature Verification Failed: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid signature");
         } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.internalServerError().body("Erro ao processar o webhook");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Error parsing webhook");
         }
+
+        if ("checkout.session.completed".equals(event.getType())) {
+            // Get session object
+            Session session = (Session) event.getDataObjectDeserializer().getObject().orElse(null);
+            
+            if (session != null && "paid".equals(session.getPaymentStatus())) {
+                String registrationId = session.getMetadata().get("registrationId");
+                String transactionId = session.getPaymentIntent(); // Or session.getId()
+                
+                if (registrationId != null) {
+                    String[] regIds = registrationId.split(",");
+                    for (String rId : regIds) {
+                        rId = rId.trim();
+                        if (rId.isEmpty()) continue;
+                        EventRegistration registration = publicRegistrationService.approveRegistration(rId, transactionId);
+                        if (registration != null) {
+                            System.out.println("Webhook: Inscrição " + rId + " aprovada com sucesso via Stripe. TX: " + transactionId);
+                        } else {
+                            System.err.println("Webhook: Inscrição " + rId + " não encontrada para aprovação.");
+                        }
+                    }
+                }
+            }
+        } else {
+            System.out.println("Unhandled event type: " + event.getType());
+        }
+
+        return ResponseEntity.ok("Success");
     }
 }

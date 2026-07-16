@@ -408,6 +408,11 @@ const listPendingRows = async (eventId = '') => {
 };
 
 export const publicRegistrationService = {
+  // ========================================== //
+  //  SERVIÇO DE REGISTRO DA INSCRIÇÃO NA API   //
+  // ========================================== //
+  // Este método faz o envio (POST) oficial da inscrição para o backend.
+  // Caso a API falhe, ele entra em modo "Offline/Pending Sync" no Cache.
   register: async (payload) => {
     const payloadWithClientRequestId = ensurePayloadWithClientRequestId(payload);
     try {
@@ -475,6 +480,27 @@ export const publicRegistrationService = {
     }
   },
 
+  createCheckoutSession: async ({ registrationIds, athleteName, amount }) => {
+    try {
+      const response = await fetch(buildApiUrl('/api/public/checkout'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true'
+        },
+        body: JSON.stringify({ registrationIds, athleteName, amount })
+      });
+      
+      if (!response.ok) {
+        throw await buildHttpError(response, 'Falha ao criar sessão de pagamento.');
+      }
+      
+      return response.json();
+    } catch (error) {
+      throw error;
+    }
+  },
+
   listRegistrations: async (eventId = '') => {
     await flushPendingRegistrations();
     const query = eventId ? `?eventId=${encodeURIComponent(eventId)}` : '';
@@ -515,6 +541,11 @@ export const publicRegistrationService = {
     };
   },
 
+  // ========================================== //
+  //  ATUALIZAÇÃO DE STATUS DO PAGAMENTO        //
+  // ========================================== //
+  // Rota administrativa que avisa o banco de dados que 
+  // o atleta pagou ou teve erro no pagamento.
   updatePaymentStatus: async (registrationId, { status, reviewNotes = '', reviewedBy = '' }) => {
     const normalizedId = (registrationId || '').toString().trim();
     if (!normalizedId) {

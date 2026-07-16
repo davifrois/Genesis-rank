@@ -611,3 +611,51 @@ body.event-details-active .app-main > .container {
     grid-template-columns: 1fr;
   }
 }
+
+/* Custom formatting for Event Description */
+.sc-event-description-formatted {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 24px;
+  margin-top: 16px;
+  font-family: var(--font-body, "Outfit", sans-serif);
+}
+
+.sc-desc-inline-heading {
+  font-family: var(--font-heading, "Outfit", sans-serif);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.05em;
+  display: block;
+  margin-top: 16px;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.sc-desc-paragraph {
+  font-family: var(--font-body, "Outfit", sans-serif);
+  font-size: 1.05rem;
+  line-height: 1.7;
+  color: #ffffff;
+  margin: 0 0 12px 0;
+}
+
+.sc-desc-spacer {
+  height: 8px;
+}
+
+.sc-highlight-price {
+  color: #10b981;
+  font-weight: 700;
+}
+
+.sc-highlight-date {
+  color: #3b82f6;
+  font-weight: 700;
+}
+
+
+
+

@@ -157,6 +157,10 @@ const writeLocalUsers = (users) => {
     }
 };
 
+// ========================================== //
+//  CONTROLE DE SEGURANÇA E BLOQUEIO (LOCKOUT)//
+// ========================================== //
+// Evita ataques de força bruta limitando tentativas de login.
 const AUTH_LOCKOUT_KEY = 'genesis_auth_lockout_v1';
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
@@ -652,7 +656,15 @@ const deleteUserWithApi = async ({ id }) => {
     }
 };
 
+// ========================================== //
+//  SERVIÇO DE AUTENTICAÇÃO E LOGIN           //
+// ========================================== //
+// Centraliza a comunicação com a API de login e o fallback local.
 export const authService = {
+    // ========================================== //
+    //  LOGIN NO SISTEMA                          //
+    // ========================================== //
+    // Valida usuário e senha, checa bloqueios e devolve token de acesso
     login: async (username, password) => {
         const normalized = normalizeUsername(username);
         if (!normalized) {
@@ -702,7 +714,7 @@ export const authService = {
 
     isLocalAuth: () => isLocalAuth(),
 
-    supportsPasswordReset: () => isLocalAuth(),
+    supportsPasswordReset: () => true,
 
     getRoleForUsername: (username) => {
         const normalized = normalizeUsername(username);
@@ -823,7 +835,16 @@ export const authService = {
 
     resetPassword: async (username, newPassword) => {
         if (AUTH_MODE === 'api') {
-            throw new Error('Redefinicao de senha disponivel apenas no modo local.');
+            const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, newPassword })
+            });
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.message || 'Falha ao redefinir a senha.');
+            }
+            return response.json();
         }
 
         await new Promise((resolve) => setTimeout(resolve, 600));

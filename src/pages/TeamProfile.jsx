@@ -62,7 +62,7 @@ function useDominantColor(imageUrl, fallback = '#00c2cb') {
 
 const TeamProfile = () => {
   const { academyId } = useParams();
-  const { academies, memberProfiles } = useStore();
+  const { academies, memberProfiles, events } = useStore();
 
   const academy = useMemo(() => {
     return (academies || []).find(a => a.id === academyId);
@@ -84,6 +84,18 @@ const TeamProfile = () => {
     if (!professorProfile) return students;
     return students.filter(s => s.id !== professorProfile.id);
   }, [students, professorProfile]);
+
+  const activeChampionships = useMemo(() => {
+    const now = new Date();
+    return (events || []).filter(e => {
+      if (e.status === 'completed' || e.status === 'past') return false;
+      if (e.date) {
+        const eventDate = new Date(e.date);
+        if (!isNaN(eventDate) && eventDate < now) return false;
+      }
+      return true;
+    }).slice(0, 4); // Mostra os top 4 eventos
+  }, [events]);
 
   const accentColor = useDominantColor(academy?.logoUrl);
   const accentRgb = useMemo(() => {
@@ -278,7 +290,16 @@ const TeamProfile = () => {
               <Info size={14} /> Sobre a Equipe
             </div>
             <div style={{ padding: '1.25rem 1.5rem' }}>
-              <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.9rem', lineHeight: 1.7, margin: 0 }}>
+              <p style={{ 
+                color: 'rgba(255,255,255,0.95)', 
+                fontSize: '1rem', 
+                lineHeight: 1.8, 
+                margin: 0,
+                fontFamily: '"Outfit", "Inter", sans-serif',
+                fontWeight: 300,
+                letterSpacing: '0.02em',
+                textShadow: '0 1px 2px rgba(0,0,0,0.5)'
+              }}>
                 {academy.about || 'A equipe não forneceu uma descrição.'}
               </p>
               {(academy.website || academy.contactEmail || academy.contactPhone) && (
@@ -322,24 +343,24 @@ const TeamProfile = () => {
               <Shield size={14} /> Professor / Mestre
             </div>
             <div style={{ padding: '1.25rem 1.5rem' }}>
-              {professorProfile ? (
+              {(professorProfile || academy.coachName || academy.ownerName) ? (
                 <Link
-                  to={`/perfil-publico?codigo=${btoa(JSON.stringify({ athleteId: professorProfile.id }))}`}
-                  style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '14px' }}
+                  to={professorProfile ? `/perfil-publico?codigo=${btoa(JSON.stringify({ athleteId: professorProfile.id }))}` : '#'}
+                  style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '14px', cursor: professorProfile ? 'pointer' : 'default' }}
                 >
                   <div style={{ position: 'relative', flexShrink: 0 }}>
-                    {professorProfile.photoUrl ? (
+                    {professorProfile?.photoUrl ? (
                       <img src={professorProfile.photoUrl} alt={professorProfile.fullName}
-                        style={{ width: '54px', height: '54px', borderRadius: '50%', objectFit: 'cover', border: `2px solid ${getBeltColor(professorProfile.belt)}` }}
+                        style={{ width: '54px', height: '54px', borderRadius: '50%', objectFit: 'cover', border: `2px solid ${getBeltColor(professorProfile.belt || 'preta')}` }}
                       />
                     ) : (
                       <div style={{
                         width: '54px', height: '54px', borderRadius: '50%', display: 'flex',
                         alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', fontWeight: 700, color: '#fff',
-                        background: getBeltColor(professorProfile.belt),
-                        border: `2px solid ${getBeltColor(professorProfile.belt)}`,
+                        background: getBeltColor(professorProfile?.belt || 'preta'),
+                        border: `2px solid ${getBeltColor(professorProfile?.belt || 'preta')}`,
                       }}>
-                        {getInitials(professorProfile.fullName)}
+                        {getInitials(professorProfile?.fullName || academy.coachName || academy.ownerName)}
                       </div>
                     )}
                     <div style={{
@@ -349,15 +370,82 @@ const TeamProfile = () => {
                     }} />
                   </div>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#fff', marginBottom: '3px' }}>{professorProfile.fullName}</div>
-                    <div style={{ fontSize: '0.75rem', color: getBeltColor(professorProfile.belt), fontWeight: 600, textTransform: 'capitalize' }}>
-                      Faixa {professorProfile.belt || 'Não informada'}
+                    <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#fff', marginBottom: '3px' }}>
+                      {professorProfile?.fullName || academy.coachName || academy.ownerName}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: getBeltColor(professorProfile?.belt || 'preta'), fontWeight: 600, textTransform: 'capitalize' }}>
+                      Faixa {professorProfile?.belt || 'Preta'}
                     </div>
                     {professorProfile.age && <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>{professorProfile.age} anos</div>}
                   </div>
                 </Link>
               ) : (
                 <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.88rem', margin: 0, fontStyle: 'italic' }}>Sem professor vinculado.</p>
+              )}
+            </div>
+          </div>
+
+          {/* Campeonatos Ativos */}
+          <div style={{
+            background: 'rgba(255,255,255,0.03)',
+            border: `1px solid rgba(${accentRgb},0.15)`,
+            borderRadius: '20px', overflow: 'hidden',
+            backdropFilter: 'blur(8px)',
+          }}>
+            <div style={{
+              padding: '1rem 1.5rem',
+              borderBottom: `1px solid rgba(${accentRgb},0.1)`,
+              display: 'flex', alignItems: 'center', gap: '8px',
+              fontSize: '0.82rem', fontWeight: 700, color: accentColor,
+              textTransform: 'uppercase', letterSpacing: '0.1em'
+            }}>
+              <Trophy size={14} /> Campeonatos Ativos
+            </div>
+            <div style={{ padding: '1rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {activeChampionships.length > 0 ? (
+                activeChampionships.map(event => (
+                  <Link key={event.id} to={`/eventos?id=${event.id}`} style={{
+                    textDecoration: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '8px',
+                    borderRadius: '12px',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.05)',
+                    transition: 'all 0.2s',
+                  }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.borderColor = `rgba(${accentRgb},0.3)`;
+                      e.currentTarget.style.background = `rgba(${accentRgb},0.08)`;
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)';
+                      e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
+                    }}
+                  >
+                    <div style={{
+                      width: '40px', height: '40px', borderRadius: '8px',
+                      background: `rgba(${accentRgb},0.15)`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: accentColor, flexShrink: 0
+                    }}>
+                      <Calendar size={18} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '170px' }}>
+                        {event.name || 'Campeonato Oficial'}
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.5)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <MapPin size={10} /> {event.location || event.city || 'Local a confirmar'}
+                      </div>
+                    </div>
+                  </Link>
+                ))
+              ) : (
+                <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.88rem', margin: 0, fontStyle: 'italic' }}>
+                  Nenhum campeonato ativo no momento.
+                </p>
               )}
             </div>
           </div>

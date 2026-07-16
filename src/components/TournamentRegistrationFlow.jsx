@@ -397,6 +397,11 @@ const TournamentRegistrationFlow = ({ event, onComplete }) => {
     setStep(3);
   };
 
+  // ========================================== //
+  //  FLUXO DE INSCRIÇÃO E GERAÇÃO DE PAGAMENTO  //
+  // ========================================== //
+  // Esta função é acionada ao finalizar a etapa de pagamento.
+  // Ela monta o payload de inscrição do atleta e envia para a API.
   const handleFinish = async (proofData = {}) => {
     try {
       const categoryInfo = resolveCategoryByProfile(selectedProfile);
@@ -531,6 +536,31 @@ const TournamentRegistrationFlow = ({ event, onComplete }) => {
     // Clean temp cache and advance UI
     localStorage.removeItem(`registration_progress_${event.id}`);
     if (onComplete) onComplete();
+    
+    // STRIPE INTEGRATION: Redirect if Stripe was chosen
+    if (proofData.useStripe && registrationData.price > 0) {
+      try {
+        const registrationIds = payloads.map(p => p.id).join(',');
+        const athleteName = selectedProfile.fullName || selectedProfile.nome || 'Atleta';
+        const data = await publicRegistrationService.createCheckoutSession({
+          registrationIds,
+          athleteName,
+          amount: registrationData.price
+        });
+        
+        if (data.url) {
+          window.location.href = data.url; // Redirect to Stripe Checkout
+          return;
+        } else {
+          console.error('Failed to create Stripe Checkout session, no url returned');
+          alert('Erro ao iniciar pagamento via Stripe. Tente novamente mais tarde.');
+        }
+      } catch (err) {
+        console.error('Stripe error:', err);
+        alert('Erro ao conectar com Stripe.');
+      }
+    }
+    
     setStep(4);
     } catch (criticalError) {
       alert(`Critical error in TournamentRegistrationFlow handleFinish: ${criticalError.message}`);
@@ -617,6 +647,9 @@ const TournamentRegistrationFlow = ({ event, onComplete }) => {
             );
           })()}
           {step === 3 && (
+            // ========================================== //
+            // TELA DE PAGAMENTO (GERAÇÃO DE PIX/CARTÃO) //
+            // ========================================== //
             <PaymentStep
               key="step3"
               event={event}
@@ -1458,11 +1491,13 @@ const PaymentStep = ({ event, profile, registration, onComplete }) => {
                   </div>
                 </div>
               ) : (
-                <div className="card-payment">
+                <div className="card-payment" style={{ padding: '2rem', textAlign: 'center', background: '#111', borderRadius: '12px', border: '1px solid #3f3f46' }}>
                   <div className="card-placeholder">
-                    <CreditCard size={48} />
-                    <p>Integracao com Cartao de Credito em breve.</p>
-                    <small>Utilize o Pix para confirmacao imediata.</small>
+                    <CreditCard size={48} style={{ margin: '0 auto 1rem', color: '#6366f1' }} />
+                    <h4 style={{ marginBottom: '0.75rem', color: '#f4f4f5' }}>Pagar com Cartão de Crédito via Stripe</h4>
+                    <p style={{ fontSize: '0.9rem', color: '#a1a1aa' }}>
+                      Você será redirecionado para o ambiente seguro da Stripe para finalizar seu pagamento com cartão, Apple Pay ou Google Pay.
+                    </p>
                   </div>
                 </div>
               )}
@@ -1472,8 +1507,18 @@ const PaymentStep = ({ event, profile, registration, onComplete }) => {
       </div>
 
       <div className="payment-footer">
-        <button className="btn-finish" onClick={handleFinish} disabled={isProcessingProof || (registration.price > 0 && !proofFile)}>
-          {isProcessingProof ? 'Processando...' : registration.price === 0 ? 'Confirmar Inscricao' : 'Enviar Comprovante e Finalizar'}
+        <button 
+          className="btn-finish" 
+          onClick={() => {
+            if (paymentMethod === 'card') {
+              onComplete({ useStripe: true });
+            } else {
+              handleFinish();
+            }
+          }} 
+          disabled={isProcessingProof || (registration.price > 0 && paymentMethod === 'pix' && !proofFile)}
+        >
+          {isProcessingProof ? 'Processando...' : registration.price === 0 ? 'Confirmar Inscricao' : paymentMethod === 'card' ? 'Pagar Inscrição via Stripe' : 'Enviar Comprovante e Finalizar'}
           <Check size={20} />
         </button>
       </div>

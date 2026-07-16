@@ -1,4 +1,4 @@
-﻿server:
+server:
   port: 8080
 
 spring:
@@ -68,3 +68,6 @@ app:
     from: ${COACH_ATHLETE_EMAIL_FROM:no-reply@genesisesportes.com.br}
     reply-to: ${COACH_ATHLETE_EMAIL_REPLY_TO:contato@genesisesportes.com.br}
     subject-prefix: ${COACH_ATHLETE_EMAIL_SUBJECT_PREFIX:Genesis Esportes}
+  stripe:
+    api-key: ${STRIPE_API_KEY:}
+    webhook-secret: ${STRIPE_WEBHOOK_SECRET:}

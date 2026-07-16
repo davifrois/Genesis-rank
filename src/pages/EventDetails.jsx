@@ -15,6 +15,70 @@ import BracketTree, { buildRounds } from '../components/BracketTree';
 import { publicRegistrationService } from '../services/publicRegistrationService';
 import './EventDetails.css';
 
+const renderFormattedDescription = (text) => {
+  if (!text) return null;
+  
+  let formattedText = text;
+  const emojis = ['🏆', '🗓️', '💰', '⚠️', '🚻', '🎁', '📞', '🥋', '⚖️', '📝', '📍', '🥇', '🚨', '🎫', '🥈', '🥉', '👥', '📢', '🔥'];
+  
+  emojis.forEach(emoji => {
+    // Break before emoji and ensure space after
+    formattedText = formattedText.split(emoji).join(`\n\n${emoji} `);
+  });
+  
+  // Format specific common patterns in Jiu Jitsu descriptions that lose spacing
+  formattedText = formattedText
+    .replace(/([a-z])([A-Z])/g, '$1 $2') // e.g. GeraisData -> Gerais Data
+    .replace(/(\d{2}\/\d{2})\)/g, '$1) ') // e.g. 10/08)1º Lote -> 10/08) 1º Lote
+    .replace(/([a-zA-Z])(R\$)/g, '$1 $2') // e.g. JuvenilR$ -> Juvenil R$
+    .replace(/:(?! )/g, ': ') // add space after colon if missing
+    .replace(/\+(?! )/g, '+ ') // add space after plus
+    .replace(/ {2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  return (
+    <div className="sc-event-description-formatted">
+      {formattedText.split('\n').map((line, idx) => {
+        if (!line.trim()) return <div key={idx} className="sc-desc-spacer"></div>;
+        
+        const isEmojiStart = emojis.some(e => line.trim().startsWith(e));
+        
+        let processLine = line.trim();
+        let prefix = null;
+        
+        // If it starts with an emoji and has a colon, we treat the part before the colon as a heading
+        if (isEmojiStart && processLine.includes(':')) {
+           const colonIndex = processLine.indexOf(':');
+           prefix = processLine.substring(0, colonIndex + 1);
+           processLine = processLine.substring(colonIndex + 1);
+        } else if (isEmojiStart) {
+           // If no colon, treat the whole line as heading
+           prefix = processLine;
+           processLine = '';
+        }
+        
+        // Highlight dates and prices automatically using a simple regex
+        const processHighlights = (str) => {
+           if (!str) return null;
+           return str.split(/(R\$ \d+,\d{2}|\d{2}\/\d{2}\/\d{4})/g).map((part, i) => {
+             if (part.match(/R\$ \d+,\d{2}/)) return <strong key={`price-${i}`} className="sc-highlight-price">{part}</strong>;
+             if (part.match(/\d{2}\/\d{2}\/\d{4}/)) return <strong key={`date-${i}`} className="sc-highlight-date">{part}</strong>;
+             return part;
+           });
+        };
+        
+        return (
+          <p key={idx} className="sc-desc-paragraph">
+            {prefix && <strong className="sc-desc-inline-heading">{prefix}</strong>}
+            {processLine && <span> {processHighlights(processLine)}</span>}
+          </p>
+        );
+      })}
+    </div>
+  );
+};
+
 const parseDate = (value) => {
   if (!value) return null;
   const parsed = new Date(value);
@@ -90,10 +154,38 @@ const EventDetails = () => {
     return () => window.removeEventListener(PUBLISHED_EVENT_SCHEDULE_CHANGED, handleScheduleChange);
   }, [eventId]);
 
-  const { events, athletes, brackets, memberProfiles = [] } = useStore();
+  const { events, athletes, brackets, memberProfiles = [], currentUser, favoriteEvents, subscribedEvents, toggleFavoriteEvent, toggleEventSubscription } = useStore();
   const [resultsData, setResultsData] = useState(null);
   const [teamRankingData, setTeamRankingData] = useState(null);
   const [resultsSubTab, setResultsSubTab] = useState('resultados');
+  const [toastMessage, setToastMessage] = useState('');
+
+  const isFavorited = favoriteEvents?.includes(eventId);
+  const isSubscribed = subscribedEvents?.includes(eventId);
+
+  const handleFavorite = () => {
+    if (!currentUser) {
+      setToastMessage('Faça login para favoritar.');
+      setTimeout(() => setToastMessage(''), 3000);
+      return;
+    }
+    toggleFavoriteEvent(eventId);
+  };
+
+  const handleSubscribe = () => {
+    if (!currentUser) {
+      setToastMessage('Faça login para ligar os alertas.');
+      setTimeout(() => setToastMessage(''), 3000);
+      return;
+    }
+    toggleEventSubscription(eventId);
+    if (!isSubscribed) {
+      setToastMessage('Notificações ativadas! Você será avisado sobre novidades.');
+    } else {
+      setToastMessage('Notificações desativadas.');
+    }
+    setTimeout(() => setToastMessage(''), 4000);
+  };
 
   useEffect(() => {
     if (activeTab === 'results') {
@@ -414,20 +506,16 @@ const EventDetails = () => {
               <div className="sc-info-main-col">
                 <h1 className="sc-info-main-title">{event.name}</h1>
                 {event.eventDescription && (
-                  <div className="sc-info-block">
-                    <div className="sc-event-description" style={{ whiteSpace: 'pre-wrap', color: '#e2e8f0', lineHeight: '1.6' }}>
-                      {event.eventDescription}
-                    </div>
+                  <div className="sc-info-block sc-description-block">
+                    {renderFormattedDescription(event.eventDescription)}
                   </div>
                 )}
                 {event.prizesDescription && (
-                  <div className="sc-info-block">
-                    <div className="sc-info-block-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f59e0b' }}>
+                  <div className="sc-info-block sc-description-block">
+                    <div className="sc-info-block-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f59e0b', marginBottom: '16px' }}>
                       <span style={{ fontSize: '1.2rem' }}>🏆</span> Premiação do Evento
                     </div>
-                    <div className="sc-event-description" style={{ whiteSpace: 'pre-wrap', color: '#e2e8f0', lineHeight: '1.6' }}>
-                      {event.prizesDescription}
-                    </div>
+                    {renderFormattedDescription(event.prizesDescription)}
                   </div>
                 )}
                 {(event.weightTableGiUrl || event.weightTableNoGiUrl || event.circularUrl) && (
@@ -1293,14 +1381,52 @@ const EventDetails = () => {
             <p>{eventDateLabel}</p>
           </div>
         </div>
-        <div className="sc-hero-actions">
-          <button className="sc-btn-icon"><Bell size={18} /></button>
-          <button className="sc-btn-icon"><Heart size={18} /></button>
+        <div className="sc-hero-actions" style={{ position: 'relative' }}>
+          
+          {toastMessage && (
+            <div style={{
+              position: 'absolute', top: '-50px', right: 0,
+              background: '#09090b', border: '1px solid #333', color: '#fff',
+              padding: '8px 12px', borderRadius: '8px', fontSize: '0.8rem',
+              whiteSpace: 'nowrap', zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+              animation: 'fadeInOut 4s forwards'
+            }}>
+              <style>{`
+                @keyframes fadeInOut {
+                  0% { opacity: 0; transform: translateY(10px); }
+                  10% { opacity: 1; transform: translateY(0); }
+                  90% { opacity: 1; transform: translateY(0); }
+                  100% { opacity: 0; transform: translateY(-10px); }
+                }
+              `}</style>
+              {toastMessage}
+            </div>
+          )}
+
+          <button onClick={handleSubscribe} className="sc-btn-icon" style={{ 
+            color: isSubscribed ? '#eab308' : '#fff',
+            background: isSubscribed ? 'rgba(234, 179, 8, 0.1)' : 'rgba(255,255,255,0.05)',
+            border: isSubscribed ? '1px solid rgba(234, 179, 8, 0.3)' : '1px solid rgba(255,255,255,0.1)'
+          }}>
+            <Bell size={18} fill={isSubscribed ? '#eab308' : 'transparent'} />
+          </button>
+
+          <button onClick={handleFavorite} className="sc-btn-icon" style={{ 
+            color: isFavorited ? '#ef4444' : '#fff',
+            background: isFavorited ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255,255,255,0.05)',
+            border: isFavorited ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(255,255,255,0.1)'
+          }}>
+            <Heart size={18} fill={isFavorited ? '#ef4444' : 'transparent'} />
+          </button>
+          
+          {/* ========================================== */}
+          {/* GATILHO PARA A TELA DE INSCRIÇÃO          */}
+          {/* Redireciona o usuário para o Flow de Registro */}
+          {/* ========================================== */}
           <Link to={`/eventos/${eventId}/inscricao`} className="sc-btn-primary" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Inscrever-se</Link>
         </div>
       </div>
 
-      {/* TABS NAV */}
       <div className="sc-tabs-nav">
         {[
           { key: 'information', label: copy.infoTab, icon: <BookOpen size={16} /> },
@@ -1320,6 +1446,9 @@ const EventDetails = () => {
         ))}
       </div>
 
+      {/* ========================================== */}
+      {/* RENDERIZAÇÃO DAS ABAS (CHAVES, RESULTADOS) */}
+      {/* ========================================== */}
       {activeTab === 'information' && renderInformationTab()}
       {activeTab === 'athletes' && renderAthletesTab()}
       {activeTab === 'brackets' && renderBracketsTab()}

@@ -25,7 +25,8 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '', initialMode = 'logi
     const [resetUsername, setResetUsername] = useState('');
     const [resetPassword, setResetPassword] = useState('');
     const [resetConfirm, setResetConfirm] = useState('');
-    const supportsLocalReset = authService.isLocalAuth ? authService.isLocalAuth() : true;
+    const supportsLocalReset = authService.supportsPasswordReset ? authService.supportsPasswordReset() : true;
+    const supportsRegistration = true;
     const canClose = typeof onClose === 'function';
     const isEnglish = uiLanguage === 'en-US';
     const isSpanish = uiLanguage === 'es-ES';
@@ -362,7 +363,7 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '', initialMode = 'logi
     };
 
     const handleOpenRegister = () => {
-        if (!supportsLocalReset) {
+        if (!supportsRegistration) {
             setError(copy.registerUnavailable);
             return;
         }
@@ -431,7 +432,7 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '', initialMode = 'logi
                     <p>{copy.subtitle}</p>
                 </div>
 
-                {supportsLocalReset && !resetMode && (
+                {supportsRegistration && !resetMode && (
                     <div className="login-mode-switch" aria-label="Account access mode">
                         <div className="login-mode-slider" style={{ transform: registerMode ? 'translateX(100%)' : 'translateX(0)' }}></div>
                         <button
@@ -642,11 +643,7 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '', initialMode = 'logi
                                     {copy.form.forgot}
                                 </button>
                             )}
-                            {supportsLocalReset && (
-                                <button type="button" className="login-link" onClick={handleOpenRegister}>
-                                    {copy.form.create}
-                                </button>
-                            )}
+
                         </div>
                     </form>
                 )}

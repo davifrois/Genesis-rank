@@ -30,6 +30,12 @@ import br.com.genesis.ranking.service.EventService;
 import br.com.genesis.ranking.service.InstagramFeedService;
 import br.com.genesis.ranking.service.PublicRegistrationService;
 import br.com.genesis.ranking.service.SocialMediaProxyService;
+import br.com.genesis.ranking.service.StripeService;
+import com.stripe.model.checkout.Session;
+import java.util.Map;
+import org.springframework.http.HttpStatus;
+import br.com.genesis.ranking.dto.CheckoutRequest;
+import br.com.genesis.ranking.model.EventRegistration;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 
@@ -42,19 +48,22 @@ public class PublicController {
   private final PublicRegistrationService registrationService;
   private final InstagramFeedService instagramFeedService;
   private final SocialMediaProxyService socialMediaProxyService;
+  private final StripeService stripeService;
 
   public PublicController(
       EventService eventService,
       BracketService bracketService,
       PublicRegistrationService registrationService,
       InstagramFeedService instagramFeedService,
-      SocialMediaProxyService socialMediaProxyService
+      SocialMediaProxyService socialMediaProxyService,
+      StripeService stripeService
   ) {
     this.eventService = eventService;
     this.bracketService = bracketService;
     this.registrationService = registrationService;
     this.instagramFeedService = instagramFeedService;
     this.socialMediaProxyService = socialMediaProxyService;
+    this.stripeService = stripeService;
   }
 
   @GetMapping("/events")
@@ -127,6 +136,18 @@ public class PublicController {
   public List<PublicRegistrationResponse> listRegistrations(@RequestParam(required = false) String eventId) {
     return registrationService.listRegistrations(eventId);
   }
+
+  @PostMapping("/checkout")
+  public ResponseEntity<?> createCheckoutSession(@RequestBody CheckoutRequest request) {
+    try {
+      Session session = stripeService.createCheckoutSession(request.getRegistrationIds(), request.getAthleteName(), request.getAmount());
+      return ResponseEntity.ok(Map.of("url", session.getUrl()));
+    } catch (Exception e) {
+      e.printStackTrace();
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Error creating checkout session"));
+    }
+  }
+
 
   private PublicBracketsResponse buildPublicBracketsResponse(EventResponse event, String athleteSearch) {
     String eventId = event == null ? "" : event.getId();
