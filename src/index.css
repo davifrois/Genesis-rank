@@ -16181,4 +16181,225 @@ textarea:focus-visible {
   box-shadow: 0 0 6px #ef4444;
 }
 
+/* ==========================================================================
+   COMPLETE MOBILE RESPONSIVENESS & TOUCH OPTIMIZATION (320px - 768px)
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  /* 1. Global Viewport Safety & Anti-Overflow */
+  html, body {
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
+    width: 100% !important;
+    position: relative !important;
+  }
+  
+  #root, .app, .app-main, .main-content {
+    overflow-x: hidden !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Prevent 100vw calculations from overflowing on mobile browsers */
+  .home-hero, .home-hero::before, .home-hero::after,
+  .ajp-header-section, .hero-section, .sc-hero {
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+  }
+
+  /* 2. Topbar & Mobile Header Fit */
+  .topbar-main__inner {
+    padding: 8px 12px !important;
+  }
+
+  .brand-logo {
+    height: 30px !important;
+    max-width: 100% !important;
+  }
+
+  .brand-title {
+    font-size: 1rem !important;
+  }
+
+  /* 3. Event Details Page Fixes */
+  .sc-event-page {
+    zoom: 1 !important; /* Overrides desktop 1.2 zoom on mobile screens */
+  }
+
+  .sc-hero {
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+    padding: 16px 12px !important;
+    gap: 14px !important;
+  }
+
+  .sc-hero-left {
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+    gap: 10px !important;
+  }
+
+  .sc-hero-poster {
+    width: 100% !important;
+    max-width: 220px !important;
+    height: auto !important;
+    max-height: 130px !important;
+    border-radius: 10px !important;
+  }
+
+  .sc-hero-info h1 {
+    font-size: 1.25rem !important;
+    line-height: 1.25 !important;
+  }
+
+  .sc-hero-actions {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  .sc-btn-primary {
+    width: 100% !important;
+    padding: 14px 18px !important;
+    font-size: 0.95rem !important;
+    justify-content: center !important;
+  }
+
+  .sc-tabs-nav {
+    gap: 14px !important;
+    padding: 0 12px !important;
+    justify-content: flex-start !important;
+  }
+
+  .sc-tab {
+    font-size: 0.85rem !important;
+    padding: 12px 0 !important;
+  }
+
+  .sc-subnav {
+    padding: 12px 8px !important;
+    gap: 8px !important;
+  }
+
+  .sc-subtab {
+    padding: 8px 14px !important;
+    font-size: 0.8rem !important;
+  }
+
+  .sc-content {
+    padding: 14px 10px !important;
+  }
+
+  .sc-info-body {
+    grid-template-columns: 1fr !important;
+    gap: 20px !important;
+  }
+
+  /* 4. Registration Wizard (`TournamentRegistrationFlow`) Mobile Polish */
+  .profile-selection-v2 {
+    padding: 16px 0 !important;
+  }
+
+  .avatar-grid {
+    gap: 10px !important;
+    width: 100% !important;
+  }
+
+  .avatar-item {
+    width: calc(50% - 5px) !important;
+    height: auto !important;
+    min-height: 150px !important;
+    padding: 14px 8px !important;
+    border-radius: 10px !important;
+  }
+
+  .avatar-circle {
+    width: 64px !important;
+    height: 64px !important;
+    margin-bottom: 10px !important;
+  }
+
+  .avatar-label {
+    font-size: 0.8rem !important;
+    line-height: 1.2 !important;
+  }
+
+  .registration-details-v2 {
+    padding: 0 4px 30px 4px !important;
+    gap: 14px !important;
+  }
+
+  .details-section .section-header {
+    padding: 10px 12px !important;
+    font-size: 0.8rem !important;
+  }
+
+  .payment-layout {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
+  .btn-finish {
+    width: 100% !important;
+    padding: 14px 18px !important;
+    font-size: 0.95rem !important;
+    justify-content: center !important;
+  }
+
+  .registration-success-screen {
+    margin: 16px auto !important;
+    padding: 24px 12px !important;
+    border-radius: 14px !important;
+  }
+
+  .registration-success-screen h2 {
+    font-size: 1.6rem !important;
+  }
+
+  .success-actions {
+    flex-direction: column !important;
+    width: 100% !important;
+  }
+
+  .success-actions button {
+    width: 100% !important;
+    padding: 14px 16px !important;
+  }
+
+  /* 5. Rankings Page Mobile Polish */
+  .ajp-header-top {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+
+  .ajp-header-search input {
+    width: 100% !important;
+  }
+
+  .ajp-athlete-card {
+    padding: 10px !important;
+  }
+
+  .ajp-athlete-name {
+    font-size: 0.9rem !important;
+  }
+
+  .ajp-stat-col {
+    font-size: 0.72rem !important;
+  }
+
+  /* 6. Touch Controls & iOS Input Auto-Zoom Prevention */
+  button, input, select, textarea {
+    touch-action: manipulation;
+  }
+
+  input[type="text"], input[type="email"], input[type="password"], select {
+    font-size: 16px !important; /* Prevents unwanted auto-zoom on iOS Safari */
+  }
+}
+
 
