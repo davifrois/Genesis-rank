@@ -31,7 +31,8 @@ import {
   normalizeEventBeltRegistration,
   normalizeEventFees,
   resolveAthleteEventPrice,
-  resolveEventPixKey
+  resolveEventPixKey,
+  resolveAgeNumber
 } from '../utils/eventPricing';
 import { publicRegistrationService } from '../services/publicRegistrationService';
 import { generatePixPayload } from '../utils/pix';
@@ -76,9 +77,10 @@ const normalizeWhatsappPhone = (value = '') => {
 };
 
 // Determina automaticamente a categoria etria CBJJ pelo perfil
-const resolveCategoryByProfile = (profile) => {
-  const age = Number(profile.age) || 0;
-  const gender = (profile.gender || profile.genero || '').toLowerCase();
+const resolveCategoryByProfile = (profile = {}) => {
+  const safeProfile = profile || {};
+  const age = resolveAgeNumber(safeProfile) || 0;
+  const gender = (safeProfile.gender || safeProfile.genero || '').toLowerCase();
   const isFemale = gender.includes('femi') || gender.includes('mulher');
   const genderLabel = isFemale ? 'Feminino' : 'Masculino';
 
@@ -101,81 +103,155 @@ const resolveCategoryByProfile = (profile) => {
   return { ageCategory, ageCategoryLabel, ageCategoryColor, genderLabel, isFemale, age };
 };
 
-const resolveWeightOptions = (profile, isNoGi, eventOptions) => {
-  if (eventOptions && typeof eventOptions === 'string' && eventOptions.trim()) {
-    return eventOptions.split('\n').map(o => o.trim()).filter(Boolean).map(o => ({ value: o, label: o }));
-  }
-
-  const age = Number(profile.age) || 30;
-  const gender = (profile.gender || profile.genero || '').toLowerCase();
+const resolveWeightOptions = (profile = {}, isNoGi, eventOptions) => {
+  const safeProfile = profile || {};
+  const age = resolveAgeNumber(safeProfile) || 30;
+  const gender = (safeProfile.gender || safeProfile.genero || '').toLowerCase();
   const isFemale = gender.includes('femi') || gender.includes('mulher');
 
+  let defaultOptions = [];
+
+  // Kids (4 to 15 years old)
   if (age <= 15) {
-    const categoryInfo = resolveCategoryByProfile(profile);
-    const suffix = `${categoryInfo.ageCategory} - ${categoryInfo.genderLabel}`;
-    return [
-      { value: 'Galo', label: `Galo (${suffix})` },
-      { value: 'Pluma', label: `Pluma (${suffix})` },
-      { value: 'Pena', label: `Pena (${suffix})` },
-      { value: 'Leve', label: `Leve (${suffix})` },
-      { value: 'Mdio', label: `Mdio (${suffix})` },
-      { value: 'Meio-Pesado', label: `Meio-Pesado (${suffix})` },
-      { value: 'Pesado', label: `Pesado (${suffix})` },
-      { value: 'Super-Pesado', label: `Super-Pesado (${suffix})` },
-      { value: 'Pesadssimo', label: `Pesadssimo (${suffix})` }
+    let youthIndex = 5;
+    if (age <= 5) youthIndex = 0;
+    else if (age <= 7) youthIndex = 1;
+    else if (age <= 9) youthIndex = 2;
+    else if (age <= 11) youthIndex = 3;
+    else if (age <= 13) youthIndex = 4;
+
+    const youthWeightMatrix = {
+      Galo: ['15', '19', '24', '30', '35', '44'],
+      Pluma: ['18', '21', '27', '33', '39', '48'],
+      Pena: ['21', '24', '30', '36', '43', '52'],
+      Leve: ['24', '27', '33', '39', '47', '56'],
+      Mdio: ['26', '30', '36', '42', '52', '60'],
+      'Meio-Pesado': ['29', '33', '39', '45', '56', '65'],
+      Pesado: ['32', '36', '42', '48', '60', '69'],
+      'Super-Pesado': ['35', '39', '45', '51', '64', '73'],
+      Pesadssimo: ['Sem limite', 'Sem limite', 'Sem limite', 'Sem limite', 'Sem limite', 'Sem limite']
+    };
+
+    const getW = (cat) => {
+      const val = youthWeightMatrix[cat][youthIndex];
+      return val === 'Sem limite' ? val : `até ${val} kg`;
+    };
+
+    defaultOptions = [
+      { value: 'Galo', label: `Galo (${getW('Galo')})` },
+      { value: 'Pluma', label: `Pluma (${getW('Pluma')})` },
+      { value: 'Pena', label: `Pena (${getW('Pena')})` },
+      { value: 'Leve', label: `Leve (${getW('Leve')})` },
+      { value: 'Mdio', label: `Médio (${getW('Mdio')})` },
+      { value: 'Meio-Pesado', label: `Meio-Pesado (${getW('Meio-Pesado')})` },
+      { value: 'Pesado', label: `Pesado (${getW('Pesado')})` },
+      { value: 'Super-Pesado', label: `Super-Pesado (${getW('Super-Pesado')})` },
+      { value: 'Pesadssimo', label: `Pesadíssimo (${getW('Pesadssimo')})` }
     ];
   }
-
-  if (isFemale) {
-    if (isNoGi) {
-      return [
-        { value: 'Galo', label: 'Galo (at 46.5kg)' },
-        { value: 'Pluma', label: 'Pluma (at 51.5kg)' },
-        { value: 'Pena', label: 'Pena (at 56.5kg)' },
-        { value: 'Leve', label: 'Leve (at 61.5kg)' },
-        { value: 'Mdio', label: 'Mdio (at 66.5kg)' },
-        { value: 'Meio-Pesado', label: 'Meio-Pesado (at 71.5kg)' },
-        { value: 'Pesado', label: 'Pesado (at 76.5kg)' },
-        { value: 'Super-Pesado', label: 'Super-Pesado (acima de 76.5kg)' }
+  // Juvenil (16 and 17 years old)
+  else if (age === 16 || age === 17) {
+    if (isFemale) {
+      defaultOptions = [
+        { value: 'Galo', label: 'Galo (até 44.3 kg)' },
+        { value: 'Pluma', label: 'Pluma (até 48.3 kg)' },
+        { value: 'Pena', label: 'Pena (até 52.3 kg)' },
+        { value: 'Leve', label: 'Leve (até 56.5 kg)' },
+        { value: 'Mdio', label: 'Médio (até 60.5 kg)' },
+        { value: 'Meio-Pesado', label: 'Meio-Pesado (até 65 kg)' },
+        { value: 'Pesado', label: 'Pesado (até 69 kg)' },
+        { value: 'Super-Pesado', label: 'Super-Pesado (até 74 kg)' },
+        { value: 'Pesadssimo', label: 'Pesadíssimo (Sem limite)' }
+      ];
+    } else {
+      defaultOptions = [
+        { value: 'Galo', label: 'Galo (até 53.5 kg)' },
+        { value: 'Pluma', label: 'Pluma (até 58.5 kg)' },
+        { value: 'Pena', label: 'Pena (até 64 kg)' },
+        { value: 'Leve', label: 'Leve (até 69 kg)' },
+        { value: 'Mdio', label: 'Médio (até 74 kg)' },
+        { value: 'Meio-Pesado', label: 'Meio-Pesado (até 79.3 kg)' },
+        { value: 'Pesado', label: 'Pesado (até 84.3 kg)' },
+        { value: 'Super-Pesado', label: 'Super-Pesado (até 89.3 kg)' },
+        { value: 'Pesadssimo', label: 'Pesadíssimo (Sem limite)' }
       ];
     }
-    return [
-      { value: 'Galo', label: 'Galo (at 47.5kg)' },
-      { value: 'Pluma', label: 'Pluma (at 53.5kg)' },
-      { value: 'Pena', label: 'Pena (at 58.5kg)' },
-      { value: 'Leve', label: 'Leve (at 64kg)' },
-      { value: 'Mdio', label: 'Mdio (at 69kg)' },
-      { value: 'Meio-Pesado', label: 'Meio-Pesado (at 74kg)' },
-      { value: 'Pesado', label: 'Pesado (at 79.3kg)' },
-      { value: 'Super-Pesado', label: 'Super-Pesado (acima de 79.3kg)' }
-    ];
+  }
+  // Adulto and Master (>= 18)
+  else {
+    if (isFemale) {
+      if (isNoGi) {
+        defaultOptions = [
+          { value: 'Galo', label: 'Galo (até 46.5 kg)' },
+          { value: 'Pluma', label: 'Pluma (até 51.5 kg)' },
+          { value: 'Pena', label: 'Pena (até 56.5 kg)' },
+          { value: 'Leve', label: 'Leve (até 61.5 kg)' },
+          { value: 'Mdio', label: 'Médio (até 66.5 kg)' },
+          { value: 'Meio-Pesado', label: 'Meio-Pesado (até 71.5 kg)' },
+          { value: 'Pesado', label: 'Pesado (até 76.5 kg)' },
+          { value: 'Super-Pesado', label: 'Super-Pesado (acima de 76.5 kg)' }
+        ];
+      } else {
+        defaultOptions = [
+          { value: 'Galo', label: 'Galo (até 48.5 kg)' },
+          { value: 'Pluma', label: 'Pluma (até 53.5 kg)' },
+          { value: 'Pena', label: 'Pena (até 58.5 kg)' },
+          { value: 'Leve', label: 'Leve (até 64 kg)' },
+          { value: 'Mdio', label: 'Médio (até 69 kg)' },
+          { value: 'Meio-Pesado', label: 'Meio-Pesado (até 74 kg)' },
+          { value: 'Pesado', label: 'Pesado (até 79.3 kg)' },
+          { value: 'Super-Pesado', label: 'Super-Pesado (até 84.3 kg)' },
+          { value: 'Pesadssimo', label: 'Pesadíssimo (Sem limite)' }
+        ];
+      }
+    } else {
+      if (isNoGi) {
+        defaultOptions = [
+          { value: 'Galo', label: 'Galo (até 55.5 kg)' },
+          { value: 'Pluma', label: 'Pluma (até 61.5 kg)' },
+          { value: 'Pena', label: 'Pena (até 67.5 kg)' },
+          { value: 'Leve', label: 'Leve (até 73.5 kg)' },
+          { value: 'Mdio', label: 'Médio (até 79.5 kg)' },
+          { value: 'Meio-Pesado', label: 'Meio-Pesado (até 85.5 kg)' },
+          { value: 'Pesado', label: 'Pesado (até 91.5 kg)' },
+          { value: 'Super-Pesado', label: 'Super-Pesado (até 97.5 kg)' },
+          { value: 'Pesadssimo', label: 'Pesadíssimo (acima de 97.5 kg)' }
+        ];
+      } else {
+        defaultOptions = [
+          { value: 'Galo', label: 'Galo (até 57.5 kg)' },
+          { value: 'Pluma', label: 'Pluma (até 64 kg)' },
+          { value: 'Pena', label: 'Pena (até 70 kg)' },
+          { value: 'Leve', label: 'Leve (até 76 kg)' },
+          { value: 'Mdio', label: 'Médio (até 82.3 kg)' },
+          { value: 'Meio-Pesado', label: 'Meio-Pesado (até 88.3 kg)' },
+          { value: 'Pesado', label: 'Pesado (até 94.3 kg)' },
+          { value: 'Super-Pesado', label: 'Super-Pesado (até 100.5 kg)' },
+          { value: 'Pesadssimo', label: 'Pesadíssimo (Sem limite)' }
+        ];
+      }
+    }
   }
 
-  if (isNoGi) {
-    return [
-      { value: 'Galo', label: 'Galo (at 55.5kg)' },
-      { value: 'Pluma', label: 'Pluma (at 61.5kg)' },
-      { value: 'Pena', label: 'Pena (at 67.5kg)' },
-      { value: 'Leve', label: 'Leve (at 73.5kg)' },
-      { value: 'Mdio', label: 'Mdio (at 79.5kg)' },
-      { value: 'Meio-Pesado', label: 'Meio-Pesado (at 85.5kg)' },
-      { value: 'Pesado', label: 'Pesado (at 91.5kg)' },
-      { value: 'Super-Pesado', label: 'Super-Pesado (at 97.5kg)' },
-      { value: 'Pesadssimo', label: 'Pesadssimo (acima de 97.5kg)' }
-    ];
+  if (eventOptions && typeof eventOptions === 'string' && eventOptions.trim()) {
+    const customLines = eventOptions.split('\n').map(o => o.trim()).filter(Boolean);
+    return customLines.map(line => {
+      const lowerLine = line.toLowerCase();
+      // Need to handle "Médio" correctly if line is "Medio" without accent, etc.
+      const match = defaultOptions.find(opt => {
+        const optVal = opt.value.toLowerCase().replace('mdio', 'médio').replace('medio', 'médio');
+        const searchLine = lowerLine.replace('medio', 'médio').replace('pesadissimo', 'pesadíssimo');
+        return optVal === searchLine || optVal.includes(searchLine) || opt.label.toLowerCase().startsWith(searchLine);
+      });
+      if (match) {
+        // Keep the original value (e.g. "Medio") so we don't break existing databases, but update the label
+        return { value: line, label: match.label };
+      }
+      return { value: line, label: line };
+    });
   }
 
-  return [
-    { value: 'Galo', label: 'Galo (at 57.5kg)' },
-    { value: 'Pluma', label: 'Pluma (at 64kg)' },
-    { value: 'Pena', label: 'Pena (at 70kg)' },
-    { value: 'Leve', label: 'Leve (at 76kg)' },
-    { value: 'Mdio', label: 'Mdio (at 82.3kg)' },
-    { value: 'Meio-Pesado', label: 'Meio-Pesado (at 88.3kg)' },
-    { value: 'Pesado', label: 'Pesado (at 94.3kg)' },
-    { value: 'Super-Pesado', label: 'Super-Pesado (at 100.5kg)' },
-    { value: 'Pesadssimo', label: 'Pesadssimo (acima de 100.5kg)' }
-  ];
+  return defaultOptions;
 };
 
 // Function moved up
@@ -183,10 +259,8 @@ const resolveWeightOptions = (profile, isNoGi, eventOptions) => {
 
 const buildBeltRegistrationWhatsappUrl = ({ event = {}, profile = {}, beltRegistration = {} } = {}) => {
   const phone = normalizeWhatsappPhone(
-    event.beltRegistrationWhatsapp
-    || event.eventSocialWhatsapp
-    || event.organizerWhatsapp
-    || event.whatsapp
+    event.beltRegistrationPhone
+    || event.beltRegistrationWhatsapp
     || ''
   );
   if (!phone) return '';
@@ -194,11 +268,11 @@ const buildBeltRegistrationWhatsappUrl = ({ event = {}, profile = {}, beltRegist
   const beltName = beltRegistration.title || 'Cinturo';
   const priceText = formatBrlCurrency(beltRegistration.price || 0);
   const message = [
-    `Ola, quero fazer a inscricao no ${beltName}.`,
+    `Olá, quero fazer a inscrição para Luta Casada / Cinturão.`,
     `Evento: ${event.name || ''}`,
     `Atleta: ${athleteName}`,
-    `Faixa: ${profile.belt || profile.faixa || ''}`,
-    `Valor informado: ${priceText}`
+    `Faixa: ${profile.belt || profile.faixa || 'Não informada'}`,
+    `Academia: ${profile.team || profile.equipe || 'Não informada'}`
   ].filter(Boolean).join('\n');
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 };
@@ -317,6 +391,11 @@ const TournamentRegistrationFlow = ({ event, onComplete }) => {
     voucherCode: ''
   });
 
+  // Scroll to top smoothly when changing steps (changing screens)
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [step]);
+
   const handleRemoveProfile = (profileId) => {
     if (typeof deleteMemberProfile === 'function') {
       deleteMemberProfile(profileId);
@@ -392,9 +471,11 @@ const TournamentRegistrationFlow = ({ event, onComplete }) => {
     setStep(2);
   };
 
+  // Salva a escolha de categoria e peso e avança direto para o processamento de pagamento
   const handleCategoryConfirm = (data) => {
     setRegistrationData(data);
-    setStep(3);
+    // Pula a tela 3 (PaymentStep) e já aciona a finalização com Mercado Pago
+    handleFinish({ useMercadoPago: true }, data);
   };
 
   // ========================================== //
@@ -402,8 +483,9 @@ const TournamentRegistrationFlow = ({ event, onComplete }) => {
   // ========================================== //
   // Esta função é acionada ao finalizar a etapa de pagamento.
   // Ela monta o payload de inscrição do atleta e envia para a API.
-  const handleFinish = async (proofData = {}) => {
+  const handleFinish = async (proofData = {}, overrideRegistrationData = null) => {
     try {
+      const activeRegData = overrideRegistrationData || registrationData;
       const categoryInfo = resolveCategoryByProfile(selectedProfile);
       const now = Date.now();
 
@@ -418,22 +500,22 @@ const TournamentRegistrationFlow = ({ event, onComplete }) => {
       phone: selectedProfile.phone || '',
       academia: selectedProfile.academyName || selectedProfile.academy || selectedProfile.academia || 'Sem Academia',
       faixa: selectedProfile.belt || selectedProfile.faixa || 'Branca',
-      peso: registrationData.weight || 'Padrao',
+      peso: activeRegData.weight || 'Padrao',
       genero: selectedProfile.gender || 'Masculino',
       photoUrl: selectedProfile.photoUrl || '',
     };
 
     // Resolve selected modalities
-    // registrationData.modalities is an array like ['GI', 'NO-GI']
-    // registrationData.modality is a single string fallback
-    const selectedModalities = Array.isArray(registrationData.modalities) && registrationData.modalities.length > 0
-      ? registrationData.modalities
-      : [registrationData.modality || 'GI'];
+    // activeRegData.modalities is an array like ['GI', 'NO-GI']
+    // activeRegData.modality is a single string fallback
+    const selectedModalities = Array.isArray(activeRegData.modalities) && activeRegData.modalities.length > 0
+      ? activeRegData.modalities
+      : [activeRegData.modality || 'GI'];
 
-    const hasAbsoluto = !!registrationData.absolute;
-    const ageCategory  = registrationData.category || categoryInfo?.ageCategory || 'Adulto';
+    const hasAbsoluto = !!activeRegData.absolute;
+    const ageCategory  = activeRegData.category || categoryInfo?.ageCategory || 'Adulto';
     const belt         = selectedProfile.belt || selectedProfile.faixa || '';
-    const weight       = registrationData.weight || '';
+    const weight       = activeRegData.weight || '';
     const gender       = selectedProfile.gender || 'Masculino';
 
     // Build one registration per modality and absolute
@@ -450,13 +532,14 @@ const TournamentRegistrationFlow = ({ event, onComplete }) => {
         isNoGi,
         isAbsolute: false,
         categoria: fullCategory,
-        price: registrationData.price,
-        status: 'PENDING',
+        price: activeRegData.price,
+        status: 'APPROVED',
+        paymentMethod: 'Mercado Pago',
         notes: JSON.stringify({
           absolute: false,
           modalities: selectedModalities,
-          pricingBreakdown: registrationData.pricingBreakdown || null,
-          totalValue: registrationData.price,
+          pricingBreakdown: activeRegData.pricingBreakdown || null,
+          totalValue: activeRegData.price,
           savedLocally: true,
           comprovanteArquivoDataUrl: proofData.proofDataUrl || '',
           comprovanteNome: proofData.proofName || '',
@@ -479,13 +562,14 @@ const TournamentRegistrationFlow = ({ event, onComplete }) => {
           isNoGi,
           isAbsolute: true,
           categoria: absCategory,
-          price: registrationData.pricingBreakdown?.absoluteFee ?? registrationData.price,
-          status: 'PENDING',
+          price: activeRegData.pricingBreakdown?.absoluteFee ?? activeRegData.price,
+          status: 'APPROVED',
+          paymentMethod: 'Mercado Pago',
           notes: JSON.stringify({
             absolute: true,
             modalities: selectedModalities,
-            pricingBreakdown: registrationData.pricingBreakdown || null,
-            totalValue: registrationData.pricingBreakdown?.absoluteFee ?? registrationData.price,
+            pricingBreakdown: activeRegData.pricingBreakdown || null,
+            totalValue: activeRegData.pricingBreakdown?.absoluteFee ?? activeRegData.price,
             savedLocally: true,
             comprovanteArquivoDataUrl: proofData.proofDataUrl || '',
             comprovanteNome: proofData.proofName || '',
@@ -537,27 +621,27 @@ const TournamentRegistrationFlow = ({ event, onComplete }) => {
     localStorage.removeItem(`registration_progress_${event.id}`);
     if (onComplete) onComplete();
     
-    // STRIPE INTEGRATION: Redirect if Stripe was chosen
-    if (proofData.useStripe && registrationData.price > 0) {
+    // MERCADO PAGO INTEGRATION: Redirect if Mercado Pago was chosen
+    if (proofData.useMercadoPago && activeRegData.price > 0) {
       try {
         const registrationIds = payloads.map(p => p.id).join(',');
         const athleteName = selectedProfile.fullName || selectedProfile.nome || 'Atleta';
         const data = await publicRegistrationService.createCheckoutSession({
           registrationIds,
           athleteName,
-          amount: registrationData.price
+          amount: activeRegData.price
         });
         
         if (data.url) {
-          window.location.href = data.url; // Redirect to Stripe Checkout
+          window.location.href = data.url;
           return;
         } else {
-          console.error('Failed to create Stripe Checkout session, no url returned');
-          alert('Erro ao iniciar pagamento via Stripe. Tente novamente mais tarde.');
+          console.error('Failed to create Mercado Pago Checkout session, no url returned', data);
+          alert('Erro ao iniciar pagamento via Mercado Pago. Tente novamente mais tarde.');
         }
       } catch (err) {
-        console.error('Stripe error:', err);
-        alert('Erro ao conectar com Stripe.');
+        console.error('Mercado Pago error:', err);
+        alert('Erro ao conectar com Mercado Pago: ' + err.message);
       }
     }
     
@@ -646,18 +730,6 @@ const TournamentRegistrationFlow = ({ event, onComplete }) => {
               />
             );
           })()}
-          {step === 3 && (
-            // ========================================== //
-            // TELA DE PAGAMENTO (GERAÇÃO DE PIX/CARTÃO) //
-            // ========================================== //
-            <PaymentStep
-              key="step3"
-              event={event}
-              profile={selectedProfile}
-              registration={registrationData}
-              onComplete={handleFinish}
-            />
-          )}
           {step === 4 && (
             <SuccessStep
               key="step4"
@@ -1022,7 +1094,7 @@ const CategorySelectionStep = ({ profile, event, registeredModalities = [], onCo
     modalitiesCount: modalities.length,
     absolute
   }), [absolute, event, modalities.length, profile]);
-  const basePrice = serverClockPrice.base || ((profile.age || 0) <= 15 ? eventFees.under15 : eventFees.over15);
+  const basePrice = serverClockPrice.base || ((profile?.age || 0) <= 15 ? eventFees.under15 : eventFees.over15);
   const absoluteFee = serverClockPrice.absoluteFee || eventFees.absolute;
   const comboPrice = serverClockPrice.combo || eventFees.combo;
   const activeBatchName = serverClockPrice.batchName || 'Lote atual';
@@ -1030,9 +1102,9 @@ const CategorySelectionStep = ({ profile, event, registeredModalities = [], onCo
 
   const totalPrice = useMemo(() => {
     if (voucher && voucher.trim().length > 0) return 0;
-    const fallbackTotal = categoryBasePrice + (absolute ? absoluteFee : 0);
-    return serverClockPrice.total || fallbackTotal;
-  }, [absolute, absoluteFee, categoryBasePrice, serverClockPrice.total, voucher]);
+    if (modalities.length === 0 && !absolute) return 0;
+    return serverClockPrice.total;
+  }, [absolute, modalities.length, serverClockPrice.total, voucher]);
 
   const toggleModality = (mod) => {
     setModalities(prev => {
@@ -1152,24 +1224,26 @@ const CategorySelectionStep = ({ profile, event, registeredModalities = [], onCo
                 <span>KIMONO {registeredModalities.includes('GI') ? '(Ja inscrito)' : ''}</span>
               </div>
             </button>
-            <button
-              type="button"
-              className={`modality-btn-pro ${modalities.includes('NO-GI') ? 'is-active' : ''} ${registeredModalities.includes('NO-GI') ? 'is-disabled' : ''}`}
-              onClick={() => {
-                if (registeredModalities.includes('NO-GI')) return;
-                toggleModality('NO-GI');
-              }}
-              disabled={registeredModalities.includes('NO-GI')}
-              style={registeredModalities.includes('NO-GI') ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
-            >
-              <div className="modality-btn-pro__check">
-                <Check size={14} />
-              </div>
-              <div className="modality-btn-pro__content">
-                <strong>NO-GI</strong>
-                <span>SEM KIMONO {registeredModalities.includes('NO-GI') ? '(Ja inscrito)' : ''}</span>
-              </div>
-            </button>
+            {Number(event?.feeCombo || event?.priceCombo || 0) > 0 && (
+              <button
+                type="button"
+                className={`modality-btn-pro ${modalities.includes('NO-GI') ? 'is-active' : ''} ${registeredModalities.includes('NO-GI') ? 'is-disabled' : ''}`}
+                onClick={() => {
+                  if (registeredModalities.includes('NO-GI')) return;
+                  toggleModality('NO-GI');
+                }}
+                disabled={registeredModalities.includes('NO-GI')}
+                style={registeredModalities.includes('NO-GI') ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+              >
+                <div className="modality-btn-pro__check">
+                  <Check size={14} />
+                </div>
+                <div className="modality-btn-pro__content">
+                  <strong>NO-GI</strong>
+                  <span>SEM KIMONO {registeredModalities.includes('NO-GI') ? '(Ja inscrito)' : ''}</span>
+                </div>
+              </button>
+            )}
             {beltRegistration.enabled && (
               <button
                 type="button"
@@ -1216,17 +1290,19 @@ const CategorySelectionStep = ({ profile, event, registeredModalities = [], onCo
           />
         </div>
 
-        <div className="absolute-upsell">
-          <div className="absolute-upsell__content">
-            <h3>Inscricao no Absoluto?</h3>
-            <p>Lute na categoria sem limite de peso da sua faixa.</p>
-            <div className="absolute-upsell__price">+{formatBrlCurrency(absoluteFee)}</div>
+        {Number(event?.feeAbsolute || event?.priceAbsolute || 0) > 0 && (
+          <div className="absolute-upsell">
+            <div className="absolute-upsell__content">
+              <h3>Inscricao no Absoluto?</h3>
+              <p>Lute na categoria sem limite de peso da sua faixa.</p>
+              <div className="absolute-upsell__price">+{formatBrlCurrency(absoluteFee)}</div>
+            </div>
+            <label className="pro-switch">
+              <input type="checkbox" checked={absolute} onChange={(e) => setAbsolute(e.target.checked)} />
+              <span className="pro-slider"></span>
+            </label>
           </div>
-          <label className="pro-switch">
-            <input type="checkbox" checked={absolute} onChange={(e) => setAbsolute(e.target.checked)} />
-            <span className="pro-slider"></span>
-          </label>
-        </div>
+        )}
 
 
         {event.liabilityWaiver && (
@@ -1256,12 +1332,20 @@ const CategorySelectionStep = ({ profile, event, registeredModalities = [], onCo
             <div className="total-label">Total a pagar</div>
             <div className="total-amount">{formatBrlCurrency(totalPrice)}</div>
             <div className="total-breakdown">
-              {activeBatchName}  {categoryInfo.ageCategoryLabel}  Base {formatBrlCurrency(categoryBasePrice)}
-              {absolute ? ` + Absoluto ${formatBrlCurrency(absoluteFee)}` : ''}
+              {modalities.length === 0 ? (
+                absolute ? `Apenas Absoluto ${formatBrlCurrency(absoluteFee)}` : 'Já inscrito nas modalidades deste evento'
+              ) : (
+                <>{activeBatchName} • {categoryInfo.ageCategoryLabel} • Base {formatBrlCurrency(categoryBasePrice)}{absolute ? ` + Absoluto ${formatBrlCurrency(absoluteFee)}` : ''}</>
+              )}
             </div>
           </div>
-          <button type="submit" className="btn-confirm-pro" disabled={!weight || (event.liabilityWaiver && !acceptLiability)}>
-            AVANAR PARA PAGAMENTO <ChevronRight size={20} />
+          <button
+            type="submit"
+            className="btn-confirm-pro"
+            disabled={!weight || (modalities.length === 0 && !absolute) || (event.liabilityWaiver && !acceptLiability)}
+            style={(!weight || (modalities.length === 0 && !absolute)) ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+          >
+            {(modalities.length === 0 && !absolute) ? 'NENHUMA MODALIDADE SELECIONADA' : 'AVANÇAR PARA PAGAMENTO'} <ChevronRight size={20} />
           </button>
         </div>
       </form>
@@ -1443,13 +1527,13 @@ const PaymentStep = ({ event, profile, registration, onComplete }) => {
                 className={paymentMethod === 'pix' ? 'active' : ''}
                 onClick={() => setPaymentMethod('pix')}
               >
-                <QrCode size={20} /> Pix
+                <QrCode size={20} /> Pix Manual
               </button>
               <button
                 className={paymentMethod === 'card' ? 'active' : ''}
                 onClick={() => setPaymentMethod('card')}
               >
-                <CreditCard size={20} /> Cartao
+                <CreditCard size={20} /> Mercado Pago (Recomendado)
               </button>
             </div>
 
@@ -1493,10 +1577,10 @@ const PaymentStep = ({ event, profile, registration, onComplete }) => {
               ) : (
                 <div className="card-payment" style={{ padding: '2rem', textAlign: 'center', background: '#111', borderRadius: '12px', border: '1px solid #3f3f46' }}>
                   <div className="card-placeholder">
-                    <CreditCard size={48} style={{ margin: '0 auto 1rem', color: '#6366f1' }} />
-                    <h4 style={{ marginBottom: '0.75rem', color: '#f4f4f5' }}>Pagar com Cartão de Crédito via Stripe</h4>
+                    <CreditCard size={48} style={{ margin: '0 auto 1rem', color: '#009ee3' }} />
+                    <h4 style={{ marginBottom: '0.75rem', color: '#f4f4f5' }}>Pagar com Mercado Pago</h4>
                     <p style={{ fontSize: '0.9rem', color: '#a1a1aa' }}>
-                      Você será redirecionado para o ambiente seguro da Stripe para finalizar seu pagamento com cartão, Apple Pay ou Google Pay.
+                      Você será redirecionado para o ambiente seguro do Mercado Pago para finalizar seu pagamento via PIX, Cartão ou Boleto.
                     </p>
                   </div>
                 </div>
@@ -1511,14 +1595,14 @@ const PaymentStep = ({ event, profile, registration, onComplete }) => {
           className="btn-finish" 
           onClick={() => {
             if (paymentMethod === 'card') {
-              onComplete({ useStripe: true });
+              onComplete({ useMercadoPago: true });
             } else {
               handleFinish();
             }
           }} 
           disabled={isProcessingProof || (registration.price > 0 && paymentMethod === 'pix' && !proofFile)}
         >
-          {isProcessingProof ? 'Processando...' : registration.price === 0 ? 'Confirmar Inscricao' : paymentMethod === 'card' ? 'Pagar Inscrição via Stripe' : 'Enviar Comprovante e Finalizar'}
+          {isProcessingProof ? 'Processando...' : registration.price === 0 ? 'Confirmar Inscricao' : paymentMethod === 'card' ? 'Pagar com Mercado Pago' : 'Enviar Comprovante e Finalizar'}
           <Check size={20} />
         </button>
       </div>

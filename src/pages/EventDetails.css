@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 /* EventDetails.css */
 
 /* Overrides para que a tela do evento ocupe 100% do espaço (removendo margens do container) */
@@ -15,6 +17,7 @@ body.event-details-active .app-main > .container {
   color: #e4e4e7;
   min-height: 100vh;
   font-family: var(--font-body, system-ui, sans-serif);
+  zoom: 1.2; /* Aumenta toda a página em 20% */
 }
 
 .sc-hero {
@@ -22,32 +25,32 @@ body.event-details-active .app-main > .container {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 24px;
+  padding: 24px max(2rem, calc((100% - 1400px) / 2));
   border-bottom: 1px solid #27272a;
 }
 
 .sc-hero-left {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 24px;
 }
 
 .sc-hero-poster {
-  width: 80px;
-  height: 45px;
+  width: 140px;
+  height: 80px;
   object-fit: cover;
-  border-radius: 4px;
+  border-radius: 8px;
 }
 
 .sc-hero-info h1 {
-  font-size: 1.1rem;
+  font-size: 1.6rem;
   font-weight: 700;
-  margin: 0 0 4px 0;
+  margin: 0 0 8px 0;
   color: #fff;
 }
 
 .sc-hero-info p {
-  font-size: 0.85rem;
+  font-size: 1rem;
   margin: 0;
   color: #a1a1aa;
 }
@@ -55,15 +58,15 @@ body.event-details-active .app-main > .container {
 .sc-hero-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
 }
 
 .sc-btn-icon {
   background: #27272a;
   border: none;
   color: #e4e4e7;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -75,20 +78,58 @@ body.event-details-active .app-main > .container {
   background: #3f3f46;
 }
 
+@keyframes btnBouncePulse {
+  0% {
+    transform: translateY(0) scale(1);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+  }
+  15% {
+    transform: translateY(-8px) scale(1.05);
+    box-shadow: 0 12px 24px rgba(37, 99, 235, 0.7);
+  }
+  30% {
+    transform: translateY(0) scale(1.01);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+  }
+  42% {
+    transform: translateY(-4px) scale(1.03);
+    box-shadow: 0 8px 18px rgba(37, 99, 235, 0.55);
+  }
+  55% {
+    transform: translateY(0) scale(1);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+  }
+}
+
 .sc-btn-primary {
-  background-color: #3b82f6;
+  background-color: #2563eb;
   color: #fff;
   border: none;
-  padding: 8px 16px;
-  border-radius: 6px;
-  font-weight: 600;
+  padding: 9px 20px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 700;
   cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s, box-shadow 0.2s;
+  animation: btnBouncePulse 2.4s infinite ease-in-out;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+}
+
+.sc-btn-primary:hover {
+  background-color: #1d4ed8;
+  animation-play-state: paused;
+  transform: translateY(-3px) scale(1.04);
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.7);
 }
 
 .sc-tabs-nav {
   display: flex;
-  gap: 24px;
-  padding: 0 24px;
+  gap: 32px;
+  padding: 0 max(2rem, calc((100% - 1400px) / 2));
   background-color: #000000;
   border-bottom: 1px solid #27272a;
   overflow-x: auto;
@@ -97,38 +138,41 @@ body.event-details-active .app-main > .container {
 .sc-tab {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 16px 0;
+  gap: 10px;
+  padding: 20px 0;
   color: #a1a1aa;
   cursor: pointer;
-  font-size: 0.95rem;
-  font-weight: 500;
-  border-bottom: 2px solid transparent;
+  font-size: 1.05rem;
+  font-weight: 600;
+  border-bottom: 3px solid transparent;
   white-space: nowrap;
 }
 
 .sc-tab.active {
   color: #fff;
-  border-bottom-color: #3b82f6;
+  border-bottom-color: #fff;
 }
 
 .sc-subnav {
   display: flex;
-  gap: 12px;
-  padding: 16px 24px;
+  gap: 16px;
+  padding: 24px max(2rem, calc((100% - 1400px) / 2));
   background-color: #121212;
   overflow-x: auto;
 }
 
 .sc-subtab {
-  padding: 6px 16px;
-  border-radius: 20px;
+  padding: 10px 24px;
+  border-radius: 30px;
   color: #a1a1aa;
-  font-size: 0.85rem;
-  font-weight: 500;
+  font-size: 1rem;
+  font-weight: 600;
   cursor: pointer;
   border: 1px solid #27272a;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .sc-subtab.active {
@@ -139,15 +183,15 @@ body.event-details-active .app-main > .container {
 
 .sc-content {
   padding: 24px 2rem;
-  max-width: 1100px;
+  max-width: 1400px;
   margin: 0 auto;
   width: 100%;
 }
 
 .sc-info-body {
   display: grid;
-  grid-template-columns: 1fr 350px;
-  gap: 32px;
+  grid-template-columns: 1fr 480px;
+  gap: 80px;
   align-items: start;
 }
 
@@ -161,24 +205,23 @@ body.event-details-active .app-main > .container {
 .sc-hero-card {
   display: flex;
   flex-direction: row;
-  border-radius: 16px;
+  border-radius: 12px;
   overflow: hidden;
-  background: #1c1c20;
-  border: 1px solid rgba(255,255,255,0.07);
+  background: #27272a;
+  border: none;
   margin-bottom: 32px;
-  margin-left: -2rem;
-  margin-right: -2rem;
-  height: 380px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.45);
+  height: 440px;
+  padding: 16px 0 16px 16px;
 }
 
 /* ─── IMAGEM GRANDE (esquerda) ─── */
 .sc-hero-card__banner {
   position: relative;
-  flex: 0 0 75%;
+  flex: 1;
   height: 100%;
   overflow: hidden;
   background: #0f0f12;
+  border-radius: 8px;
 }
 
 .sc-hero-card__img {
@@ -206,40 +249,36 @@ body.event-details-active .app-main > .container {
 
 /* ─── PAINEL DATAS (direita) ─── */
 .sc-hero-card__dates {
-  flex: 0 0 25%;
+  flex: 0 0 35%;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  background: #131316;
-  border-left: 1px solid rgba(255,255,255,0.06);
-  padding: 20px 16px;
-  gap: 12px;
+  background: transparent;
+  padding: 16px 32px;
+  gap: 20px;
 }
 
 .sc-hero-card__date-row {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .sc-hero-card__date-row--event {
   padding-top: 16px;
-  border-top: 1px solid rgba(255,255,255,0.07);
-  margin-top: 4px;
+  margin-top: 8px;
 }
 
 .sc-hero-card__date-label {
-  font-size: 0.58rem;
-  color: #52525b;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
+  font-size: 0.85rem;
+  color: #a1a1aa;
+  font-weight: 500;
 }
 
 .sc-hero-card__date-value {
-  font-size: 0.78rem;
+  font-size: 1rem;
   font-weight: 700;
-  color: #e4e4e7;
+  color: #fff;
   line-height: 1.3;
 }
 
@@ -353,17 +392,18 @@ body.event-details-active .app-main > .container {
 
 .sc-sidebar-card {
   background-color: #27272a;
-  border-radius: 12px;
+  border-radius: 8px;
   overflow: hidden;
-  border: 1px solid #3f3f46;
+  border: none;
 }
 
 .sc-sidebar-card__header {
-  padding: 16px;
-  font-weight: 700;
-  font-size: 0.95rem;
+  padding: 24px 24px 12px 24px;
+  font-weight: 800;
+  font-size: 1.25rem;
   color: #fff;
-  border-bottom: 1px solid #3f3f46;
+  border-bottom: none;
+  font-family: inherit;
 }
 
 .sc-sidebar-card__header--blue {
@@ -372,11 +412,11 @@ body.event-details-active .app-main > .container {
 }
 
 .sc-sidebar-card__body {
-  padding: 16px;
+  padding: 0 24px 24px 24px;
 }
 
 .sc-sidebar-card__body--links {
-  padding: 8px 0;
+  padding: 0;
 }
 
 .sc-sidebar-card__body--entries {
@@ -386,10 +426,12 @@ body.event-details-active .app-main > .container {
 .sc-organizer-name {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-weight: 600;
-  color: #e4e4e7;
-  margin-bottom: 12px;
+  gap: 12px;
+  font-weight: 500;
+  color: #f4f4f5;
+  margin-bottom: 20px;
+  font-size: 1.15rem;
+  line-height: 1.4;
 }
 
 .sc-organizer-logo {
@@ -402,10 +444,14 @@ body.event-details-active .app-main > .container {
 .sc-organizer-perk {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 0.85rem;
+  gap: 12px;
+  font-size: 1.05rem;
   color: #a1a1aa;
-  margin-bottom: 8px;
+  margin-bottom: 20px; /* Aumentado para dar mais altura */
+}
+
+.sc-organizer-perk:last-child {
+  margin-bottom: 0;
 }
 
 .sc-organizer-perk strong {
@@ -415,12 +461,18 @@ body.event-details-active .app-main > .container {
 .sc-contact-link {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  color: #e4e4e7;
+  gap: 16px;
+  padding: 12px 24px; /* Diminuído para bater a proporção de ~179px */
+  color: #f4f4f5;
   text-decoration: none;
-  font-size: 0.9rem;
+  font-size: 1.05rem;
+  font-weight: 500;
   transition: background 0.2s;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.sc-contact-link:last-child {
+  border-bottom: none;
 }
 
 .sc-contact-link:hover {
@@ -463,19 +515,27 @@ body.event-details-active .app-main > .container {
   border-bottom: none;
 }
 
-.sc-cancel-row {
+.sc-cancel-list-item {
   display: flex;
-  justify-content: space-between;
-  font-size: 0.9rem;
+  flex-direction: column;
+  padding: 16px 24px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
 }
 
-.sc-cancel-label {
-  color: #a1a1aa;
+.sc-cancel-list-item:last-child {
+  border-bottom: none;
 }
 
-.sc-cancel-date {
-  color: #e4e4e7;
-  font-weight: 600;
+.sc-cancel-title {
+  color: #f4f4f5;
+  font-weight: 500;
+  font-size: 1.05rem;
+}
+
+.sc-cancel-desc {
+  color: #71717a;
+  font-size: 0.85rem;
+  margin-top: 4px;
 }
 
 .sc-doc-link {
@@ -531,74 +591,35 @@ body.event-details-active .app-main > .container {
   border: 1px solid rgba(255,255,255,0.12);
 }
 
-.sc-location-platforms__title {
-  font-size: 1rem;
-  font-weight: 700;
-  color: #f1f5f9;
-  margin: 0 0 16px 0;
+.sc-location-header {
+  text-align: center;
+  margin-bottom: 24px;
 }
 
-/* ─── ACCOMMODATION CARDS ─── */
-.sc-accom-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+.sc-location-title {
+  font-family: var(--font-heading, "Outfit", sans-serif);
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #ffffff;
+  text-transform: uppercase;
+  margin: 0 0 12px 0;
+  letter-spacing: 0.02em;
 }
 
-.sc-accom-card {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  background: #1c1c20;
-  border: 1px solid rgba(255,255,255,0.07);
-  border-radius: 12px;
-  padding: 14px 16px;
-  text-decoration: none;
-  color: inherit;
-  transition: background 0.2s, border-color 0.2s, transform 0.15s;
+.sc-location-subtitle {
+  font-size: 1.05rem;
+  color: #cbd5e1;
+  font-weight: 500;
+  margin: 0;
 }
 
-.sc-accom-card:hover {
-  background: #242428;
-  border-color: rgba(59,130,246,0.35);
-  transform: translateY(-2px);
+.sc-interactive-rule {
+  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
 }
-
-.sc-accom-card__logo {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.sc-accom-card__logo--airbnb { background: rgba(255, 90, 96, 0.15); color: #ff5a60; }
-.sc-accom-card__logo--booking { background: rgba(0, 115, 230, 0.15); color: #0073e6; }
-.sc-accom-card__logo--hotels  { background: rgba(255, 165, 0, 0.15);  color: #ffa500; }
-.sc-accom-card__logo--maps    { background: rgba(52, 211, 153, 0.15); color: #34d399; }
-
-.sc-accom-card__info {
-  flex: 1;
-}
-
-.sc-accom-card__name {
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: #e4e4e7;
-  margin-bottom: 2px;
-}
-
-.sc-accom-card__desc {
-  font-size: 0.75rem;
-  color: #71717a;
-}
-
-.sc-accom-card__arrow {
-  font-size: 1.1rem;
-  color: #52525b;
-  transition: color 0.2s, transform 0.2s;
+.sc-interactive-rule:hover {
+  transform: translateX(4px);
+  border-color: #3f3f46 !important;
+  background: #27272a !important;
 }
 
 .sc-accom-card:hover .sc-accom-card__arrow {
@@ -612,18 +633,19 @@ body.event-details-active .app-main > .container {
   }
 }
 
-/* Custom formatting for Event Description */
 .sc-event-description-formatted {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
-  padding: 24px;
+  background: transparent;
+  border: none;
+  padding: 16px 0;
   margin-top: 16px;
-  font-family: var(--font-body, "Outfit", sans-serif);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: #e2e8f0;
 }
 
 .sc-desc-inline-heading {
-  font-family: var(--font-heading, "Outfit", sans-serif);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 1.15rem;
   font-weight: 700;
   color: #ffffff;
@@ -659,3 +681,53 @@ body.event-details-active .app-main > .container {
 
 
 
+
+@keyframes livePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.05); }
+}
+
+/* BLOCO CTA DE INSCRIÇÃO DIRETA NA PÁGINA DO EVENTO */
+.sc-cta-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  padding: 1.6rem 1.8rem;
+  background: linear-gradient(135deg, rgba(30, 58, 138, 0.35), rgba(15, 23, 42, 0.85));
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  border-left: 5px solid #2563eb;
+  border-radius: 12px;
+  margin-top: 2rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.sc-cta-box__content {
+  flex: 1;
+  min-width: 260px;
+}
+
+.sc-cta-box__title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0 0 0.35rem 0;
+  letter-spacing: 0.02em;
+}
+
+.sc-cta-box__subtitle {
+  font-size: 0.95rem;
+  color: #cbd5e1;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.sc-cta-box__btn {
+  padding: 12px 24px !important;
+  font-size: 1rem !important;
+  font-weight: 800 !important;
+  border-radius: 10px !important;
+  white-space: nowrap;
+  flex-shrink: 0;
+}

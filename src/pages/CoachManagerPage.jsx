@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { motion } from 'framer-motion';
 import { useStore } from '../hooks/useStore';
 import GerenteTreinador from '../components/GerenteTreinador';
 import LoginOverlay from '../components/LoginOverlay';
@@ -165,27 +166,38 @@ const CoachManagerPage = () => {
 
       <div style={{ marginTop: '2rem', marginBottom: '5rem', paddingLeft: 'clamp(1.5rem, 4vw, 4rem)', paddingRight: 'clamp(1.5rem, 4vw, 4rem)' }}>
         {/* Seletor de Campeonato */}
-        <div style={{
-          background: 'rgba(15, 23, 42, 0.6)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(36, 120, 255, 0.2)',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)',
-          borderRadius: '24px',
-          padding: '32px',
-          marginBottom: '36px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '24px',
-          flexWrap: 'wrap'
-        }}>
-          <div style={{ flex: '1', minWidth: '250px' }}>
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          style={{
+            background: 'rgba(15, 23, 42, 0.4)',
+            backdropFilter: 'blur(24px)',
+            border: '1px solid rgba(0, 194, 203, 0.15)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05), 0 0 40px rgba(0, 194, 203, 0.05)',
+            borderRadius: '24px',
+            padding: '32px',
+            marginBottom: '40px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '24px',
+            flexWrap: 'wrap',
+            position: 'relative',
+            overflow: 'hidden'
+          }}
+        >
+          {/* Decorative glowing orb in background */}
+          <div style={{ position: 'absolute', top: '-50px', right: '-50px', width: '200px', height: '200px', background: 'rgba(0,194,203,0.1)', filter: 'blur(60px)', borderRadius: '50%', pointerEvents: 'none' }} />
+          
+          <div style={{ flex: '1', minWidth: '250px', position: 'relative', zIndex: 1 }}>
             <label style={{
-              display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px',
-              color: 'var(--brand-primary, #00c2cb)',
-              fontWeight: '700', fontSize: '12px',
-              textTransform: 'uppercase', letterSpacing: '0.1em',
+              display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px',
+              color: '#00c2cb',
+              fontWeight: '700', fontSize: '13px',
+              textTransform: 'uppercase', letterSpacing: '0.12em',
+              textShadow: '0 0 10px rgba(0,194,203,0.3)'
             }}>
-              <Trophy size={14} /> Selecione o Campeonato Alvo
+              <Trophy size={16} /> Selecione o Campeonato Alvo
             </label>
 
             {activeEvents.length === 0 ? (
@@ -206,14 +218,16 @@ const CoachManagerPage = () => {
               </div>
             ) : (
               <div style={{ position: 'relative' }}>
-                <select
+                <motion.select
+                  whileFocus={{ scale: 1.01 }}
+                  whileHover={{ backgroundColor: 'rgba(0,0,0,0.4)', borderColor: 'rgba(0,194,203,0.4)' }}
                   value={selectedEventId}
                   onChange={e => setSelectedEventId(e.target.value)}
                   style={{
                     width: '100%', maxWidth: '600px',
-                    padding: '14px 20px',
-                    borderRadius: '12px',
-                    background: 'rgba(0,0,0,0.3)',
+                    padding: '16px 24px',
+                    borderRadius: '16px',
+                    background: 'rgba(0,0,0,0.25)',
                     color: '#fff',
                     border: '1px solid rgba(255,255,255,0.1)',
                     fontSize: '16px',
@@ -222,19 +236,22 @@ const CoachManagerPage = () => {
                     cursor: 'pointer',
                     appearance: 'none',
                     transition: 'all 0.3s ease',
+                    boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)',
                   }}
-                  onFocus={e => e.target.style.borderColor = 'var(--brand-primary)'}
-                  onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+                  onFocus={e => { e.target.style.borderColor = '#00c2cb'; e.target.style.boxShadow = '0 0 0 4px rgba(0,194,203,0.1)'; }}
+                  onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'inset 0 2px 4px rgba(0,0,0,0.2)'; }}
                 >
                   {activeEvents.map(ev => (
-                    <option key={ev.id} value={ev.id}>{ev.name}</option>
+                    <option key={ev.id} value={ev.id} style={{ background: '#0f172a' }}>{ev.name}</option>
                   ))}
-                </select>
-                <ChevronDown size={18} style={{ position: 'absolute', right: '20px', top: '50%', transform: 'translateY(-50%)', color: '#888', pointerEvents: 'none' }} />
+                </motion.select>
+                <div style={{ position: 'absolute', right: '20px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#00c2cb' }}>
+                  <ChevronDown size={20} />
+                </div>
               </div>
             )}
           </div>
-        </div>
+        </motion.div>
 
         {/* Componente de gerenciamento */}
         {campeonatoAtivo ? (

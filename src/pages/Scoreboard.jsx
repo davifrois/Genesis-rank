@@ -7,7 +7,7 @@ import { buildBracketMatches } from '../services/bracketService';
 const DEFAULT_TIME = 300; // 5 minutes
 
 const Scoreboard = () => {
-  const { events, athletes, brackets: storeBrackets, finalizeMatch, applyBracketPodium, setBracketPodium, applyBracketToRanking } = useStore();
+  const { events, athletes, brackets: storeBrackets, finalizeMatch, applyBracketPodium, setBracketPodium, applyBracketToRanking, setBracketLiveStatus } = useStore();
 
   const [selectedEventId, setSelectedEventId] = useState('');
   const [selectedBracketId, setSelectedBracketId] = useState('');
@@ -19,6 +19,7 @@ const Scoreboard = () => {
   const [matchInfo, setMatchInfo] = useState({
     category: 'CATEGORIA',
     matchNumber: '0',
+    totalMatches: '0',
     phase: 'FASE',
     athleteA: { id: 'A', name: 'LUTADOR A', academy: 'ACADEMIA A' },
     athleteB: { id: 'B', name: 'LUTADOR B', academy: 'ACADEMIA B' }
@@ -80,22 +81,75 @@ const Scoreboard = () => {
       setBrackets([]);
       return;
     }
-    const filteredBrackets = storeBrackets.filter(b => b.eventId === selectedEventId);
+    
+    const getSortKeys = (label) => {
+      const upper = label.toUpperCase();
+      
+      let isKids = true;
+      let primaryIndex = 99;
+      
+      if (upper.includes('PRE-MIRIM') || upper.includes('PRÉ-MIRIM') || upper.includes('MIRIM')) {
+        primaryIndex = 0;
+      } else if (upper.includes('INFANTIL')) {
+        primaryIndex = 1;
+      } else if (upper.includes('INFANTO') || upper.includes('INF JUVENIL')) {
+        primaryIndex = 2;
+      } else if (upper.includes('JUVENIL')) {
+        primaryIndex = 3;
+      } else {
+        isKids = false;
+      }
+
+      let beltIndex = 99;
+      if (upper.includes('BRANCA')) beltIndex = 0;
+      else if (upper.includes('CINZA')) beltIndex = 1;
+      else if (upper.includes('AMARELA')) beltIndex = 2;
+      else if (upper.includes('LARANJA')) beltIndex = 3;
+      else if (upper.includes('VERDE')) beltIndex = 4;
+      else if (upper.includes('AZUL')) beltIndex = 5;
+      else if (upper.includes('ROXA')) beltIndex = 6;
+      else if (upper.includes('MARROM')) beltIndex = 7;
+      else if (upper.includes('PRETA')) beltIndex = 8;
+
+      let adultAgeIndex = 99;
+      if (!isKids) {
+        if (upper.includes('ADULTO')) adultAgeIndex = 0;
+        else if (upper.includes('MASTER 1')) adultAgeIndex = 1;
+        else if (upper.includes('MASTER 2')) adultAgeIndex = 2;
+        else if (upper.includes('MASTER 3')) adultAgeIndex = 3;
+        else if (upper.includes('MASTER 4')) adultAgeIndex = 4;
+        else if (upper.includes('MASTER 5')) adultAgeIndex = 5;
+        else if (upper.includes('MASTER 6')) adultAgeIndex = 6;
+        else if (upper.includes('MASTER 7')) adultAgeIndex = 7;
+        else if (upper.includes('MASTER')) adultAgeIndex = 8;
+      }
+
+      const isAbsoluto = upper.includes('ABSOLUTO') ? 1 : 0;
+
+      if (isKids) {
+        return { isAbsoluto, group: primaryIndex, sub1: beltIndex };
+      } else {
+        return { isAbsoluto, group: 10 + adultAgeIndex, sub1: beltIndex };
+      }
+    };
+
+    let filteredBrackets = storeBrackets.filter(b => b.eventId === selectedEventId && !b.podium?.goldId);
+    
+    filteredBrackets.sort((a, b) => {
+      const keysA = getSortKeys(a.label);
+      const keysB = getSortKeys(b.label);
+      
+      if (keysA.isAbsoluto !== keysB.isAbsoluto) return keysA.isAbsoluto - keysB.isAbsoluto;
+      if (keysA.group !== keysB.group) return keysA.group - keysB.group;
+      if (keysA.sub1 !== keysB.sub1) return keysA.sub1 - keysB.sub1;
+      
+      return a.label.localeCompare(b.label);
+    });
+
     setBrackets(filteredBrackets);
   }, [selectedEventId, storeBrackets]);
 
-  useEffect(() => {
-    if (!selectedBracketId) {
-      setMatches([]);
-      return;
-    }
-    const bracket = brackets.find(b => b.id === selectedBracketId);
-    if (bracket) {
-      setMatches(buildBracketMatches(bracket.seedIds, bracket.size, bracket.manualSlots, false, bracket.matchResults || {}));
-    } else {
-      setMatches([]);
-    }
-  }, [selectedBracketId, brackets]);
+
 
   useEffect(() => {
     if (broadcastRef.current) {
@@ -124,7 +178,7 @@ const Scoreboard = () => {
     const bracket = brackets.find(b => b.id === selectedBracketId);
     if (!bracket) return;
     
-    const matchList = buildBracketMatches(bracket.seedIds, bracket.size, bracket.manualSlots, false, bracket.matchResults || {});
+    const matchList = buildBracketMatches(bracket.seedIds, bracket.size, bracket.manualSlots, bracket.pairingMode === 'SAME_ACADEMY', bracket.matchResults || {});
     const match = matchList.find(m => m.id === matchId);
     if (!match) return;
 
@@ -146,6 +200,7 @@ const Scoreboard = () => {
     setMatchInfo({
        category: bracket.label,
        matchNumber: matchIndex.toString(),
+       totalMatches: matchList.length.toString(),
        phase: phaseName,
        athleteA: { 
           id: match.slotA,
@@ -167,7 +222,40 @@ const Scoreboard = () => {
     setStallingTimerA(null);
     setStallingTimerB(null);
     setWinner(null);
+    
+    // Broadcast that a new live match has started
+    broadcastRef.current?.postMessage({
+      type: 'LIVE_MATCH_STARTED',
+      bracketId: selectedBracketId,
+      matchId: matchId,
+      athleteA: { id: match.slotA, name: athA ? athA.nome : 'A', academy: athA ? athA.academia : '' },
+      athleteB: { id: match.slotB, name: athB ? athB.nome : 'B', academy: athB ? athB.academia : '' }
+    });
   };
+
+  useEffect(() => {
+    if (!selectedBracketId) {
+      setMatches([]);
+      setSelectedMatchId('');
+      return;
+    }
+    const bracket = brackets.find(b => b.id === selectedBracketId);
+    if (bracket) {
+      const matchList = buildBracketMatches(bracket.seedIds, bracket.size, bracket.manualSlots, bracket.pairingMode === 'SAME_ACADEMY', bracket.matchResults || {});
+      setMatches(matchList);
+      
+      const nextMatch = matchList.find(m => !bracket.matchResults?.[m.id]);
+      if (nextMatch && !selectedMatchId) {
+        // Auto-select only if no match is currently selected (e.g. initial load)
+        setTimeout(() => handleMatchSelect(nextMatch.id), 0);
+      } else if (!nextMatch && !selectedMatchId) {
+        setSelectedMatchId('');
+      }
+    } else {
+      setMatches([]);
+      setSelectedMatchId('');
+    }
+  }, [selectedBracketId, brackets]);
 
   useEffect(() => {
     if (isMainTimerRunning && mainTimer > 0) {
@@ -277,7 +365,23 @@ const Scoreboard = () => {
     setWinReason(`VENCEU POR ${selectedOutcome.reason}`);
     
     if (selectedBracketId && selectedMatchId && winnerObj.id) {
-       finalizeMatch(selectedBracketId, selectedMatchId, winnerObj.id, scoreA, scoreB, loserObj.id);
+       const matchDuration = Math.max(0, configuredTime - mainTimer);
+       
+       finalizeMatch(selectedBracketId, selectedMatchId, winnerObj.id, scoreA, scoreB, loserObj.id, selectedOutcome.reason, matchDuration);
+       
+       // Broadcast the result so EventDetails can update the bracket tree in real time
+       broadcastRef.current?.postMessage({
+         type: 'BRACKET_MATCH_RESULT',
+         bracketId: selectedBracketId,
+         matchId: selectedMatchId,
+         winnerId: winnerObj.id,
+         loserId: loserObj.id,
+         scoreA: { ...scoreA },
+         scoreB: { ...scoreB },
+         winReason: selectedOutcome.reason,
+         matchDuration,
+         timestamp: new Date().toISOString()
+       });
        
        const bracket = brackets.find(b => b.id === selectedBracketId);
        let newPodium = { ...bracket?.podium };
@@ -303,10 +407,6 @@ const Scoreboard = () => {
        if (isComplete) {
            if (applyBracketPodium) applyBracketPodium(selectedBracketId, newPodium);
            if (applyBracketToRanking) applyBracketToRanking(selectedBracketId, selectedEventId, new Date().getFullYear());
-           
-           setTimeout(() => {
-               window.location.href = `/eventos/${selectedEventId}?tab=resultados`;
-           }, 2500);
        }
     }
     setIsEndingMatch(false);
@@ -503,7 +603,7 @@ const Scoreboard = () => {
       <div className="sb-footer">
         <div className="sb-footer-left">
           <div className="sb-footer-info-row">
-            <div className="sb-match-num">{matchInfo.matchNumber}-{matchInfo.matchNumber}</div>
+            <div className="sb-match-num">{matchInfo.totalMatches}-{matchInfo.matchNumber}</div>
             <div className="sb-match-details">
               <div className="cat">PLACAR / {matchInfo.category}</div>
               <div className="phase">{matchInfo.phase}</div>
@@ -565,7 +665,7 @@ const Scoreboard = () => {
         </div>
         
         <div className="sb-timer-section">
-          <div className="sb-timer-huge" onClick={() => setIsMainTimerRunning(!isMainTimerRunning)}>
+          <div className={`sb-timer-huge ${isMainTimerRunning && mainTimer <= 10 && mainTimer > 0 ? 'timer-warning-pulse' : ''}`} onClick={() => setIsMainTimerRunning(!isMainTimerRunning)}>
              {formatTime(mainTimer)}
           </div>
           <div className="sb-timer-controls">
@@ -609,7 +709,7 @@ const Scoreboard = () => {
                if (selectedBracketId) {
                  const bracket = brackets.find(b => b.id === selectedBracketId);
                  if (bracket) {
-                   const matchList = buildBracketMatches(bracket.seedIds, bracket.size, bracket.manualSlots, false, bracket.matchResults || {});
+                   const matchList = buildBracketMatches(bracket.seedIds, bracket.size, bracket.manualSlots, bracket.pairingMode === 'SAME_ACADEMY', bracket.matchResults || {});
                    const nextMatch = matchList.find(m => !bracket.matchResults?.[m.id]);
                    if (nextMatch) {
                      handleMatchSelect(nextMatch.id);

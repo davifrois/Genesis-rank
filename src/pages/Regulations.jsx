@@ -88,8 +88,8 @@ const copyByLanguage = {
     category: 'Categoria',
     points: 'Pontos',
     podiumCards: [
-      { place: '1o Lugar', points: '3 pontos', tone: 'gold', icon: Trophy, detail: 'Maior impacto no ranking oficial.' },
-      { place: '2o Lugar', points: '2 pontos', tone: 'silver', icon: Medal, detail: 'Mantem regularidade competitiva.' },
+      { place: '1o Lugar', points: '9 pontos', tone: 'gold', icon: Trophy, detail: 'Maior impacto no ranking oficial.' },
+      { place: '2o Lugar', points: '3 pontos', tone: 'silver', icon: Medal, detail: 'Mantem regularidade competitiva.' },
       { place: '3o Lugar', points: '1 ponto', tone: 'bronze', icon: Award, detail: 'Valoriza cada podium conquistado.' }
     ],
     featureCards: [
@@ -403,12 +403,17 @@ const Regulations = () => {
       <div className="regulations-shell">
         <div className="regulations-main">
           <section className="regulamento-hero" id="regulamento-hero" style={{
-            backgroundImage: `linear-gradient(to bottom, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.95)), url(${heroBg})`,
+            backgroundImage: `linear-gradient(to bottom, rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.88)), url('/arbrito.jpg')`,
             backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            width: '100%',
-            marginLeft: 0,
-            padding: '80px 20px 40px',
+            backgroundPosition: 'center 12%',
+            width: '100vw',
+            position: 'relative',
+            left: '50%',
+            right: '50%',
+            marginLeft: '-50vw',
+            marginRight: '-50vw',
+            minHeight: '380px',
+            padding: '100px 20px 50px',
             display: 'flex',
             justifyContent: 'center',
             borderBottom: '1px solid rgba(255, 255, 255, 0.05)'

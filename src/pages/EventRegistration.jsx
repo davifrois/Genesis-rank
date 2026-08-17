@@ -44,7 +44,49 @@ const EventRegistration = () => {
   const isDateClosed = registrationCloseDate && !Number.isNaN(registrationCloseDate.getTime()) && now > registrationCloseDate;
   const maxAthletes = Number(event.maxAthletes || 0);
   const isCapacityClosed = event.closeOnCapacity === true && maxAthletes > 0 && registrationCount >= maxAthletes;
+  
+  let earliestStart = null;
+  let isRegistrationNotStarted = false;
+  if (Array.isArray(event.batches) && event.batches.length > 0) {
+    let hasOpenBatch = false;
+    for (const batch of event.batches) {
+      if (!batch) continue;
+      if (!batch.startDate) {
+        hasOpenBatch = true;
+        break;
+      }
+      const start = new Date(batch.startDate);
+      if (!Number.isNaN(start.getTime())) {
+        if (earliestStart === null || start < earliestStart) {
+          earliestStart = start;
+        }
+      } else {
+        hasOpenBatch = true;
+        break;
+      }
+    }
+    if (!hasOpenBatch && earliestStart !== null && now < earliestStart) {
+      isRegistrationNotStarted = true;
+    }
+  }
+
   const isRegistrationClosed = lifecycle.isPast || event.registrationOpen === false || isDateClosed || isCapacityClosed;
+
+  if (isRegistrationNotStarted) {
+    return (
+      <div className="registration-flow">
+        <div className="registration-step__header">
+          <h2>Inscrições em Breve</h2>
+          <p>
+            As inscrições para este campeonato abrirão em:{' '}
+            <strong style={{ color: '#00c2cb' }}>
+              {earliestStart.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+            </strong>.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (isRegistrationClosed) {
     return (

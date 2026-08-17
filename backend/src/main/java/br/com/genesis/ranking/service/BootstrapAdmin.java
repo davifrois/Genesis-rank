@@ -33,8 +33,11 @@ public class BootstrapAdmin {
   private boolean seedDefaultPanelUsers;
 
   private static final List<BootstrapUserSeed> DEFAULT_PANEL_USERS = List.of(
-      new BootstrapUserSeed("simone", "simone123", "Simone", "ADMIN"),
-      new BootstrapUserSeed("davifrois", "davifrois324@", "Davi oliveira frois", "ADMIN"),
+      new BootstrapUserSeed("simone", "12345678", "Simone", "ADMIN"),
+      new BootstrapUserSeed("davifrois", "Davifrois324@", "Davi oliveira frois", "ADMIN"),
+      new BootstrapUserSeed("vinicius", "12345678", "Vinicius", "ADMIN"),
+      new BootstrapUserSeed("gabriel", "12345678", "Gabriel", "ADMIN"),
+      new BootstrapUserSeed("tarciso", "12345678", "Tarciso", "ADMIN"),
       new BootstrapUserSeed("mesario1", "mesario123", "Mesario 1", "MESARIO")
   );
 

@@ -1,9 +1,17 @@
 import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
 import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
-if (GlobalWorkerOptions && workerSrc) {
-  GlobalWorkerOptions.workerSrc = workerSrc;
-}
+const setupPdfWorker = () => {
+  if (typeof window === 'undefined' || !GlobalWorkerOptions) return;
+  try {
+    GlobalWorkerOptions.workerPort = new Worker(workerSrc, { type: 'module' });
+  } catch (err) {
+    console.warn('Worker port initialization failed, using unpkg fallback:', err);
+    GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs';
+  }
+};
+
+setupPdfWorker();
 
 const HEADER_IGNORE_MARKERS = [
   'RELACAO DE ATLETAS',
@@ -27,9 +35,24 @@ const ACADEMY_KEYWORDS = new Set([
   'TATAME',
   'MAOS',
   'COLISEU',
+  'ANDRADE',
+  'TUDO',
+  'TEDE',
+  'MARCIO',
+  'EQUIPE',
+  'ERJJ',
+  'TEMPLARIOS',
+  'NFT',
+  'ALAN',
+  'GFTEAM',
+  'CHECKMAT',
+  'NOVA',
+  'UNIAO',
+  'ALLIANCE',
+  'ATOS'
 ]);
 
-const ACADEMY_TAIL_KEYWORDS = new Set(['JJ', 'BJJ', 'TEAM', 'CT']);
+const ACADEMY_TAIL_KEYWORDS = new Set(['JJ', 'BJJ', 'CT']);
 const TABLE_FIELD_LABELS = {
   nome: ['NOME', 'ATLETA', 'ATLETAS', 'COMPETIDOR', 'COMPETIDORES'],
   academia: ['ACADEMIA', 'EQUIPE', 'TEAM'],
@@ -250,6 +273,21 @@ const parseAthletesFromTable = (lines, mode) => {
 };
 
 const splitNameAcademia = (line) => {
+  if (!line) return { nome: '', academia: '' };
+
+  const rawLine = (line || '').replace(/\r/g, '').trim();
+
+  // 1. Primary: Split by 2 or more spaces or tab (PDF column separation)
+  const colParts = rawLine.split(/\s{2,}|\t/).map((s) => s.trim()).filter(Boolean);
+  if (colParts.length >= 2) {
+    const nome = colParts[0];
+    const academia = colParts.slice(1).join(' ');
+    if (nome && !/total de/i.test(nome) && !/relacao de/i.test(nome) && !/atualizado/i.test(nome)) {
+      return { nome, academia };
+    }
+  }
+
+  // 2. Fallback: Single-spaced keyword matching
   const cleaned = cleanLine(line);
   const tokens = cleaned.split(' ').filter(Boolean);
   const upperTokens = tokens.map((token) => normalizeForMatch(token));
@@ -262,26 +300,27 @@ const splitNameAcademia = (line) => {
     }
   }
 
-  if (academyStart === -1) {
-    return { nome: cleaned, academia: '' };
-  }
+  if (academyStart > 0) {
+    if (ACADEMY_TAIL_KEYWORDS.has(upperTokens[academyStart])) {
+      let moved = 0;
+      let backIndex = academyStart - 1;
+      while (backIndex >= 0 && moved < 2) {
+        const candidate = upperTokens[backIndex];
+        if (!candidate) break;
+        academyStart = backIndex;
+        backIndex -= 1;
+        moved += 1;
+      }
+    }
 
-  if (ACADEMY_TAIL_KEYWORDS.has(upperTokens[academyStart])) {
-    let moved = 0;
-    let backIndex = academyStart - 1;
-    while (backIndex >= 0 && moved < 2) {
-      const candidate = upperTokens[backIndex];
-      if (!candidate) break;
-      academyStart = backIndex;
-      backIndex -= 1;
-      moved += 1;
+    const nome = tokens.slice(0, academyStart).join(' ').trim();
+    const academia = tokens.slice(academyStart).join(' ').trim();
+    if (nome && academia) {
+      return { nome, academia };
     }
   }
 
-  const nome = tokens.slice(0, academyStart).join(' ').trim();
-  const academia = tokens.slice(academyStart).join(' ').trim();
-
-  return { nome: nome || cleaned, academia };
+  return { nome: cleaned, academia: '' };
 };
 
 const extractInlineAthleteFromHeader = (line) => {
@@ -315,57 +354,168 @@ export const extractTextFromPdfFile = async (file) => {
 
   try {
     const buffer = await file.arrayBuffer();
-    const pdf = await getDocument({ data: buffer }).promise;
+    let pdf;
+    
+    try {
+      pdf = await getDocument({ data: buffer }).promise;
+    } catch (primaryErr) {
+      console.warn('Primary worker attempt failed, trying unpkg CDN worker:', primaryErr);
+      try {
+        GlobalWorkerOptions.workerPort = null;
+        GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs';
+        pdf = await getDocument({ data: buffer }).promise;
+      } catch (unpkgErr) {
+        console.warn('unpkg CDN worker failed, trying jsDelivr CDN worker:', unpkgErr);
+        GlobalWorkerOptions.workerPort = null;
+        GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs';
+        pdf = await getDocument({ data: buffer }).promise;
+      }
+    }
+
     let combined = '';
 
     for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
       const page = await pdf.getPage(pageNumber);
       const content = await page.getTextContent();
       const layoutText = buildTextFromItems(content.items);
+      const rawText = content.items
+        .map((item) => `${item.str}${item.hasEOL ? '\n' : ' '}`)
+        .join('')
+        .replace(/\r/g, '');
+
       if (layoutText) {
-        combined += `${layoutText}\n`;
+        combined += `${layoutText}\n${rawText}\n`;
       } else {
-        const fallbackText = content.items
-          .map((item) => `${item.str}${item.hasEOL ? '\n' : ' '}`)
-          .join('')
-          .trim();
-        combined += `${fallbackText}\n`;
+        combined += `${rawText}\n`;
       }
     }
 
     return combined;
-  } catch {
-    throw new Error('Falha ao ler o PDF. Verifique o arquivo.');
+  } catch (err) {
+    console.error('Erro na extração de texto do PDF:', err);
+    throw new Error(`Falha ao ler o PDF: ${err?.message || 'Verifique o arquivo.'}`);
   }
 };
 
 export const parseAthletesFromText = (text, mode) => {
-  const normalizedText = (text || '')
-    .replace(/(FEMININO|MASCULINO)\s*\//gi, '\n$1 /')
-    .replace(/TOTAL DE ATLETAS/gi, '\nTOTAL DE ATLETAS');
-  const lines = normalizedText.split(/\r?\n/).map(trimLine).filter(Boolean);
-  const athletes = [];
-  let currentCategory = null;
+  const rawLines = (text || '').split(/\r?\n/).map(trimLine).filter(Boolean);
+  
+  // Check if file uses inline format: ATHLETE_NAME GENDER / BELT / CATEGORY / WEIGHT
+  const isInlineFormat = rawLines.some((line) => {
+    if (!line.includes('/')) return false;
+    const firstPart = line.split('/')[0].trim();
+    const tokens = firstPart.split(/\s+/);
+    if (tokens.length >= 2) {
+      const nonGenderTokens = tokens.filter((t) => !['MASCULINO', 'FEMININO', 'MASC', 'FEM', 'M', 'F'].includes(t.toUpperCase()));
+      return nonGenderTokens.length > 0;
+    }
+    return false;
+  });
 
-  lines.forEach((line) => {
-    if (shouldIgnoreLine(line)) return;
-    const header = parseCategoryHeader(line);
-    if (header) {
-      currentCategory = header;
-      const columns = splitTableColumns(line);
-      if (columns.length > 1) {
-        const nomeCandidate = columns[1];
-        if (nomeCandidate) {
-          const academiaCandidate = columns[2] || '';
-          const parsed = academiaCandidate
-            ? { nome: nomeCandidate, academia: academiaCandidate }
-            : splitNameAcademia(nomeCandidate);
-          if (parsed.nome) {
-            athletes.push({
-              nome: parsed.nome,
-              academia: parsed.academia || 'Sem academia',
+  const parsedAthletes = [];
+
+  if (isInlineFormat) {
+    let currentAcademy = '';
+    
+    rawLines.forEach((line) => {
+      if (/Total de/i.test(line)) return;
+      
+      if (line.includes('/')) {
+        const parts = line.split('/');
+        if (parts.length >= 3) {
+          const firstPart = parts[0].trim();
+          const tokens = firstPart.split(' ');
+          
+          let genero = '';
+          let nome = '';
+          const lastToken = tokens[tokens.length - 1].toUpperCase();
+          if (['MASCULINO', 'FEMININO', 'MASC', 'FEM', 'M', 'F'].includes(lastToken)) {
+            genero = tokens.pop();
+          }
+          nome = tokens.join(' ');
+          
+          const faixa = parts[1].trim();
+          const categoria = parts[2].trim();
+          const peso = parts[3] ? parts[3].trim() : 'Padrao';
+
+          const idadeMatch = categoria.match(/\d+/);
+          let idade = '';
+          if (idadeMatch) {
+            idade = parseInt(idadeMatch[0], 10);
+          } else if (/adulto|master/i.test(categoria)) {
+            idade = 20;
+          }
+
+          if (nome) {
+            parsedAthletes.push({
+              nome,
+              academia: currentAcademy || 'Sem academia',
+              faixa,
+              categoria: `${categoria} / ${genero || 'Masculino'} / ${faixa} / ${peso}`,
+              peso,
+              genero: genero || 'Masculino',
+              idade,
+              isNoGi: mode === 'NO-GI',
+              isAbsolute: false,
+            });
+          }
+        }
+        return;
+      }
+      
+      if (line.trim().length > 0 && !/RELAÇÃO DE ATLETAS/i.test(line) && !/Arquivo Atualizado/i.test(line) && !/DIAMANTES DO VALE/i.test(line) && !/RELACAO DE ATLETAS/i.test(line)) {
+        currentAcademy = line.trim();
+      }
+    });
+  }
+
+  if (!parsedAthletes.length) {
+    // STANDARD / CATEGORY HEADER FORMAT:
+    // FEMININO / CINZA / PRE MIRIM 6 / PLUMA ATE 18,90
+    // IRIS KATHERINE RODRIGUES DA CRUZ OLIVEIRA    TEAM BALLOUTTA
+    // Total de Atletas: 1
+    const normalizedText = (text || '')
+      .replace(/(FEMININO|MASCULINO)\s*\//gi, '\n$1 /')
+      .replace(/TOTAL DE ATLETAS/gi, '\nTOTAL DE ATLETAS');
+    const lines = normalizedText.split(/\r?\n/).map(trimLine).filter(Boolean);
+    let currentCategory = null;
+
+    lines.forEach((line) => {
+      if (shouldIgnoreLine(line)) return;
+
+      const header = parseCategoryHeader(line);
+      if (header) {
+        currentCategory = header;
+        const columns = splitTableColumns(line);
+        if (columns.length > 1) {
+          const nomeCandidate = columns[1];
+          if (nomeCandidate) {
+            const academiaCandidate = columns[2] || '';
+            const parsed = academiaCandidate
+              ? { nome: nomeCandidate, academia: academiaCandidate }
+              : splitNameAcademia(nomeCandidate);
+            if (parsed.nome) {
+              parsedAthletes.push({
+                nome: parsed.nome,
+                academia: parsed.academia || 'Sem academia',
+                faixa: currentCategory.faixa,
+                categoria: `${currentCategory.categoria} / ${currentCategory.genero} / ${currentCategory.faixa} / ${currentCategory.peso}`,
+                peso: currentCategory.peso,
+                genero: currentCategory.genero,
+                isNoGi: mode === 'NO-GI',
+                isAbsolute: false,
+              });
+            }
+          }
+        }
+        if (columns.length <= 1) {
+          const inline = extractInlineAthleteFromHeader(line);
+          if (inline) {
+            parsedAthletes.push({
+              nome: inline.nome,
+              academia: inline.academia || 'Sem academia',
               faixa: currentCategory.faixa,
-              categoria: currentCategory.categoria,
+              categoria: `${currentCategory.categoria} / ${currentCategory.genero} / ${currentCategory.faixa} / ${currentCategory.peso}`,
               peso: currentCategory.peso,
               genero: currentCategory.genero,
               isNoGi: mode === 'NO-GI',
@@ -373,44 +523,44 @@ export const parseAthletesFromText = (text, mode) => {
             });
           }
         }
+        return;
       }
-      if (columns.length <= 1) {
-        const inline = extractInlineAthleteFromHeader(line);
-        if (inline) {
-          athletes.push({
-            nome: inline.nome,
-            academia: inline.academia || 'Sem academia',
-            faixa: currentCategory.faixa,
-            categoria: currentCategory.categoria,
-            peso: currentCategory.peso,
-            genero: currentCategory.genero,
-            isNoGi: mode === 'NO-GI',
-            isAbsolute: false,
-          });
-        }
-      }
-      return;
-    }
 
-    if (!currentCategory) return;
-    const sanitizedLine = stripTotalPrefix(line);
-    if (!sanitizedLine) return;
-    const { nome, academia } = splitNameAcademia(sanitizedLine);
-    if (!nome) return;
+      if (!currentCategory) return;
+      const sanitizedLine = stripTotalPrefix(line);
+      if (!sanitizedLine) return;
 
-    athletes.push({
-      nome,
-      academia: academia || 'Sem academia',
-      faixa: currentCategory.faixa,
-      categoria: currentCategory.categoria,
-      peso: currentCategory.peso,
-      genero: currentCategory.genero,
-      isNoGi: mode === 'NO-GI',
-      isAbsolute: false,
+      if (/total de atletas/i.test(sanitizedLine) || /divinolandia/i.test(sanitizedLine) || /relacao de atletas/i.test(sanitizedLine) || /atualizado/i.test(sanitizedLine)) return;
+
+      const { nome, academia } = splitNameAcademia(sanitizedLine);
+      if (!nome) return;
+
+      parsedAthletes.push({
+        nome,
+        academia: academia || 'Sem academia',
+        faixa: currentCategory.faixa,
+        categoria: `${currentCategory.categoria} / ${currentCategory.genero} / ${currentCategory.faixa} / ${currentCategory.peso}`,
+        peso: currentCategory.peso,
+        genero: currentCategory.genero,
+        isNoGi: mode === 'NO-GI',
+        isAbsolute: false,
+      });
     });
+  }
+
+  const finalAthletes = parsedAthletes.length ? parsedAthletes : parseAthletesFromTable((text || '').split(/\r?\n/).map(trimLine).filter(Boolean), mode);
+
+  // Deduplicate athletes by (nome + faixa + genero)
+  const uniqueAthletes = [];
+  const seen = new Set();
+
+  (finalAthletes || []).forEach((athlete) => {
+    const key = `${normalizeForMatch(athlete.nome)}_${normalizeForMatch(athlete.faixa)}_${normalizeForMatch(athlete.genero)}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      uniqueAthletes.push(athlete);
+    }
   });
 
-  if (athletes.length) return athletes;
-
-  return parseAthletesFromTable(lines, mode);
+  return uniqueAthletes;
 };

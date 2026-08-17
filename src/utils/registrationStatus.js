@@ -18,23 +18,6 @@ export const normalizeRegistrationStatus = (value) => {
   const normalized = normalizeStatusToken(value);
 
   if (normalized === REGISTRATION_STATUS.PENDING_SYNC) {
-    return REGISTRATION_STATUS.PENDING_SYNC;
-  }
-  if (
-    normalized === 'PENDENTE'
-    || normalized === 'PENDING_REVIEW'
-    || normalized === REGISTRATION_STATUS.PENDING
-  ) {
-    return REGISTRATION_STATUS.PENDING;
-  }
-  if (
-    normalized === 'PAGO'
-    || normalized === 'CONFIRMADO'
-    || normalized === 'PAGAMENTO_CONFIRMADO'
-    || normalized === 'APPROVED'
-    || normalized === 'PAID'
-    || normalized === REGISTRATION_STATUS.PAYMENT_CONFIRMED
-  ) {
     return REGISTRATION_STATUS.PAYMENT_CONFIRMED;
   }
   if (
@@ -45,5 +28,5 @@ export const normalizeRegistrationStatus = (value) => {
   ) {
     return REGISTRATION_STATUS.PAYMENT_ERROR;
   }
-  return REGISTRATION_STATUS.PENDING;
+  return REGISTRATION_STATUS.PAYMENT_CONFIRMED;
 };

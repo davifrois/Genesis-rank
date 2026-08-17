@@ -133,6 +133,9 @@ public class EventService {
     event.setInternalRegistration(request.getInternalRegistration() == null ? true : request.getInternalRegistration());
     event.setDate(parseDate(request.getDate()));
     event.setEndDate(parseDate(request.getEndDate()));
+    event.setCheckinEndDate(parseDateTime(request.getCheckinEndDate()));
+    event.setNoGiEnabled(request.getNoGiEnabled() == null ? true : request.getNoGiEnabled());
+    event.setAbsoluteEnabled(request.getAbsoluteEnabled() == null ? true : request.getAbsoluteEnabled());
   }
 
   private LocalDate parseDate(String value) {
@@ -144,6 +147,20 @@ public class EventService {
     }
   }
 
+  // Formatters aceitos: com e sem segundos (datetime-local do browser nao envia segundos)
+  private static final DateTimeFormatter DT_FORMATTER = DateTimeFormatter.ofPattern(
+      "yyyy-MM-dd'T'HH:mm[:ss]"
+  );
+
+  private LocalDateTime parseDateTime(String value) {
+    if (value == null || value.isBlank()) return null;
+    try {
+      return LocalDateTime.parse(value.trim(), DT_FORMATTER);
+    } catch (DateTimeParseException ex) {
+      throw new IllegalArgumentException("Data/Hora inválida. Use o formato YYYY-MM-DDTHH:mm ou YYYY-MM-DDTHH:mm:ss.");
+    }
+  }
+
   public EventResponse toResponse(Event event) {
     EventResponse response = new EventResponse();
     response.setId(event.getId());
@@ -151,6 +168,7 @@ public class EventService {
     response.setLocation(event.getLocation());
     response.setDate(event.getDate() != null ? event.getDate().toString() : null);
     response.setEndDate(event.getEndDate() != null ? event.getEndDate().toString() : null);
+    response.setCheckinEndDate(event.getCheckinEndDate() != null ? event.getCheckinEndDate().toString() : null);
     response.setAccommodationEnabled(Boolean.TRUE.equals(event.getAccommodationEnabled()));
     response.setAccommodationTitle(trimOrFallback(event.getAccommodationTitle(), "Onde Ficar"));
     response.setAccommodationDescription(trimOrNull(event.getAccommodationDescription()));
@@ -162,6 +180,8 @@ public class EventService {
     response.setFeeOver15(resolveFee(event.getFeeOver15(), DEFAULT_FEE_OVER_15));
     response.setFeeCombo(resolveFee(event.getFeeCombo(), DEFAULT_FEE_COMBO));
     response.setFeeAbsolute(resolveFee(event.getFeeAbsolute(), DEFAULT_FEE_ABSOLUTE));
+    response.setNoGiEnabled(event.getNoGiEnabled());
+    response.setAbsoluteEnabled(event.getAbsoluteEnabled());
     response.setBeltRegistrationEnabled(Boolean.TRUE.equals(event.getBeltRegistrationEnabled()));
     response.setBeltRegistrationTitle(trimOrFallback(event.getBeltRegistrationTitle(), DEFAULT_BELT_REGISTRATION_TITLE));
     response.setBeltRegistrationPrice(resolveFee(event.getBeltRegistrationPrice(), 0.0));
@@ -300,6 +320,14 @@ public class EventService {
     }
   }
 
+  // Extrai apenas a parte da data (yyyy-MM-dd) de uma string que pode ser date ou datetime
+  private static String extractDatePart(String value) {
+    if (value == null) return null;
+    String trimmed = value.trim();
+    int tIndex = trimmed.indexOf('T');
+    return tIndex > 0 ? trimmed.substring(0, tIndex) : trimmed;
+  }
+
   private String resolveNextBatchChangeAt(List<EventBatchDto> batches) {
     if (batches == null) return null;
     return batches.stream()
@@ -307,18 +335,18 @@ public class EventService {
         .map(EventBatchDto::getEndDate)
         .filter(value -> value != null && !value.isBlank())
         .findFirst()
-        .map(value -> LocalDate.parse(value).atTime(LocalTime.MAX).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
+        .map(value -> LocalDate.parse(extractDatePart(value)).atTime(LocalTime.MAX).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
         .orElse(null);
   }
 
   private LocalDateTime parseDateStart(String value) {
     if (value == null || value.isBlank()) return null;
-    return LocalDate.parse(value.trim()).atStartOfDay();
+    return LocalDate.parse(extractDatePart(value)).atStartOfDay();
   }
 
   private LocalDateTime parseDateEnd(String value) {
     if (value == null || value.isBlank()) return null;
-    return LocalDate.parse(value.trim()).atTime(LocalTime.MAX);
+    return LocalDate.parse(extractDatePart(value)).atTime(LocalTime.MAX);
   }
 
   private String trimOrNull(String value) {

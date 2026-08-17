@@ -26,7 +26,7 @@
 
 .membership-page .profile-header > div {
   width: 100%;
-  max-width: 900px;
+  max-width: 100%;
 }
 
 .membership-page .profile-title {
@@ -65,7 +65,7 @@
 /* ── BLOCK HEADER ────────────────────────────────────────────────── */
 .membership-page .membership-block {
   width: 100%;
-  max-width: 900px;
+  max-width: 100%;
   padding: 0 2rem;
 }
 
@@ -100,7 +100,7 @@
 /* ── CARD (Form container) ───────────────────────────────────────── */
 .membership-page .profile-grid {
   width: 100%;
-  max-width: 900px;
+  max-width: 100%;
   padding: 0 2rem;
 }
 

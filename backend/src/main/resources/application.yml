@@ -71,3 +71,7 @@ app:
   stripe:
     api-key: ${STRIPE_API_KEY:}
     webhook-secret: ${STRIPE_WEBHOOK_SECRET:}
+mercadopago:
+  access-token: ${MERCADOPAGO_ACCESS_TOKEN:APP_USR-5076214841905920-081112-768e0648179ce52ceb48a90a14882388-1214160384}
+  public-key: ${MERCADOPAGO_PUBLIC_KEY:APP_USR-89e1340b-b66b-4fa3-a0cb-99a38667da22}
+  notification-url: ${MERCADOPAGO_NOTIFICATION_URL:}

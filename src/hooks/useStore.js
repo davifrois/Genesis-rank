@@ -392,6 +392,7 @@ const normalizeBracket = (bracket) => {
     const size = Number.isFinite(bracket.size) ? bracket.size : nextPowerOfTwo(seedIds.length, 2);
     const podium = bracket.podium && typeof bracket.podium === 'object' ? bracket.podium : {};
     const id = normalizeId(bracket.id) || Math.random().toString(36).substr(2, 9);
+    const published = Boolean(bracket.published || bracket.isPublished);
     return {
         id,
         number: Number.isFinite(bracket.number) ? bracket.number : 0,
@@ -401,6 +402,9 @@ const normalizeBracket = (bracket) => {
         mode: normalizeTextTrimmed(bracket.mode || '') || 'GI',
         seedIds,
         size,
+        published,
+        isPublished: published,
+        publishedAt: bracket.publishedAt || '',
         podium: {
             goldId: normalizeId(podium.goldId),
             silverId: normalizeId(podium.silverId),
@@ -656,9 +660,13 @@ const normalizeMemberProfile = (profile) => {
     const birthDate = normalizeTextTrimmed(profile.birthDate || profile.dataNascimento || '');
     const parsedAge = Number(profile.age || profile.idade || '');
     const calculatedAge = calculateAgeFromBirthDate(birthDate);
-    const age = calculatedAge !== ''
+    let age = calculatedAge !== ''
         ? calculatedAge
         : (Number.isFinite(parsedAge) && parsedAge >= 0 ? Math.floor(parsedAge) : '');
+    
+    if (typeof age === 'number' && age > 1900) {
+        age = new Date().getFullYear() - age;
+    }
     if (!fullName) return null;
 
     return {
@@ -1536,20 +1544,30 @@ const useStoreState = (loadedState) => {
             addLog({ type: 'ERROR', action: 'ADD_EVENT', details: 'Nome do evento nao informado.' });
             throw new Error('Informe o nome do evento.');
         }
-        const exists = data.events.find((item) => normalizeKeyPart(item.name) === normalizeKeyPart(name));
+        const isEditing = Boolean(event?.id);
+        const exists = data.events.find((item) => normalizeKeyPart(item.name) === normalizeKeyPart(name) && item.id !== event?.id);
         if (exists) {
             addLog({ type: 'ERROR', action: 'ADD_EVENT', details: `Evento duplicado: ${name}` });
-            throw new Error('Ja existe um evento com este nome.');
+            throw new Error('Já existe outro evento com este mesmo nome.');
         }
         const fees = normalizeEventFees(event);
         const pixKey = resolveEventPixKey(event);
 
         const localEventDraft = {
-            id: Date.now().toString(),
+            id: event?.id || Date.now().toString(),
             name,
             date: typeof event?.date === 'string' ? event.date.trim() : event?.date || '',
             endDate: typeof event?.endDate === 'string' ? event.endDate.trim() || null : event?.endDate || null,
             location: normalizeTextTrimmed(event?.location || ''),
+            isPremium: Boolean(event?.isPremium),
+            registrationCloseDate: typeof event?.registrationCloseDate === 'string' ? event.registrationCloseDate.trim() : event?.registrationCloseDate || '',
+            checkinEndDate: typeof event?.checkinEndDate === 'string' ? event.checkinEndDate.trim() : event?.checkinEndDate || '',
+            eventSocialWebsite: (event?.eventSocialWebsite || '').toString().trim() || null,
+            eventSocialWhatsapp: (event?.eventSocialWhatsapp || '').toString().trim() || null,
+            eventSocialInstagram: (event?.eventSocialInstagram || '').toString().trim() || null,
+            prizesDescription: (event?.prizesDescription || '').toString().trim() || null,
+            liabilityWaiver: (event?.liabilityWaiver || '').toString().trim() || null,
+            mapIframeUrl: (event?.mapIframeUrl || '').toString().trim() || null,
             eventDescription: (event?.eventDescription || '').toString().trim() || null,
             posterUrl: normalizeOptionalUrl(event?.posterUrl || event?.imageUrl || ''),
             registrationUrl: normalizeOptionalUrl(event?.registrationUrl || event?.registrationLink || ''),
@@ -1590,7 +1608,9 @@ const useStoreState = (loadedState) => {
 
         if (hasApiToken) {
             try {
-                const remoteResult = await eventAdminService.createEvent(localEventDraft);
+                const remoteResult = isEditing
+                    ? await eventAdminService.updateEvent(event.id, localEventDraft)
+                    : await eventAdminService.createEvent(localEventDraft);
                 if (remoteResult?.data) {
                     const mergedRemoteEvent = normalizeEvent({
                         ...localEventDraft,
@@ -1646,6 +1666,68 @@ const useStoreState = (loadedState) => {
 
         const sourceLabel = hasApiToken ? ' (sincronizado no backend)' : ' (modo local)';
         addLog({ type: 'INFO', action: 'ADD_EVENT', details: `Evento criado: ${name}${sourceLabel}` });
+
+        // Auto-generate news publication for newly created events
+        if (!isEditing) {
+            try {
+                const isOpen = savedEvent.registrationOpen !== false;
+                let regStartDateStr = null;
+                if (Array.isArray(savedEvent.batches) && savedEvent.batches.length > 0) {
+                    if (savedEvent.batches[0]?.startDate) {
+                        regStartDateStr = savedEvent.batches[0].startDate;
+                    }
+                }
+
+                const formatDisplayDate = (dStr) => {
+                    if (!dStr) return '';
+                    try {
+                        const cleanStr = dStr.includes('T') ? dStr.split('T')[0] : dStr;
+                        const [y, m, d] = cleanStr.split('-');
+                        if (y && m && d) return `${d}/${m}/${y}`;
+                    } catch (e) {}
+                    return dStr;
+                };
+
+                const formattedEventDate = formatDisplayDate(savedEvent.date || '');
+                const formattedRegStartDate = regStartDateStr ? formatDisplayDate(regStartDateStr) : null;
+                const locationStr = savedEvent.location || 'A definir';
+
+                let newsTitle = '';
+                let newsSummary = '';
+                let newsBody = '';
+                let newsTags = ['eventos'];
+
+                if (isOpen && (!formattedRegStartDate || new Date(regStartDateStr) <= new Date())) {
+                    newsTitle = `Inscrições Abertas: ${savedEvent.name}`;
+                    newsSummary = `As inscrições para o evento ${savedEvent.name} já estão oficialmente abertas! Garanta a sua vaga.`;
+                    newsBody = `Atletas, as inscrições para o evento **${savedEvent.name}** já estão oficialmente abertas!\n\n📅 **Data do Evento:** ${formattedEventDate || 'A confirmar'}\n📍 **Local:** ${locationStr}\n\nNão perca tempo e garanta já a sua vaga!`;
+                    newsTags.push('inscricoes');
+                } else {
+                    const startDateNotice = formattedRegStartDate ? `a partir do dia **${formattedRegStartDate}**` : 'em breve';
+                    const startDateSummary = formattedRegStartDate ? `a partir do dia ${formattedRegStartDate}` : 'em breve';
+
+                    newsTitle = `Novo Evento Confirmado: ${savedEvent.name}`;
+                    newsSummary = `O evento ${savedEvent.name} foi anunciado! As inscrições começam a valer ${startDateSummary}.`;
+                    newsBody = `Atletas, o evento **${savedEvent.name}** acaba de ser anunciado!\n\n📅 **Data do Evento:** ${formattedEventDate || 'A confirmar'}\n📍 **Local:** ${locationStr}\n\n⏰ **Atenção:** As inscrições começam a valer ${startDateNotice}. Fiquem atentos para garantir a sua vaga no primeiro lote!`;
+                    newsTags.push('anuncio');
+                }
+
+                addNews({
+                    title: newsTitle,
+                    summary: newsSummary,
+                    body: newsBody,
+                    category: 'eventos',
+                    tags: newsTags,
+                    imageUrl: savedEvent.posterUrl || savedEvent.imageUrl || '',
+                    eventId: savedEvent.id,
+                    status: 'published',
+                    publishedAt: new Date().toISOString()
+                });
+            } catch (err) {
+                console.error('Erro ao gerar notícia automática do evento:', err);
+            }
+        }
+
         return savedEvent;
     };
 
@@ -1693,6 +1775,19 @@ const useStoreState = (loadedState) => {
                 ? updates.endDate.trim() || null
                 : updates?.endDate ?? current.endDate ?? null,
             location: normalizeTextTrimmed(updates?.location ?? current.location ?? ''),
+            isPremium: updates?.isPremium ?? current.isPremium ?? false,
+            registrationCloseDate: typeof updates?.registrationCloseDate === 'string'
+                ? updates.registrationCloseDate.trim()
+                : updates?.registrationCloseDate ?? current.registrationCloseDate ?? '',
+            checkinEndDate: typeof updates?.checkinEndDate === 'string'
+                ? updates.checkinEndDate.trim()
+                : updates?.checkinEndDate ?? current.checkinEndDate ?? '',
+            eventSocialWebsite: (updates?.eventSocialWebsite ?? current.eventSocialWebsite ?? '').toString().trim() || null,
+            eventSocialWhatsapp: (updates?.eventSocialWhatsapp ?? current.eventSocialWhatsapp ?? '').toString().trim() || null,
+            eventSocialInstagram: (updates?.eventSocialInstagram ?? current.eventSocialInstagram ?? '').toString().trim() || null,
+            prizesDescription: (updates?.prizesDescription ?? current.prizesDescription ?? '').toString().trim() || null,
+            liabilityWaiver: (updates?.liabilityWaiver ?? current.liabilityWaiver ?? '').toString().trim() || null,
+            mapIframeUrl: (updates?.mapIframeUrl ?? current.mapIframeUrl ?? '').toString().trim() || null,
             eventDescription: (updates?.eventDescription ?? current.eventDescription ?? '').toString().trim() || null,
             posterUrl: normalizeOptionalUrl(updates?.posterUrl ?? current.posterUrl ?? ''),
             registrationUrl: normalizeOptionalUrl(updates?.registrationUrl ?? current.registrationUrl ?? ''),
@@ -2091,6 +2186,50 @@ const useStoreState = (loadedState) => {
         return { created: payload.brackets.length, brackets: payload.brackets };
     };
 
+    const publishBrackets = (eventId, mode = 'ALL') => {
+        const normalizedEventId = normalizeId(eventId);
+        if (!normalizedEventId) return;
+
+        const now = new Date().toISOString();
+        setData((prev) => ({
+            ...prev,
+            brackets: prev.brackets.map((bracket) => {
+                const bEventId = normalizeId(bracket.eventId);
+                if (bEventId !== normalizedEventId) return bracket;
+                if (mode !== 'ALL' && bracket.mode !== mode) return bracket;
+
+                return {
+                    ...bracket,
+                    published: true,
+                    isPublished: true,
+                    publishedAt: now
+                };
+            })
+        }));
+
+        addLog({
+            type: 'INFO',
+            action: 'PUBLISH_BRACKETS',
+            details: `Chaves publicadas para evento ${normalizedEventId} (modalidade: ${mode}).`
+        });
+    };
+
+    const deleteBracket = (bracketId) => {
+        const normalizedId = normalizeId(bracketId);
+        if (!normalizedId) return;
+
+        setData((prev) => ({
+            ...prev,
+            brackets: prev.brackets.filter((b) => normalizeId(b.id) !== normalizedId)
+        }));
+
+        addLog({
+            type: 'INFO',
+            action: 'DELETE_BRACKET',
+            details: `Chave ${normalizedId} excluída.`
+        });
+    };
+
     const setBracketPodium = (bracketId, podium) => {
         setData(prev => ({
             ...prev,
@@ -2170,7 +2309,7 @@ const useStoreState = (loadedState) => {
         }));
     };
 
-    const finalizeMatch = (bracketId, matchId, winnerId, scoreA, scoreB, loserId) => {
+    const finalizeMatch = (bracketId, matchId, winnerId, scoreA, scoreB, loserId, winReason, matchDuration) => {
         setData(prev => ({
             ...prev,
             brackets: prev.brackets.map(b => {
@@ -2179,7 +2318,7 @@ const useStoreState = (loadedState) => {
                     ...b,
                     matchResults: {
                         ...(b.matchResults || {}),
-                        [matchId]: { winnerId, loserId, scoreA, scoreB, timestamp: new Date().toISOString() }
+                        [matchId]: { winnerId, loserId, scoreA, scoreB, winReason, matchDuration, timestamp: new Date().toISOString() }
                     }
                 };
             })
@@ -2409,6 +2548,8 @@ const useStoreState = (loadedState) => {
         setManualPoints,
         resetAthletePoints,
         generateBrackets,
+        publishBrackets,
+        deleteBracket,
         setBracketPodium,
         setBracketSeedOrder,
         setBracketManualSlots,

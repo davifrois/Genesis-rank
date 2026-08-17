@@ -262,9 +262,9 @@
 /* --- NEW AJP STYLES FOR ATHLETES HEADER --- */
 .athletes-ajp-header-section {
     background-color: #000000;
-    background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.8)), url('../assets/jiu_jitsu_community_bg.png');
+    background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.85)), url('/atleta.jpg');
     background-size: cover;
-    background-position: center center;
+    background-position: center 65%;
     padding: 60px 40px 40px;
     margin-bottom: 0px;
     border-bottom: 1px solid #222;

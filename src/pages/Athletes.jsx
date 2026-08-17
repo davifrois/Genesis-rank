@@ -177,7 +177,7 @@ const Athletes = () => {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [showAllGold, setShowAllGold] = useState(false);
-  const [showAllWinRate, setShowAllWinRate] = useState(false);
+  const [showAllPoints, setShowAllPoints] = useState(false);
   const [showAllActive, setShowAllActive] = useState(false);
   const [seasonFilter, setSeasonFilter] = useState('2026');
   const [genderFilter, setGenderFilter] = useState('all');
@@ -211,7 +211,7 @@ const Athletes = () => {
         virtualProfiles.set(normName, {
           id: 'virtual-' + (athlete.id || normName),
           fullName: athlete.nome,
-          academyName: athlete.equipe || '',
+          academyName: athlete.academia || athlete.equipe || '',
           belt: athlete.faixa || '',
           country: athlete.countryCode || 'Brasil',
           gender: athlete.sexo || '',
@@ -334,12 +334,10 @@ const Athletes = () => {
       })
   ), [columnSourceRows]);
 
-  const topWinRate = useMemo(() => (
+  const topPoints = useMemo(() => (
     columnSourceRows
       .slice()
       .sort((left, right) => {
-        if (right.winRate !== left.winRate) return right.winRate - left.winRate;
-        if (right.fights !== left.fights) return right.fights - left.fights;
         return right.totalPoints - left.totalPoints;
       })
   ), [columnSourceRows]);
@@ -455,11 +453,11 @@ const Athletes = () => {
   };
 
   const renderTopList = (items, type, isExpanded, onToggle) => {
-    const displayedItems = isExpanded ? items : items.slice(0, 5);
+    const displayedItems = isExpanded ? items : items.slice(0, 7);
     const title = type === 'gold'
       ? (isEnglish ? 'Most Gold Medals' : 'Mais Medalhas de Ouro')
-      : type === 'winrate'
-        ? (isEnglish ? 'Best Win/Loss Difference' : 'Melhor Aproveitamento')
+      : type === 'points'
+        ? (isEnglish ? 'Highest Score' : 'Maior Pontuação')
         : (isEnglish ? 'Most Active Athlete' : 'Atletas Mais Ativos');
 
     const emptyText = isEnglish
@@ -467,13 +465,13 @@ const Athletes = () => {
       : 'Sem dados de atletas ainda.';
 
     return (
-      <article className="athlete-community-column">
-        <header className="athlete-community-column__head">
-          <h3>{title}</h3>
-        </header>
-        <div className="athlete-community-column__body">
+      <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+        <h3 style={{ textAlign: 'center', fontSize: '0.85rem', color: '#ffffff', textTransform: 'uppercase', fontWeight: '800', marginBottom: '15px' }}>
+          {title}
+        </h3>
+        <div style={{ background: '#212124', borderRadius: '6px', overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
           {displayedItems.length === 0 ? (
-            <div className="empty-state">{emptyText}</div>
+            <div className="empty-col-state">{emptyText}</div>
           ) : (
             displayedItems.map((item, index) => {
               const profile = item.profile || {};
@@ -483,57 +481,90 @@ const Athletes = () => {
                 academyName: profile.academyName,
                 birthDate: profile.birthDate
               });
-              const metricLabel = type === 'gold'
-                ? `${item.recentGold} ouro`
-                : type === 'winrate'
-                  ? `${item.winRate}%`
+              
+              const highlightColorClass = '#3f3f46';
+              const pill1Text = type === 'gold'
+                ? `${item.recentGold} ouros`
+                : type === 'points'
+                  ? `${item.totalPoints} pts`
                   : `${item.eventsCount} eventos`;
+              const pill2Text = type === 'gold'
+                ? `${item.totalPoints} pts / ${item.eventsCount} eventos`
+                : type === 'points'
+                  ? `${item.recentGold} ouros / ${item.eventsCount} eventos`
+                  : `${item.totalPoints} pts / ${item.recentGold} ouros`;
+
+              const getFlagCode = (c) => {
+                const lc = (c || '').toLowerCase();
+                if (lc.includes('usa') || lc.includes('estados unidos') || lc.includes('united states')) return 'us';
+                if (lc.includes('argentina')) return 'ar';
+                if (lc.includes('chile')) return 'cl';
+                if (lc.includes('colombia')) return 'co';
+                if (lc.includes('peru')) return 'pe';
+                if (lc.includes('mexico')) return 'mx';
+                if (lc.includes('portugal')) return 'pt';
+                if (lc.includes('spain') || lc.includes('espanha')) return 'es';
+                if (lc.includes('italy') || lc.includes('italia')) return 'it';
+                if (lc.includes('france') || lc.includes('frança')) return 'fr';
+                if (lc.includes('uk') || lc.includes('england') || lc.includes('inglaterra')) return 'gb';
+                if (lc.includes('russia')) return 'ru';
+                if (lc.includes('japan') || lc.includes('japao')) return 'jp';
+                if (lc.includes('uae') || lc.includes('emirados')) return 'ae';
+                return 'br';
+              };
+              const flagCode = getFlagCode(profile.country);
 
               return (
                 <Link
                   key={`${type}-${profile.id || index}`}
-                  className="athlete-community-rank-item"
+                  className="athlete-row-item"
+                  style={{ borderTop: index === 0 ? 'none' : '1px solid rgba(255, 255, 255, 0.05)', padding: '20px 24px', display: 'flex', alignItems: 'center', textDecoration: 'none' }}
                   to={`/perfil-publico?codigo=${encodeURIComponent(shareCode)}`}
                 >
-                  <span className="athlete-community-rank-item__position">#{index + 1}</span>
-                  <span className="athlete-community-rank-item__avatar">
-                    {profile.photoUrl ? <img src={profile.photoUrl} alt={profile.fullName || 'Atleta'} loading="lazy" /> : getInitials(profile.fullName)}
-                  </span>
-                  <span className="athlete-community-rank-item__content">
-                    <strong>{profile.fullName || 'Atleta'}</strong>
-                    <small>{profile.academyName || (isEnglish ? 'No academy' : 'Sem academia')}</small>
-                  </span>
-                  <span className="athlete-community-rank-item__metric">{metricLabel}</span>
+                  <div className="athlete-row-avatar" style={{ width: '56px', height: '56px', marginRight: '20px', flexShrink: 0 }}>
+                    {profile.photoUrl ? <img src={profile.photoUrl} alt={profile.fullName || 'Atleta'} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} loading="lazy" /> : <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>{getInitials(profile.fullName)}</div>}
+                  </div>
+                  <div className="athlete-row-info" style={{ gap: '8px', display: 'flex', flexDirection: 'column' }}>
+                    <div className="athlete-row-name-line" style={{ gap: '10px', display: 'flex', alignItems: 'center' }}>
+                      <span className="athlete-row-name" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '1.05rem', color: '#e4e4e7', fontWeight: '700' }}>{profile.fullName || 'Atleta'}</span>
+                      <img src={`https://flagcdn.com/16x12/${flagCode}.png`} alt={profile.country || 'Country'} style={{ width: '18px', height: '13.5px', borderRadius: '2px' }} />
+                    </div>
+                    <div className="athlete-row-pills" style={{ gap: '8px', display: 'flex' }}>
+                        <span style={{ backgroundColor: highlightColorClass, color: '#ffffff', padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: '800', textTransform: 'uppercase' }}>
+                            {pill1Text}
+                        </span>
+                        <span style={{ fontSize: '0.75rem', color: '#a1a1aa', fontWeight: '700', textTransform: 'uppercase', paddingTop: '2px' }}>
+                            {pill2Text}
+                        </span>
+                    </div>
+                  </div>
                 </Link>
               );
             })
           )}
-          {items.length > 5 && (
-            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '15px' }}>
+          {items.length > 7 && (
+            <div style={{ padding: '12px', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }}>
               <button 
                   onClick={onToggle}
                   style={{ 
                       backgroundColor: 'transparent', 
-                      border: '1px solid #444', 
-                      color: '#fff', 
-                      padding: '6px 20px', 
-                      borderRadius: '4px',
+                      border: 'none', 
+                      color: '#a1a1aa', 
+                      padding: '4px 0', 
                       cursor: 'pointer',
-                      fontSize: '0.8rem',
+                      fontSize: '0.7rem',
+                      fontWeight: '700',
                       textTransform: 'uppercase',
-                      letterSpacing: '1px',
-                      transition: 'all 0.2s',
-                      width: '100%'
+                      width: '100%',
+                      textAlign: 'center'
                   }}
-                  onMouseOver={(e) => e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)'}
-                  onMouseOut={(e) => e.target.style.backgroundColor = 'transparent'}
               >
                   {isExpanded ? (isEnglish ? 'Show Less' : 'Mostrar Menos') : (isEnglish ? 'Show More' : 'Mostrar Mais')}
               </button>
             </div>
           )}
         </div>
-      </article>
+      </div>
     );
   };
 
@@ -541,54 +572,69 @@ const Athletes = () => {
     <div className="public-page athlete-community-page" style={{ padding: 0 }}>
       {/* HEADER SECTION */}
       <div className="athletes-ajp-header-section" style={{ 
-          backgroundImage: `linear-gradient(to bottom, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.8)), url(${bgImage})`,
+          backgroundImage: `linear-gradient(to bottom, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.85)), url('/atleta.jpg')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center 65%',
           width: '100%',
-          margin: 0
+          minHeight: '420px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '40px 20px',
+          margin: 0,
+          borderBottom: '1px solid #222'
         }}>
-        <div className="athletes-ajp-header-inner">
-        <h1 className="athletes-ajp-title">
-          {isEnglish ? 'ATHLETES COMMUNITY' : 'COMUNIDADE DE ATLETAS'}
-        </h1>
-        
-        <div className="athletes-ajp-filters-row">
-          <input
-            type="search"
-            className="athletes-ajp-input"
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-            placeholder={isEnglish ? 'Search...' : 'Pesquisar...'}
-          />
-          <select className="athletes-ajp-select" value={countryFilter} onChange={(event) => setCountryFilter(event.target.value)}>
-            <option value="all">{isEnglish ? 'Select country' : 'Selecione o país'}</option>
-            {Array.from(new Set(memberProfiles.map(p => p.country).filter(Boolean))).sort().map(c => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-          <select className="athletes-ajp-select" value={beltFilter} onChange={(event) => setBeltFilter(event.target.value)}>
-            <option value="all">{isEnglish ? '- Continent -' : '- Continente -'}</option>
-          </select>
-          <select className="athletes-ajp-select" value={academyFilter} onChange={(event) => setAcademyFilter(event.target.value)}>
-            <option value="all">{isEnglish ? 'Academy' : 'Academia'}</option>
-            {availableAcademies.map(a => (
-              <option key={a.id} value={a.id}>{a.name}</option>
-            ))}
-          </select>
-          <select className="athletes-ajp-select" value={genderFilter} onChange={(event) => setGenderFilter(event.target.value)}>
-            <option value="all">{isEnglish ? '- Gender -' : '- Gênero -'}</option>
-            <option value="Masculino">{isEnglish ? "Men's" : "Masculino"}</option>
-            <option value="Feminino">{isEnglish ? "Women's" : "Feminino"}</option>
-          </select>
+        <div style={{ maxWidth: '680px', width: '100%', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <h1 style={{ color: '#fff', textAlign: 'left', fontSize: '1.7rem', margin: '0', textTransform: 'uppercase' }}>
+            <span style={{ fontWeight: '800' }}>{isEnglish ? 'ATHLETES ' : 'ATLETAS '}</span>
+            <span style={{ fontWeight: '400', color: '#a1a1aa' }}>{isEnglish ? 'COMMUNITY' : 'COMUNIDADE'}</span>
+          </h1>
           
-          <button className="athletes-ajp-btn-filter" onClick={() => {}}>
-            {isEnglish ? 'FILTER' : 'FILTRAR'}
-          </button>
-          <button className="athletes-ajp-btn-share" onClick={() => {
-            navigator.clipboard.writeText(window.location.href);
-            alert(isEnglish ? 'Link copied!' : 'Link copiado!');
-          }}>
-            {isEnglish ? 'SHARE TOPLIST' : 'COMPARTILHAR'}
-          </button>
-        </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <input
+              type="search"
+              style={{ width: '100%', padding: '14px 16px', borderRadius: '4px', border: 'none', fontSize: '0.9rem', color: '#000', backgroundColor: '#fff', outline: 'none' }}
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder={isEnglish ? 'Search...' : 'Pesquisar...'}
+            />
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+              <select style={{ width: '100%', padding: '12px', borderRadius: '4px', border: 'none', fontSize: '0.8rem', color: '#333', backgroundColor: '#fff', cursor: 'pointer', outline: 'none' }} value={countryFilter} onChange={(event) => setCountryFilter(event.target.value)}>
+                <option value="all">{isEnglish ? 'Select country' : 'Selecione o país'}</option>
+                {Array.from(new Set(memberProfiles.map(p => p.country).filter(Boolean))).sort().map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+              <select style={{ width: '100%', padding: '12px', borderRadius: '4px', border: 'none', fontSize: '0.8rem', color: '#333', backgroundColor: '#fff', cursor: 'pointer', outline: 'none' }} value={beltFilter} onChange={(event) => setBeltFilter(event.target.value)}>
+                <option value="all">{isEnglish ? '- Continent -' : '- Continente -'}</option>
+              </select>
+              <select style={{ width: '100%', padding: '12px', borderRadius: '4px', border: 'none', fontSize: '0.8rem', color: '#333', backgroundColor: '#fff', cursor: 'pointer', outline: 'none' }} value={academyFilter} onChange={(event) => setAcademyFilter(event.target.value)}>
+                <option value="all">{isEnglish ? 'Academy' : 'Academia'}</option>
+                {availableAcademies.map(a => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </select>
+              <select style={{ width: '100%', padding: '12px', borderRadius: '4px', border: 'none', fontSize: '0.8rem', color: '#333', backgroundColor: '#fff', cursor: 'pointer', outline: 'none' }} value={genderFilter} onChange={(event) => setGenderFilter(event.target.value)}>
+                <option value="all">{isEnglish ? '- Gender -' : '- Gênero -'}</option>
+                <option value="Masculino">{isEnglish ? "Men's" : "Masculino"}</option>
+                <option value="Feminino">{isEnglish ? "Women's" : "Feminino"}</option>
+              </select>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
+              <button style={{ padding: '12px 28px', backgroundColor: '#0ea5e9', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: '700', fontSize: '0.85rem', cursor: 'pointer', transition: 'background-color 0.2s' }} onClick={() => {}} onMouseOver={(e) => e.target.style.backgroundColor = '#0284c7'} onMouseOut={(e) => e.target.style.backgroundColor = '#0ea5e9'}>
+                {isEnglish ? 'Filter' : 'Filtrar'}
+              </button>
+              <button style={{ padding: '12px 28px', backgroundColor: '#71717a', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: '700', fontSize: '0.85rem', cursor: 'pointer', transition: 'background-color 0.2s' }} onClick={() => {
+                navigator.clipboard.writeText(window.location.href);
+                alert(isEnglish ? 'Link copied!' : 'Link copiado!');
+              }} onMouseOver={(e) => e.target.style.backgroundColor = '#52525b'} onMouseOut={(e) => e.target.style.backgroundColor = '#71717a'}>
+                {isEnglish ? 'Share toplist' : 'Compartilhar'}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -598,10 +644,18 @@ const Athletes = () => {
           {isEnglish ? 'TOP ATHLETES' : 'PRINCIPAIS ATLETAS'} <span className="muted">{isEnglish ? 'LAST 100 DAYS' : 'ÚLTIMOS 100 DIAS'}</span>
         </h2>
         
-        <div className="athlete-community-columns">
-          {renderTopList(topGold, 'gold', showAllGold, () => setShowAllGold(!showAllGold))}
-          {renderTopList(topWinRate, 'winrate', showAllWinRate, () => setShowAllWinRate(!showAllWinRate))}
-          {renderTopList(topActive, 'active', showAllActive, () => setShowAllActive(!showAllActive))}
+        <div style={{ display: 'flex', justifyContent: 'center', width: '100%', padding: '0 20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px', width: '100%', maxWidth: '1400px' }}>
+            <div style={{ width: '100%' }}>
+              {renderTopList(topGold, 'gold', showAllGold, () => setShowAllGold(!showAllGold))}
+            </div>
+            <div style={{ width: '100%' }}>
+              {renderTopList(topPoints, 'points', showAllPoints, () => setShowAllPoints(!showAllPoints))}
+            </div>
+            <div style={{ width: '100%' }}>
+              {renderTopList(topActive, 'active', showAllActive, () => setShowAllActive(!showAllActive))}
+            </div>
+          </div>
         </div>
       </section>
 

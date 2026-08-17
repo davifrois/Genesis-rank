@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import EventsMapView from '../components/EventsMapView';
 import {
   Calendar,
   ChevronDown,
@@ -15,7 +16,6 @@ import { useI18n } from '../hooks/useI18n';
 import { countryCodeFromValue, countryLabelFromCode, flagFromCountryCode } from '../utils/countryFlags';
 import { getStartOfDayTime, parseEventDateValue, resolveEventLifecycle } from '../utils/eventLifecycle';
 import { formatBrlCurrency, resolveBatchFee } from '../utils/eventPricing';
-import jjBanner from '../assets/jj_events_banner.png';
 
 const parseDate = (value) => {
   return parseEventDateValue(value);
@@ -172,6 +172,7 @@ const Events = () => {
   const [dateTo, setDateTo] = useState('');
   const [sortBy, setSortBy] = useState('date');
   const [isLoading, setIsLoading] = useState(true);
+  const [viewMode, setViewMode] = useState('list'); // 'list' | 'map'
 
   useEffect(() => {
     const timer = window.setTimeout(() => setIsLoading(false), 220);
@@ -458,9 +459,33 @@ const Events = () => {
           <img src={event.posterUrl || '/header-bg-championship.jpg'} alt={event.name} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
         </div>
         <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', flex: 1, background: 'rgba(20,20,24,0.4)' }}>
-          <h3 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#e2e8f0', margin: '0 0 12px 0', lineHeight: 1.4, textTransform: 'uppercase' }}>
-            {event.name || copy.eventFallback}
-          </h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '8px' }}>
+            <h3 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#e2e8f0', margin: 0, lineHeight: 1.4, textTransform: 'uppercase', flex: 1 }}>
+              {event.name || copy.eventFallback}
+            </h3>
+            {!event.isPastEvent && (
+              <Link
+                to={!isExternal ? `/eventos/${event.id}/inscricao?step=entradas` : (event.registrationUrl || '#')}
+                target={isExternal ? '_blank' : undefined}
+                rel={isExternal ? 'noreferrer' : undefined}
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  background: 'linear-gradient(135deg, #00c2cb 0%, #0088ff 100%)',
+                  color: '#fff',
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  textDecoration: 'none',
+                  whiteSpace: 'nowrap',
+                  boxShadow: '0 2px 10px rgba(0,194,203,0.3)',
+                  flexShrink: 0
+                }}
+              >
+                Inscrever-se
+              </Link>
+            )}
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.7rem', color: '#71717a', marginBottom: '16px' }}>
             <span aria-hidden="true" style={{ fontSize: '1rem' }}>{flagFromCountryCode(event.countryCode)}</span>
             <span style={{ fontWeight: 500 }}>{resolveEventLocation(event, copy.locationFallback)}</span>
@@ -486,13 +511,13 @@ const Events = () => {
       }}>
         {/* Background image */}
         <img
-          src={jjBanner}
+          src="/eventos-banner.jpeg"
           alt=""
           aria-hidden="true"
           style={{
             position: 'absolute', inset: 0, width: '100%', height: '100%',
-            objectFit: 'cover', objectPosition: 'center 40%',
-            filter: 'brightness(0.28) saturate(0.8)',
+            objectFit: 'cover', objectPosition: 'center 55%',
+            filter: 'brightness(0.32) saturate(0.85)',
             zIndex: 0
           }}
         />
@@ -533,7 +558,16 @@ const Events = () => {
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
             <Link to="/admin/events/new" className="premium-btn">Criar evento</Link>
             <button className="premium-btn" style={{ background: 'transparent', color: '#0ea5e9', border: '1px solid rgba(0,194,203,0.3)', boxShadow: 'none' }}><MapPin size={14} /> Academy finder</button>
-            <button className="premium-btn">Ver mapa</button>
+            <button
+              className="premium-btn"
+              onClick={() => setViewMode(viewMode === 'map' ? 'list' : 'map')}
+              style={viewMode === 'map'
+                ? { background: 'linear-gradient(135deg,#00c2cb,#38f9d7)', color: '#0a0a0f' }
+                : {}}
+            >
+              <MapPin size={14} />
+              {viewMode === 'map' ? 'Ver lista' : 'Ver mapa'}
+            </button>
           </div>
 
           {/* Search Grid */}
@@ -560,25 +594,35 @@ const Events = () => {
       </div>
 
       <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '40px 20px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <h2 style={{ fontSize: '1.4rem', fontWeight: 800, textTransform: 'uppercase', margin: 0, color: '#fff' }}>MAIS EVENTOS</h2>
-          <select style={{ background: '#fff', border: 'none', padding: '8px 12px', borderRadius: '4px', fontSize: '0.8rem', color: '#1a1a1a', outline: 'none', fontWeight: 500, appearance: 'none' }}>
-            <option>Ordenar por dist...</option>
-          </select>
-        </div>
+        {/* Map View */}
+        {viewMode === 'map' && (
+          <EventsMapView events={filteredEvents} copy={copy} />
+        )}
 
-        {isLoading ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
-            {[1,2,3,4,5,6,7,8].map(i => <div key={i} style={{ height: '240px', background: '#27272a', borderRadius: '8px' }} />)}
-          </div>
-        ) : (
-          filteredEvents.length > 0 ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
-              {filteredEvents.map(event => renderEventCard(event))}
+        {/* List View */}
+        {viewMode === 'list' && (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h2 style={{ fontSize: '1.4rem', fontWeight: 800, textTransform: 'uppercase', margin: 0, color: '#fff' }}>MAIS EVENTOS</h2>
+              <select style={{ background: '#fff', border: 'none', padding: '8px 12px', borderRadius: '4px', fontSize: '0.8rem', color: '#1a1a1a', outline: 'none', fontWeight: 500, appearance: 'none' }}>
+                <option>Ordenar por dist...</option>
+              </select>
             </div>
-          ) : (
-            <div style={{ padding: '60px 20px', textAlign: 'center', color: '#a1a1aa', fontSize: '1rem' }}>{copy.noEvents}</div>
-          )
+
+            {isLoading ? (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
+                {[1,2,3,4,5,6,7,8].map(i => <div key={i} style={{ height: '240px', background: '#27272a', borderRadius: '8px' }} />)}
+              </div>
+            ) : (
+              filteredEvents.length > 0 ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
+                  {filteredEvents.map(event => renderEventCard(event))}
+                </div>
+              ) : (
+                <div style={{ padding: '60px 20px', textAlign: 'center', color: '#a1a1aa', fontSize: '1rem' }}>{copy.noEvents}</div>
+              )
+            )}
+          </>
         )}
       </div>
 

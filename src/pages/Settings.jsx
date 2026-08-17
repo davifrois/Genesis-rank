@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { 
   User, Mail, Phone, MapPin, Building2, Medal, 
   Calendar, Info, AlertTriangle, CheckCircle, 
-  Settings as SettingsIcon, LogOut, Camera, Share2, Copy, Trash2, Lock, Image, Save, UserRound, ScanLine, Trophy
+  Settings as SettingsIcon, LogOut, Camera, Share2, Copy, Trash2, Lock, Image, Save, UserRound, ScanLine, Trophy, ShieldCheck
 } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import AthleteDigitalCard from '../components/AthleteDigitalCard';
@@ -16,12 +16,44 @@ import { authService } from '../services/authService';
 import { formatBrazilPhone } from '../utils/phone';
 import { evaluatePasswordStrength } from '../utils/passwordStrength';
 import { getAvailableBeltsForAge, isValidBeltForAge } from '../utils/beltRules';
+import { getAvailableWeightsForProfile } from '../utils/weightRules';
 import {
   buildProfileShareCode,
   buildPublicProfileSnapshot,
   encodePublicProfileSnapshot
 } from '../utils/profileShare';
 import { compressImage } from '../utils/imageUtils';
+import { BRAZIL_CITIES } from '../utils/brazilCities';
+
+const BRAZIL_STATES = [
+  { sigla: 'AC', nome: 'Acre' },
+  { sigla: 'AL', nome: 'Alagoas' },
+  { sigla: 'AP', nome: 'Amapá' },
+  { sigla: 'AM', nome: 'Amazonas' },
+  { sigla: 'BA', nome: 'Bahia' },
+  { sigla: 'CE', nome: 'Ceará' },
+  { sigla: 'DF', nome: 'Distrito Federal' },
+  { sigla: 'ES', nome: 'Espírito Santo' },
+  { sigla: 'GO', nome: 'Goiás' },
+  { sigla: 'MA', nome: 'Maranhão' },
+  { sigla: 'MT', nome: 'Mato Grosso' },
+  { sigla: 'MS', nome: 'Mato Grosso do Sul' },
+  { sigla: 'MG', nome: 'Minas Gerais' },
+  { sigla: 'PA', nome: 'Pará' },
+  { sigla: 'PB', nome: 'Paraíba' },
+  { sigla: 'PR', nome: 'Paraná' },
+  { sigla: 'PE', nome: 'Pernambuco' },
+  { sigla: 'PI', nome: 'Piauí' },
+  { sigla: 'RJ', nome: 'Rio de Janeiro' },
+  { sigla: 'RN', nome: 'Rio Grande do Norte' },
+  { sigla: 'RS', nome: 'Rio Grande do Sul' },
+  { sigla: 'RO', nome: 'Rondônia' },
+  { sigla: 'RR', nome: 'Roraima' },
+  { sigla: 'SC', nome: 'Santa Catarina' },
+  { sigla: 'SP', nome: 'São Paulo' },
+  { sigla: 'SE', nome: 'Sergipe' },
+  { sigla: 'TO', nome: 'Tocantins' }
+];
 
 const BELT_OPTIONS = ['Branca', 'Cinza', 'Amarela', 'Laranja', 'Verde', 'Azul', 'Roxa', 'Marrom', 'Preta'];
 
@@ -65,9 +97,12 @@ const createForm = () => ({
 const profileSchema = z.object({
   firstName: z.string().trim().min(1, 'Informe o primeiro nome.'),
   lastName: z.string().trim().min(1, 'Informe o sobrenome.'),
-  email: z.string().trim().email('Informe um e-mail válido.'),
-  gender: z.string().min(1, 'Selecione o gênero.'),
-  academyId: z.string().min(1, 'Selecione a academia.')
+  email: z.union([
+    z.string().trim().email('Informe um e-mail válido.'),
+    z.string().trim().max(0)
+  ]).optional(),
+  gender: z.string().optional(),
+  academyId: z.string().optional()
 });
 
 const fileToDataUrl = (file) => compressImage(file, 800, 800, 0.7);
@@ -180,6 +215,8 @@ const Settings = () => {
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showDigitalCard, setShowDigitalCard] = useState(false);
+  const [brStates] = useState(BRAZIL_STATES);
+  const [brCities] = useState(BRAZIL_CITIES);
 
   const currentProfile = useMemo(() => {
     if (!currentUser) return null;
@@ -302,7 +339,8 @@ const Settings = () => {
   const recommendedEvents = useMemo(() => {
     const now = new Date();
     return (events || []).filter(e => {
-      if (e.status === 'completed' || e.status === 'past') return false;
+      if (e.status === 'completed' || e.status === 'past' || e.status === 'draft') return false;
+      if (e.registrationOpen === false) return false;
       if (e.date) {
         const eventDate = new Date(e.date);
         if (!isNaN(eventDate) && eventDate < now) return false;
@@ -468,10 +506,16 @@ const Settings = () => {
     } catch (err) {
       if (err instanceof z.ZodError) {
         setIsSaving(false);
-        return setError(err.errors[0].message);
+        const msg = err.errors[0].message;
+        setError(msg);
+        setTimeout(() => {
+          document.querySelector('.login-error')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 50);
+        return;
       }
       setIsSaving(false);
-      return setError('Erro ao validar os dados do formulário.');
+      setError('Erro ao validar os dados do formulário.');
+      return;
     }
 
     const firstName = (form.firstName || '').trim();
@@ -511,9 +555,16 @@ const Settings = () => {
         createdByUsername: currentUser?.username || '',
         createdByName: currentUser?.name || ''
       });
-      setSuccess('Perfil do atleta atualizado com sucesso.');
+      setSuccess('✅ Perfil atualizado com sucesso!');
+      setTimeout(() => {
+        document.querySelector('.profile-success')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 50);
+      setTimeout(() => setSuccess(''), 5000);
     } catch (submitError) {
       setError(submitError?.message || 'Nao foi possivel atualizar seu perfil.');
+      setTimeout(() => {
+        document.querySelector('.login-error')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 50);
     } finally {
       setIsSaving(false);
     }
@@ -628,10 +679,13 @@ const Settings = () => {
       <section className="profile-header">
         <div>
           <span className="section-kicker">Conta</span>
-          <h1 className="profile-title">Configuracoes de perfil</h1>
-          <p className="profile-subtitle">
-            Atualize os dados do atleta para inscricao automatica, categoria correta e comunicacao oficial.
-          </p>
+          <h1 className="profile-title">Configurações de Perfil</h1>
+          <div className="profile-settings-notice">
+            <Info className="profile-settings-notice__icon" size={20} />
+            <p className="profile-subtitle">
+              <strong className="profile-subtitle__highlight">Atenção:</strong> É necessário preencher e manter os dados do atleta atualizados para validar sua inscrição nos campeonatos e ranqueamento.
+            </p>
+          </div>
         </div>
         <div className="profile-settings-toolbar">
           <Link to="/minha-conta" className="btn btn-secondary profile-settings-toolbar__btn">
@@ -783,12 +837,45 @@ const Settings = () => {
                   <input className="profile-input profile-input--dark" value={form.address} onChange={(event) => setForm((previous) => ({ ...previous, address: event.target.value }))} />
                 </div>
                 <div className="profile-field">
-                  <label>Cidade</label>
-                  <input className="profile-input profile-input--dark" value={form.city} onChange={(event) => setForm((previous) => ({ ...previous, city: event.target.value }))} />
+                  <label>Estado / provincia</label>
+                  {form.country?.toLowerCase() === 'brasil' ? (
+                    <select 
+                      className="profile-input profile-input--dark"
+                      value={form.state}
+                      onChange={e => setForm(prev => ({ ...prev, state: e.target.value, city: '' }))}
+                    >
+                      <option value="">Selecione o estado</option>
+                      {brStates.map(st => <option key={st.sigla} value={st.sigla}>{st.nome}</option>)}
+                    </select>
+                  ) : (
+                    <input 
+                      className="profile-input profile-input--dark" 
+                      value={form.state} 
+                      onChange={e => setForm(prev => ({ ...prev, state: e.target.value, city: '' }))} 
+                    />
+                  )}
                 </div>
                 <div className="profile-field">
-                  <label>Estado / provincia</label>
-                  <input className="profile-input profile-input--dark" value={form.state} onChange={(event) => setForm((previous) => ({ ...previous, state: event.target.value }))} />
+                  <label>Cidade</label>
+                  {form.country?.toLowerCase() === 'brasil' ? (
+                    <select 
+                      className="profile-input profile-input--dark"
+                      value={form.city}
+                      onChange={e => setForm(prev => ({ ...prev, city: e.target.value }))}
+                      disabled={!form.state || !BRAZIL_CITIES[form.state]}
+                    >
+                      <option value="">Selecione a cidade</option>
+                      {form.state && BRAZIL_CITIES[form.state] && BRAZIL_CITIES[form.state].map(cityName => (
+                        <option key={cityName} value={cityName}>{cityName}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input 
+                      className="profile-input profile-input--dark" 
+                      value={form.city} 
+                      onChange={e => setForm(prev => ({ ...prev, city: e.target.value }))} 
+                    />
+                  )}
                 </div>
                 <div className="profile-field">
                   <label>Pais</label>
@@ -905,8 +992,8 @@ const Settings = () => {
                   <label>Peso / divisao</label>
                   <select className="profile-input profile-input--dark" value={form.weight} onChange={(event) => setForm((previous) => ({ ...previous, weight: event.target.value }))}>
                     <option value="">Selecione o peso</option>
-                    {WEIGHT_OPTIONS.map((weight) => (
-                      <option key={weight} value={weight}>{weight}</option>
+                    {getAvailableWeightsForProfile(age, form.gender).map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
                 </div>
@@ -918,16 +1005,33 @@ const Settings = () => {
             </div>
           </article>
 
-          {error && <div className="login-error"><p>{error}</p></div>}
-          {success && <div className="profile-success">{success}</div>}
+          {error && <div className="login-error" style={{ marginTop: '12px' }}><p>{error}</p></div>}
+          {success && (
+            <div className="profile-success" style={{
+              position: 'fixed',
+              bottom: '24px',
+              right: '24px',
+              zIndex: 9999,
+              padding: '14px 22px',
+              borderRadius: '12px',
+              fontWeight: 600,
+              fontSize: '15px',
+              boxShadow: '0 4px 24px rgba(0,0,0,0.18)',
+              animation: 'fadeInUp 0.3s ease',
+              minWidth: '260px',
+              textAlign: 'center'
+            }}>
+              {success}
+            </div>
+          )}
 
           <div className="profile-actions-row">
             <button type="submit" className="btn btn-primary" disabled={isSaving}>
-              <Save size={14} />
+              <Save size={18} />
               {isSaving ? 'Salvando...' : 'Salvar alteracoes'}
             </button>
             <button type="button" className="btn btn-secondary" onClick={handleReset}>
-              <UserRound size={14} />
+              <UserRound size={18} />
               Restaurar dados
             </button>
           </div>
@@ -1012,7 +1116,7 @@ const Settings = () => {
                     value={form.academyId} 
                     onChange={(value) => setForm((previous) => ({ ...previous, academyId: value }))} 
                     onRegisterNew={() => navigate('/registro-academia')} 
-                    theme="dark"
+                    theme="light"
                   />
                 </div>
                 <div className="profile-field profile-field--full" style={{ marginTop: '10px' }}>

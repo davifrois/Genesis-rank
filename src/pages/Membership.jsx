@@ -9,6 +9,8 @@ import { authService } from '../services/authService';
 import { formatBrazilPhone } from '../utils/phone';
 import { evaluatePasswordStrength } from '../utils/passwordStrength';
 import { compressImage } from '../utils/imageUtils';
+import { resolveAgeNumber } from '../utils/eventPricing';
+import { getAvailableWeightsForProfile } from '../utils/weightRules';
 import '../membership.css';
 
 const createAcademyForm = () => ({
@@ -20,6 +22,7 @@ const createAcademyForm = () => ({
   ownerUsername: '',
   contactPhone: '',
   contactEmail: '',
+  website: '',
   logoUrl: '',
   coverUrl: '',
   biography: '',
@@ -1172,7 +1175,8 @@ const Membership = () => {
         contactPhone: academyForm.contactPhone || '',
         logoUrl: academyForm.logoUrl || '',
         coverUrl: academyForm.coverUrl || '',
-        biography: academyForm.biography || ''
+        biography: academyForm.biography || '',
+        website: academyForm.website || ''
       };
 
       let ownerName = (academyForm.ownerName || '').toString().trim();
@@ -1234,7 +1238,8 @@ const Membership = () => {
           contactEmail: savedAcademy?.contactEmail || academyForm.contactEmail || fallbackCoachEmail,
           logoUrl: savedAcademy?.logoUrl || academyForm.logoUrl || '',
           coverUrl: savedAcademy?.coverUrl || academyForm.coverUrl || '',
-          biography: savedAcademy?.biography || academyForm.biography || ''
+          biography: savedAcademy?.biography || academyForm.biography || '',
+          website: savedAcademy?.website || academyForm.website || ''
         });
         setAthleteForm((prev) => ({
           ...prev,
@@ -1242,16 +1247,18 @@ const Membership = () => {
         }));
 
         try {
+          const existingProfile = memberProfiles.find(p => p.accountUsername === currentUsername);
           addMemberProfile({
-            fullName: currentName || academyForm.ownerName || 'Professor',
+            ...(existingProfile || {}),
+            fullName: existingProfile?.fullName || currentName || academyForm.ownerName || 'Professor',
             accountUsername: currentUsername,
             createdByUsername: currentUsername,
             createdByName: currentName || academyForm.ownerName || '',
-            email: fallbackCoachEmail || academyForm.contactEmail || '',
+            email: existingProfile?.email || fallbackCoachEmail || academyForm.contactEmail || '',
             academyId: savedAcademy?.id || '',
             academyName: savedAcademy?.name || academyForm.name || '',
-            role: 'coach',
-            userRole: 'coach'
+            role: existingProfile?.role || 'coach',
+            userRole: existingProfile?.userRole || 'coach'
           });
         } catch {
           // Keep academy save successful even if coach profile already exists.
@@ -1263,16 +1270,18 @@ const Membership = () => {
 
       if (isAdmin && ownerUsername) {
         try {
+          const existingCoachProfile = memberProfiles.find(p => p.accountUsername === ownerUsername);
           addMemberProfile({
-            fullName: ownerName || academyForm.coachName || 'Professor',
+            ...(existingCoachProfile || {}),
+            fullName: existingCoachProfile?.fullName || ownerName || academyForm.coachName || 'Professor',
             accountUsername: ownerUsername,
             createdByUsername: currentUsername,
             createdByName: currentName || '',
-            email: contactEmail || '',
+            email: existingCoachProfile?.email || contactEmail || '',
             academyId: savedAcademy?.id || '',
             academyName: savedAcademy?.name || academyForm.name || '',
-            role: 'coach',
-            userRole: 'coach'
+            role: existingCoachProfile?.role || 'coach',
+            userRole: existingCoachProfile?.userRole || 'coach'
           });
         } catch {
           // Keep academy save successful even if coach profile already exists.
@@ -1879,13 +1888,23 @@ const Membership = () => {
                       onChange={(event) => setAcademyForm((prev) => ({ ...prev, contactPhone: formatBrazilPhone(event.target.value) }))}
                     />
                   </div>
-                  <div className="profile-field profile-field--full">
+                  <div className="profile-field">
                     <label>{copy.academyEmail}</label>
                     <input
                       className="profile-input profile-input--dark"
                       type="email"
                       value={academyForm.contactEmail}
                       onChange={(event) => setAcademyForm((prev) => ({ ...prev, contactEmail: event.target.value }))}
+                    />
+                  </div>
+                  <div className="profile-field">
+                    <label>Website (Opcional)</label>
+                    <input
+                      className="profile-input profile-input--dark"
+                      type="url"
+                      placeholder="https://..."
+                      value={academyForm.website || ''}
+                      onChange={(event) => setAcademyForm((prev) => ({ ...prev, website: event.target.value }))}
                     />
                   </div>
 
@@ -2207,8 +2226,8 @@ const Membership = () => {
                   onChange={(event) => setAthleteForm((prev) => ({ ...prev, weight: event.target.value }))}
                 >
                   <option value="">Selecione o peso</option>
-                  {WEIGHT_OPTIONS.map((weight) => (
-                    <option key={weight} value={weight}>{weight}</option>
+                  {getAvailableWeightsForProfile(athleteForm.birthDate || athleteForm.age, athleteForm.gender).map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
                 </select>
               </div>
@@ -2420,7 +2439,7 @@ const Membership = () => {
                             profile.gender || '',
                             profile.belt || '-',
                             profile.weight || '',
-                            profile.age ? `${profile.age} ${copy.yearsOld}` : ''
+                            resolveAgeNumber(profile) !== null ? `${resolveAgeNumber(profile)} ${copy.yearsOld}` : ''
                           ].filter(Boolean).join(' - ')
                           : copy.noBeltData}
                       </div>

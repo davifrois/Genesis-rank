@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   CheckCircle, XCircle, Info, UserCheck, Users, ChevronDown,
   ChevronUp, Edit3, Tag, ShieldCheck, AlertTriangle,
-  X, Check, RotateCcw, CreditCard, Camera, Copy, AlertCircle
+  X, Check, RotateCcw, CreditCard, Camera, Copy, AlertCircle, UserPlus
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { publicRegistrationService } from '../services/publicRegistrationService';
@@ -105,7 +105,7 @@ function useToast() {
 }
 
 // ─── Painel de Categoria Inline ───────────────────────────────────────────
-const CategoryModal = ({ atleta, onClose, onChange, valorBase, valorAbsoluto, registeredModalities = [] }) => {
+const CategoryModal = ({ atleta, onClose, onChange, valorBase, valorAbsoluto, valorCombo, registeredModalities = [], getSuggestedPrice }) => {
   const [local, setLocal] = useState({
     modalidade: atleta.categoria?.modalidade || '',
     faixa: atleta.categoria?.faixa || '',
@@ -128,7 +128,9 @@ const CategoryModal = ({ atleta, onClose, onChange, valorBase, valorAbsoluto, re
 
   const isValid = local.modalidade && local.faixa && local.categoriaEtaria && local.peso && isValidBeltForAge(local.faixa, age);
   
-  const currentPricePreview = local.modalidade?.includes('Combo') ? valorBase + valorAbsoluto : valorBase;
+  const currentPricePreview = getSuggestedPrice
+    ? getSuggestedPrice(local, atleta)
+    : (local.modalidade?.includes('Combo') ? valorBase + valorAbsoluto : valorBase);
 
   const fieldStyle = {
     display: 'block', fontSize: '14px', color: '#888', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 'bold'
@@ -160,7 +162,7 @@ const CategoryModal = ({ atleta, onClose, onChange, valorBase, valorAbsoluto, re
         <label style={fieldStyle}>Modalidade</label>
         <select value={local.modalidade} onChange={e => setLocal(p => ({ ...p, modalidade: e.target.value }))} style={selectStyle}>
           <option value="">Selecione</option>
-          {MODALIDADES.map(m => {
+          {MODALIDADES.filter(m => (valorCombo > 0 || m.includes('Gi (Com Kimono)'))).map(m => {
             const mUpper = m.toUpperCase();
             let isRegistered = false;
             if (mUpper.includes('GI') && !mUpper.includes('NO-GI')) {
@@ -205,7 +207,7 @@ const CategoryModal = ({ atleta, onClose, onChange, valorBase, valorAbsoluto, re
         <label style={fieldStyle}>Peso</label>
         <select value={local.peso} onChange={e => setLocal(p => ({ ...p, peso: e.target.value }))} style={selectStyle}>
           <option value="">Selecione</option>
-          {PESOS.map(p => <option key={p} value={p}>{p}</option>)}
+          {PESOS.filter(p => (valorAbsoluto > 0 || p !== 'Absoluto')).map(p => <option key={p} value={p}>{p}</option>)}
         </select>
       </div>
 
@@ -238,7 +240,7 @@ const CategoryModal = ({ atleta, onClose, onChange, valorBase, valorAbsoluto, re
 };
 
 // ─── Linha de Atleta ──────────────────────────────────────────────────────
-const AtletaRow = ({ atleta, selecionado, onToggle, onCategoria, onCheckin, onValorChange, valorBase, valorAbsoluto, eventRegistrations = [] }) => {
+const AtletaRow = ({ atleta, selecionado, onToggle, onCategoria, onCheckin, onValorChange, valorBase, valorAbsoluto, valorCombo, eventRegistrations = [], getSuggestedPrice }) => {
   const [expandido, setExpandido] = useState(false);
   const [editandoValor, setEditandoValor] = useState(false);
   const [valorLocal, setValorLocal] = useState(String(atleta.valor));
@@ -451,7 +453,9 @@ const AtletaRow = ({ atleta, selecionado, onToggle, onCategoria, onCheckin, onVa
               atleta={atleta}
               valorBase={valorBase}
               valorAbsoluto={valorAbsoluto}
+              valorCombo={valorCombo}
               registeredModalities={registeredModalities}
+              getSuggestedPrice={getSuggestedPrice}
               onChange={onCategoria}
               onClose={() => setExpandido(false)}
             />
@@ -514,11 +518,7 @@ const PixCheckoutModal = ({ onConfirm, onCancel, total, isLoading, error }) => {
   };
 
   const handleFinish = async () => {
-    if (total > 0 && !proofFile) {
-      setProofError('Por favor, anexe o comprovante de pagamento antes de finalizar.');
-      return;
-    }
-    onConfirm(proofFile);
+    onConfirm(null);
   };
 
   return (
@@ -541,52 +541,13 @@ const PixCheckoutModal = ({ onConfirm, onCancel, total, isLoading, error }) => {
 
         <div style={{ padding: '24px' }}>
           <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-            <div style={{ fontSize: '14px', color: '#888', marginBottom: '8px' }}>Valor Total a Pagar</div>
-            <div style={{ fontSize: '36px', fontWeight: '800', color: '#2ecc71' }}>{formatBRL(total)}</div>
+            <div style={{ fontSize: '14px', color: '#888', marginBottom: '8px' }}>Valor Total da Equipe</div>
+            <div style={{ fontSize: '36px', fontWeight: '800', color: '#00c2cb' }}>{formatBRL(total)}</div>
           </div>
 
-          {total > 0 && (
-            <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
-              <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-                <div style={{ width: '140px', height: '140px', background: '#fff', borderRadius: '8px', padding: '8px' }}>
-                  {qrCodeDataUrl ? <img src={qrCodeDataUrl} alt="QR Code PIX" style={{ width: '100%', height: '100%' }} /> : <div style={{ width: '100%', height: '100%', background: '#eee' }}/>}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: '14px', color: '#ccc', margin: '0 0 12px 0', lineHeight: 1.5 }}>
-                    Escaneie o QR Code com o app do seu banco ou copie o código PIX Copia e Cola.
-                  </p>
-                  <button onClick={handleCopy} style={{
-                    width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--brand-primary, #00c2cb)',
-                    background: 'transparent', color: 'var(--brand-primary, #00c2cb)', fontWeight: '600',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer'
-                  }}>
-                    {copied ? <Check size={16}/> : <Copy size={16}/>}
-                    {copied ? 'Código Copiado!' : 'Copiar Código PIX'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#f0f0f0', marginBottom: '10px' }}>
-              Comprovante de Pagamento (Obrigatório)
-            </label>
-            <div style={{
-              border: '2px dashed #444', borderRadius: '12px', padding: '24px', textAlign: 'center',
-              background: 'rgba(0,0,0,0.2)', transition: 'border-color 0.2s',
-              borderColor: proofFile ? '#2ecc71' : proofError ? '#e74c3c' : '#444'
-            }}>
-              <input type="file" id="pix-proof" accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} />
-              <label htmlFor="pix-proof" style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-                {proofFile ? <CheckCircle size={32} color="#2ecc71" /> : <Camera size={32} color="#888" />}
-                <div style={{ color: proofFile ? '#2ecc71' : '#aaa', fontSize: '15px' }}>
-                  {proofFile ? `Arquivo selecionado: ${proofFile.name}` : 'Clique para selecionar a imagem do comprovante'}
-                </div>
-              </label>
-            </div>
-            {proofError && <div style={{ color: '#e74c3c', fontSize: '13px', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}><AlertCircle size={14}/> {proofError}</div>}
-          </div>
+          <p style={{ color: '#aaa', fontSize: '14px', textAlign: 'center', marginBottom: '24px', lineHeight: '1.5' }}>
+            Ao clicar abaixo, a inscrição da sua equipe será registrada e você será direcionado para o **Mercado Pago** para concluir o pagamento com PIX, Cartão ou Boleto.
+          </p>
 
           {error && (
             <div style={{ padding: '12px', background: 'rgba(231,76,60,0.1)', border: '1px solid #e74c3c55', color: '#e74c3c', borderRadius: '8px', fontSize: '14px', marginBottom: '20px' }}>
@@ -596,15 +557,15 @@ const PixCheckoutModal = ({ onConfirm, onCancel, total, isLoading, error }) => {
 
           <button
             onClick={handleFinish}
-            disabled={isLoading || (total > 0 && !proofFile)}
+            disabled={isLoading}
             style={{
-              width: '100%', padding: '16px', borderRadius: '10px', border: 'none',
+              width: '100%', padding: '16px', borderRadius: '12px', border: 'none',
               background: 'linear-gradient(135deg, var(--brand-primary, #00c2cb), #009ba3)',
               color: '#000', fontWeight: '800', fontSize: '16px', cursor: 'pointer',
               opacity: isLoading ? 0.7 : 1
             }}
           >
-            {isLoading ? 'Enviando Inscrições...' : 'Finalizar Inscrições da Equipe'}
+            {isLoading ? 'Gerando Checkout...' : 'Ir para o Mercado Pago ▶'}
           </button>
         </div>
       </motion.div>
@@ -697,7 +658,7 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
     );
   }
 
-  const { base: valorBase, absoluteFee: valorAbsoluto } = useMemo(() => {
+  const { base: valorBase, absoluteFee: valorAbsoluto, combo: valorCombo } = useMemo(() => {
     return resolveAthleteEventPrice({ event: campeonatoAtivo });
   }, [campeonatoAtivo]);
 
@@ -827,8 +788,13 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
         }
       }
 
+      // Redirecionar lote da equipe para o Mercado Pago
+      const regIds = [];
       for (const atleta of atletasSelecionados) {
+        const regId = `reg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+        regIds.push(regId);
         const payload = {
+          id: regId,
           eventId: campeonatoAtivo.id,
           eventName: campeonatoAtivo.nome,
           nome: atleta.nome,
@@ -840,23 +806,13 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
           modalidade: atleta.categoria.modalidade,
           genero: atleta.genero || 'Masculino',
           price: atleta.valor,
-          notes: JSON.stringify({
-            comprovanteArquivoDataUrl: proofDataUrl,
-            equipeLote: true
-          }),
-          status: 'pending_sync' // status initial
+          notes: JSON.stringify({ equipeLote: true, totalAtletas: atletasSelecionados.length }),
+          status: 'PENDING'
         };
         
         try {
           if (typeof addAthlete === 'function') {
-            // Remove the base64 image from the local cache payload to prevent localStorage quota errors
-            const cachePayload = { ...payload };
-            if (cachePayload.notes) {
-              const notesObj = JSON.parse(cachePayload.notes);
-              delete notesObj.comprovanteArquivoDataUrl;
-              cachePayload.notes = JSON.stringify(notesObj);
-            }
-            addAthlete(cachePayload);
+            addAthlete(payload);
           }
         } catch (e) {
           console.warn('Falha ao adicionar atleta ao cache local:', e);
@@ -865,10 +821,24 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
         await publicRegistrationService.register(payload);
       }
 
-      // Marcar os selecionados como checkin = true (enviado) e desmarcar
       setRoster(prev => prev.map(a => atletasSelecionados.find(s => s.id === a.id) ? { ...a, checkin: true, selecionado: false } : a));
       
-      addToast(`Sucesso! ${atletasSelecionados.length} inscrições enviadas para aprovação. Comprovante anexado.`, TOAST_TYPES.success, 8000);
+      // Chamada Checkout Pro Mercado Pago para o lote da equipe
+      if (totalCost > 0) {
+        const registrationIds = regIds.join(',');
+        const athleteName = `Equipe ${academyName || 'Academia'} (${atletasSelecionados.length} Atletas)`;
+        const data = await publicRegistrationService.createCheckoutSession({
+          registrationIds,
+          athleteName,
+          amount: totalCost
+        });
+        
+        if (data?.url) {
+          window.location.href = data.url;
+          return;
+        }
+      }
+
       setShowPixModal(false);
       setShowSuccessModal(true);
 
@@ -881,10 +851,76 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
 
   if (roster.length === 0) {
     return (
-      <div style={{ textAlign: 'center', padding: '80px 20px', background: 'rgba(255,255,255,0.02)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.06)' }}>
-        <Users size={48} style={{ color: '#444', marginBottom: '16px' }} />
-        <p style={{ color: '#888', fontSize: '16px' }}>Nenhum aluno vinculado a esta academia.<br /><span style={{ fontSize: '14px', color: '#555' }}>Adicione alunos em "Academia" para gerenciar inscrições.</span></p>
-      </div>
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+        style={{ 
+          textAlign: 'center', 
+          padding: '80px 20px', 
+          background: 'rgba(15, 23, 42, 0.4)', 
+          backdropFilter: 'blur(16px)',
+          borderRadius: '24px', 
+          border: '1px solid rgba(255,255,255,0.08)',
+          boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '24px',
+          maxWidth: '600px',
+          margin: '0 auto'
+        }}
+      >
+        <motion.div
+          animate={{ y: [0, -10, 0] }}
+          transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+          style={{
+            width: '96px',
+            height: '96px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, rgba(36, 120, 255, 0.1), rgba(36, 120, 255, 0.02))',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: '1px solid rgba(36, 120, 255, 0.2)',
+            boxShadow: '0 0 30px rgba(36, 120, 255, 0.1)'
+          }}
+        >
+          <Users size={40} style={{ color: '#2478ff' }} />
+        </motion.div>
+        
+        <div>
+          <h3 style={{ color: '#fff', fontSize: '1.5rem', fontWeight: '700', marginBottom: '12px', letterSpacing: '-0.5px' }}>
+            Nenhum aluno vinculado
+          </h3>
+          <p style={{ color: '#94a3b8', fontSize: '1.1rem', lineHeight: '1.6', margin: 0, maxWidth: '400px' }}>
+            Para gerenciar inscrições neste campeonato, você precisa primeiro vincular alunos à sua academia.
+          </p>
+        </div>
+
+        <motion.a 
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          href="/minha-conta"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            background: 'linear-gradient(135deg, #2478ff 0%, #1e40af 100%)',
+            color: '#fff',
+            padding: '14px 28px',
+            borderRadius: '12px',
+            fontWeight: '600',
+            fontSize: '1rem',
+            textDecoration: 'none',
+            boxShadow: '0 4px 20px rgba(36, 120, 255, 0.4)',
+            marginTop: '12px'
+          }}
+        >
+          <UserPlus size={18} />
+          Adicionar Alunos Agora
+        </motion.a>
+      </motion.div>
     );
   }
 
@@ -986,6 +1022,8 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
             selecionado={atleta.selecionado}
             valorBase={valorBase}
             valorAbsoluto={valorAbsoluto}
+            valorCombo={valorCombo}
+            getSuggestedPrice={getSuggestedPrice}
             onToggle={() => toggleSelecionado(atleta.id)}
             onCategoria={(novaCategoria) => {
               if (novaCategoria && typeof novaCategoria === 'object' && novaCategoria.faixa) {

@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { useMemo } from 'react';
 import { nextPowerOfTwo, seedSlotsWithRankingAwareByes } from '../services/bracketService';
+import { Users, CheckCircle2 } from 'lucide-react';
 
 const STATUS_PENDING = 'PENDING';
 const STATUS_READY = 'READY';
@@ -193,7 +194,7 @@ export const buildRounds = ({ seedIds, size, liveMatches, athleteMap, seedInfoMa
 };
 
 const statusLabel = (status) => {
-  if (status === STATUS_LIVE) return 'LIVE';
+  if (status === STATUS_LIVE) return 'AO VIVO';
   if (status === STATUS_DONE) return 'OK';
   if (status === STATUS_READY) return 'PRONTA';
   return 'AGUARD.';
@@ -222,9 +223,9 @@ const BracketTree = ({
   const hasData = firstRoundMatchCount > 0;
 
   const layout = useMemo(() => {
-    const rowHeight = 120;
-    const cardWidth = 312;
-    const cardHeight = 102;
+    const rowHeight = 135;
+    const cardWidth = 320;
+    const cardHeight = 110;
     const columnGap = 118;
     const leftPadding = 18;
     const rightPadding = 34;
@@ -342,6 +343,8 @@ const BracketTree = ({
       const isByeA = !isResolvedSeed(match.slotAId);
       const isByeB = !isResolvedSeed(match.slotBId);
 
+      const isLive = safeStatus === STATUS_LIVE;
+
       cards.push(
         <g
           key={match.id}
@@ -350,57 +353,89 @@ const BracketTree = ({
           role={typeof onMatchClick === 'function' ? 'button' : undefined}
           tabIndex={typeof onMatchClick === 'function' ? 0 : undefined}
         >
-          <rect
-            x={x}
-            y={topY}
-            rx="12"
-            ry="12"
-            width={layout.cardWidth}
-            height={layout.cardHeight}
-            fill="rgba(8, 18, 40, 0.95)"
-            stroke={statusColor}
-            strokeWidth="1.6"
-          />
+          {/* Live halo — animated outer ring */}
+          {isLive && (
+            <rect
+              x={x - 3}
+              y={topY - 3}
+              rx="14"
+              ry="14"
+              width={layout.cardWidth + 6}
+              height={layout.cardHeight + 6}
+              className="bracket-tree__live-halo"
+            >
+              <animate attributeName="opacity" values="0.5;0.1;0.5" dur="1.2s" repeatCount="indefinite" />
+              <animate attributeName="stroke-width" values="2;3.5;2" dur="1.2s" repeatCount="indefinite" />
+            </rect>
+          )}
 
-          <text x={x + 12} y={topY + 16} className="bracket-tree__meta">
-            {match.fightNumber ? `Luta #${match.fightNumber}` : `Luta #${match.matchNumber}`}
-          </text>
-          <text x={x + layout.cardWidth - 12} y={topY + 16} className="bracket-tree__meta bracket-tree__meta--status" textAnchor="end">
-            {statusLabel(safeStatus)}
-          </text>
+          <foreignObject x={x} y={topY} width={layout.cardWidth} height={layout.cardHeight} style={{ overflow: 'visible' }}>
+            <div xmlns="http://www.w3.org/1999/xhtml" style={{ width: '100%', height: '100%', position: 'relative' }}>
+              {/* Match Badge */}
+              <span style={{
+                backgroundColor: '#2b2b2b', color: '#a0a0a0', fontSize: '0.75rem', fontWeight: 700,
+                padding: '5px 8px', borderRadius: '12px', position: 'absolute', left: '-15px', top: '-10px',
+                zIndex: 2, border: '1px solid rgba(255, 255, 255, 0.1)'
+              }}>
+                {match.fightNumber ? match.fightNumber : match.matchNumber}
+              </span>
+              
+              <div style={{
+                backgroundColor: '#242424', border: `1px solid ${isLive ? '#f97316' : 'rgba(255, 255, 255, 0.08)'}`,
+                borderRadius: '10px', width: '100%', height: '100%', overflow: 'hidden',
+                boxShadow: isLive ? '0 0 10px rgba(249, 115, 22, 0.5)' : '0 4px 15px rgba(0, 0, 0, 0.3)',
+                display: 'flex', flexDirection: 'column'
+              }}>
+                {/* Slot A */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 12px', flex: 1, opacity: isByeA || (match.winnerId && !isWinnerA) ? 0.45 : 1 }}>
+                  <div style={{ position: 'relative', width: '30px', height: '30px', flexShrink: 0 }}>
+                    <div style={{ width: '100%', height: '100%', borderRadius: '50%', backgroundColor: '#3f3f46', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {isByeA ? <span style={{ fontSize: '9px', fontWeight: 'bold', color: '#71717a' }}>BYE</span> : <Users size={16} color="#a1a1aa" />}
+                    </div>
+                    {isWinnerA && (
+                      <span style={{ position: 'absolute', bottom: '-4px', right: '-4px', backgroundColor: '#00c853', color: '#fff', fontSize: '10px', width: '16px', height: '16px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #242424' }}>
+                        <CheckCircle2 size={10} color="#fff" />
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {!isByeA && <span style={{ fontSize: '12px', marginRight: '4px' }}>🇧🇷</span>}
+                      {match.slotALabel}
+                    </span>
+                    {!isByeA && <span style={{ fontSize: '0.7rem', color: '#999', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {match.slotAAcademy || '-'}
+                    </span>}
+                  </div>
+                </div>
 
-          <rect
-            x={x + 8}
-            y={topY + 22}
-            rx="8"
-            ry="8"
-            width={layout.cardWidth - 16}
-            height="30"
-            className={`bracket-tree__row ${isWinnerA ? 'is-winner' : ''} ${isByeA ? 'is-muted' : ''}`.trim()}
-          />
-          <rect
-            x={x + 8}
-            y={topY + 58}
-            rx="8"
-            ry="8"
-            width={layout.cardWidth - 16}
-            height="30"
-            className={`bracket-tree__row ${isWinnerB ? 'is-winner' : ''} ${isByeB ? 'is-muted' : ''}`.trim()}
-          />
+                <div style={{ height: '1px', backgroundColor: 'rgba(255, 255, 255, 0.05)', width: '100%' }}></div>
 
-          <text x={x + 16} y={topY + 36} className="bracket-tree__name">
-            {truncate(match.slotALabel, 30)}
-          </text>
-          <text x={x + 16} y={topY + 47} className="bracket-tree__academy">
-            {truncate(match.slotAAcademy || '-', 34)}
-          </text>
-
-          <text x={x + 16} y={topY + 72} className="bracket-tree__name">
-            {truncate(match.slotBLabel, 30)}
-          </text>
-          <text x={x + 16} y={topY + 83} className="bracket-tree__academy">
-            {truncate(match.slotBAcademy || '-', 34)}
-          </text>
+                {/* Slot B */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 12px', flex: 1, opacity: isByeB || (match.winnerId && !isWinnerB) ? 0.45 : 1 }}>
+                  <div style={{ position: 'relative', width: '30px', height: '30px', flexShrink: 0 }}>
+                    <div style={{ width: '100%', height: '100%', borderRadius: '50%', backgroundColor: '#3f3f46', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {isByeB ? <span style={{ fontSize: '9px', fontWeight: 'bold', color: '#71717a' }}>BYE</span> : <Users size={16} color="#a1a1aa" />}
+                    </div>
+                    {isWinnerB && (
+                      <span style={{ position: 'absolute', bottom: '-4px', right: '-4px', backgroundColor: '#00c853', color: '#fff', fontSize: '10px', width: '16px', height: '16px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #242424' }}>
+                        <CheckCircle2 size={10} color="#fff" />
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {!isByeB && <span style={{ fontSize: '12px', marginRight: '4px' }}>🇧🇷</span>}
+                      {match.slotBLabel}
+                    </span>
+                    {!isByeB && <span style={{ fontSize: '0.7rem', color: '#999', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {match.slotBAcademy || '-'}
+                    </span>}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </foreignObject>
 
           {canPickA && (
             <g className="bracket-tree__winner-btn" onClick={(event) => handleWinnerPick(event, match, match.slotAId)}>
@@ -423,8 +458,8 @@ const BracketTree = ({
     <div className={`bracket-tree ${className}`.trim()}>
       <svg
         viewBox={`0 0 ${layout.width} ${layout.height}`}
-        width="100%"
-        height="100%"
+        width={layout.width}
+        height={layout.height}
         preserveAspectRatio="xMinYMin meet"
         className="bracket-tree__svg"
       >

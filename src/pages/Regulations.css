@@ -40,7 +40,16 @@
 
 /* HERO */
 .regulamento-hero {
+  background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.88)), url('/arbrito.jpg');
+  background-size: cover;
+  background-position: center 12%;
   padding-top: 100px;
+  width: 100vw;
+  position: relative;
+  left: 50%;
+  right: 50%;
+  margin-left: -50vw;
+  margin-right: -50vw;
 }
 
 .regulamento-hero__content {

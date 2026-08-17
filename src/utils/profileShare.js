@@ -96,7 +96,7 @@ export const resolveProfileAthleteRows = ({
     if (!namesMatch) return false;
 
     if (!targetAcademy) return true;
-    const athleteAcademy = normalizeLookup(athlete?.academia || '');
+    const athleteAcademy = normalizeLookup(athlete?.academia || athlete?.equipe || '');
     if (!athleteAcademy || athleteAcademy === normalizeLookup('Sem academia')) return true;
     return (
       athleteAcademy === targetAcademy

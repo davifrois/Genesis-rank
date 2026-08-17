@@ -3,7 +3,8 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import {
   Bell, Heart, BookOpen, Users, Clock, BarChart2, Swords,
   ShieldCheck, Printer, Globe, Mail, MapPin, ChevronRight, Info,
-  ChevronDown, ChevronUp, X, Search, Download, ExternalLink, Calendar, CheckCircle2
+  ChevronDown, ChevronUp, X, Search, Download, ExternalLink, Calendar, CheckCircle2,
+  Network, Contact, Play, Instagram, Building, Check, XCircle, AlertCircle
 } from 'lucide-react';
 import { useStore } from '../hooks/useStore';
 import { useI18n } from '../hooks/useI18n';
@@ -12,7 +13,9 @@ import { REGISTRATION_STATUS, normalizeRegistrationStatus } from '../utils/regis
 import { buildCategoryDescriptor } from '../services/categoryService';
 import { getPublishedEventSchedule, PUBLISHED_EVENT_SCHEDULE_CHANGED } from '../utils/eventSchedule';
 import BracketTree, { buildRounds } from '../components/BracketTree';
+import ChaveamentoBracket from '../components/ChaveamentoBracket';
 import { publicRegistrationService } from '../services/publicRegistrationService';
+import { translateBelt, translateCategory, translateWeight, translateCompositeLabel } from '../utils/localeLabels';
 import './EventDetails.css';
 
 const renderFormattedDescription = (text) => {
@@ -129,6 +132,9 @@ const EventDetails = () => {
   const activeSubTab = searchParams.get('subtab') || 'info';
 
   const [schedule, setSchedule] = useState(null);
+  const [bracketSearch, setBracketSearch] = useState('');
+  const [bracketSortOrder, setBracketSortOrder] = useState('asc');
+  const [athleteSearch, setAthleteSearch] = useState(searchParams.get('search') || '');
 
   // Expande a página para ocupar 100% da tela burlando os constraints do container
   useEffect(() => {
@@ -204,15 +210,33 @@ const EventDetails = () => {
   const isEnglish = uiLanguage === 'en-US';
   const isSpanish = uiLanguage === 'es-ES';
   const copy = {
-    infoTab: isEnglish ? 'Information' : isSpanish ? 'Información' : 'Informações',
-    athletesTab: isEnglish ? 'Athletes' : isSpanish ? 'Atletas' : 'Atletas',
+    infoTab: isEnglish ? 'Information' : isSpanish ? 'Información' : 'Informação',
+    athletesTab: isEnglish ? 'Participants' : isSpanish ? 'Participantes' : 'Participantes',
     bracketsTab: isEnglish ? 'Brackets' : isSpanish ? 'Llaves' : 'Chaves',
     matchesTab: isEnglish ? 'Matches' : isSpanish ? 'Luchas' : 'Lutas',
-    scheduleTab: isEnglish ? 'Schedule' : isSpanish ? 'Cronograma' : 'Cronograma',
+    scheduleTab: isEnglish ? 'Schedule' : isSpanish ? 'Horario' : 'Horário',
     resultsTab: isEnglish ? 'Results' : isSpanish ? 'Resultados' : 'Resultados',
     subInfo: isEnglish ? 'Information' : isSpanish ? 'Información' : 'Informações',
     subLocation: isEnglish ? 'Location & Accommodation' : isSpanish ? 'Ubicación & Alojamiento' : 'Local & Hospedagem',
     subParents: isEnglish ? 'Parents & Guardians' : isSpanish ? 'Padres & Tutores' : 'Pais & Responsáveis',
+    athletesTabTitle: isEnglish ? 'Athletes' : isSpanish ? 'Atletas' : 'Atletas',
+    seeBracketsAndSchedule: isEnglish ? 'See brackets and schedule' : isSpanish ? 'Ver llaves y horario' : 'Ver chaves e cronograma',
+    searchAthletePlaceholder: isEnglish ? 'Search athlete or division...' : isSpanish ? 'Buscar atleta o división...' : 'Pesquisar atleta ou categoria...',
+    selectCountry: isEnglish ? 'Select country' : isSpanish ? 'Seleccionar país' : 'Selecionar país',
+    brazil: isEnglish ? 'Brazil' : isSpanish ? 'Brasil' : 'Brasil',
+    thAthlete: isEnglish ? 'Athlete' : isSpanish ? 'Atleta' : 'Atleta',
+    thBirth: isEnglish ? 'Birth' : isSpanish ? 'Nacimiento' : 'Nascimento',
+    thAcademy: isEnglish ? 'Academy & Affiliation' : isSpanish ? 'Academia & Afiliación' : 'Academia & Afiliação',
+    thRegistration: isEnglish ? 'Registration' : isSpanish ? 'Inscripción' : 'Inscrição',
+    thDownload: isEnglish ? 'Download' : isSpanish ? 'Descargar' : 'Download',
+    thStatus: isEnglish ? 'Status' : isSpanish ? 'Estado' : 'Status',
+    approvedRegistrations: isEnglish ? 'Approved registrations' : isSpanish ? 'Inscripciones aprobadas' : 'Inscrições aprovadas',
+    showUnapprovedRegistrations: isEnglish ? 'Show unapproved registrations' : isSpanish ? 'Mostrar inscripciones no aprobadas' : 'Mostrar inscrições não aprovadas',
+    noAthletesYet: isEnglish ? 'No athletes registered yet.' : isSpanish ? 'Ningún atleta inscrito aún.' : 'Nenhum atleta inscrito ainda.',
+    unapproved: isEnglish ? 'Unapproved' : isSpanish ? 'No aprobado' : 'Não aprovado',
+    yearsOld: isEnglish ? 'years' : isSpanish ? 'años' : 'anos',
+    publicEventCard: isEnglish ? 'Public event card' : isSpanish ? 'Ficha pública del evento' : 'Card público do evento',
+    bracketBadge: isEnglish ? 'Bracket' : isSpanish ? 'Llave' : 'Chave'
   };
 
   const event = useMemo(() => events.find((item) => String(item.id) === String(eventId)), [events, eventId]);
@@ -256,18 +280,53 @@ const EventDetails = () => {
     return [...storeAthletes, ...uniquePending];
   }, [athletes, eventId, publicRegistrations]);
 
-  const eventBrackets = useMemo(() => (brackets || []).filter(b => String(b.eventId) === String(eventId)), [brackets, eventId]);
+  const eventBrackets = useMemo(() => {
+    let sortedBrackets = (brackets || []).filter(b => String(b.eventId) === String(eventId));
+    
+    // Inject schedule information based on category label
+    sortedBrackets = sortedBrackets.map(b => {
+      let groupName = b.label || '';
+      const parts = groupName.split(' - ').map(s => s.trim()).filter(Boolean);
+      if (parts.length >= 3) {
+          const age = parts[0];
+          const belt = parts[1];
+          const gender = parts[parts.length - 1];
+          groupName = `${age} - ${belt} - ${gender}`;
+      }
+
+      const scheduleRow = schedule?.rows?.find(r => r.title === groupName);
+      return {
+        ...b,
+        scheduleTime: scheduleRow?.startLabel || 'A definir',
+        scheduleArea: scheduleRow?.area || 'A definir'
+      };
+    });
+
+    sortedBrackets.sort((a, b) => {
+      const timeA = a.scheduleTime === 'A definir' ? '23:59' : a.scheduleTime;
+      const timeB = b.scheduleTime === 'A definir' ? '23:59' : b.scheduleTime;
+      if (bracketSortOrder === 'asc') {
+        return timeA.localeCompare(timeB);
+      } else {
+        return timeB.localeCompare(timeA);
+      }
+    });
+    return sortedBrackets;
+  }, [brackets, eventId, bracketSortOrder, schedule]);
 
   const groupedAthletes = useMemo(() => {
     const groups = {};
+    const lowerSearch = athleteSearch.toLowerCase().trim();
+    
     eventAthletes.forEach(athlete => {
+      if (lowerSearch && !athlete.nome.toLowerCase().includes(lowerSearch)) return;
       const descriptor = buildCategoryDescriptor(athlete);
       const label = descriptor.label.replace(/ - /g, ' / ');
       if (!groups[label]) groups[label] = [];
       groups[label].push(athlete);
     });
     return groups;
-  }, [eventAthletes]);
+  }, [eventAthletes, athleteSearch]);
 
   const athleteMap = useMemo(() => {
     return new Map(eventAthletes.map(a => [a.id, a]));
@@ -277,7 +336,6 @@ const EventDetails = () => {
   const [expandedUnapproved, setExpandedUnapproved] = useState({});
   const [selectedBracket, setSelectedBracket] = useState(null);
   const [showFullBracket, setShowFullBracket] = useState(false);
-  const [bracketSearch, setBracketSearch] = useState('');
   
   const [showSuperFightApplication, setShowSuperFightApplication] = useState(false);
   const [superFightForm, setSuperFightForm] = useState({ name: '', belt: 'Branca', weight: '', academy: '', instagram: '', titles: '' });
@@ -315,26 +373,7 @@ const EventDetails = () => {
   // Sidebar blocks
   const sidebarBlocks = (
     <div className="sc-sidebar">
-      {/* Vagas (Capacity) */}
-      {event.maxAthletes && Number(event.maxAthletes) > 0 && (
-        <div className="sc-sidebar-card">
-          <div className="sc-sidebar-card__header">Vagas do Evento</div>
-          <div className="sc-sidebar-card__body">
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px', fontWeight: 600, color: '#e2e8f0' }}>
-              <span>Preenchidas: {Math.min(athletes.length, Number(event.maxAthletes))}</span>
-              <span>Total: {event.maxAthletes}</span>
-            </div>
-            <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
-              <div style={{ width: `${Math.min(100, (athletes.length / Number(event.maxAthletes)) * 100)}%`, height: '100%', background: athletes.length >= Number(event.maxAthletes) ? '#ef4444' : '#00c2cb', transition: 'width 0.5s ease' }}></div>
-            </div>
-            {athletes.length >= Number(event.maxAthletes) && (
-              <div style={{ marginTop: '10px', fontSize: '12px', color: '#ef4444', fontWeight: 700, textAlign: 'center' }}>
-                LOTAÇÃO MÁXIMA ATINGIDA
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+
 
       {/* Organizer & merchant */}
       <div className="sc-sidebar-card">
@@ -347,12 +386,12 @@ const EventDetails = () => {
             {event.organizerName || 'Organizador'} <Info size={14} style={{ color: '#71717a', cursor: 'pointer' }} />
           </div>
           <div className="sc-organizer-perk">
-            <ShieldCheck size={16} style={{ color: '#22c55e' }} />
-            <span><strong>2 anos</strong> na plataforma</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="12" fill="#4ade80"/><path d="M7 13L10 16L17 9" stroke="#18181b" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <span><strong>2 anos</strong> <span style={{ color: '#71717a', fontWeight: 'normal' }}>na plataforma da genesis</span></span>
           </div>
           <div className="sc-organizer-perk">
-            <ShieldCheck size={16} style={{ color: '#22c55e' }} />
-            <span><strong>Eventos verificados</strong></span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="12" fill="#4ade80"/><path d="M7 13L10 16L17 9" stroke="#18181b" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <span><strong>Eventos verificados</strong> <span style={{ color: '#71717a', fontWeight: 'normal' }}>na plataforma da genesis</span></span>
           </div>
         </div>
       </div>
@@ -368,21 +407,28 @@ const EventDetails = () => {
               <ChevronRight size={14} style={{ marginLeft: 'auto', color: '#71717a' }} />
             </a>
           )}
-          {event.eventSocialWhatsapp && (
-            <a href={`https://wa.me/${event.eventSocialWhatsapp}`} target="_blank" rel="noreferrer" className="sc-contact-link">
-              <Mail size={16} />
-              <span>WhatsApp</span>
-              <ChevronRight size={14} style={{ marginLeft: 'auto', color: '#71717a' }} />
-            </a>
-          )}
           {event.eventSocialInstagram && (
             <a href={`https://instagram.com/${event.eventSocialInstagram.replace('@', '')}`} target="_blank" rel="noreferrer" className="sc-contact-link">
-              <Globe size={16} />
+              <Instagram size={16} />
               <span>Instagram</span>
               <ChevronRight size={14} style={{ marginLeft: 'auto', color: '#71717a' }} />
             </a>
           )}
-          {!event.eventSocialWebsite && !event.eventSocialWhatsapp && !event.eventSocialInstagram && (
+          {event.eventSocialWhatsapp && (
+            <a href={`https://wa.me/${event.eventSocialWhatsapp.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="sc-contact-link">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/><path d="M14.05 2a9 9 0 0 1 8 7.94"/><path d="M14.05 6A5 5 0 0 1 18 10"/></svg>
+              <span>WhatsApp</span>
+              <ChevronRight size={14} style={{ marginLeft: 'auto', color: '#71717a' }} />
+            </a>
+          )}
+          {(event.eventSocialEmail || event.supportEmail || event.organizerEmail) && (
+            <a href={`mailto:${event.eventSocialEmail || event.supportEmail || event.organizerEmail}`} className="sc-contact-link">
+              <Mail size={16} />
+              <span>Email</span>
+              <ChevronRight size={14} style={{ marginLeft: 'auto', color: '#71717a' }} />
+            </a>
+          )}
+          {!event.eventSocialWebsite && !event.eventSocialWhatsapp && !event.eventSocialInstagram && !event.eventSocialEmail && !event.supportEmail && !event.organizerEmail && (
             <span style={{ color: '#71717a', fontSize: '0.875rem' }}>Sem contato cadastrado</span>
           )}
         </div>
@@ -397,19 +443,51 @@ const EventDetails = () => {
             target={event.location ? "_blank" : undefined}
             rel="noreferrer"
             className="sc-contact-link"
-            style={{ alignItems: 'flex-start' }}
+            style={{ alignItems: 'center' }}
           >
-            <MapPin size={16} style={{ color: '#71717a', marginTop: '2px', flexShrink: 0 }} />
-            <div>
-              <div style={{ fontWeight: 600 }}>{event.location || 'Local a definir'}</div>
-              <div style={{ color: '#71717a', fontSize: '0.8rem', marginTop: '4px', fontWeight: 'normal' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ color: '#a1a1aa', fontWeight: 600, lineHeight: 1.5 }}>
+                {event.location || 'Local a definir'}
+                <br />
+                Brazil
+              </div>
+              <div style={{ color: '#71717a', fontSize: '0.85rem', fontWeight: 'normal' }}>
                 Fuso horário &nbsp; America/Sao_Paulo
               </div>
             </div>
-            <ChevronRight size={14} style={{ marginLeft: 'auto', color: '#71717a', flexShrink: 0, marginTop: '2px' }} />
+            <ChevronRight size={14} style={{ color: '#71717a', flexShrink: 0 }} />
           </a>
         </div>
       </div>
+
+      {/* Mapa Acomodações Sidebar */}
+      {event.location && (
+        <div style={{ background: '#ffffff', borderRadius: '12px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '8px 8px 0 8px' }}>
+            <a 
+              href={`https://www.stay22.com/embed/gm?address=${encodeURIComponent(event.location || 'Brasil')}`} 
+              target="_blank" 
+              rel="noreferrer"
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: '#080811', color: '#fff', padding: '12px', borderRadius: '8px', textDecoration: 'none', fontWeight: 600, fontSize: '0.95rem' }}
+            >
+              <Building size={16} /> Ver acomodações
+            </a>
+          </div>
+          <iframe
+            title="Mapa de Acomodações"
+            width="100%"
+            height="450"
+            style={{ border: 0, display: 'block', marginTop: '8px' }}
+            loading="lazy"
+            allowFullScreen
+            src={`https://www.stay22.com/embed/gm?address=${encodeURIComponent(event.location || 'Brasil')}${
+              event.date ? `&checkin=${String(event.date).split('T')[0]}` : ''
+            }${
+              (event.endDate || event.date) ? `&checkout=${String(event.endDate || event.date).split('T')[0]}` : ''
+            }`}
+          />
+        </div>
+      )}
 
       {/* Entradas */}
       <div className="sc-sidebar-card">
@@ -436,20 +514,32 @@ const EventDetails = () => {
 
       {/* Política de Cancelamento */}
       <div className="sc-sidebar-card">
-        <div className="sc-sidebar-card__header sc-sidebar-card__header--blue">Política de Cancelamento/Reembolso</div>
-        <div className="sc-sidebar-card__body">
+        <div className="sc-sidebar-card__header">Política de Cancelamento/Reembolso</div>
+        <div className="sc-sidebar-card__body sc-sidebar-card__body--links">
           {batches[batches.length - 1] && (
             <>
-              <div className="sc-cancel-row">
-                <span className="sc-cancel-label">Último dia para cancelar</span>
-                <span className="sc-cancel-date">{formatFull(batches[batches.length - 1].endDate, locale)}</span>
+              <div className="sc-cancel-list-item">
+                <div className="sc-cancel-title">Último dia para cancelar</div>
+                <div className="sc-cancel-desc">
+                  em 1 mês ({new Date(batches[batches.length - 1].endDate).toLocaleDateString(locale)} 23:59)
+                </div>
+              </div>
+              <div className="sc-cancel-list-item">
+                <div className="sc-cancel-title">Reembolso: Não ativado para este evento</div>
+              </div>
+              <div className="sc-cancel-list-item">
+                <div className="sc-cancel-title">Último dia para editar</div>
+                <div className="sc-cancel-desc">
+                  em 1 mês ({new Date(batches[batches.length - 1].endDate).toLocaleDateString(locale)} 23:59)
+                </div>
               </div>
             </>
           )}
-          <div className="sc-cancel-row" style={{ marginTop: '8px' }}>
-            <span className="sc-cancel-label">Reembolso após encerramento</span>
-            <span style={{ color: '#ef4444', fontSize: '0.8rem' }}>0%</span>
-          </div>
+          {!batches[batches.length - 1] && (
+            <div className="sc-cancel-list-item">
+              <div className="sc-cancel-title" style={{ color: '#71717a' }}>Sem lotes cadastrados</div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -532,6 +622,26 @@ const EventDetails = () => {
                     )}
                   </div>
                 )}
+
+                {/* BOTÃO DE INSCRIÇÃO DIRETA NO FINAL DA DESCRIÇÃO */}
+                <div style={{ marginTop: '3.5rem', marginBottom: '1.5rem', display: 'flex', justifyContent: 'center', width: '100%' }}>
+                  <Link
+                    to={`/eventos/${eventId}/inscricao`}
+                    className="sc-btn-primary"
+                    style={{
+                      textDecoration: 'none',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '14px 36px',
+                      fontSize: '1.05rem',
+                      fontWeight: 800,
+                      borderRadius: '10px'
+                    }}
+                  >
+                    Inscrever-se
+                  </Link>
+                </div>
               </div>
               {sidebarBlocks}
             </div>
@@ -541,91 +651,30 @@ const EventDetails = () => {
 
         {activeSubTab === 'location' && (
           <div className="sc-location-tab">
-            {/* Mapa */}
-            <div className="sc-location-map-wrap">
+            <div className="sc-location-header">
+              <h2 className="sc-location-title">
+                ENCONTRE ACOMODAÇÕES PRÓXIMAS {event.name?.toUpperCase()}{event.location ? ` - ${event.location.toUpperCase()}` : ''}
+              </h2>
+              <p className="sc-location-subtitle">
+                Use esse mapa para encontrar hotéis e acomodações próximas a localização.
+              </p>
+            </div>
+            
+            {/* Mapa Stay22 */}
+            <div className="sc-location-map-wrap" style={{ height: '600px', marginTop: '24px' }}>
               <iframe
-                title="Mapa de Hotéis"
+                title="Mapa de Acomodações"
                 width="100%"
                 height="100%"
-                style={{ border: 0, display: 'block' }}
+                style={{ border: 0, display: 'block', borderRadius: '12px' }}
                 loading="lazy"
                 allowFullScreen
-                src={event.mapIframeUrl
-                  ? event.mapIframeUrl
-                  : (event.location
-                    ? `https://maps.google.com/maps?q=hoteis+perto+de+${encodeURIComponent(event.location)}&t=m&z=13&output=embed&iwloc=near`
-                    : 'https://maps.google.com/maps?q=hoteis+no+Brasil&t=m&z=4&output=embed')}
+                src={`https://www.stay22.com/embed/gm?address=${encodeURIComponent(event.location || 'Brasil')}${
+                  event.date ? `&checkin=${String(event.date).split('T')[0]}` : ''
+                }${
+                  (event.endDate || event.date) ? `&checkout=${String(event.endDate || event.date).split('T')[0]}` : ''
+                }`}
               />
-              <div className="sc-location-map-badge">
-                <MapPin size={13} />
-                {event.location || 'Local do evento'}
-              </div>
-            </div>
-
-            {/* Plataformas */}
-            <div className="sc-location-platforms">
-              <h3 className="sc-location-platforms__title">Onde se hospedar</h3>
-              <div className="sc-accom-grid">
-                <a
-                  href={event.location ? `https://www.airbnb.com.br/s/${encodeURIComponent(event.location)}/homes` : '#'}
-                  target="_blank" rel="noreferrer"
-                  className="sc-accom-card"
-                >
-                  <div className="sc-accom-card__logo sc-accom-card__logo--airbnb">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 4c1.034 0 1.875.84 1.875 1.875S13.034 7.75 12 7.75s-1.875-.84-1.875-1.875S10.966 4 12 4zm4.5 13.5c-.375 1.5-2.25 2.5-4.5 2.5s-4.125-1-4.5-2.5c-.094-.375 0-.75.375-.938L9.75 15c.5-.25 1-.375 1.5-.375H12h.75c.5 0 1 .125 1.5.375l1.875 1.063c.375.187.469.562.375.937z" /></svg>
-                  </div>
-                  <div className="sc-accom-card__info">
-                    <div className="sc-accom-card__name">Airbnb</div>
-                    <div className="sc-accom-card__desc">Quartos e casas perto do evento</div>
-                  </div>
-                  <div className="sc-accom-card__arrow">→</div>
-                </a>
-
-                <a
-                  href={event.location ? `https://www.booking.com/searchresults.pt-br.html?ss=${encodeURIComponent(event.location)}` : '#'}
-                  target="_blank" rel="noreferrer"
-                  className="sc-accom-card"
-                >
-                  <div className="sc-accom-card__logo sc-accom-card__logo--booking">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18v16H3V4zm2 2v12h14V6H5zm2 2h10v2H7V8zm0 4h6v2H7v-2z" /></svg>
-                  </div>
-                  <div className="sc-accom-card__info">
-                    <div className="sc-accom-card__name">Booking.com</div>
-                    <div className="sc-accom-card__desc">Hotéis com cancelamento grátis</div>
-                  </div>
-                  <div className="sc-accom-card__arrow">→</div>
-                </a>
-
-                <a
-                  href={event.location ? `https://www.hotels.com/search.do?q-destination=${encodeURIComponent(event.location)}` : '#'}
-                  target="_blank" rel="noreferrer"
-                  className="sc-accom-card"
-                >
-                  <div className="sc-accom-card__logo sc-accom-card__logo--hotels">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h18v18H3V3zm2 2v14h14V5H5zm2 2h4v4H7V7zm6 0h4v4h-4V7zm-6 6h4v4H7v-4zm6 0h4v4h-4v-4z" /></svg>
-                  </div>
-                  <div className="sc-accom-card__info">
-                    <div className="sc-accom-card__name">Hotels.com</div>
-                    <div className="sc-accom-card__desc">Comparar preços de hotéis</div>
-                  </div>
-                  <div className="sc-accom-card__arrow">→</div>
-                </a>
-
-                <a
-                  href={event.location ? `https://maps.google.com/?q=hoteis+perto+de+${encodeURIComponent(event.location)}` : '#'}
-                  target="_blank" rel="noreferrer"
-                  className="sc-accom-card"
-                >
-                  <div className="sc-accom-card__logo sc-accom-card__logo--maps">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" /></svg>
-                  </div>
-                  <div className="sc-accom-card__info">
-                    <div className="sc-accom-card__name">Google Maps</div>
-                    <div className="sc-accom-card__desc">Ver hotéis e localizações</div>
-                  </div>
-                  <div className="sc-accom-card__arrow">→</div>
-                </a>
-              </div>
             </div>
           </div>
         )}
@@ -708,7 +757,24 @@ const EventDetails = () => {
     const photoUrl = fullProfile?.photoUrl || fullProfile?.avatarUrl || athlete.photoUrl;
     const age = fullProfile?.age || athlete.idade;
     const birthYear = fullProfile?.birthDate ? new Date(fullProfile.birthDate).getFullYear() : (age ? new Date().getFullYear() - age : '2014');
-    const ageText = age ? `${age} years` : '11 years';
+    const ageText = age ? `${age} ${copy.yearsOld}` : `11 ${copy.yearsOld}`;
+
+    const rawStatus = athlete.status || (!isUnapproved ? REGISTRATION_STATUS.PAYMENT_CONFIRMED : REGISTRATION_STATUS.PENDING);
+    const regStatus = normalizeRegistrationStatus(rawStatus);
+
+    let statusColor = '#22c55e';
+    let StatusIcon = CheckCircle2;
+
+    if (regStatus === REGISTRATION_STATUS.PAYMENT_CONFIRMED) {
+      statusColor = '#22c55e';
+      StatusIcon = CheckCircle2;
+    } else if (regStatus === REGISTRATION_STATUS.PAYMENT_ERROR) {
+      statusColor = '#ef4444';
+      StatusIcon = XCircle;
+    } else {
+      statusColor = '#f59e0b';
+      StatusIcon = Clock;
+    }
 
     return (
       <tr key={athlete.id} style={{ borderBottom: '1px solid #27272a' }}>
@@ -741,7 +807,7 @@ const EventDetails = () => {
             </div>
             {isUnapproved && (
               <div style={{ fontSize: '0.85rem', color: '#a1a1aa', marginTop: '6px', fontStyle: 'italic' }}>
-                Não aprovado
+                {copy.unapproved}
               </div>
             )}
           </div>
@@ -756,14 +822,14 @@ const EventDetails = () => {
           <span style={{ color: '#3b82f6', fontWeight: 500, fontSize: '0.85rem', textTransform: 'uppercase' }}>{fullProfile?.academyName || athlete.academia}</span>
         </td>
       <td style={{ padding: '12px 16px', verticalAlign: 'middle' }}>
-        <span style={{ color: '#f4f4f5', fontSize: '0.85rem' }}>{athlete.faixa}</span>
+        <span style={{ color: '#f4f4f5', fontSize: '0.85rem' }}>{translateBelt(athlete.faixa, uiLanguage)}</span>
       </td>
       <td style={{ padding: '12px 16px', verticalAlign: 'middle' }}>
-        <span style={{ color: '#a1a1aa', fontSize: '0.85rem' }}>{athlete.categoria}</span>
+        <span style={{ color: '#a1a1aa', fontSize: '0.85rem' }}>{translateCategory(athlete.categoria, uiLanguage)}</span>
       </td>
       <td style={{ padding: '12px 16px', verticalAlign: 'middle' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-          <span style={{ color: '#f4f4f5', fontSize: '0.85rem', fontWeight: 500 }}>{athlete.peso || ''}</span>
+          <span style={{ color: '#f4f4f5', fontSize: '0.85rem', fontWeight: 500 }}>{translateWeight(athlete.peso || '', uiLanguage)}</span>
           {athlete.pesoAtual && (
             <span style={{ color: '#22c55e', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
               <span style={{ width: '6px', height: '6px', background: '#22c55e', borderRadius: '50%', display: 'inline-block' }}></span>
@@ -773,7 +839,12 @@ const EventDetails = () => {
         </div>
       </td>
       <td style={{ padding: '12px 16px', verticalAlign: 'middle', textAlign: 'right' }}>
-        <a href="#" onClick={(e) => e.preventDefault()} style={{ color: '#3b82f6', fontSize: '0.85rem', textDecoration: 'none' }}>Public event card</a>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
+          <StatusIcon size={16} style={{ color: statusColor, flexShrink: 0 }} />
+          <a href="#" onClick={(e) => e.preventDefault()} style={{ color: statusColor, fontSize: '0.85rem', textDecoration: 'none', fontWeight: 500 }}>
+            {copy.publicEventCard}
+          </a>
+        </div>
       </td>
     </tr>
   );
@@ -783,27 +854,21 @@ const EventDetails = () => {
     const categories = Object.keys(groupedAthletes).sort();
 
     return (
-      <div className="sc-content" style={{ maxWidth: '1100px', margin: '0 auto', padding: '20px' }}>
+      <div className="sc-content" style={{ maxWidth: '1600px', margin: '0 auto', padding: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
-          <h2 className="sc-section-title" style={{ margin: 0, fontSize: '2.4rem', fontWeight: 900, letterSpacing: '-0.5px' }}>Athletes</h2>
-          <button 
-            style={{ background: '#27272a', color: '#e4e4e7', border: '1px solid #3f3f46', padding: '10px 20px', borderRadius: '24px', fontSize: '0.95rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}
-            onMouseOver={(e) => e.target.style.background = '#3f3f46'}
-            onMouseOut={(e) => e.target.style.background = '#27272a'}
-          >
-            See brackets and schedule
-          </button>
+          <h2 className="sc-section-title" style={{ margin: 0, fontSize: '2.4rem', fontWeight: 900, letterSpacing: '-0.5px' }}>{copy.athletesTabTitle}</h2>
+
         </div>
         <div className="sc-filter-bar" style={{ background: '#1a1a1a', padding: '16px', borderRadius: '8px', marginBottom: '40px', display: 'flex', gap: '16px', border: '1px solid #27272a' }}>
-          <input type="text" className="sc-input" placeholder="Search athlete or division..." style={{ flex: 2, background: '#27272a', border: 'none', padding: '12px 16px', borderRadius: '6px', color: '#fff', fontSize: '1rem', outline: 'none' }} />
+          <input type="text" className="sc-input" placeholder={copy.searchAthletePlaceholder} value={athleteSearch} onChange={(e) => setAthleteSearch(e.target.value)} style={{ flex: 2, background: '#27272a', border: 'none', padding: '12px 16px', borderRadius: '6px', color: '#fff', fontSize: '1rem', outline: 'none' }} />
           <select className="sc-select" style={{ flex: 1, background: '#27272a', border: 'none', padding: '12px 16px', borderRadius: '6px', color: '#fff', fontSize: '1rem', outline: 'none', appearance: 'none' }}>
-            <option>Select country</option>
-            <option>Brazil</option>
+            <option>{copy.selectCountry}</option>
+            <option>{copy.brazil}</option>
           </select>
         </div>
         
         {categories.length === 0 && (
-          <p className="sc-placeholder" style={{ marginTop: '20px' }}>Nenhum atleta inscrito ainda.</p>
+          <p className="sc-placeholder" style={{ marginTop: '20px' }}>{copy.noAthletesYet}</p>
         )}
 
         {categories.map(catLabel => {
@@ -820,23 +885,23 @@ const EventDetails = () => {
           return (
             <div key={catLabel} className="sc-category-block" style={{ marginBottom: '40px' }}>
               <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <h3 style={{ fontSize: '1.6rem', color: '#fff', margin: 0, fontWeight: 900, letterSpacing: '-0.5px' }}>{catLabel}</h3>
-                <span style={{ background: '#3b82f6', color: '#fff', fontSize: '0.85rem', fontWeight: 800, padding: '4px 14px', borderRadius: '20px' }}>Bracket</span>
+                <h3 style={{ fontSize: '1.6rem', color: '#fff', margin: 0, fontWeight: 900, letterSpacing: '-0.5px' }}>{translateCompositeLabel(catLabel, uiLanguage)}</h3>
+                <span style={{ background: '#3b82f6', color: '#fff', fontSize: '0.85rem', fontWeight: 800, padding: '4px 14px', borderRadius: '20px' }}>{copy.bracketBadge}</span>
               </div>
               
               <div style={{ overflowX: 'auto', marginBottom: '16px', borderRadius: '8px', border: '1px solid #27272a' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', color: '#e4e4e7', fontSize: '0.95rem', background: '#1c1c1e' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', color: '#e4e4e7', fontSize: '0.95rem', background: 'transparent' }}>
                   {approvedAthletes.length > 0 && (
                     <>
                       <thead>
                         <tr style={{ borderBottom: '1px solid #27272a', textAlign: 'left', color: '#71717a', fontSize: '0.8rem', textTransform: 'capitalize' }}>
-                          <th style={{ padding: '12px 16px', fontWeight: 'normal' }}>Athlete</th>
-                          <th style={{ padding: '12px 16px', fontWeight: 'normal' }}>Birth</th>
-                          <th style={{ padding: '12px 16px', fontWeight: 'normal' }}>Academy & Affiliation</th>
-                          <th style={{ padding: '12px 16px', fontWeight: 'normal' }}>Registration</th>
+                          <th style={{ padding: '12px 16px', fontWeight: 'normal' }}>{copy.thAthlete}</th>
+                          <th style={{ padding: '12px 16px', fontWeight: 'normal' }}>{copy.thBirth}</th>
+                          <th style={{ padding: '12px 16px', fontWeight: 'normal' }}>{copy.thAcademy}</th>
+                          <th style={{ padding: '12px 16px', fontWeight: 'normal' }}>{copy.thRegistration}</th>
                           <th></th>
                           <th></th>
-                          <th style={{ padding: '12px 16px', fontWeight: 'normal', textAlign: 'right' }}>Download</th>
+                          <th style={{ padding: '12px 16px', fontWeight: 'normal', textAlign: 'right' }}>{copy.thStatus}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -848,7 +913,7 @@ const EventDetails = () => {
               </div>
 
               <div style={{ fontSize: '0.85rem', color: '#71717a', marginBottom: '8px' }}>
-                Approved registrations: {approvedAthletes.length}
+                {copy.approvedRegistrations}: {approvedAthletes.length}
               </div>
 
               {unapprovedAthletes.length > 0 && (
@@ -857,21 +922,21 @@ const EventDetails = () => {
                     onClick={(e) => toggleUnapproved(catLabel, e)}
                     style={{ background: 'none', border: 'none', color: '#3b82f6', fontSize: '0.85rem', cursor: 'pointer', padding: 0 }}
                   >
-                    Show unapproved registrations ({unapprovedAthletes.length})
+                    {copy.showUnapprovedRegistrations} ({unapprovedAthletes.length})
                   </button>
                   
                   {isUnapprovedExpanded && (
                     <div style={{ marginTop: '16px', overflowX: 'auto', borderRadius: '8px', border: '1px solid #27272a' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', color: '#e4e4e7', fontSize: '0.95rem', background: '#1c1c1e' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', color: '#e4e4e7', fontSize: '0.95rem', background: 'transparent' }}>
                         <thead>
                           <tr style={{ borderBottom: '1px solid #27272a', textAlign: 'left', color: '#71717a', fontSize: '0.8rem', textTransform: 'capitalize' }}>
-                            <th style={{ padding: '12px 16px', fontWeight: 'normal' }}>Athlete</th>
-                            <th style={{ padding: '12px 16px', fontWeight: 'normal' }}>Birth</th>
-                            <th style={{ padding: '12px 16px', fontWeight: 'normal' }}>Academy & Affiliation</th>
-                            <th style={{ padding: '12px 16px', fontWeight: 'normal' }}>Registration</th>
+                            <th style={{ padding: '12px 16px', fontWeight: 'normal' }}>{copy.thAthlete}</th>
+                            <th style={{ padding: '12px 16px', fontWeight: 'normal' }}>{copy.thBirth}</th>
+                            <th style={{ padding: '12px 16px', fontWeight: 'normal' }}>{copy.thAcademy}</th>
+                            <th style={{ padding: '12px 16px', fontWeight: 'normal' }}>{copy.thRegistration}</th>
                             <th></th>
                             <th></th>
-                            <th style={{ padding: '12px 16px', fontWeight: 'normal', textAlign: 'right' }}>Download</th>
+                            <th style={{ padding: '12px 16px', fontWeight: 'normal', textAlign: 'right' }}>{copy.thStatus}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -889,114 +954,148 @@ const EventDetails = () => {
     );
   };
 
-  // ---- Brackets Tab ----
-  const renderBracketsTab = () => (
-    <div className="sc-content" style={{ maxWidth: '1100px', margin: '0 auto', padding: '20px' }}>
-      <h2 className="sc-section-title" style={{ margin: 0, fontSize: '2.4rem', fontWeight: 900, letterSpacing: '-0.5px', marginBottom: '32px' }}>Brackets</h2>
-      <div className="sc-filter-bar" style={{ background: '#1a1a1a', padding: '16px', borderRadius: '8px', marginBottom: '40px', display: 'flex', border: '1px solid #27272a' }}>
-        <input type="text" className="sc-input" placeholder="Search bracket..." style={{ flex: 1, background: '#27272a', border: 'none', padding: '12px 16px', borderRadius: '6px', color: '#fff', fontSize: '1rem', outline: 'none' }} />
-      </div>
-
-      {eventBrackets.length === 0 ? (
-        <p className="sc-placeholder" style={{ color: '#a1a1aa' }}>As chaves ainda não foram publicadas</p>
-      ) : (
-        <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid #27272a' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', color: '#e4e4e7', fontSize: '0.95rem', background: '#1c1c1e' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid #27272a', textAlign: 'left', color: '#71717a', fontSize: '0.8rem' }}>
-                <th style={{ padding: '16px 20px', fontWeight: 'normal' }}>Group</th>
-                <th style={{ padding: '16px 20px', fontWeight: 'normal', width: '120px' }}>Est. start?</th>
-                <th style={{ padding: '16px 20px', fontWeight: 'normal', width: '150px' }}>Where</th>
-                <th style={{ padding: '16px 20px', fontWeight: 'normal', width: '50px' }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {eventBrackets.map(bracket => (
-                <tr 
-                  key={bracket.id} 
-                  style={{ borderBottom: '1px solid #27272a', cursor: 'pointer', transition: 'background 0.2s' }}
-                  onClick={() => setSelectedBracket(bracket)}
-                  onMouseOver={(e) => e.currentTarget.style.background = '#27272a'}
-                  onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
-                >
-                  <td style={{ padding: '16px 20px' }}>
-                    <div style={{ fontWeight: 500, fontSize: '0.95rem', color: '#f4f4f5' }}>{bracket.label}</div>
-                    <div style={{ color: '#a1a1aa', fontSize: '0.85rem', marginTop: '4px' }}>{bracket.seedIds?.filter(id => id && !id.startsWith('placeholder-') && id.toUpperCase() !== 'BYE').length || 0} participants</div>
-                  </td>
-                  <td style={{ padding: '16px 20px', fontWeight: 500, color: '#e4e4e7', fontSize: '0.9rem' }}>
-                    {bracket.liveMatches?.[0]?.scheduledAt || 'A definir'}
-                  </td>
-                  <td style={{ padding: '16px 20px', color: '#e4e4e7', fontSize: '0.9rem' }}>
-                    {bracket.liveMatches?.[0]?.area || 'A definir'}
-                  </td>
-                  <td style={{ padding: '16px 20px', textAlign: 'right', color: '#71717a' }}>
-                    <ChevronRight size={18} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      
-      {/* ── SUPER FIGHT APPLICATION MODAL ───────────────────────── */}
-      {showSuperFightApplication && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)' }} onClick={() => setShowSuperFightApplication(false)} />
-          <div style={{ position: 'relative', background: '#1e293b', width: '100%', maxWidth: '500px', borderRadius: '24px', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.6)', border: '1px solid rgba(245,158,11,0.3)' }}>
-            <div style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', padding: '24px', textAlign: 'center' }}>
-              <h2 style={{ margin: 0, color: '#fff', fontSize: '1.4rem', fontWeight: 800 }}>Candidatura para Super Luta</h2>
-              <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', margin: '8px 0 0 0' }}>Preencha seus dados para avaliação da organização.</p>
-            </div>
-            
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              alert('Candidatura enviada com sucesso! A organização analisará seu perfil.');
-              setShowSuperFightApplication(false);
-              setSuperFightForm({ name: '', belt: 'Branca', weight: '', academy: '', instagram: '', titles: '' });
-            }} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', color: '#94a3b8', marginBottom: '6px', fontWeight: 700 }}>Nome Completo *</label>
-                <input required type="text" value={superFightForm.name} onChange={e => setSuperFightForm({...superFightForm, name: e.target.value})} style={{ width: '100%', padding: '12px 16px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontSize: '15px' }} placeholder="Seu nome" />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', color: '#94a3b8', marginBottom: '6px', fontWeight: 700 }}>Faixa *</label>
-                  <select required value={superFightForm.belt} onChange={e => setSuperFightForm({...superFightForm, belt: e.target.value})} style={{ width: '100%', padding: '12px 16px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontSize: '15px' }}>
-                    {['Branca', 'Cinza', 'Amarela', 'Laranja', 'Verde', 'Azul', 'Roxa', 'Marrom', 'Preta'].map(b => <option key={b} value={b}>{b}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', color: '#94a3b8', marginBottom: '6px', fontWeight: 700 }}>Peso (kg) *</label>
-                  <input required type="number" step="0.1" value={superFightForm.weight} onChange={e => setSuperFightForm({...superFightForm, weight: e.target.value})} style={{ width: '100%', padding: '12px 16px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontSize: '15px' }} placeholder="Ex: 75.5" />
-                </div>
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', color: '#94a3b8', marginBottom: '6px', fontWeight: 700 }}>Equipe / Academia *</label>
-                <input required type="text" value={superFightForm.academy} onChange={e => setSuperFightForm({...superFightForm, academy: e.target.value})} style={{ width: '100%', padding: '12px 16px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontSize: '15px' }} placeholder="Sua equipe" />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', color: '#94a3b8', marginBottom: '6px', fontWeight: 700 }}>Instagram (Link ou @) *</label>
-                <input required type="text" value={superFightForm.instagram} onChange={e => setSuperFightForm({...superFightForm, instagram: e.target.value})} style={{ width: '100%', padding: '12px 16px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontSize: '15px' }} placeholder="@seu.perfil" />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', color: '#94a3b8', marginBottom: '6px', fontWeight: 700 }}>Principais Títulos (Resumo)</label>
-                <textarea rows="3" value={superFightForm.titles} onChange={e => setSuperFightForm({...superFightForm, titles: e.target.value})} style={{ width: '100%', padding: '12px 16px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontSize: '15px', resize: 'vertical' }} placeholder="Ex: Campeão Mundial, Bi-campeão Brasileiro..." />
-              </div>
-              
-              <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
-                <button type="button" onClick={() => setShowSuperFightApplication(false)} style={{ flex: 1, padding: '14px', background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 700, fontSize: '1rem', cursor: 'pointer' }}>Cancelar</button>
-                <button type="submit" style={{ flex: 2, padding: '14px', background: '#f59e0b', color: '#000', border: 'none', borderRadius: '8px', fontWeight: 800, fontSize: '1rem', cursor: 'pointer' }}>Enviar Candidatura</button>
-              </div>
-            </form>
+  const renderBracketsTab = () => {
+    if (selectedBracket && showFullBracket) {
+      return (
+        <div className="sc-content" style={{ maxWidth: '1600px', margin: '0 auto', padding: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
+            <button 
+              onClick={() => { setShowFullBracket(false); setSelectedBracket(null); }} 
+              style={{ background: '#2563eb', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+            >
+              Voltar para Lista
+            </button>
+          </div>
+          <div style={{ width: '100%', overflowX: 'auto' }}>
+            <ChaveamentoBracket 
+              bracket={selectedBracket} 
+              athleteMap={athleteMap} 
+              liveMatches={selectedBracket.liveMatches}
+            />
           </div>
         </div>
-      )}
-    </div>
-  );
+      );
+    }
+
+    const filteredBrackets = eventBrackets.filter(b => 
+      !bracketSearch || (b.label || '').toLowerCase().includes(bracketSearch.toLowerCase())
+    );
+
+    return (
+      <div className="sc-content" style={{ maxWidth: '1600px', margin: '0 auto', padding: '20px' }}>
+        <h2 className="sc-section-title" style={{ margin: 0, fontSize: '2.4rem', fontWeight: 900, letterSpacing: '-0.5px', marginBottom: '32px' }}>Brackets</h2>
+        <div className="sc-filter-bar" style={{ background: '#1a1a1a', padding: '16px', borderRadius: '8px', marginBottom: '40px', display: 'flex', border: '1px solid #27272a' }}>
+          <input type="text" className="sc-input" placeholder="Search bracket..." value={bracketSearch} onChange={(e) => setBracketSearch(e.target.value)} style={{ flex: 1, background: '#27272a', border: 'none', padding: '12px 16px', borderRadius: '6px', color: '#fff', fontSize: '1rem', outline: 'none' }} />
+        </div>
+
+        {eventBrackets.length === 0 ? (
+          <p className="sc-placeholder" style={{ color: '#a1a1aa' }}>As chaves ainda não foram publicadas</p>
+        ) : filteredBrackets.length === 0 ? (
+          <p className="sc-placeholder" style={{ color: '#a1a1aa' }}>Nenhuma chave encontrada</p>
+        ) : (
+          <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid #27272a' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', color: '#e4e4e7', fontSize: '0.95rem', background: 'transparent' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #27272a', textAlign: 'left', color: '#a1a1aa', fontSize: '0.95rem' }}>
+                  <th style={{ padding: '16px 20px', fontWeight: 600 }}>Chave</th>
+                  <th 
+                    style={{ padding: '16px 20px', fontWeight: 600, width: '130px', cursor: 'pointer', userSelect: 'none' }}
+                    onClick={() => setBracketSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                  >
+                    Previsão {bracketSortOrder === 'asc' ? '↑' : '↓'}
+                  </th>
+                  <th style={{ padding: '16px 20px', fontWeight: 600, width: '150px' }}>Local</th>
+                  <th style={{ padding: '16px 20px', fontWeight: 600, width: '50px' }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredBrackets.map(bracket => (
+                  <tr 
+                    key={bracket.id} 
+                    style={{ borderBottom: '1px solid #27272a', cursor: 'pointer', transition: 'background 0.2s' }}
+                    onClick={() => { setSelectedBracket(bracket); setShowFullBracket(false); }}
+                    onMouseOver={(e) => e.currentTarget.style.background = '#27272a'}
+                    onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <td style={{ padding: '16px 20px' }}>
+                      <div style={{ fontWeight: 500, fontSize: '0.95rem', color: '#f4f4f5' }}>{bracket.label}</div>
+                      <div style={{ color: '#a1a1aa', fontSize: '0.85rem', marginTop: '4px' }}>{bracket.seedIds?.filter(id => id && !id.startsWith('placeholder-') && id.toUpperCase() !== 'BYE').length || 0} participants</div>
+                    </td>
+                    <td style={{ padding: '16px 20px', fontWeight: 500, color: '#e4e4e7', fontSize: '0.9rem' }}>
+                      {bracket.scheduleTime || 'A definir'}
+                    </td>
+                    <td style={{ padding: '16px 20px', color: '#e4e4e7', fontSize: '0.9rem' }}>
+                      {bracket.scheduleArea || 'A definir'}
+                    </td>
+                    <td style={{ padding: '16px 20px', textAlign: 'right', color: '#71717a' }}>
+                      <ChevronRight size={18} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        
+        {/* ── SUPER FIGHT APPLICATION MODAL ───────────────────────── */}
+        {showSuperFightApplication && (
+          <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+            <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)' }} onClick={() => setShowSuperFightApplication(false)} />
+            <div style={{ position: 'relative', background: '#1e293b', width: '100%', maxWidth: '500px', borderRadius: '24px', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.6)', border: '1px solid rgba(245,158,11,0.3)' }}>
+              <div style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', padding: '24px', textAlign: 'center' }}>
+                <h2 style={{ margin: 0, color: '#fff', fontSize: '1.4rem', fontWeight: 800 }}>Candidatura para Super Luta</h2>
+                <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', margin: '8px 0 0 0' }}>Preencha seus dados para avaliação da organização.</p>
+              </div>
+              
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                alert('Candidatura enviada com sucesso! A organização analisará seu perfil.');
+                setShowSuperFightApplication(false);
+                setSuperFightForm({ name: '', belt: 'Branca', weight: '', academy: '', instagram: '', titles: '' });
+              }} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', color: '#94a3b8', marginBottom: '6px', fontWeight: 700 }}>Nome Completo *</label>
+                  <input required type="text" value={superFightForm.name} onChange={e => setSuperFightForm({...superFightForm, name: e.target.value})} style={{ width: '100%', padding: '12px 16px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontSize: '15px' }} placeholder="Seu nome" />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', color: '#94a3b8', marginBottom: '6px', fontWeight: 700 }}>Faixa *</label>
+                    <select required value={superFightForm.belt} onChange={e => setSuperFightForm({...superFightForm, belt: e.target.value})} style={{ width: '100%', padding: '12px 16px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontSize: '15px' }}>
+                      {['Branca', 'Cinza', 'Amarela', 'Laranja', 'Verde', 'Azul', 'Roxa', 'Marrom', 'Preta'].map(b => <option key={b} value={b}>{b}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', color: '#94a3b8', marginBottom: '6px', fontWeight: 700 }}>Peso (kg) *</label>
+                    <input required type="number" step="0.1" value={superFightForm.weight} onChange={e => setSuperFightForm({...superFightForm, weight: e.target.value})} style={{ width: '100%', padding: '12px 16px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontSize: '15px' }} placeholder="Ex: 75.5" />
+                  </div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', color: '#94a3b8', marginBottom: '6px', fontWeight: 700 }}>Equipe / Academia *</label>
+                  <input required type="text" value={superFightForm.academy} onChange={e => setSuperFightForm({...superFightForm, academy: e.target.value})} style={{ width: '100%', padding: '12px 16px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontSize: '15px' }} placeholder="Sua equipe" />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', color: '#94a3b8', marginBottom: '6px', fontWeight: 700 }}>Instagram (Link ou @) *</label>
+                  <input required type="text" value={superFightForm.instagram} onChange={e => setSuperFightForm({...superFightForm, instagram: e.target.value})} style={{ width: '100%', padding: '12px 16px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontSize: '15px' }} placeholder="@seu.perfil" />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', color: '#94a3b8', marginBottom: '6px', fontWeight: 700 }}>Principais Títulos (Resumo)</label>
+                  <textarea rows="3" value={superFightForm.titles} onChange={e => setSuperFightForm({...superFightForm, titles: e.target.value})} style={{ width: '100%', padding: '12px 16px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontSize: '15px', resize: 'vertical' }} placeholder="Ex: Campeão Mundial, Bi-campeão Brasileiro..." />
+                </div>
+                
+                <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+                  <button type="button" onClick={() => setShowSuperFightApplication(false)} style={{ flex: 1, padding: '14px', background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 700, fontSize: '1rem', cursor: 'pointer' }}>Cancelar</button>
+                  <button type="submit" style={{ flex: 2, padding: '14px', background: '#f59e0b', color: '#000', border: 'none', borderRadius: '8px', fontWeight: 800, fontSize: '1rem', cursor: 'pointer' }}>Enviar Candidatura</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const renderPlaceholderTab = (title) => (
-    <div className="sc-content" style={{ maxWidth: '1100px', margin: '0 auto', padding: '20px' }}>
+    <div className="sc-content" style={{ maxWidth: '1600px', margin: '0 auto', padding: '20px' }}>
       <h2 className="sc-section-title" style={{ margin: 0, fontSize: '2.4rem', fontWeight: 900, letterSpacing: '-0.5px', marginBottom: '32px', textTransform: 'uppercase' }}>{title}</h2>
       <p className="sc-placeholder" style={{ color: '#a1a1aa' }}>As informações para {title} ainda não foram publicadas</p>
     </div>
@@ -1085,15 +1184,15 @@ const EventDetails = () => {
       return renderPlaceholderTab('Cronograma');
     }
     return (
-      <div className="sc-content" style={{ maxWidth: '1100px', margin: '0 auto', padding: '20px' }}>
+      <div className="sc-content" style={{ maxWidth: '1600px', margin: '0 auto', padding: '20px' }}>
         <h2 className="sc-section-title" style={{ margin: 0, fontSize: '2.4rem', fontWeight: 900, letterSpacing: '-0.5px', marginBottom: '32px', textTransform: 'uppercase' }}>Cronograma</h2>
         <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid #27272a' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', color: '#e4e4e7', fontSize: '0.95rem', background: '#1c1c1e' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', color: '#e4e4e7', fontSize: '0.95rem', background: 'transparent' }}>
             <thead>
-              <tr style={{ borderBottom: '1px solid #27272a', textAlign: 'left', color: '#71717a', fontSize: '0.8rem' }}>
-                <th style={{ padding: '16px 20px', fontWeight: 'normal', width: '150px' }}>Horário</th>
-                <th style={{ padding: '16px 20px', fontWeight: 'normal' }}>Descrição</th>
-                <th style={{ padding: '16px 20px', fontWeight: 'normal', textAlign: 'right', width: '120px' }}>Local</th>
+              <tr style={{ borderBottom: '1px solid #27272a', textAlign: 'left', color: '#a1a1aa', fontSize: '0.95rem' }}>
+                <th style={{ padding: '16px 20px', fontWeight: 600, width: '150px' }}>Horário</th>
+                <th style={{ padding: '16px 20px', fontWeight: 600 }}>Descrição</th>
+                <th style={{ padding: '16px 20px', fontWeight: 600, textAlign: 'right', width: '120px' }}>Local</th>
               </tr>
             </thead>
             <tbody>
@@ -1108,7 +1207,7 @@ const EventDetails = () => {
                     {row.startLabel} {row.endLabel && row.endLabel !== row.startLabel ? `- ${row.endLabel}` : ''}
                   </td>
                   <td style={{ padding: '16px 20px' }}>
-                    <div style={{ fontWeight: 500, fontSize: '0.95rem', color: '#3b82f6', letterSpacing: '-0.01em' }}>{row.title}</div>
+                    <div style={{ fontWeight: 500, fontSize: '0.95rem', color: '#e4e4e7', letterSpacing: '-0.01em' }}>{row.title}</div>
                     {row.notes && <div style={{ color: '#a1a1aa', fontSize: '0.85rem', marginTop: '4px' }}>{row.notes}</div>}
                   </td>
                   <td style={{ padding: '16px 20px', color: '#a1a1aa', textAlign: 'right' }}>{row.area || '-'}</td>
@@ -1140,7 +1239,7 @@ const EventDetails = () => {
           <div style={{ padding: '16px 0', color: '#a1a1aa', fontWeight: 600, cursor: 'pointer', fontSize: '0.9rem', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color = '#e4e4e7'} onMouseOut={e => e.currentTarget.style.color = '#a1a1aa'}>Top listas</div>
         </div>
       </div>
-      <div className="sc-content" style={{ maxWidth: '1100px', margin: '0 auto', padding: '32px 20px' }}>
+      <div className="sc-content" style={{ maxWidth: '1600px', margin: '0 auto', padding: '32px 20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
           <h2 className="sc-section-title" style={{ margin: 0, fontSize: '2.4rem', fontWeight: 900, letterSpacing: '-0.5px', textTransform: 'uppercase' }}>Resultados</h2>
           <button style={{ background: 'transparent', color: '#a1a1aa', border: '1px solid #3f3f46', padding: '8px 16px', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s' }} onMouseOver={e => {e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = '#71717a';}} onMouseOut={e => {e.currentTarget.style.color = '#a1a1aa'; e.currentTarget.style.borderColor = '#3f3f46';}}>
@@ -1242,7 +1341,7 @@ const EventDetails = () => {
   };
 
   const renderBracketModal = () => {
-    if (!selectedBracket) return null;
+    if (!selectedBracket || showFullBracket) return null;
 
     const rounds = buildRounds({
       seedIds: selectedBracket.seedIds,
@@ -1263,109 +1362,193 @@ const EventDetails = () => {
       });
     }
 
-    return (
-      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
-        <div style={{ backgroundColor: '#09090b', borderRadius: '16px', width: '100%', maxWidth: showFullBracket ? '1200px' : '450px', border: '1px solid #27272a', boxShadow: '0 0 40px rgba(59, 130, 246, 0.1), 0 0 0 1px rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', maxHeight: '90vh', transition: 'all 0.4s cubic-bezier(0.16, 1, 0.3, 1)', overflow: 'hidden' }}>
+      return (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', zIndex: 9999, display: 'flex', justifyContent: 'flex-end' }} onClick={() => { setSelectedBracket(null); setShowFullBracket(false); setBracketSearch(''); }}>
           
-          <div style={{ padding: '24px', borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'linear-gradient(180deg, rgba(39,39,42,0.4) 0%, rgba(9,9,11,0) 100%)', position: 'relative' }}>
-            <h3 style={{ margin: '0 0 20px 0', fontSize: '1.25rem', paddingRight: '24px', color: '#fff', fontWeight: 700, letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#3b82f6', boxShadow: '0 0 12px #3b82f6' }}></div>
-              {selectedBracket.label}
-            </h3>
-            <button onClick={() => { setSelectedBracket(null); setShowFullBracket(false); setBracketSearch(''); }} style={{ position: 'absolute', top: '24px', right: '24px', background: 'rgba(255,255,255,0.05)', border: 'none', color: '#a1a1aa', cursor: 'pointer', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }} onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = '#fff'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = '#a1a1aa'; }}>
-              <X size={18} />
-            </button>
+          <div style={{ backgroundColor: '#18181b', width: '100%', maxWidth: showFullBracket ? '100vw' : '450px', height: '100vh', display: 'flex', flexDirection: 'column', transition: 'all 0.3s ease-in-out', overflow: 'hidden', boxShadow: '-10px 0 30px rgba(0,0,0,0.5)', position: 'relative' }} onClick={e => e.stopPropagation()}>
             
-            <button 
-              onClick={() => setShowFullBracket(!showFullBracket)}
-              style={{ width: '100%', background: showFullBracket ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)', color: 'white', border: showFullBracket ? '1px solid rgba(255,255,255,0.1)' : 'none', padding: '12px', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.2s', boxShadow: showFullBracket ? 'none' : '0 4px 12px rgba(37, 99, 235, 0.3)' }}
-              onMouseEnter={(e) => { if(!showFullBracket) e.currentTarget.style.transform = 'translateY(-1px)'; }}
-              onMouseLeave={(e) => { if(!showFullBracket) e.currentTarget.style.transform = 'none'; }}
-            >
-              <Swords size={18} />
-              {showFullBracket ? 'Ver lista de lutas' : 'Ver chave completa (Gráfico)'}
+            <button onClick={() => { setSelectedBracket(null); setShowFullBracket(false); setBracketSearch(''); }} style={{ position: 'absolute', top: '16px', right: '16px', background: 'rgba(255,255,255,0.1)', border: 'none', color: '#a1a1aa', cursor: 'pointer', width: '28px', height: '28px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', zIndex: 10 }}>
+              <X size={16} />
             </button>
-            
-            {!showFullBracket && (
-              <div style={{ position: 'relative' }}>
-                <Search size={16} color="#71717a" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
-                <input 
-                  type="text" 
-                  value={bracketSearch}
-                  onChange={(e) => setBracketSearch(e.target.value)}
-                  placeholder="Buscar atleta nesta categoria..." 
-                  style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '12px 12px 12px 40px', color: '#fff', fontSize: '0.9rem', outline: 'none', transition: 'all 0.2s' }} 
-                  onFocus={(e) => { e.target.style.borderColor = '#3b82f6'; e.target.style.backgroundColor = 'rgba(59, 130, 246, 0.05)'; }}
-                  onBlur={(e) => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.backgroundColor = 'rgba(255,255,255,0.03)'; }}
-                />
-              </div>
-            )}
-          </div>
-          
-          <div style={{ padding: '24px', overflowY: 'auto', flex: 1, backgroundColor: showFullBracket ? '#09090b' : 'transparent' }}>
+
             {showFullBracket ? (
-              <div style={{ width: '100%', overflowX: 'auto', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', padding: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                <BracketTree 
-                  bracket={selectedBracket} 
-                  athleteMap={athleteMap} 
-                  liveMatches={selectedBracket.liveMatches} 
-                />
+              <div style={{ padding: '24px', overflowY: 'auto', flex: 1, backgroundColor: '#09090b', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                  <h3 style={{ margin: 0, color: '#fff', fontSize: '1.2rem', fontWeight: 700 }}>{selectedBracket.label}</h3>
+                  <button onClick={() => setShowFullBracket(false)} style={{ background: '#2563eb', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>Voltar para Lista</button>
+                </div>
+                <div style={{ width: '100%', overflowX: 'auto', flex: 1, display: 'flex', justifyContent: 'flex-start' }}>
+                  <ChaveamentoBracket 
+                    bracket={selectedBracket} 
+                    athleteMap={athleteMap} 
+                    liveMatches={selectedBracket.liveMatches} 
+                  />
+                </div>
               </div>
             ) : (
-              <>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '0 0 16px 0' }}>
-                  <h4 style={{ margin: 0, fontSize: '0.875rem', color: '#a1a1aa', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cronograma de Lutas</h4>
-                  <span style={{ fontSize: '0.75rem', backgroundColor: 'rgba(59, 130, 246, 0.1)', color: '#60a5fa', padding: '4px 8px', borderRadius: '12px', fontWeight: 600 }}>{displayMatches.length} lutas</span>
-                </div>
+              <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {displayMatches.map((match, idx) => {
-                    const aId = match.slotAId;
-                    const bId = match.slotBId;
-                    const aName = match.slotALabel || 'Aguardando';
-                    const bName = match.slotBLabel || 'Aguardando';
-
-                    return (
-                      <div key={idx} style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'all 0.2s', cursor: 'default' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)'; }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, position: 'relative' }}>
-                          <div style={{ position: 'absolute', left: '15px', top: '22px', bottom: '22px', width: '2px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '2px' }}></div>
-                          
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', zIndex: 1 }}>
-                            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: '#60a5fa', fontWeight: 700, boxShadow: 'inset 0 0 10px rgba(59,130,246,0.1)' }}>A</div>
-                            {aId ? <Link to={`/perfil-publico/${aId}`} style={{ color: '#fff', textDecoration: 'none', fontWeight: 600, fontSize: '0.95rem', transition: 'color 0.2s' }} onMouseEnter={(e) => e.target.style.color = '#60a5fa'} onMouseLeave={(e) => e.target.style.color = '#fff'}>{aName}</Link> : <span style={{ color: '#71717a', fontSize: '0.95rem', fontStyle: 'italic' }}>{aName}</span>}
-                          </div>
-                          
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', zIndex: 1 }}>
-                            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: '#f87171', fontWeight: 700, boxShadow: 'inset 0 0 10px rgba(239,68,68,0.1)' }}>B</div>
-                            {bId ? <Link to={`/perfil-publico/${bId}`} style={{ color: '#fff', textDecoration: 'none', fontWeight: 600, fontSize: '0.95rem', transition: 'color 0.2s' }} onMouseEnter={(e) => e.target.style.color = '#f87171'} onMouseLeave={(e) => e.target.style.color = '#fff'}>{bName}</Link> : <span style={{ color: '#71717a', fontSize: '0.95rem', fontStyle: 'italic' }}>{bName}</span>}
-                          </div>
-                        </div>
-                        
-                        {match.scheduledAt && (
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', paddingLeft: '16px', borderLeft: '1px solid rgba(255,255,255,0.05)' }}>
-                            <span style={{ fontSize: '0.85rem', color: '#fff', fontWeight: 600, backgroundColor: 'rgba(255,255,255,0.1)', padding: '4px 8px', borderRadius: '6px' }}>{match.scheduledAt}</span>
-                            <span style={{ fontSize: '0.75rem', color: '#a1a1aa', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <MapPin size={10} />
-                              {match.area}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-                
-                {displayMatches.length === 0 && (
-                  <div style={{ color: '#71717a', fontSize: '0.9rem', textAlign: 'center', padding: '40px 20px', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px dashed rgba(255,255,255,0.1)' }}>
-                    {bracketSearch ? 'Nenhum atleta encontrado na busca.' : 'As lutas ainda não foram geradas.'}
+                <div style={{ padding: '24px 24px 16px 24px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <h3 style={{ margin: '0 0 24px 0', fontSize: '1.15rem', paddingRight: '32px', color: '#fff', fontWeight: 600, lineHeight: 1.4 }}>
+                    {selectedBracket.label}
+                  </h3>
+                  
+                  <button 
+                    onClick={() => setShowFullBracket(true)}
+                    style={{ width: '100%', background: '#2563eb', color: 'white', border: 'none', padding: '12px', borderRadius: '24px', fontWeight: 600, cursor: 'pointer', marginBottom: '16px', fontSize: '1rem', transition: 'background 0.2s' }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#1d4ed8'}
+                    onMouseLeave={e => e.currentTarget.style.background = '#2563eb'}
+                  >
+                    View bracket
+                  </button>
+                  
+                  <div style={{ position: 'relative', marginBottom: '16px' }}>
+                    <input 
+                      type="text" 
+                      value={bracketSearch}
+                      onChange={(e) => setBracketSearch(e.target.value)}
+                      placeholder="Search..." 
+                      style={{ width: '100%', backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: '20px', padding: '10px 16px', color: '#fff', fontSize: '0.9rem', outline: 'none' }} 
+                    />
                   </div>
-                )}
-              </>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ width: '36px', height: '20px', backgroundColor: '#22c55e', borderRadius: '10px', position: 'relative' }}>
+                      <div style={{ width: '16px', height: '16px', backgroundColor: '#fff', borderRadius: '50%', position: 'absolute', right: '2px', top: '2px' }}></div>
+                    </div>
+                    <span style={{ color: '#d4d4d8', fontSize: '0.9rem' }}>Display all bracket matches</span>
+                  </div>
+                </div>
+                
+                <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
+                  {displayMatches.length === 0 ? (
+                    <div style={{ color: '#71717a', fontSize: '0.9rem', textAlign: 'center', padding: '40px 20px' }}>
+                      {bracketSearch ? 'Nenhum atleta encontrado.' : 'As lutas ainda não foram geradas.'}
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                      {/* Agrupamos por Round fictício apenas para visual (Ex: Quarterfinals, Semifinals) */}
+                      {(() => {
+                        // Divisão simples de rounds para o design bater com a imagem
+                        const chunks = [];
+                        let chunkSize = Math.ceil(displayMatches.length / 3) || 1;
+                        for (let i = 0; i < displayMatches.length; i += chunkSize) {
+                          chunks.push(displayMatches.slice(i, i + chunkSize));
+                        }
+                        const roundNames = ['Quarterfinals', 'Semifinals', 'Bronze match', 'Final'];
+                        
+                        return chunks.map((chunk, chunkIdx) => (
+                          <div key={chunkIdx}>
+                            <h4 style={{ margin: '0 0 12px 0', fontSize: '0.9rem', color: '#a1a1aa', fontWeight: 500 }}>{roundNames[chunkIdx] || `Round ${chunkIdx + 1}`}</h4>
+                            
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              {chunk.map((match, idx) => {
+                                const aId = match.slotAId;
+                                const bId = match.slotBId;
+                                const aName = match.slotALabel || 'BYE';
+                                const bName = match.slotBLabel || 'BYE';
+                                const isByeA = aName === 'BYE' || aName === 'Aguardando';
+                                const isByeB = bName === 'BYE' || bName === 'Aguardando';
+
+                                const result = selectedBracket.matchResults?.[match.matchId || match.id];
+                                const isFinished = !!result;
+                                const winnerA = isFinished && result.winnerId === aId;
+                                const winnerB = isFinished && result.winnerId === bId;
+
+                                const formatDuration = (secs) => {
+                                  if (secs == null || isNaN(secs)) return '';
+                                  const m = Math.floor(secs / 60).toString().padStart(2, '0');
+                                  const s = (secs % 60).toString().padStart(2, '0');
+                                  return `${m}:${s}`;
+                                };
+
+                                return (
+                                  <div key={idx} style={{ backgroundColor: '#27272a', borderRadius: '8px', padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
+                                      {/* Slot A */}
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', opacity: isByeA || (isFinished && !winnerA) ? 0.5 : 1 }}>
+                                        <div style={{ position: 'relative' }}>
+                                          <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#3f3f46', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            {isByeA ? <span style={{ fontSize: '9px', fontWeight: 'bold', color: '#71717a' }}>BYE</span> : <Users size={16} color="#a1a1aa" />}
+                                          </div>
+                                          {winnerA && (
+                                            <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', background: '#22c55e', borderRadius: '50%', padding: '2px' }}>
+                                              <CheckCircle2 size={12} color="#fff" />
+                                            </div>
+                                          )}
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            {!isByeA && <span style={{ fontSize: '10px' }}>🇧🇷</span>}
+                                            <span style={{ color: winnerA ? '#22c55e' : (isByeA ? '#71717a' : '#fff'), fontWeight: winnerA ? 700 : 600, fontSize: '0.9rem' }}>{aName}</span>
+                                          </div>
+                                          {!isByeA && <span style={{ color: '#71717a', fontSize: '0.75rem' }}>Equipe / Academy</span>}
+                                        </div>
+                                      </div>
+                                      
+                                      {/* Slot B */}
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', opacity: isByeB || (isFinished && !winnerB) ? 0.5 : 1 }}>
+                                        <div style={{ position: 'relative' }}>
+                                          <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#3f3f46', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            {isByeB ? <span style={{ fontSize: '9px', fontWeight: 'bold', color: '#71717a' }}>BYE</span> : <Users size={16} color="#a1a1aa" />}
+                                          </div>
+                                          {winnerB && (
+                                            <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', background: '#22c55e', borderRadius: '50%', padding: '2px' }}>
+                                              <CheckCircle2 size={12} color="#fff" />
+                                            </div>
+                                          )}
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            {!isByeB && <span style={{ fontSize: '10px' }}>🇧🇷</span>}
+                                            <span style={{ color: winnerB ? '#22c55e' : (isByeB ? '#71717a' : '#fff'), fontWeight: winnerB ? 700 : 600, fontSize: '0.9rem' }}>{bName}</span>
+                                          </div>
+                                          {!isByeB && <span style={{ color: '#71717a', fontSize: '0.75rem' }}>Equipe / Academy</span>}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center', gap: '4px', borderLeft: '1px solid #3f3f46', paddingLeft: '12px', minWidth: '80px' }}>
+                                      {isFinished ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', textAlign: 'right' }}>
+                                          <span style={{ fontSize: '0.7rem', color: '#22c55e', fontWeight: 700, textTransform: 'uppercase', marginBottom: '2px' }}>{result.winReason || 'FINALIZADO'}</span>
+                                          {result.matchDuration != null && (
+                                            <span style={{ fontSize: '0.75rem', color: '#a1a1aa', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                              <Clock size={12} /> {formatDuration(result.matchDuration)}
+                                            </span>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <>
+                                          <Clock size={16} color="#71717a" />
+                                          {match.scheduledAt ? (
+                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                                              <span style={{ fontSize: '0.8rem', color: '#fff', fontWeight: 600, background: '#3f3f46', padding: '2px 6px', borderRadius: '4px', marginBottom: '4px' }}>2-{idx + 1}</span>
+                                              <span style={{ fontSize: '0.75rem', color: '#a1a1aa' }}>{match.scheduledAt}</span>
+                                            </div>
+                                          ) : (
+                                            <span style={{ fontSize: '0.75rem', color: '#71717a' }}>xx:xx</span>
+                                          )}
+                                        </>
+                                      )}
+                                    </div>
+                                    
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
           </div>
         </div>
-      </div>
-    );
+      );
   };
 
   return (
@@ -1429,19 +1612,32 @@ const EventDetails = () => {
 
       <div className="sc-tabs-nav">
         {[
-          { key: 'information', label: copy.infoTab, icon: <BookOpen size={16} /> },
-          { key: 'athletes', label: copy.athletesTab, icon: <Users size={16} /> },
-          { key: 'brackets', label: copy.bracketsTab, icon: <Swords size={16} /> },
-          { key: 'matches', label: copy.matchesTab, icon: <Swords size={16} /> },
-          { key: 'schedule', label: copy.scheduleTab, icon: <Clock size={16} /> },
-          { key: 'results', label: copy.resultsTab, icon: <BarChart2 size={16} /> },
-        ].map(({ key, label, icon }) => (
+          { key: 'information', label: copy.infoTab, icon: <BookOpen size={20} /> },
+          { key: 'athletes', label: copy.athletesTab, icon: <Users size={20} />, count: eventAthletes.length },
+          { key: 'brackets', label: copy.bracketsTab, icon: <Network size={20} style={{ transform: 'rotate(90deg)' }} /> },
+          { key: 'matches', label: copy.matchesTab, icon: <Contact size={20} /> },
+          { key: 'schedule', label: copy.scheduleTab, icon: <Clock size={20} /> },
+          { key: 'results', label: copy.resultsTab, icon: <BarChart2 size={20} /> },
+        ].map(({ key, label, icon, count }) => (
           <div
             key={key}
             className={`sc-tab ${activeTab === key ? 'active' : ''}`}
             onClick={() => setTab(key)}
           >
             {icon} {label}
+            {count !== undefined && (
+              <span style={{ 
+                background: '#3f3f46', 
+                color: '#e4e4e7', 
+                padding: '2px 8px', 
+                borderRadius: '12px', 
+                fontSize: '0.75rem', 
+                marginLeft: '6px',
+                fontWeight: 600
+              }}>
+                {count}
+              </span>
+            )}
           </div>
         ))}
       </div>

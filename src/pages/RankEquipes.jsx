@@ -1,5 +1,5 @@
 import React, { useDeferredValue, useEffect, useMemo, useState } from 'react';
-import { Medal, Search, Trophy } from 'lucide-react';
+import { Medal, Search, Trophy, Shield } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { useStore } from '../hooks/useStore';
 import { useI18n } from '../hooks/useI18n';
@@ -48,7 +48,7 @@ const detectMode = (athlete) => (
 // Página de Ranking de Equipes
 // Este componente exibe o ranking focado em academias/equipes.
 const RankEquipes = () => {
-  const { athletes, events, activeEventId } = useStore();
+  const { athletes, events, activeEventId, academies = [] } = useStore();
   const { uiLanguage } = useI18n();
   const isEnglish = uiLanguage === 'en-US';
   const isSpanish = uiLanguage === 'es-ES';
@@ -422,154 +422,171 @@ const RankEquipes = () => {
   };
 
   return (
-    <div className="ranking-minimal team-ranking-premium">
-      <div className="rank-controls">
-        <div>
-          <div className="rank-controls__label">{copy.event}</div>
-          <div className="rank-controls__value">{eventLabel}</div>
+    <div className="ajp-page-container">
+      <div className="ajp-header-section" style={{
+        backgroundImage: "linear-gradient(to right, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.45) 35%, rgba(0,0,0,0.45) 65%, rgba(0,0,0,0.85) 100%), url('/rankequipe.jpeg')",
+        backgroundSize: 'cover',
+        backgroundPosition: 'center 28%',
+      }}>
+        <div className="ajp-header-top">
+          <h1 className="ajp-header-title">RANKING EQUIPES</h1>
+          <div style={{ position: 'relative' }}>
+            <select
+              className="ajp-event-dropdown"
+              style={{ appearance: 'none', WebkitAppearance: 'none', background: 'transparent', border: 'none', color: '#fff', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer', paddingRight: '20px' }}
+              value={selectedEventId}
+              onChange={(event) => setSelectedEventId(event.target.value)}
+              aria-label={copy.selectEvent}
+            >
+              <option value="all">{copy.allEvents}</option>
+              <option value="none">{copy.noEvent}</option>
+              {events.map((eventItem) => (
+                <option key={eventItem.id} value={eventItem.id} style={{ color: '#000' }}>{eventItem.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
-        <select
-          className="input select-compact"
-          value={selectedEventId}
-          onChange={(event) => setSelectedEventId(event.target.value)}
-          aria-label={copy.selectEvent}
-        >
-          <option value="all">{copy.allEvents}</option>
-          <option value="none">{copy.noEvent}</option>
-          {events.map((eventItem) => (
-            <option key={eventItem.id} value={eventItem.id}>{eventItem.name}</option>
-          ))}
-        </select>
-      </div>
+        
+        <div className="ajp-breadcrumb">
+          <span>Rankings</span>
+          <span>/</span>
+          <span className="bc-current">{eventLabel}</span>
+          <span>/</span>
+          <span>EQUIPES</span>
+        </div>
 
-      <div className="rank-toolbar">
-        <div className="rank-search rank-search--inline">
-          <Search size={16} />
+        <div className="ajp-gender-toggles" style={{ justifyContent: 'flex-start', flexWrap: 'wrap', gap: '8px' }}>
+          {SEGMENT_IDS.map((segmentId) => (
+            <button
+              key={segmentId}
+              type="button"
+              className={`ajp-gender-btn ${segmentId === segment ? 'active' : ''}`}
+              onClick={() => setSegment(segmentId)}
+            >
+              <Trophy size={16} />
+              {copy.segments[segmentId]}
+            </button>
+          ))}
+        </div>
+
+        <div 
+          className="ajp-header-search" 
+          style={{ 
+            marginTop: '24px', 
+            display: 'inline-flex', 
+            alignItems: 'center', 
+            gap: '8px', 
+            background: 'rgba(255, 255, 255, 0.05)', 
+            border: '1px solid rgba(255, 255, 255, 0.1)', 
+            borderRadius: '4px', 
+            padding: '8px 16px',
+            width: '100%',
+            maxWidth: '300px'
+          }}
+        >
+          <Search size={16} color="#aaa" />
           <input
             type="text"
             placeholder={copy.searchTeam}
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
             aria-label={copy.searchTeam}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#fff',
+              fontSize: '14px',
+              outline: 'none',
+              width: '100%'
+            }}
           />
         </div>
-        <div className="rank-toolbar__actions">
-          <label className="rank-limit">
-            <span>{copy.show}</span>
-            <select
-              value={tableLimit}
-              onChange={(event) => setTableLimit(Number(event.target.value))}
-            >
-              <option value={25}>{copy.top25}</option>
-              <option value={50}>{copy.top50}</option>
-              <option value={100}>{copy.top100}</option>
-              <option value={0}>{copy.all}</option>
-            </select>
-          </label>
-          <button type="button" className="btn btn-ghost" onClick={handleExportCsv}>
-            {copy.exportCsv}
-          </button>
-        </div>
       </div>
 
-      <div className="rank-stats-bar">
-        <div className="rank-stat">
-          <span>{copy.teams}</span>
-          <strong>{totalTeams}</strong>
-        </div>
-        <div className="rank-stat">
-          <span>{copy.athletes}</span>
-          <strong>{totalAthletes}</strong>
-        </div>
-        <div className="rank-stat">
-          <span>{copy.panels}</span>
-          <strong>{panelTemplates.length}</strong>
-        </div>
-      </div>
-
-      <div className="team-ranking-segments">
-        {SEGMENT_IDS.map((segmentId) => (
-          <button
-            key={segmentId}
-            type="button"
-            className={`team-ranking-segment ${segmentId === segment ? 'is-active' : ''}`}
-            onClick={() => setSegment(segmentId)}
-          >
-            {copy.segments[segmentId]}
-          </button>
-        ))}
-      </div>
-
-      <div className="team-ranking-panels">
+      <div className="ajp-category-grid" style={{ padding: '0 40px 40px', maxWidth: '1400px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(500px, 1fr))', gap: '32px' }}>
         {panelData.map((panel) => {
           const expanded = expandedPanels.has(panel.key);
-          const hasMore = panel.teams.length > 3;
-          const visibleTeams = expanded ? panel.teams : panel.teams.slice(0, 3);
+          const hasMore = panel.teams.length > 5;
+          const visibleTeams = expanded ? panel.teams : panel.teams.slice(0, 5);
           return (
-            <section key={panel.key} className="team-ranking-panel">
-              <header className="team-ranking-panel__header">
-                <div>
-                  <h3>{panel.title}</h3>
-                  <p>{copy.updatedNow}</p>
-                </div>
-                <span className="team-ranking-panel__season">{seasonLabel}</span>
-              </header>
+            <div key={panel.key} className="ajp-category-card">
+              <div className="ajp-category-header">
+                <h3 className="ajp-category-title">{panel.title}</h3>
+                <p className="ajp-category-subtitle">Last calculated just now</p>
+              </div>
 
-              <div className="team-ranking-panel__body">
+              <div className="ajp-category-body">
                 {visibleTeams.length === 0 ? (
-                  <div className="rank-empty">{copy.noData}</div>
+                  <div className="ajp-empty-state">{copy.noData}</div>
                 ) : (
-                  visibleTeams.map((team) => {
+                  visibleTeams.map((team, index) => {
                     const countryLabel = countryLabelFromCode(team.countryCode, uiLanguage) || team.countryCode;
+                    
+                    const academyDetails = (academies || []).find(a => 
+                        a.name && team.academy && a.name.toLowerCase() === team.academy.toLowerCase()
+                    );
+                    const logoUrl = academyDetails?.logoUrl;
+                    
                     return (
-                      <article key={`${panel.key}-${team.key}`} className="team-ranking-row">
-                        <div className="team-ranking-row__left">
-                          <div className="team-ranking-row__rank">{team.rank}</div>
-                          <div className="team-ranking-row__identity">
-                            <strong>{team.academy}</strong>
-                            <span>
-                              <span className="team-ranking-row__flag" aria-hidden="true">{flagFromCountryCode(team.countryCode)}</span>
-                              {countryLabel}
-                            </span>
+                      <div key={`${panel.key}-${team.key}`} className="ajp-category-row" style={{ cursor: 'default' }}>
+                        <div className="ajp-category-rank">{team.rank}.</div>
+                        <div className="ajp-category-avatar" style={{ background: 'transparent' }}>
+                          {logoUrl ? (
+                            <img src={logoUrl} alt={team.academy} loading="lazy" />
+                          ) : (
+                            <Shield size={24} color="#aaa" />
+                          )}
+                        </div>
+                        <div className="ajp-category-info">
+                          <div className="ajp-category-name">{team.academy}</div>
+                          <div className="ajp-category-country">
+                            <span>{flagFromCountryCode(team.countryCode)}</span>
+                            <span>{countryLabel}</span>
                           </div>
                         </div>
 
-                        <div className="team-ranking-row__metrics">
-                          <div className="team-ranking-metric is-points">
-                            <strong>{team.pontos}</strong>
-                            <span>{copy.points}</span>
+                        <div className="ajp-category-stats">
+                          <div className="ajp-stat-col">
+                            <span className="ajp-stat-val blue">{team.pontos || 0}</span>
+                            <span className="ajp-stat-label">Points</span>
                           </div>
-                          <div className="team-ranking-metric is-wins">
-                            <strong>{team.wins}</strong>
-                            <span>{copy.wins}</span>
+                          <div className="ajp-stat-col">
+                            <span className="ajp-stat-val green">{team.wins || 0}</span>
+                            <span className="ajp-stat-label">Wins</span>
                           </div>
-                          <div className="team-ranking-metric is-medals">
-                            <strong>{team.campeao + team.vice + team.terceiro}</strong>
-                            <span>{copy.gold + '/' + copy.silver + '/' + copy.bronze}</span>
+                          <div className="ajp-stat-col">
+                            <span className="ajp-stat-val red">0</span>
+                            <span className="ajp-stat-label">Losses</span>
                           </div>
-                          <div className="team-ranking-medals">
-                            <span><Medal size={12} /> {team.campeao}</span>
-                            <span><Medal size={12} /> {team.vice}</span>
-                            <span><Medal size={12} /> {team.terceiro}</span>
-                            <span><Trophy size={12} /> {team.atletas} {copy.athletesLabel}</span>
+                          <div className="ajp-stat-col">
+                            <span className="ajp-stat-val gold">{team.campeao || 0}</span>
+                            <span className="ajp-stat-label" style={{fontSize: '10px', marginTop: '2px'}}>🥇</span>
+                          </div>
+                          <div className="ajp-stat-col">
+                            <span className="ajp-stat-val silver">{team.vice || 0}</span>
+                            <span className="ajp-stat-label" style={{fontSize: '10px', marginTop: '2px'}}>🥈</span>
+                          </div>
+                          <div className="ajp-stat-col">
+                            <span className="ajp-stat-val bronze">{team.terceiro || 0}</span>
+                            <span className="ajp-stat-label" style={{fontSize: '10px', marginTop: '2px'}}>🥉</span>
                           </div>
                         </div>
-                      </article>
+                      </div>
                     );
                   })
                 )}
               </div>
 
               {hasMore && (
-                <button
-                  type="button"
-                  className="team-ranking-panel__toggle"
+                <div 
+                  className="ajp-category-footer"
                   onClick={() => togglePanel(panel.key)}
+                  style={{ cursor: 'pointer' }}
                 >
-                  {expanded ? copy.collapse : copy.seeAll}
-                </button>
+                  {expanded ? (copy.collapse || 'Collapse') : (copy.seeAll || 'See all')}
+                </div>
               )}
-            </section>
+            </div>
           );
         })}
       </div>

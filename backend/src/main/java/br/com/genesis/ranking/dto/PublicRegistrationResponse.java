@@ -24,6 +24,8 @@ public class PublicRegistrationResponse {
   private String paymentReviewNotes;
   private String paymentReviewedBy;
   private String paymentReviewedAt;
+  private Boolean checkedIn = false;
+  private String checkedInAt;
 
   public String getId() {
     return id;
@@ -207,5 +209,21 @@ public class PublicRegistrationResponse {
 
   public void setPaymentReviewedAt(String paymentReviewedAt) {
     this.paymentReviewedAt = paymentReviewedAt;
+  }
+
+  public Boolean getCheckedIn() {
+    return checkedIn != null && checkedIn;
+  }
+
+  public void setCheckedIn(Boolean checkedIn) {
+    this.checkedIn = checkedIn != null && checkedIn;
+  }
+
+  public String getCheckedInAt() {
+    return checkedInAt;
+  }
+
+  public void setCheckedInAt(String checkedInAt) {
+    this.checkedInAt = checkedInAt;
   }
 }

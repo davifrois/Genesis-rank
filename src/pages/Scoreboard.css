@@ -376,6 +376,7 @@ body {
   display: flex;
   flex-direction: column;
   height: 100%;
+  width: 300px;
 }
 
 .sb-timer-huge {
@@ -390,8 +391,21 @@ body {
   justify-content: center;
   flex: 1;
   cursor: pointer;
+  transition: color 0.2s, transform 0.2s;
 }
 
+@keyframes heartbeat-timer {
+  0% { color: #fff; transform: scale(1); }
+  10% { color: #ff0000; transform: scale(1.08); text-shadow: 0 0 10px rgba(255,0,0,0.5); }
+  25% { color: #fff; transform: scale(1); text-shadow: none; }
+  40% { color: #ff0000; transform: scale(1.08); text-shadow: 0 0 10px rgba(255,0,0,0.5); }
+  55% { color: #fff; transform: scale(1); text-shadow: none; }
+  100% { color: #fff; transform: scale(1); text-shadow: none; }
+}
+
+.timer-warning-pulse {
+  animation: heartbeat-timer 1s infinite;
+}
 .sb-timer-controls {
   background: #000;
   display: flex;

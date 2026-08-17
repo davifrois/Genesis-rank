@@ -18,8 +18,11 @@ const usersPath = path.join(__dirname, 'users.json');
 
 // Default initial state
 const defaultUsers = [
-    { username: 'simone', password: 'simone123', name: 'Simone', role: 'admin' },
+    { username: 'simone', password: '12345678', name: 'Simone', role: 'admin' },
     { username: 'davifrois', password: 'Davifrois324@', name: 'Davi oliveira frois', role: 'admin' },
+    { username: 'vinicius', password: '12345678', name: 'Vinicius', role: 'admin' },
+    { username: 'gabriel', password: '12345678', name: 'Gabriel', role: 'admin' },
+    { username: 'tarciso', password: '12345678', name: 'Tarciso', role: 'admin' },
     { username: 'mesario1', password: 'mesario123', name: 'Mesario 1', role: 'mesario' }
 ];
 
@@ -202,6 +205,215 @@ app.delete('/api/admin/users/:id', (req, res) => {
     users.splice(index, 1);
     writeUsers(users);
     res.json({ success: true });
+});
+
+// Registration API endpoints
+app.get('/api/public/events', (req, res) => {
+    try {
+        const db = readDb();
+        res.json(db.events || []);
+    } catch (e) {
+        res.status(500).json({ error: 'Erro ao listar eventos.' });
+    }
+});
+
+app.get('/api/public/registrations', (req, res) => {
+    try {
+        const db = readDb();
+        const eventId = req.query.eventId;
+        let list = db.publicRegistrations || [];
+        if (eventId) {
+            list = list.filter(r => r.eventId === eventId);
+        }
+        res.json(list);
+    } catch (e) {
+        res.status(500).json({ error: 'Erro ao listar inscrições.' });
+    }
+});
+
+app.post('/api/public/registrations', (req, res) => {
+    try {
+        const db = readDb();
+        if (!db.publicRegistrations) db.publicRegistrations = [];
+        const registration = req.body;
+        
+        const index = db.publicRegistrations.findIndex(r => 
+            (r.clientRequestId && registration.clientRequestId && r.clientRequestId === registration.clientRequestId) ||
+            (r.id && registration.id && r.id === registration.id)
+        );
+        
+        if (index !== -1) {
+            db.publicRegistrations[index] = { ...db.publicRegistrations[index], ...registration };
+        } else {
+            db.publicRegistrations.push(registration);
+        }
+        
+        writeDb(db);
+        res.json(registration);
+    } catch (e) {
+        res.status(500).json({ error: 'Erro ao salvar inscrição.' });
+    }
+});
+
+app.patch('/api/admin/registrations/:id/payment', (req, res) => {
+    try {
+        const db = readDb();
+        if (!db.publicRegistrations) db.publicRegistrations = [];
+        const { id } = req.params;
+        const { status, paymentProofUrl, notes } = req.body;
+        const index = db.publicRegistrations.findIndex(r => r.id === id || r.clientRequestId === id);
+        if (index !== -1) {
+            db.publicRegistrations[index] = {
+                ...db.publicRegistrations[index],
+                status: status || db.publicRegistrations[index].status,
+                paymentProofUrl: paymentProofUrl !== undefined ? paymentProofUrl : db.publicRegistrations[index].paymentProofUrl,
+                notes: notes !== undefined ? notes : db.publicRegistrations[index].notes
+            };
+            writeDb(db);
+            res.json(db.publicRegistrations[index]);
+        } else {
+            res.status(404).json({ error: 'Inscrição não encontrada.' });
+        }
+    } catch (e) {
+        res.status(500).json({ error: 'Erro ao atualizar pagamento.' });
+    }
+});
+
+app.patch('/api/admin/registrations/:id/details', (req, res) => {
+    try {
+        const db = readDb();
+        if (!db.publicRegistrations) db.publicRegistrations = [];
+        const { id } = req.params;
+        const updates = req.body;
+        const index = db.publicRegistrations.findIndex(r => r.id === id || r.clientRequestId === id);
+        if (index !== -1) {
+            db.publicRegistrations[index] = {
+                ...db.publicRegistrations[index],
+                ...updates
+            };
+            writeDb(db);
+            res.json(db.publicRegistrations[index]);
+        } else {
+            res.status(404).json({ error: 'Inscrição não encontrada.' });
+        }
+    } catch (e) {
+        res.status(500).json({ error: 'Erro ao atualizar detalhes.' });
+    }
+});
+
+app.post('/api/webhooks/payment/checkout', async (req, res) => {
+    try {
+        const { registrationIds, athleteName, amount } = req.body;
+        const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN || 'APP_USR-5076214841905920-081112-768e0648179ce52ceb48a90a14882388-1214160384';
+        
+        const origin = req.headers.origin || 'http://localhost:5173';
+        const isLocalhost = origin.includes('localhost') || origin.includes('127.0.0.1');
+
+        const preferencePayload = {
+            items: [
+                {
+                    title: `Inscrição Campeonato - ${athleteName || 'Atleta'}`,
+                    description: `Inscrição oficial no campeonato Genesis Sports para ${athleteName || 'Atleta'}`,
+                    quantity: 1,
+                    unit_price: Number(amount || 0),
+                    currency_id: 'BRL'
+                }
+            ],
+            payer: {
+                name: athleteName || 'Atleta Genesis',
+                email: req.body.athleteEmail || 'contato@genesisesportes.com.br'
+            },
+            back_urls: {
+                success: `${origin}/payment/success`,
+                failure: `${origin}/payment/cancel`,
+                pending: `${origin}/payment/cancel`
+            },
+            external_reference: String(registrationIds || '')
+        };
+
+        if (!isLocalhost) {
+            preferencePayload.auto_return = 'approved';
+            preferencePayload.notification_url = 'https://genesisesportes.com.br/api/webhooks/payment/mercadopago';
+        }
+
+        const mpResponse = await fetch('https://api.mercadopago.com/checkout/preferences', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${accessToken}`
+            },
+            body: JSON.stringify(preferencePayload)
+        });
+
+        const mpData = await mpResponse.json();
+        
+        if (accessToken.startsWith('APP_USR') && mpData.init_point) {
+            res.json({ url: mpData.init_point });
+        } else if (mpData.sandbox_init_point) {
+            res.json({ url: mpData.sandbox_init_point });
+        } else if (mpData.init_point) {
+            res.json({ url: mpData.init_point });
+        } else {
+            console.error('Mercado Pago Erro:', mpData);
+            res.status(500).json({ error: 'Falha ao gerar link do Mercado Pago' });
+        }
+    } catch (e) {
+        console.error('Erro no checkout:', e);
+        res.status(500).json({ error: 'Erro interno ao processar pagamento.' });
+    }
+});
+
+// Mercado Pago Webhook Handler
+app.post('/api/webhooks/payment/mercadopago', async (req, res) => {
+    try {
+        const { type, data } = req.body || {};
+        const paymentId = data?.id || req.query['data.id'];
+        
+        console.log(`Webhook Mercado Pago recebido: tipo=${type}, paymentId=${paymentId}`);
+        
+        if (paymentId) {
+            const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN || 'APP_USR-5076214841905920-081112-768e0648179ce52ceb48a90a14882388-1214160384';
+            const payRes = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+            });
+            
+            if (payRes.ok) {
+                const paymentInfo = await payRes.json();
+                if (paymentInfo.status === 'approved' && paymentInfo.external_reference) {
+                    const regIds = paymentInfo.external_reference.split(',');
+                    const db = readDb();
+                    if (!db.publicRegistrations) db.publicRegistrations = [];
+                    
+                    let updated = false;
+                    regIds.forEach(rawId => {
+                        const rId = rawId.trim();
+                        const idx = db.publicRegistrations.findIndex(r => r.id === rId || r.clientRequestId === rId);
+                        if (idx !== -1) {
+                            db.publicRegistrations[idx].status = 'APPROVED';
+                            db.publicRegistrations[idx].paymentMethod = 'Mercado Pago';
+                            db.publicRegistrations[idx].transactionId = String(paymentId);
+                            db.publicRegistrations[idx].notes = JSON.stringify({
+                                ...(JSON.parse(db.publicRegistrations[idx].notes || '{}')),
+                                statusPagamento: 'APROVADO_MERCADO_PAGO',
+                                transactionId: String(paymentId),
+                                aprovadoEm: new Date().toISOString()
+                            });
+                            updated = true;
+                        }
+                    });
+                    
+                    if (updated) {
+                        writeDb(db);
+                        console.log(`Inscrições [${paymentInfo.external_reference}] aprovadas automaticamente via Mercado Pago!`);
+                    }
+                }
+            }
+        }
+        res.status(200).send('OK');
+    } catch (e) {
+        console.error('Erro no webhook Mercado Pago:', e);
+        res.status(500).send('Webhook Error');
+    }
 });
 
 app.listen(PORT, () => {

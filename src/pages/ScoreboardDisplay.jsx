@@ -108,7 +108,7 @@ const ScoreboardDisplay = () => {
         </div>
         
         <div className="sb-timer-section">
-          <div className="sb-timer-huge" style={{ cursor: 'default' }}>
+          <div className={`sb-timer-huge ${mainTimer <= 10 && mainTimer > 0 ? 'timer-warning-pulse' : ''}`} style={{ cursor: 'default' }}>
              {formatTime(mainTimer)}
           </div>
         </div>

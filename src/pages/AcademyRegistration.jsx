@@ -1,13 +1,45 @@
-import React, { useState, useMemo, useRef } from 'react';
-import { ChevronDown, X, Building2, MapPin, UploadCloud, Image as ImageIcon } from 'lucide-react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { ChevronDown, X, Building2, MapPin, UploadCloud, Image as ImageIcon, CheckCircle2 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useStore } from '../hooks/useStore';
 import { authService } from '../services/authService';
+import { BRAZIL_CITIES } from '../utils/brazilCities';
 import './AcademyRegistration.css';
 
 const normalizeLookup = (value = '') => (
   value.toString().trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 );
+
+const BRAZIL_STATES = [
+  { sigla: 'AC', nome: 'Acre' },
+  { sigla: 'AL', nome: 'Alagoas' },
+  { sigla: 'AP', nome: 'Amapá' },
+  { sigla: 'AM', nome: 'Amazonas' },
+  { sigla: 'BA', nome: 'Bahia' },
+  { sigla: 'CE', nome: 'Ceará' },
+  { sigla: 'DF', nome: 'Distrito Federal' },
+  { sigla: 'ES', nome: 'Espírito Santo' },
+  { sigla: 'GO', nome: 'Goiás' },
+  { sigla: 'MA', nome: 'Maranhão' },
+  { sigla: 'MT', nome: 'Mato Grosso' },
+  { sigla: 'MS', nome: 'Mato Grosso do Sul' },
+  { sigla: 'MG', nome: 'Minas Gerais' },
+  { sigla: 'PA', nome: 'Pará' },
+  { sigla: 'PB', nome: 'Paraíba' },
+  { sigla: 'PR', nome: 'Paraná' },
+  { sigla: 'PE', nome: 'Pernambuco' },
+  { sigla: 'PI', nome: 'Piauí' },
+  { sigla: 'RJ', nome: 'Rio de Janeiro' },
+  { sigla: 'RN', nome: 'Rio Grande do Norte' },
+  { sigla: 'RS', nome: 'Rio Grande do Sul' },
+  { sigla: 'RO', nome: 'Rondônia' },
+  { sigla: 'RR', nome: 'Roraima' },
+  { sigla: 'SC', nome: 'Santa Catarina' },
+  { sigla: 'SP', nome: 'São Paulo' },
+  { sigla: 'SE', nome: 'Sergipe' },
+  { sigla: 'TO', nome: 'Tocantins' }
+];
 
 const AcademyRegistration = () => {
   const navigate = useNavigate();
@@ -21,11 +53,14 @@ const AcademyRegistration = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectedAcademy, setSelectedAcademy] = useState(null);
   const [error, setError] = useState('');
+
+  const [brStates] = useState(BRAZIL_STATES);
   
   // New Academy Form State
   const [academyName, setAcademyName] = useState(location.state?.initialName || '');
   const [formData, setFormData] = useState({
     country: '',
+    state: '',
     city: '',
     address: '',
     ownerName: '',
@@ -64,9 +99,10 @@ const AcademyRegistration = () => {
       const profileName = currentUser?.name || '';
       
       addMemberProfile({
+        ...currentProfile,
         id: currentProfile?.id || undefined,
         createdAt: currentProfile?.createdAt || new Date().toISOString(),
-        fullName: profileName,
+        fullName: currentProfile?.fullName || profileName,
         firstName: currentProfile?.firstName || profileName.split(' ')[0] || '',
         lastName: currentProfile?.lastName || profileName.split(' ').slice(1).join(' ') || '',
         email: currentProfile?.email || currentUser?.email || '',
@@ -74,8 +110,8 @@ const AcademyRegistration = () => {
         academyId: selectedAcademy.id,
         academyName: selectedAcademy.name,
         joinStatus: joinStatus,
-        role: 'athlete',
-        userRole: 'athlete',
+        role: currentProfile?.role || 'athlete',
+        userRole: currentProfile?.userRole || 'athlete',
         accountUsername: (currentUser?.username || '').toLowerCase()
       });
 
@@ -98,6 +134,7 @@ const AcademyRegistration = () => {
       const savedAcademy = addAcademy({
         name: academyName,
         country: formData.country,
+        state: formData.state,
         city: formData.city,
         address: formData.address,
         ownerName: formData.ownerName,
@@ -112,37 +149,41 @@ const AcademyRegistration = () => {
       });
 
       const profileName = currentUser?.name || '';
+      const newRole = currentUser?.role === 'admin' ? 'admin' : 'coach';
 
       addMemberProfile({
+        ...currentProfile,
         id: currentProfile?.id || undefined,
         createdAt: currentProfile?.createdAt || new Date().toISOString(),
         firstName: currentProfile?.firstName || profileName.split(' ')[0] || '',
         lastName: currentProfile?.lastName || profileName.split(' ').slice(1).join(' ') || '',
-        fullName: profileName,
+        fullName: currentProfile?.fullName || profileName,
         email: currentProfile?.email || formData.contactEmail,
         phone: currentProfile?.phone || formData.contactPhone,
         academyId: savedAcademy.id,
         academyName: savedAcademy.name,
-        role: 'coach',
-        userRole: 'coach',
+        role: newRole,
+        userRole: newRole,
         joinStatus: 'approved',
         accountUsername: (currentUser?.username || '').toLowerCase()
       });
 
-      let promotedUser = { ...currentUser, role: 'coach' };
+      let promotedUser = { ...currentUser, role: newRole };
       try {
-        promotedUser = await authService.updateAdminUser({
-          id: currentUser.username,
-          username: currentUser.username,
-          name: currentUser.name || profileName,
-          role: 'coach'
-        });
+        if (currentUser?.role !== 'admin') {
+          promotedUser = await authService.updateAdminUser({
+            id: currentUser.username,
+            username: currentUser.username,
+            name: currentUser.name || profileName,
+            role: newRole
+          });
+        }
       } catch {
-        promotedUser = { ...currentUser, role: 'coach' };
+        promotedUser = { ...currentUser, role: newRole };
       }
-      login({ ...promotedUser, role: 'coach', academyId: savedAcademy.id, academyName: savedAcademy.name });
+      login({ ...promotedUser, role: newRole, academyId: savedAcademy.id, academyName: savedAcademy.name });
 
-      navigate('/minha-conta/configuracoes');
+      setStep('SUCCESS');
     } catch (err) {
       setError(err?.message || 'Nao foi possivel salvar a academia.');
     }
@@ -341,13 +382,48 @@ const AcademyRegistration = () => {
         </div>
 
         <div className="form-group">
+          <label>Estado / província</label>
+          {formData.country === 'Brasil' ? (
+            <select 
+              className="text-input"
+              value={formData.state}
+              onChange={e => setFormData({...formData, state: e.target.value, city: ''})}
+            >
+              <option value="">Selecione o estado</option>
+              {brStates.map(st => <option key={st.sigla} value={st.sigla}>{st.nome}</option>)}
+            </select>
+          ) : (
+            <input 
+              type="text" 
+              className="text-input" 
+              value={formData.state} 
+              onChange={e => setFormData({...formData, state: e.target.value, city: ''})}
+            />
+          )}
+        </div>
+
+        <div className="form-group">
           <label>Cidade</label>
-          <input 
-            type="text" 
-            className="text-input" 
-            value={formData.city} 
-            onChange={e => setFormData({...formData, city: e.target.value})}
-          />
+          {formData.country === 'Brasil' ? (
+            <select 
+              className="text-input"
+              value={formData.city}
+              onChange={e => setFormData({...formData, city: e.target.value})}
+              disabled={!formData.state || !BRAZIL_CITIES[formData.state]}
+            >
+              <option value="">Selecione a cidade</option>
+              {formData.state && BRAZIL_CITIES[formData.state] && BRAZIL_CITIES[formData.state].map(cityName => (
+                <option key={cityName} value={cityName}>{cityName}</option>
+              ))}
+            </select>
+          ) : (
+            <input 
+              type="text" 
+              className="text-input" 
+              value={formData.city} 
+              onChange={e => setFormData({...formData, city: e.target.value})}
+            />
+          )}
         </div>
 
         <div className="form-group">
@@ -510,6 +586,92 @@ const AcademyRegistration = () => {
     </div>
   );
 
+  const renderSuccessStep = () => (
+    <motion.div 
+      initial={{ opacity: 0, scale: 0.95, y: 10 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: "easeOut" }}
+      className="academy-modal-content success-step"
+      style={{ overflow: 'hidden', border: 'none', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}
+    >
+      <div 
+        className="academy-modal-header" 
+        style={{ 
+          padding: '40px 32px 24px', 
+          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
+          textAlign: 'center',
+          position: 'relative'
+        }}
+      >
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.2 }}
+          style={{
+            width: '80px',
+            height: '80px',
+            background: 'rgba(255, 255, 255, 0.2)',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 16px',
+            boxShadow: '0 0 20px rgba(16, 185, 129, 0.4)'
+          }}
+        >
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", stiffness: 200, damping: 10, delay: 0.4 }}
+          >
+            <CheckCircle2 size={48} color="#ffffff" strokeWidth={2.5} />
+          </motion.div>
+        </motion.div>
+        <h2 style={{ fontSize: '1.75rem', color: '#ffffff', fontWeight: '800', margin: 0, letterSpacing: '-0.5px' }}>
+          Academia Criada com Sucesso!
+        </h2>
+      </div>
+
+      <div className="academy-modal-body" style={{ textAlign: 'center', padding: '48px 32px' }}>
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5, duration: 0.4 }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
+            <div style={{ background: '#f1f5f9', padding: '16px', borderRadius: '50%' }}>
+              <Building2 size={32} color="#64748b" />
+            </div>
+          </div>
+          <p style={{ color: '#475569', fontSize: '1.125rem', lineHeight: '1.6', margin: 0, maxWidth: '400px', marginLeft: 'auto', marginRight: 'auto' }}>
+            Sua academia foi registrada no sistema. Agora você pode adicionar informações detalhadas, 
+            como o <strong>logotipo da equipe</strong>, <strong>horários</strong> e configurar os <strong>pagamentos</strong>.
+          </p>
+        </motion.div>
+      </div>
+
+      <div className="academy-modal-footer" style={{ padding: '24px 32px', background: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
+        <motion.button 
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className="btn-success full-width" 
+          onClick={() => navigate('/gerente-treinador')}
+          style={{ 
+            width: '100%', 
+            padding: '16px', 
+            fontSize: '1.125rem', 
+            fontWeight: '600',
+            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+            border: 'none',
+            boxShadow: '0 4px 14px 0 rgba(37, 99, 235, 0.39)'
+          }}
+        >
+          Acessar Painel da Academia
+        </motion.button>
+      </div>
+    </motion.div>
+  );
+
   return (
     <div
       className="academy-registration-page"
@@ -525,6 +687,7 @@ const AcademyRegistration = () => {
         {step === 'SIMILAR_ACADEMIES' && renderAlreadyHere()}
         {step === 'FULL_FORM' && renderCreateStep2()}
         {step === 'JOIN_ACADEMY' && renderJoinStep()}
+        {step === 'SUCCESS' && renderSuccessStep()}
       </div>
     </div>
   );

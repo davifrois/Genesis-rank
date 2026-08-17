@@ -126,6 +126,32 @@ export const resolveBatchFee = (batch = {}, feeKey = 'over15', fallback = 0) => 
   return toMoneyNumber(fallback, 0);
 };
 
+const parseDateRobust = (dateStr) => {
+  if (!dateStr) return Number.NaN;
+  const trimmed = String(dateStr).trim();
+  if (!trimmed) return Number.NaN;
+  
+  // se for formato ISO normal (YYYY-MM-DD)
+  const isoParsed = new Date(trimmed).getTime();
+  if (!Number.isNaN(isoParsed)) return isoParsed;
+
+  // formato BR: DD/MM/YYYY [HH:mm]
+  const brMatch = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}))?/);
+  if (brMatch) {
+    const [ , day, month, year, hours, minutes ] = brMatch;
+    // JS dates usam mes 0-indexado
+    return new Date(
+      Number(year),
+      Number(month) - 1,
+      Number(day),
+      hours ? Number(hours) : 0,
+      minutes ? Number(minutes) : 0
+    ).getTime();
+  }
+
+  return Number.NaN;
+};
+
 export const resolveCurrentEventBatch = (event = {}, now = new Date()) => {
   const batches = Array.isArray(event?.batches) ? event.batches.filter(Boolean) : [];
   if (!batches.length) return null;
@@ -133,19 +159,31 @@ export const resolveCurrentEventBatch = (event = {}, now = new Date()) => {
   const nowTime = now instanceof Date ? now.getTime() : new Date(now).getTime();
   const datedBatch = batches.find((batch) => {
     if (!batch) return false;
-    const startTime = batch.startDate ? new Date(batch.startDate).getTime() : Number.NEGATIVE_INFINITY;
-    const endTime = batch.endDate ? new Date(batch.endDate).getTime() : Number.POSITIVE_INFINITY;
+    const startTime = parseDateRobust(batch.startDate);
+    const endTime = parseDateRobust(batch.endDate);
+    
     const startsOk = Number.isFinite(startTime) ? nowTime >= startTime : true;
     const endsOk = Number.isFinite(endTime) ? nowTime <= endTime : true;
+    
+    // Se as duas datas forem inválidas/vazias, não podemos afirmar que está ativo baseando apenas nisso,
+    // a menos que seja o único lote ou tenha flag active. Mas a lógica original retornava true se validasse o empty.
+    // Vamos manter a lógica original: se startTime/endTime forem infinitos (vazios), startsOk/endsOk são true.
     return startsOk && endsOk;
   });
 
   return datedBatch || batches.find((batch) => batch?.active === true) || batches[0] || null;
 };
 
-const resolveAgeNumber = (athlete = {}, referenceDate = new Date()) => {
+export const resolveAgeNumber = (athlete = {}, referenceDate = new Date()) => {
   const directAge = Number(athlete.age ?? athlete.idade ?? '');
-  if (Number.isFinite(directAge) && directAge >= 0) return Math.floor(directAge);
+  if (Number.isFinite(directAge) && directAge >= 0) {
+    if (directAge > 1900) {
+      const reference = referenceDate instanceof Date ? referenceDate : new Date(referenceDate);
+      const safeReference = Number.isNaN(reference.getTime()) ? new Date() : reference;
+      return Math.max(0, safeReference.getUTCFullYear() - directAge);
+    }
+    return Math.floor(directAge);
+  }
 
   const birthDate = (athlete.birthDate || athlete.dataNascimento || '').toString().trim();
   if (!birthDate) return null;
@@ -181,15 +219,21 @@ export const resolveAthleteEventPrice = ({
     : resolveBatchFee(activeBatch, 'over15', eventFees.over15);
   const comboPrice = resolveBatchFee(activeBatch, 'combo', eventFees.combo);
   const absolutePrice = resolveBatchFee(activeBatch, 'absolute', eventFees.absolute);
-  const safeModalitiesCount = Math.max(1, Number(modalitiesCount) || 1);
-  const base = safeModalitiesCount >= 2
-    ? comboPrice
-    : baseSinglePrice * safeModalitiesCount;
+  const rawCount = Number(modalitiesCount);
+  const modalitiesNum = Number.isNaN(rawCount) ? 0 : rawCount;
+  let base = 0;
+  if (modalitiesNum >= 2) {
+    base = comboPrice;
+  } else if (modalitiesNum === 1) {
+    base = baseSinglePrice;
+  } else {
+    base = 0;
+  }
   const total = base + (absolute ? absolutePrice : 0);
 
   return {
     total: toMoneyNumber(total, 0),
-    base: toMoneyNumber(baseSinglePrice, 0),
+    base: toMoneyNumber(base, 0),
     combo: toMoneyNumber(comboPrice, 0),
     absoluteFee: toMoneyNumber(absolutePrice, 0),
     age,

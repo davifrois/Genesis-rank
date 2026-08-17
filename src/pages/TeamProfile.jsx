@@ -1,7 +1,8 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useStore } from '../hooks/useStore';
-import { MapPin, Users, ChevronLeft, Shield, Globe, Mail, Phone, Info, Trophy, Star, Zap } from 'lucide-react';
+import { MapPin, Users, ChevronLeft, Shield, Globe, Mail, Phone, Info, Trophy, Star, Zap, Calendar } from 'lucide-react';
+import { resolveAgeNumber } from '../utils/eventPricing';
 
 const BELT_COLORS = {
   preta: '#111827', marrom: '#92400e', roxa: '#7c3aed',
@@ -376,7 +377,7 @@ const TeamProfile = () => {
                     <div style={{ fontSize: '0.75rem', color: getBeltColor(professorProfile?.belt || 'preta'), fontWeight: 600, textTransform: 'capitalize' }}>
                       Faixa {professorProfile?.belt || 'Preta'}
                     </div>
-                    {professorProfile.age && <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>{professorProfile.age} anos</div>}
+                    {(resolveAgeNumber(professorProfile) !== null) && <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>{resolveAgeNumber(professorProfile)} anos</div>}
                   </div>
                 </Link>
               ) : (
@@ -532,7 +533,7 @@ const TeamProfile = () => {
                           <div style={{ fontSize: '0.73rem', color: getBeltColor(student.belt), fontWeight: 600, textTransform: 'capitalize', marginTop: '2px' }}>
                             Faixa {student.belt || '—'}
                           </div>
-                          {student.age && <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)' }}>{student.age} anos</div>}
+                          {student?.age && <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)' }}>{student.age} anos</div>}
                         </div>
                       </div>
                     </Link>

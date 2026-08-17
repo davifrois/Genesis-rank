@@ -180,15 +180,54 @@ const AthleteCheckinModal = ({ isOpen, onClose, athlete, athleteAge, onSave }) =
                                 className="form-control"
                             >
                                 <option value="">Selecione o peso</option>
-                                <option value="Galo">Galo</option>
-                                <option value="Pluma">Pluma</option>
-                                <option value="Pena">Pena</option>
-                                <option value="Leve">Leve</option>
-                                <option value="Médio">Médio</option>
-                                <option value="Meio-Pesado">Meio-Pesado</option>
-                                <option value="Pesado">Pesado</option>
-                                <option value="Super-Pesado">Super-Pesado</option>
-                                <option value="Pesadíssimo">Pesadíssimo</option>
+                                {(() => {
+                                    const isFemale = (athlete?.genero || athlete?.gender || '').toLowerCase().includes('femi');
+                                    let options = [];
+                                    if (age <= 15) {
+                                        let youthIndex = 5;
+                                        if (age <= 5) youthIndex = 0;
+                                        else if (age <= 7) youthIndex = 1;
+                                        else if (age <= 9) youthIndex = 2;
+                                        else if (age <= 11) youthIndex = 3;
+                                        else if (age <= 13) youthIndex = 4;
+                                        const youthWeightMatrix = {
+                                            Galo: ['15', '19', '24', '30', '35', '44'],
+                                            Pluma: ['18', '21', '27', '33', '39', '48'],
+                                            Pena: ['21', '24', '30', '36', '43', '52'],
+                                            Leve: ['24', '27', '33', '39', '47', '56'],
+                                            Médio: ['26', '30', '36', '42', '52', '60'],
+                                            'Meio-Pesado': ['29', '33', '39', '45', '56', '65'],
+                                            Pesado: ['32', '36', '42', '48', '60', '69'],
+                                            'Super-Pesado': ['35', '39', '45', '51', '64', '73'],
+                                            Pesadíssimo: ['Sem limite', 'Sem limite', 'Sem limite', 'Sem limite', 'Sem limite', 'Sem limite']
+                                        };
+                                        options = Object.keys(youthWeightMatrix).map(cat => {
+                                            const w = youthWeightMatrix[cat][youthIndex];
+                                            return { value: cat, label: `${cat} (${w === 'Sem limite' ? w : 'até ' + w + ' kg'})` };
+                                        });
+                                    } else if (age === 16 || age === 17) {
+                                        if (isFemale) {
+                                            options = [
+                                                { value: 'Galo', label: 'Galo (até 44.3 kg)' }, { value: 'Pluma', label: 'Pluma (até 48.3 kg)' }, { value: 'Pena', label: 'Pena (até 52.3 kg)' }, { value: 'Leve', label: 'Leve (até 56.5 kg)' }, { value: 'Médio', label: 'Médio (até 60.5 kg)' }, { value: 'Meio-Pesado', label: 'Meio-Pesado (até 65 kg)' }, { value: 'Pesado', label: 'Pesado (até 69 kg)' }, { value: 'Super-Pesado', label: 'Super-Pesado (até 74 kg)' }, { value: 'Pesadíssimo', label: 'Pesadíssimo (Sem limite)' }
+                                            ];
+                                        } else {
+                                            options = [
+                                                { value: 'Galo', label: 'Galo (até 53.5 kg)' }, { value: 'Pluma', label: 'Pluma (até 58.5 kg)' }, { value: 'Pena', label: 'Pena (até 64 kg)' }, { value: 'Leve', label: 'Leve (até 69 kg)' }, { value: 'Médio', label: 'Médio (até 74 kg)' }, { value: 'Meio-Pesado', label: 'Meio-Pesado (até 79.3 kg)' }, { value: 'Pesado', label: 'Pesado (até 84.3 kg)' }, { value: 'Super-Pesado', label: 'Super-Pesado (até 89.3 kg)' }, { value: 'Pesadíssimo', label: 'Pesadíssimo (Sem limite)' }
+                                            ];
+                                        }
+                                    } else {
+                                        if (isFemale) {
+                                            options = [
+                                                { value: 'Galo', label: 'Galo (até 48.5 kg)' }, { value: 'Pluma', label: 'Pluma (até 53.5 kg)' }, { value: 'Pena', label: 'Pena (até 58.5 kg)' }, { value: 'Leve', label: 'Leve (até 64 kg)' }, { value: 'Médio', label: 'Médio (até 69 kg)' }, { value: 'Meio-Pesado', label: 'Meio-Pesado (até 74 kg)' }, { value: 'Pesado', label: 'Pesado (até 79.3 kg)' }, { value: 'Super-Pesado', label: 'Super-Pesado (até 84.3 kg)' }, { value: 'Pesadíssimo', label: 'Pesadíssimo (Sem limite)' }
+                                            ];
+                                        } else {
+                                            options = [
+                                                { value: 'Galo', label: 'Galo (até 57.5 kg)' }, { value: 'Pluma', label: 'Pluma (até 64 kg)' }, { value: 'Pena', label: 'Pena (até 70 kg)' }, { value: 'Leve', label: 'Leve (até 76 kg)' }, { value: 'Médio', label: 'Médio (até 82.3 kg)' }, { value: 'Meio-Pesado', label: 'Meio-Pesado (até 88.3 kg)' }, { value: 'Pesado', label: 'Pesado (até 94.3 kg)' }, { value: 'Super-Pesado', label: 'Super-Pesado (até 100.5 kg)' }, { value: 'Pesadíssimo', label: 'Pesadíssimo (Sem limite)' }
+                                            ];
+                                        }
+                                    }
+                                    return options.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>);
+                                })()}
                             </select>
                         </div>
 

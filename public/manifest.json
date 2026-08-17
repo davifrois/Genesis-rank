@@ -1,0 +1,33 @@
+﻿{
+  "name": "Genesis Esportes",
+  "short_name": "Genesis",
+  "description": "Sistema de ranking e eventos de jiu-jitsu da Genesis Esportes",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#00c2cb",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon-genesis.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon-genesis.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "categories": ["sports", "fitness"],
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "screenshots": [],
+  "prefer_related_applications": false
+}

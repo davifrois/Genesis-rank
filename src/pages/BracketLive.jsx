@@ -1,7 +1,7 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Activity, ArrowLeft, Clock3, Hourglass, Radio, X } from 'lucide-react';
-import { normalizeLiveStatus, STATUS_DONE, STATUS_LIVE, STATUS_READY } from '../components/BracketTree';
+import BracketTree, { normalizeLiveStatus, STATUS_DONE, STATUS_LIVE, STATUS_READY } from '../components/BracketTree';
 import { bracketRealtimeService } from '../services/bracketRealtimeService';
 import { nextPowerOfTwo, seedSlotsWithRankingAwareByes } from '../services/bracketService';
 import { useStore } from '../hooks/useStore';
@@ -103,6 +103,9 @@ const BracketLive = () => {
   const [lastUpdate, setLastUpdate] = useState('');
   const [search, setSearch] = useState('');
   const [showAll, setShowAll] = useState(true);
+  const [viewMode, setViewMode] = useState('tree');
+  const [liveElapsed, setLiveElapsed] = useState(0); // seconds since last LIVE match started
+  const liveTimerRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -137,6 +140,15 @@ const BracketLive = () => {
       cancelled = true;
     };
   }, [bracketId, brackets]);
+
+  // Live match elapsed timer — tick every second when there are LIVE matches
+  useEffect(() => {
+    if (liveTimerRef.current) clearInterval(liveTimerRef.current);
+    liveTimerRef.current = setInterval(() => {
+      setLiveElapsed((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(liveTimerRef.current);
+  }, [lastUpdate]);
 
   useEffect(() => {
     if (!bracketId) return () => {};
@@ -182,6 +194,23 @@ const BracketLive = () => {
   }, [location.search, currentUser?.name]);
 
   const stages = useMemo(() => buildStages(bracket, athleteMap), [bracket, athleteMap]);
+
+  // All matches currently LIVE across all stages
+  const liveMatches = useMemo(() => {
+    const all = [];
+    stages.forEach((stage) => {
+      stage.matches.forEach((match) => {
+        if (match.status === STATUS_LIVE) all.push({ ...match, stageTitle: stage.title });
+      });
+    });
+    return all;
+  }, [stages]);
+
+  const formatElapsed = useCallback((secs) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }, []);
 
   const filteredStages = useMemo(() => {
     const searchText = search.trim().toLowerCase();
@@ -232,7 +261,9 @@ const BracketLive = () => {
           </Link>
           <h1>{bracket?.label || 'Categoria em definicao'}</h1>
           <p>{eventName}</p>
-          <button type="button" className="btn btn-primary live-bracket-view-link">View bracket</button>
+          <button type="button" className="btn btn-primary live-bracket-view-link" onClick={() => setViewMode(viewMode === 'tree' ? 'list' : 'tree')}>
+            {viewMode === 'tree' ? 'Ver em Lista' : 'Ver Chave'}
+          </button>
         </div>
         <div className="live-bracket-page__meta">
           <span className={`tag live-connection live-connection--${connection}`}><Radio size={12} />{connectionLabel}</span>
@@ -252,7 +283,71 @@ const BracketLive = () => {
       {!loading && error && <div className="status status-info">{error}</div>}
 
       {!loading && bracket && (
-        <div className="live-bracket-stages">
+        viewMode === 'tree' ? (
+          <div className="live-bracket-tree-wrapper" style={{ overflowX: 'auto', padding: '20px 0', background: 'var(--bg-panel)', minHeight: '600px' }}>
+            <BracketTree
+              bracket={bracket}
+              athleteMap={athleteMap}
+              liveMatches={bracket?.liveMatches || []}
+            />
+          </div>
+        ) : (
+          <div className="live-bracket-stages">
+
+          {/* EM ANDAMENTO AGORA — hero panel */}
+          {liveMatches.length > 0 && (
+            <div className="live-now-panel" role="region" aria-label="Luta em andamento agora">
+              <div className="live-now-panel__header">
+                <div className="live-now-panel__dot" />
+                <span className="live-now-panel__label">EM ANDAMENTO AGORA</span>
+                <span className="live-now-panel__meta">{liveMatches.length} luta{liveMatches.length !== 1 ? 's' : ''}</span>
+              </div>
+              {liveMatches.map((match) => (
+                <div key={match.id}>
+                  <div className="live-now-fight">
+                    {/* Atleta A */}
+                    <div className="live-now-fight__athlete">
+                      <div className="live-now-fight__avatar">
+                        {match.slotA.photoUrl
+                          ? <img src={match.slotA.photoUrl} alt={match.slotA.nome} />
+                          : (match.slotA.nome || '?').charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="live-now-fight__name">{match.slotA.flag ? `${match.slotA.flag} ` : ''}{match.slotA.nome}</div>
+                        <div className="live-now-fight__academy">{match.slotA.academia}</div>
+                      </div>
+                    </div>
+                    {/* VS / Score */}
+                    <div className="live-now-fight__vs">
+                      <span className="live-now-fight__vs-text">VS</span>
+                      <span className="live-now-fight__score">
+                        {match.scoreA !== null && match.scoreB !== null ? `${match.scoreA}-${match.scoreB}` : '--'}
+                      </span>
+                    </div>
+                    {/* Atleta B */}
+                    <div className="live-now-fight__athlete live-now-fight__athlete--right">
+                      <div className="live-now-fight__avatar">
+                        {match.slotB.photoUrl
+                          ? <img src={match.slotB.photoUrl} alt={match.slotB.nome} />
+                          : (match.slotB.nome || '?').charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="live-now-fight__name">{match.slotB.flag ? `${match.slotB.flag} ` : ''}{match.slotB.nome}</div>
+                        <div className="live-now-fight__academy">{match.slotB.academia}</div>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Info row */}
+                  <div className="live-now-fight__info-row">
+                    <span className="live-now-fight__tag">{match.stageTitle}</span>
+                    {match.scheduledAt && <span className="live-now-fight__tag">🕐 {match.scheduledAt}</span>}
+                    {match.fightNumber && <span className="live-now-fight__tag">Luta #{match.fightNumber}</span>}
+                    <span className="live-now-fight__timer">⏱ {formatElapsed(liveElapsed)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
           {filteredStages.map((stage) => (
             <article key={stage.key} className="live-stage">
               <h3>{stage.title}</h3>
@@ -275,7 +370,13 @@ const BracketLive = () => {
                     </div>
                   </div>
                   <div className="live-match-meta">
-                    <span className="live-match-meta-icon"><Hourglass size={13} /></span>
+                    {match.status === STATUS_LIVE && (
+                      <span className="badge-live">
+                        <span className="badge-live__dot" />
+                        AO VIVO
+                      </span>
+                    )}
+                    {match.status !== STATUS_LIVE && <span className="live-match-meta-icon"><Hourglass size={13} /></span>}
                     <strong className="live-match-score">{scoreLabel(match)}</strong>
                     <small>{match.scheduledAt || '-'}</small>
                   </div>
@@ -285,6 +386,7 @@ const BracketLive = () => {
           ))}
           {filteredStages.length === 0 && <div className="panel-subtitle">Nenhuma luta encontrada com os filtros atuais.</div>}
         </div>
+        )
       )}
 
       {!loading && !bracket && <div className="status status-warning">Nao foi possivel carregar esta chave.</div>}

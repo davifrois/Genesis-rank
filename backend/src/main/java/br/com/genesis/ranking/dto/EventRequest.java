@@ -39,6 +39,25 @@ public class EventRequest {
   private String eventPhase;
   private Boolean publicPublished;
   private String publishedAt;
+  private String checkinEndDate;
+  private Boolean noGiEnabled;
+  private Boolean absoluteEnabled;
+
+  public Boolean getNoGiEnabled() {
+    return noGiEnabled;
+  }
+
+  public void setNoGiEnabled(Boolean noGiEnabled) {
+    this.noGiEnabled = noGiEnabled;
+  }
+
+  public Boolean getAbsoluteEnabled() {
+    return absoluteEnabled;
+  }
+
+  public void setAbsoluteEnabled(Boolean absoluteEnabled) {
+    this.absoluteEnabled = absoluteEnabled;
+  }
 
   public String getId() {
     return id;
@@ -254,6 +273,14 @@ public class EventRequest {
 
   public void setPublishedAt(String publishedAt) {
     this.publishedAt = publishedAt;
+  }
+
+  public String getCheckinEndDate() {
+    return checkinEndDate;
+  }
+
+  public void setCheckinEndDate(String checkinEndDate) {
+    this.checkinEndDate = checkinEndDate;
   }
 
   public String getEndDate() {

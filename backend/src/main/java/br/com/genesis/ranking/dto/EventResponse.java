@@ -39,6 +39,25 @@ public class EventResponse {
   private Integer announcementSent;
   private Integer announcementFailed;
   private Boolean announcementAttempted;
+  private String checkinEndDate;
+  private Boolean noGiEnabled;
+  private Boolean absoluteEnabled;
+
+  public Boolean getNoGiEnabled() {
+    return noGiEnabled;
+  }
+
+  public void setNoGiEnabled(Boolean noGiEnabled) {
+    this.noGiEnabled = noGiEnabled;
+  }
+
+  public Boolean getAbsoluteEnabled() {
+    return absoluteEnabled;
+  }
+
+  public void setAbsoluteEnabled(Boolean absoluteEnabled) {
+    this.absoluteEnabled = absoluteEnabled;
+  }
 
   public String getId() {
     return id;
@@ -286,6 +305,14 @@ public class EventResponse {
 
   public void setAnnouncementAttempted(Boolean announcementAttempted) {
     this.announcementAttempted = announcementAttempted;
+  }
+
+  public String getCheckinEndDate() {
+    return checkinEndDate;
+  }
+
+  public void setCheckinEndDate(String checkinEndDate) {
+    this.checkinEndDate = checkinEndDate;
   }
 
   public String getEndDate() {

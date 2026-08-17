@@ -345,12 +345,70 @@ const parseRecordsFromLabels = (lines) => {
   return records;
 };
 
+const parseRecordsFromSlashFormat = (lines) => {
+  const records = [];
+  let currentAcademy = '';
+
+  lines.forEach((line) => {
+    if (/Total de/i.test(line)) return;
+    
+    if (line.includes('/')) {
+      const parts = line.split('/');
+      if (parts.length >= 3) {
+        const firstPart = parts[0].trim();
+        const tokens = firstPart.split(' ');
+        
+        let sexoRaw = '';
+        let nomeRaw = '';
+        const lastToken = tokens[tokens.length - 1].toUpperCase();
+        if (['MASCULINO', 'FEMININO', 'MASC', 'FEM', 'M', 'F'].includes(lastToken)) {
+          sexoRaw = tokens.pop();
+        }
+        nomeRaw = tokens.join(' ');
+        
+        const faixaRaw = parts[1].trim();
+        const categoriaIdadeRaw = parts[2].trim();
+
+        const record = createEmptyRecord();
+        applyValueToRecord(record, 'nome', nomeRaw);
+        applyValueToRecord(record, 'sexo', sexoRaw);
+        applyValueToRecord(record, 'faixa', faixaRaw);
+        
+        record.categoriaIdade = cleanText(categoriaIdadeRaw);
+        
+        const idadeMatch = record.categoriaIdade.match(/\d+/);
+        if (idadeMatch) {
+            record.idade = parseInt(idadeMatch[0], 10);
+        } else if (/adulto|master/i.test(record.categoriaIdade)) {
+            record.idade = 20;
+        }
+
+        applyValueToRecord(record, 'academia', currentAcademy);
+        
+        if (hasRecordValues(record)) {
+            records.push(record);
+        }
+      }
+      return;
+    }
+    
+    if (line.trim().length > 0 && !/RELAÇÃO DE ATLETAS/i.test(line) && !/Arquivo Atualizado/i.test(line) && !/DIAMANTES DO VALE/i.test(line) && !/RELACAO DE ATLETAS/i.test(line)) {
+      currentAcademy = line.trim();
+    }
+  });
+
+  return records;
+};
+
 export const parseAthleteRecordsFromText = (text) => {
   const lines = (text || '')
     .replace(/\r/g, '\n')
     .split('\n')
     .map(cleanText)
     .filter(Boolean);
+
+  const slashRecords = parseRecordsFromSlashFormat(lines);
+  if (slashRecords.length) return slashRecords;
 
   const tableRecords = parseRecordsFromTable(lines);
   if (tableRecords.length) return tableRecords;

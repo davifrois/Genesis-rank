@@ -30,6 +30,9 @@ class ErrorBoundary extends React.Component {
             Tivemos um problema inesperado ao carregar esta parte da página.
             Sua conexão pode ter oscilado ou ocorreu uma falha de sincronização.
           </p>
+          <div style={{ background: '#111', padding: '10px', borderRadius: '4px', marginBottom: '20px', fontSize: '12px', color: '#ffaaaa', maxWidth: '600px', wordWrap: 'break-word' }}>
+            {this.state.error && this.state.error.toString()}
+          </div>
           <button 
             onClick={() => window.location.reload()}
             style={{

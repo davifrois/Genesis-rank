@@ -2,8 +2,12 @@ import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
 import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { extractTextFromPdfFile } from './pdfImportService';
 
-if (GlobalWorkerOptions && workerSrc) {
-  GlobalWorkerOptions.workerSrc = workerSrc;
+if (typeof window !== 'undefined' && GlobalWorkerOptions) {
+  try {
+    GlobalWorkerOptions.workerPort = new Worker(workerSrc, { type: 'module' });
+  } catch {
+    GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs';
+  }
 }
 
 const MIN_OPTIONS_FOUND_WITHOUT_OCR = 3;

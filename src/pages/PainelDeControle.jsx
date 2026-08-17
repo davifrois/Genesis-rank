@@ -37,7 +37,13 @@ import {
     Plus,
     X,
     Eye,
-    EyeOff
+    EyeOff,
+    Camera,
+    Link2,
+    Copy,
+    ExternalLink,
+    FileText,
+    Check
 } from 'lucide-react';
 import { generateBracketsPDF, generateRankingPDF, generateSchedulePDF } from '../services/pdfService';
 import { extractTextFromPdfFile, parseAthletesFromText } from '../services/pdfImportService';
@@ -48,7 +54,7 @@ import { socialMediaService } from '../services/socialMediaService';
 import { motion, AnimatePresence } from 'framer-motion';
 import LoginOverlay from '../components/LoginOverlay';
 import { useI18n } from '../hooks/useI18n';
-import { DEFAULT_EVENT_FEES, DEFAULT_EVENT_PIX_KEY } from '../utils/eventPricing';
+import { DEFAULT_EVENT_FEES, DEFAULT_EVENT_PIX_KEY, resolveCurrentEventBatch, resolveAthleteEventPrice } from '../utils/eventPricing';
 import { buildFileSafeName, downloadCsv } from '../services/exportService';
 import { translateBelt, translateCategory, translateCompositeLabel, translateWeight } from '../utils/localeLabels';
 import { REGISTRATION_STATUS, normalizeRegistrationStatus } from '../utils/registrationStatus';
@@ -58,6 +64,305 @@ import { savePublishedEventSchedule } from '../utils/eventSchedule';
 
 const ATHLETE_PAGE_SIZE_OPTIONS = [20, 40, 80];
 const MAX_NEWS_IMAGE_UPLOAD_BYTES = 8_000_000;
+
+const getCategoryFromBirthYearOrAge = (inputVal) => {
+  if (!inputVal) return '';
+  const val = parseInt(inputVal, 10);
+  if (isNaN(val) || val <= 0) return '';
+
+  const currentYear = new Date().getFullYear();
+  let age = val;
+  if (val > 1900) {
+    age = currentYear - val;
+  }
+
+  if (age <= 4) return 'Pré-Mirim 4';
+  if (age === 5) return 'Pré-Mirim 5';
+  if (age === 6) return 'Pré-Mirim 6';
+  if (age === 7) return 'Mirim 7';
+  if (age === 8) return 'Mirim 8';
+  if (age === 9) return 'Mirim 9';
+  if (age === 10) return 'Infantil 10';
+  if (age === 11) return 'Infantil 11';
+  if (age === 12) return 'Infantil 12';
+  if (age === 13) return 'Infanto-Juvenil 13';
+  if (age === 14) return 'Infanto-Juvenil 14';
+  if (age === 15) return 'Infanto-Juvenil 15';
+  if (age === 16) return 'Juvenil 16';
+  if (age === 17) return 'Juvenil 17';
+  if (age <= 29) return 'Adulto';
+  if (age <= 35) return 'Master 1';
+  if (age <= 40) return 'Master 2';
+  if (age <= 45) return 'Master 3';
+  if (age <= 50) return 'Master 4';
+  if (age <= 55) return 'Master 5';
+  return 'Master 6';
+};
+
+const getDynamicWeightOptions = (categoria, genero, idadeInput) => {
+  const isFemale = (genero || '').toUpperCase() === 'FEMININO';
+  const currentYear = new Date().getFullYear();
+  let age = parseInt(idadeInput, 10) || 0;
+  if (age > 1900) age = currentYear - age;
+
+  const catStr = (categoria || '').toUpperCase();
+
+  // If age is not set or zero, infer age from category name
+  if (!age || age <= 0) {
+    if (catStr.includes('PRÉ-MIRIM 4') || catStr.includes('PRE-MIRIM 4')) age = 4;
+    else if (catStr.includes('PRÉ-MIRIM 5') || catStr.includes('PRE-MIRIM 5')) age = 5;
+    else if (catStr.includes('PRÉ-MIRIM 6') || catStr.includes('PRE-MIRIM 6')) age = 6;
+    else if (catStr.includes('PRÉ-MIRIM') || catStr.includes('PRE-MIRIM')) age = 6;
+    else if (catStr.includes('MIRIM 7')) age = 7;
+    else if (catStr.includes('MIRIM 8')) age = 8;
+    else if (catStr.includes('MIRIM 9')) age = 9;
+    else if (catStr.includes('MIRIM')) age = 8;
+    else if (catStr.includes('INFANTIL 10')) age = 10;
+    else if (catStr.includes('INFANTIL 11')) age = 11;
+    else if (catStr.includes('INFANTIL 12')) age = 12;
+    else if (catStr.includes('INFANTIL')) age = 11;
+    else if (catStr.includes('INFANTO-JUVENIL 13') || catStr.includes('INF. JUVENIL 13')) age = 13;
+    else if (catStr.includes('INFANTO-JUVENIL 14') || catStr.includes('INF. JUVENIL 14')) age = 14;
+    else if (catStr.includes('INFANTO-JUVENIL 15') || catStr.includes('INF. JUVENIL 15')) age = 15;
+    else if (catStr.includes('INFANTO-JUVENIL') || catStr.includes('INF. JUVENIL') || catStr.includes('INF JUVENIL')) age = 14;
+    else if (catStr.includes('JUVENIL 16')) age = 16;
+    else if (catStr.includes('JUVENIL 17')) age = 17;
+    else if (catStr.includes('JUVENIL')) age = 16;
+    else age = 20; // Default to Adulto
+  }
+
+  // Pré-Mirim 4
+  if (age === 4 || (catStr.includes('MIRIM') && catStr.includes('4') && !catStr.includes('14'))) {
+    return [
+      { value: 'Pluma', label: 'Pluma (até 14,700 kg)' },
+      { value: 'Pena', label: 'Pena (até 18,000 kg)' },
+      { value: 'Leve', label: 'Leve (até 21,000 kg)' },
+      { value: 'Médio', label: 'Médio (até 24,000 kg)' },
+      { value: 'Meio-Pesado', label: 'Meio-Pesado (até 27,000 kg)' },
+      { value: 'Pesado', label: 'Pesado (até 30,000 kg)' },
+      { value: 'Super-Pesado', label: 'Super-Pesado (até 33,000 kg)' },
+      { value: 'Pesadíssimo', label: 'Pesadíssimo (Acima de 33,000 kg)' },
+    ];
+  }
+  // Pré-Mirim 5
+  if (age === 5 || (catStr.includes('MIRIM') && catStr.includes('5') && !catStr.includes('15'))) {
+    return [
+      { value: 'Pluma', label: 'Pluma (até 17,900 kg)' },
+      { value: 'Pena', label: 'Pena (até 20,000 kg)' },
+      { value: 'Leve', label: 'Leve (até 24,000 kg)' },
+      { value: 'Médio', label: 'Médio (até 26,000 kg)' },
+      { value: 'Meio-Pesado', label: 'Meio-Pesado (até 29,000 kg)' },
+      { value: 'Pesado', label: 'Pesado (até 32,000 kg)' },
+      { value: 'Super-Pesado', label: 'Super-Pesado (até 35,000 kg)' },
+      { value: 'Pesadíssimo', label: 'Pesadíssimo (Acima de 35,000 kg)' },
+    ];
+  }
+  // Pré-Mirim 6
+  if (age === 6 || (catStr.includes('MIRIM') && catStr.includes('6') && !catStr.includes('16'))) {
+    return [
+      { value: 'Pluma', label: 'Pluma (até 18,900 kg)' },
+      { value: 'Pena', label: 'Pena (até 22,000 kg)' },
+      { value: 'Leve', label: 'Leve (até 25,000 kg)' },
+      { value: 'Médio', label: 'Médio (até 28,000 kg)' },
+      { value: 'Meio-Pesado', label: 'Meio-Pesado (até 31,200 kg)' },
+      { value: 'Pesado', label: 'Pesado (até 34,200 kg)' },
+      { value: 'Super-Pesado', label: 'Super-Pesado (até 37,200 kg)' },
+      { value: 'Pesadíssimo', label: 'Pesadíssimo (Acima de 37,200 kg)' },
+    ];
+  }
+  // Mirim 7
+  if (age === 7 || (catStr.includes('MIRIM') && catStr.includes('7') && !catStr.includes('17'))) {
+    return [
+      { value: 'Pluma', label: 'Pluma (até 21,000 kg)' },
+      { value: 'Pena', label: 'Pena (até 24,000 kg)' },
+      { value: 'Leve', label: 'Leve (até 27,000 kg)' },
+      { value: 'Médio', label: 'Médio (até 30,200 kg)' },
+      { value: 'Meio-Pesado', label: 'Meio-Pesado (até 33,200 kg)' },
+      { value: 'Pesado', label: 'Pesado (até 36,200 kg)' },
+      { value: 'Super-Pesado', label: 'Super-Pesado (até 39,300 kg)' },
+      { value: 'Pesadíssimo', label: 'Pesadíssimo (Acima de 39,300 kg)' },
+    ];
+  }
+  // Mirim 8
+  if (age === 8 || (catStr.includes('MIRIM') && catStr.includes('8'))) {
+    return [
+      { value: 'Pluma', label: 'Pluma (até 24,000 kg)' },
+      { value: 'Pena', label: 'Pena (até 27,000 kg)' },
+      { value: 'Leve', label: 'Leve (até 30,200 kg)' },
+      { value: 'Médio', label: 'Médio (até 33,200 kg)' },
+      { value: 'Meio-Pesado', label: 'Meio-Pesado (até 36,200 kg)' },
+      { value: 'Pesado', label: 'Pesado (até 39,300 kg)' },
+      { value: 'Super-Pesado', label: 'Super-Pesado (até 42,300 kg)' },
+      { value: 'Pesadíssimo', label: 'Pesadíssimo (Acima de 42,300 kg)' },
+    ];
+  }
+  // Mirim 9
+  if (age === 9 || (catStr.includes('MIRIM') && catStr.includes('9'))) {
+    return [
+      { value: 'Pluma', label: 'Pluma (até 27,000 kg)' },
+      { value: 'Pena', label: 'Pena (até 30,200 kg)' },
+      { value: 'Leve', label: 'Leve (até 33,200 kg)' },
+      { value: 'Médio', label: 'Médio (até 36,200 kg)' },
+      { value: 'Meio-Pesado', label: 'Meio-Pesado (até 39,300 kg)' },
+      { value: 'Pesado', label: 'Pesado (até 42,300 kg)' },
+      { value: 'Super-Pesado', label: 'Super-Pesado (até 45,300 kg)' },
+      { value: 'Pesadíssimo', label: 'Pesadíssimo (Acima de 45,300 kg)' },
+    ];
+  }
+  // Infantil 10
+  if (age === 10 || catStr.includes('10')) {
+    return [
+      { value: 'Galo', label: 'Galo (até 27,000 kg)' },
+      { value: 'Pluma', label: 'Pluma (até 30,200 kg)' },
+      { value: 'Pena', label: 'Pena (até 33,200 kg)' },
+      { value: 'Leve', label: 'Leve (até 36,200 kg)' },
+      { value: 'Médio', label: 'Médio (até 39,300 kg)' },
+      { value: 'Meio-Pesado', label: 'Meio-Pesado (até 42,300 kg)' },
+      { value: 'Pesado', label: 'Pesado (até 45,300 kg)' },
+      { value: 'Super-Pesado', label: 'Super-Pesado (até 48,300 kg)' },
+      { value: 'Pesadíssimo', label: 'Pesadíssimo (Acima de 48,300 kg)' },
+    ];
+  }
+  // Infantil 11
+  if (age === 11 || catStr.includes('11')) {
+    return [
+      { value: 'Galo', label: 'Galo (até 30,200 kg)' },
+      { value: 'Pluma', label: 'Pluma (até 33,200 kg)' },
+      { value: 'Pena', label: 'Pena (até 36,200 kg)' },
+      { value: 'Leve', label: 'Leve (até 39,300 kg)' },
+      { value: 'Médio', label: 'Médio (até 42,300 kg)' },
+      { value: 'Meio-Pesado', label: 'Meio-Pesado (até 45,300 kg)' },
+      { value: 'Pesado', label: 'Pesado (até 48,300 kg)' },
+      { value: 'Super-Pesado', label: 'Super-Pesado (até 51,500 kg)' },
+      { value: 'Pesadíssimo', label: 'Pesadíssimo (Acima de 51,500 kg)' },
+    ];
+  }
+  // Infantil 12
+  if (age === 12 || catStr.includes('12')) {
+    return [
+      { value: 'Galo', label: 'Galo (até 32,200 kg)' },
+      { value: 'Pluma', label: 'Pluma (até 36,200 kg)' },
+      { value: 'Pena', label: 'Pena (até 40,300 kg)' },
+      { value: 'Leve', label: 'Leve (até 44,300 kg)' },
+      { value: 'Médio', label: 'Médio (até 48,300 kg)' },
+      { value: 'Meio-Pesado', label: 'Meio-Pesado (até 52,500 kg)' },
+      { value: 'Pesado', label: 'Pesado (até 56,500 kg)' },
+      { value: 'Super-Pesado', label: 'Super-Pesado (até 60,500 kg)' },
+      { value: 'Pesadíssimo', label: 'Pesadíssimo (Acima de 60,500 kg)' },
+    ];
+  }
+  // Infanto-Juvenil 13
+  if (age === 13 || catStr.includes('13')) {
+    return [
+      { value: 'Galo', label: 'Galo (até 36,200 kg)' },
+      { value: 'Pluma', label: 'Pluma (até 40,300 kg)' },
+      { value: 'Pena', label: 'Pena (até 44,300 kg)' },
+      { value: 'Leve', label: 'Leve (até 48,300 kg)' },
+      { value: 'Médio', label: 'Médio (até 52,500 kg)' },
+      { value: 'Meio-Pesado', label: 'Meio-Pesado (até 56,500 kg)' },
+      { value: 'Pesado', label: 'Pesado (até 60,500 kg)' },
+      { value: 'Super-Pesado', label: 'Super-Pesado (até 65,000 kg)' },
+      { value: 'Pesadíssimo', label: 'Pesadíssimo (Acima de 65,000 kg)' },
+    ];
+  }
+  // Infanto-Juvenil 14
+  if (age === 14 || catStr.includes('14')) {
+    return [
+      { value: 'Galo', label: 'Galo (até 40,300 kg)' },
+      { value: 'Pluma', label: 'Pluma (até 44,300 kg)' },
+      { value: 'Pena', label: 'Pena (até 48,300 kg)' },
+      { value: 'Leve', label: 'Leve (até 52,500 kg)' },
+      { value: 'Médio', label: 'Médio (até 56,500 kg)' },
+      { value: 'Meio-Pesado', label: 'Meio-Pesado (até 60,500 kg)' },
+      { value: 'Pesado', label: 'Pesado (até 65,000 kg)' },
+      { value: 'Super-Pesado', label: 'Super-Pesado (até 69,000 kg)' },
+      { value: 'Pesadíssimo', label: 'Pesadíssimo (Acima de 69,000 kg)' },
+    ];
+  }
+  // Infanto-Juvenil 15
+  if (age === 15 || catStr.includes('15')) {
+    return [
+      { value: 'Galo', label: 'Galo (até 44,300 kg)' },
+      { value: 'Pluma', label: 'Pluma (até 48,300 kg)' },
+      { value: 'Pena', label: 'Pena (até 52,500 kg)' },
+      { value: 'Leve', label: 'Leve (até 56,500 kg)' },
+      { value: 'Médio', label: 'Médio (até 60,500 kg)' },
+      { value: 'Meio-Pesado', label: 'Meio-Pesado (até 65,000 kg)' },
+      { value: 'Pesado', label: 'Pesado (até 69,000 kg)' },
+      { value: 'Super-Pesado', label: 'Super-Pesado (até 73,000 kg)' },
+      { value: 'Pesadíssimo', label: 'Pesadíssimo (Acima de 73,000 kg)' },
+    ];
+  }
+
+  // Juvenil 16 e 17
+  const isJuvenil = catStr.includes('JUVENIL') || (age >= 16 && age <= 17 && !catStr.includes('ADULTO') && !catStr.includes('MASTER'));
+  if (isJuvenil) {
+    if (isFemale) {
+      return [
+        { value: 'Galo', label: 'Galo (até 44,300 kg)' },
+        { value: 'Pluma', label: 'Pluma (até 48,300 kg)' },
+        { value: 'Pena', label: 'Pena (até 52,500 kg)' },
+        { value: 'Leve', label: 'Leve (até 56,500 kg)' },
+        { value: 'Médio', label: 'Médio (até 60,500 kg)' },
+        { value: 'Meio-Pesado', label: 'Meio-Pesado (até 65,000 kg)' },
+        { value: 'Pesado', label: 'Pesado (até 69,000 kg)' },
+        { value: 'Super-Pesado', label: 'Super-Pesado (até 73,000 kg)' },
+        { value: 'Pesadíssimo', label: 'Pesadíssimo (Acima de 73,000 kg)' },
+      ];
+    }
+    if (catStr.includes('16') || age === 16) {
+      return [
+        { value: 'Galo', label: 'Galo (até 48,500 kg)' },
+        { value: 'Pluma', label: 'Pluma (até 53,500 kg)' },
+        { value: 'Pena', label: 'Pena (até 58,500 kg)' },
+        { value: 'Leve', label: 'Leve (até 64,000 kg)' },
+        { value: 'Médio', label: 'Médio (até 69,000 kg)' },
+        { value: 'Meio-Pesado', label: 'Meio-Pesado (até 74,000 kg)' },
+        { value: 'Pesado', label: 'Pesado (até 79,300 kg)' },
+        { value: 'Super-Pesado', label: 'Super-Pesado (até 84,300 kg)' },
+        { value: 'Pesadíssimo', label: 'Pesadíssimo (Acima de 84,300 kg)' },
+      ];
+    }
+    return [
+      { value: 'Galo', label: 'Galo (até 53,500 kg)' },
+      { value: 'Pluma', label: 'Pluma (até 58,500 kg)' },
+      { value: 'Pena', label: 'Pena (até 64,000 kg)' },
+      { value: 'Leve', label: 'Leve (até 69,000 kg)' },
+      { value: 'Médio', label: 'Médio (até 74,000 kg)' },
+      { value: 'Meio-Pesado', label: 'Meio-Pesado (até 79,300 kg)' },
+      { value: 'Pesado', label: 'Pesado (até 84,300 kg)' },
+      { value: 'Super-Pesado', label: 'Super-Pesado (até 89,300 kg)' },
+      { value: 'Pesadíssimo', label: 'Pesadíssimo (Acima de 89,300 kg)' },
+    ];
+  }
+
+  // Adulto / Master (Acima de 18)
+  if (isFemale) {
+    return [
+      { value: 'Galo', label: 'Galo (até 48,500 kg)' },
+      { value: 'Pluma', label: 'Pluma (até 53,500 kg)' },
+      { value: 'Pena', label: 'Pena (até 58,500 kg)' },
+      { value: 'Leve', label: 'Leve (até 64,000 kg)' },
+      { value: 'Médio', label: 'Médio (até 69,000 kg)' },
+      { value: 'Meio-Pesado', label: 'Meio-Pesado (até 74,000 kg)' },
+      { value: 'Pesado', label: 'Pesado (até 79,300 kg)' },
+      { value: 'Super-Pesado', label: 'Super-Pesado (até 84,300 kg)' },
+      { value: 'Pesadíssimo', label: 'Pesadíssimo (Acima de 84,300 kg)' },
+    ];
+  }
+
+  return [
+    { value: 'Galo', label: 'Galo (até 57,500 kg)' },
+    { value: 'Pluma', label: 'Pluma (até 64,000 kg)' },
+    { value: 'Pena', label: 'Pena (até 70,000 kg)' },
+    { value: 'Leve', label: 'Leve (até 76,000 kg)' },
+    { value: 'Médio', label: 'Médio (até 82,300 kg)' },
+    { value: 'Meio-Pesado', label: 'Meio-Pesado (até 88,300 kg)' },
+    { value: 'Pesado', label: 'Pesado (até 94,300 kg)' },
+    { value: 'Super-Pesado', label: 'Super-Pesado (até 100,500 kg)' },
+    { value: 'Pesadíssimo', label: 'Pesadíssimo (Acima de 100,500 kg)' },
+  ];
+};
 const TARGET_NEWS_IMAGE_STORED_BYTES = 320_000;
 const MAX_NEWS_IMAGE_STORED_BYTES = 850_000;
 const NEWS_IMAGE_MAX_WIDTH = 1600;
@@ -83,7 +388,13 @@ const createEventEditFormState = () => ({
     date: '',
     endDate: '',
     location: '',
+    isPremium: false,
+    registrationCloseDate: '',
+    checkinEndDate: '',
     eventDescription: '',
+    eventSocialWebsite: '',
+    eventSocialWhatsapp: '',
+    eventSocialInstagram: '',
     posterUrl: '',
     registrationUrl: '',
     weightTableGiUrl: '',
@@ -96,6 +407,8 @@ const createEventEditFormState = () => ({
     feeOver15: DEFAULT_EVENT_FEES.over15,
     feeCombo: DEFAULT_EVENT_FEES.combo,
     feeAbsolute: DEFAULT_EVENT_FEES.absolute,
+    noGiEnabled: true,
+    absoluteEnabled: true,
     beltRegistrationEnabled: false,
     beltRegistrationTitle: '',
     beltRegistrationPrice: 0,
@@ -441,7 +754,9 @@ const parseRegistrationRecord = (item, eventMap, copy) => {
         eventLocation: source.eventLocation || eventMap[source.eventId]?.location || '',
         paymentReviewNotes: source.paymentReviewNotes || '',
         paymentReviewedBy: source.paymentReviewedBy || '',
-        paymentReviewedAt: source.paymentReviewedAt || ''
+        paymentReviewedAt: source.paymentReviewedAt || '',
+        checkedIn: Boolean(source.checkedIn),
+        checkedInAt: source.checkedInAt || ''
     };
 };
 
@@ -773,6 +1088,8 @@ const PainelDeControle = () => {
         importAthletes,
         brackets,
         generateBrackets,
+        publishBrackets,
+        deleteBracket,
         setBracketPodium,
         setBracketSeedOrder,
         applyBracketPodium,
@@ -793,6 +1110,7 @@ const PainelDeControle = () => {
         currentUser,
         logout,
         clearEventResults,
+        updateAthlete,
         logs
     } = useStore();
     const location = useLocation();
@@ -1089,6 +1407,7 @@ const PainelDeControle = () => {
                     selectCategoryAria: 'Select bracket category',
                     allCategories: 'All categories',
                     generate: 'Generate brackets',
+                    publish: 'Publish brackets',
                     savePdf: 'Save brackets PDF',
                     exportSchedulePdfTable: 'PDF Table',
                     exportSchedulePdfTv: 'PDF TV Mode',
@@ -1664,6 +1983,7 @@ const PainelDeControle = () => {
                     selectCategoryAria: 'Selecionar categoria de chaveamento',
                     allCategories: 'Todas as categorias',
                     generate: 'Gerar chaves',
+                    publish: 'Publicar chaves',
                     savePdf: 'Salvar PDF das chaves',
                     exportSchedulePdfTable: 'PDF Tabela',
                     exportSchedulePdfTv: 'PDF Modo TV',
@@ -2075,6 +2395,7 @@ const PainelDeControle = () => {
     const [importError, setImportError] = useState('');
     const [importDebug, setImportDebug] = useState('');
     const [manualInputs, setManualInputs] = useState({});
+    const [overviewEventFilter, setOverviewEventFilter] = useState('all');
     const [eventFilter, setEventFilter] = useState(activeEventId || 'all');
     const [importEventId, setImportEventId] = useState(activeEventId || '');
     const [bracketEventId, setBracketEventId] = useState(activeEventId || '');
@@ -2101,6 +2422,12 @@ const PainelDeControle = () => {
     const [newsImageStoredSizeBytes, setNewsImageStoredSizeBytes] = useState(0);
     const [newsError, setNewsError] = useState('');
     const [instagramRefreshing, setInstagramRefreshing] = useState(false);
+    
+    // --- ROULETTE STATE ---
+    const [showRouletteModal, setShowRouletteModal] = useState(false);
+    const [rouletteInput, setRouletteInput] = useState('');
+    const [rouletteWinner, setRouletteWinner] = useState('');
+    const [isRouletteSpinning, setIsRouletteSpinning] = useState(false);
     const [instagramLastUpdatedAt, setInstagramLastUpdatedAt] = useState(loadInstagramLastRefresh);
     const [instagramFeedStatus, setInstagramFeedStatus] = useState(loadInstagramFeedStatus);
     const [newAthlete, setNewAthlete] = useState({
@@ -2155,6 +2482,7 @@ const PainelDeControle = () => {
     const [registrationSearch, setRegistrationSearch] = useState('');
     const [registrationEventFilter, setRegistrationEventFilter] = useState('all');
     const [registrationPendingOnly, setRegistrationPendingOnly] = useState(false);
+    const [registrationCheckInFilter, setRegistrationCheckInFilter] = useState('all');
     const [registrationPendingFilterTouched, setRegistrationPendingFilterTouched] = useState(false);
     const [registrationsLoading, setRegistrationsLoading] = useState(false);
     const [registrationsSyncing, setRegistrationsSyncing] = useState(false);
@@ -2361,11 +2689,16 @@ const PainelDeControle = () => {
             ...createEventEditFormState(),
             ...eventItem,
             posterUrl,
+            isPremium: eventItem.isPremium === true,
+            registrationCloseDate: eventItem.registrationCloseDate || '',
+            checkinEndDate: eventItem.checkinEndDate || '',
             pixKey: eventItem.pixKey || DEFAULT_EVENT_PIX_KEY,
             feeUnder15: eventItem.feeUnder15 ?? DEFAULT_EVENT_FEES.under15,
             feeOver15: eventItem.feeOver15 ?? DEFAULT_EVENT_FEES.over15,
             feeCombo: eventItem.feeCombo ?? DEFAULT_EVENT_FEES.combo,
             feeAbsolute: eventItem.feeAbsolute ?? DEFAULT_EVENT_FEES.absolute,
+            noGiEnabled: eventItem.noGiEnabled !== false,
+            absoluteEnabled: eventItem.absoluteEnabled !== false,
             registrationOpen: eventItem.registrationOpen !== false,
             internalRegistration: eventItem.internalRegistration !== false
         });
@@ -2395,8 +2728,14 @@ const PainelDeControle = () => {
                 name: eventEditForm.name,
                 date: eventEditForm.date,
                 endDate: eventEditForm.endDate,
+                registrationCloseDate: eventEditForm.registrationCloseDate,
+                checkinEndDate: eventEditForm.checkinEndDate,
                 location: eventEditForm.location,
+                isPremium: eventEditForm.isPremium,
                 eventDescription: eventEditForm.eventDescription,
+                eventSocialWebsite: eventEditForm.eventSocialWebsite,
+                eventSocialWhatsapp: eventEditForm.eventSocialWhatsapp,
+                eventSocialInstagram: eventEditForm.eventSocialInstagram,
                 posterUrl: eventEditForm.posterUrl,
                 registrationUrl: eventEditForm.registrationUrl,
                 weightTableGiUrl: eventEditForm.weightTableGiUrl,
@@ -2409,6 +2748,8 @@ const PainelDeControle = () => {
                 feeOver15: eventEditForm.feeOver15,
                 feeCombo: eventEditForm.feeCombo,
                 feeAbsolute: eventEditForm.feeAbsolute,
+                noGiEnabled: eventEditForm.noGiEnabled !== false,
+                absoluteEnabled: eventEditForm.absoluteEnabled !== false,
                 beltRegistrationEnabled: eventEditForm.beltRegistrationEnabled,
                 beltRegistrationTitle: eventEditForm.beltRegistrationTitle,
                 beltRegistrationPrice: eventEditForm.beltRegistrationPrice,
@@ -2742,10 +3083,48 @@ const PainelDeControle = () => {
                 return;
             }
 
-            const result = importAthletes(parsed, { eventId: importEventId || activeEventId || '' });
+            const targetEventId = importEventId || activeEventId || '';
+            const targetEvent = events.find(e => e.id === targetEventId);
+
+            const result = importAthletes(parsed, { eventId: targetEventId });
             const importedCount = result?.imported ?? parsed.length;
-            setImportStatus(`${importedCount} atletas importados.`);
-            showFeedback('success', `${importedCount} atletas importados.`);
+            
+            if (targetEvent) {
+                setImportStatus(`Importando ${importedCount} atletas para o evento...`);
+                await Promise.all(parsed.map(async (athlete, idx) => {
+                    const payload = {
+                        id: `reg-import-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 8)}`,
+                        eventId: targetEvent.id,
+                        eventName: targetEvent.name,
+                        athleteId: '',
+                        profileId: '',
+                        nome: athlete.nome || 'Atleta Importado',
+                        email: 'importado@sistema.com',
+                        phone: '',
+                        academia: athlete.academia || 'Sem Academia',
+                        faixa: athlete.faixa || 'Branca',
+                        peso: athlete.peso || 'Padrao',
+                        genero: athlete.genero || 'Masculino',
+                        photoUrl: '',
+                        modalidade: athlete.modalidade || importMode || 'GI',
+                        isNoGi: (athlete.modalidade === 'NO-GI' || importMode === 'NO-GI'),
+                        isAbsolute: false,
+                        categoria: athlete.categoria || [athlete.idade, athlete.genero, athlete.faixa, athlete.peso].filter(Boolean).join(' / ') || 'Categoria Unica',
+                        price: 0,
+                        status: 'CONFIRMED',
+                        notes: JSON.stringify({ importedFromPdf: true, importDate: new Date().toISOString() })
+                    };
+                    try {
+                        await publicRegistrationService.register(payload);
+                    } catch (e) {
+                        console.warn('Falha no sync do importado, salvo offline', e);
+                    }
+                }));
+                loadPublicRegistrations();
+            }
+
+            setImportStatus(`${importedCount} inscrições importadas.`);
+            showFeedback('success', `${importedCount} inscrições importadas.`);
         } catch (err) {
             setImportError(err?.message || copy.feedback.importReadFail);
             setImportStatus('');
@@ -2795,11 +3174,65 @@ const PainelDeControle = () => {
         new Map(athletes.map((athlete) => [athlete.id, athlete]))
     ), [athletes]);
 
-    const parsedPublicRegistrations = useMemo(() => (
-        publicRegistrations
-            .map((item) => parseRegistrationRecord(item, eventMap, copy))
-            .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
-    ), [publicRegistrations, eventMap, copy]);
+    const parsedPublicRegistrations = useMemo(() => {
+        const remoteParsed = publicRegistrations.map((item) => parseRegistrationRecord(item, eventMap, copy));
+        
+        // Map store athletes into public registration records
+        const athleteParsed = (athletes || [])
+            .filter((athlete) => Boolean(athlete?.nome || athlete?.name))
+            .map((athlete) => {
+                const eventId = athlete.eventId || '';
+                const eventMeta = eventMap[eventId] || null;
+                const rawRecord = {
+                    id: athlete.id || `ath-${Date.now()}`,
+                    eventId: eventId,
+                    eventName: athlete.eventName || eventMeta?.name || copy.common.noEvent,
+                    eventDate: athlete.eventDate || eventMeta?.date || '',
+                    eventLocation: athlete.eventLocation || eventMeta?.location || '',
+                    nome: athlete.nome || athlete.name || '',
+                    email: athlete.email || '',
+                    phone: athlete.phone || athlete.telefone || '',
+                    academia: athlete.academia || athlete.academy || 'Sem academia',
+                    faixa: athlete.faixa || athlete.belt || 'Branca',
+                    peso: athlete.peso || athlete.weight || '',
+                    categoria: athlete.categoria || athlete.category || '',
+                    genero: athlete.genero || athlete.gender || 'M',
+                    modalidade: athlete.modalidade || (athlete.isNoGi ? 'NO-GI' : 'GI'),
+                    status: athlete.status || athlete.paymentStatus || 'PAYMENT_CONFIRMED',
+                    checkedIn: Boolean(athlete.checkedIn),
+                    checkedInAt: athlete.checkedInAt || '',
+                    createdAt: athlete.createdAt || new Date().toISOString(),
+                    athletePhotoUrl: athlete.photoUrl || athlete.fotoUrl || '',
+                    notes: {
+                        athletePhotoUrl: athlete.photoUrl || athlete.fotoUrl || '',
+                        observacoes: athlete.notes || ''
+                    }
+                };
+                return parseRegistrationRecord(rawRecord, eventMap, copy);
+            });
+
+        // Combine and deduplicate by id and identity key
+        const combined = [...remoteParsed];
+        const existingKeys = new Set();
+        
+        remoteParsed.forEach((r) => {
+            if (r.id) existingKeys.add(r.id);
+            const identityKey = buildRegistrationIdentityKey(r);
+            if (identityKey) existingKeys.add(identityKey);
+        });
+
+        athleteParsed.forEach((athReg) => {
+            const identityKey = buildRegistrationIdentityKey(athReg);
+            const key = athReg.id;
+            if ((!key || !existingKeys.has(key)) && (!identityKey || !existingKeys.has(identityKey))) {
+                if (key) existingKeys.add(key);
+                if (identityKey) existingKeys.add(identityKey);
+                combined.push(athReg);
+            }
+        });
+
+        return combined.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    }, [publicRegistrations, athletes, eventMap, copy]);
 
     const latestRegistrationDecisions = useMemo(() => {
         const decisionMap = new Map();
@@ -3201,6 +3634,33 @@ const PainelDeControle = () => {
         setDragSeedContext({ bracketId: '', athleteId: '' });
     }, [dragSeedContext, setBracketSeedOrder]);
 
+    const handleMatchSeedDrop = useCallback((event, bracket, targetAthleteId) => {
+        event.preventDefault();
+        if (!bracket?.id) return;
+
+        const bracketId = (bracket.id || '').toString().trim();
+        const targetId = (targetAthleteId || '').toString().trim();
+        if (!targetId) return;
+        if (dragSeedContext.bracketId !== bracketId) return;
+
+        const sourceId = (dragSeedContext.athleteId || '').toString().trim();
+        if (!sourceId || sourceId === targetId) return;
+
+        const ordered = (Array.isArray(bracket.seedIds) ? bracket.seedIds : []).filter(Boolean);
+        const fromIndex = ordered.indexOf(sourceId);
+        const toIndex = ordered.indexOf(targetId);
+        if (fromIndex < 0 || toIndex < 0) return;
+
+        // Swap directly instead of splicing for match UI
+        const nextOrder = [...ordered];
+        const temp = nextOrder[fromIndex];
+        nextOrder[fromIndex] = nextOrder[toIndex];
+        nextOrder[toIndex] = temp;
+        
+        setBracketSeedOrder(bracketId, nextOrder);
+        setDragSeedContext({ bracketId: '', athleteId: '' });
+    }, [dragSeedContext, setBracketSeedOrder]);
+
     const updateManualScheduleRows = useCallback((eventId, updater) => {
         const normalizedEventId = (eventId || '').toString().trim();
         if (!normalizedEventId || typeof updater !== 'function') return;
@@ -3334,21 +3794,16 @@ const PainelDeControle = () => {
             return;
         }
 
-        const hasExisting = brackets.some((bracket) => (
+        const existingModeBrackets = brackets.filter((bracket) => (
             bracket.eventId === bracketEventId
             && (bracketMode === 'ALL' || bracket.mode === bracketMode)
         ));
-
-        if (hasExisting) {
-            const confirmed = window.confirm(copy.feedback.existingBracketsConfirm);
-            if (!confirmed) return;
-        }
 
         try {
             const result = generateBrackets({
                 eventId: bracketEventId,
                 mode: bracketMode,
-                replaceExisting: hasExisting
+                replaceExisting: true
             });
             if (result.created > 0) {
                 showFeedback('success', copy.feedback.bracketsGenerated(result.created));
@@ -3359,39 +3814,25 @@ const PainelDeControle = () => {
                         .sort((left, right) => (left.number || 0) - (right.number || 0))
                         .map((bracket) => bracket.id)
                 }));
-                const eventMeta = events.find((event) => event.id === bracketEventId);
-                const modeLabelMap = {
-                    ALL: isEnglish ? 'Overall' : 'Geral',
-                    GI: isEnglish ? 'GI (weight)' : 'GI (peso)',
-                    'NO-GI': isEnglish ? 'NO-GI (weight)' : 'NO-GI (peso)',
-                    'ABS-GI': 'ABS GI',
-                    'ABS-NO-GI': 'ABS NO-GI'
-                };
-
-                addNews({
-                    title: `Chaveamento liberado: ${eventMeta?.name || 'Campeonato'}`,
-                    summary: `As chaves da modalidade ${modeLabelMap[bracketMode] || bracketMode} foram geradas e estão disponíveis. Confira seus confrontos!`,
-                    body: `Atletas, o sistema acaba de processar os chaveamentos da modalidade **${modeLabelMap[bracketMode] || bracketMode}** para o evento **${eventMeta?.name || 'Campeonato'}**.\n\nAcessem a aba do campeonato para verificar a estrutura das lutas e confirmar o seu primeiro adversário. Boa sorte no tatame!`,
-                    category: 'eventos',
-                    tags: ['chaveamento', 'eventos'],
-                    imageUrl: eventMeta?.flyerUrl || eventMeta?.coverUrl || '',
-                    status: 'published',
-                    publishedAt: new Date().toISOString()
-                });
-
-                await generateBracketsPDF(result.brackets || [], athletes, {
-                    eventName: eventMeta?.name || copy.bracketsPanel.event,
-                    eventDate: eventMeta?.date || '',
-                    eventLocation: eventMeta?.location || '',
-                    modeLabel: modeLabelMap[bracketMode] || bracketMode
-                });
             } else {
-                showFeedback('error', copy.feedback.noBracketCategory);
+                showFeedback('info', isEnglish ? 'No new bracket categories to generate. Existing brackets were preserved.' : 'Nenhuma nova chave para gerar. As chaves existentes foram mantidas.');
             }
         } catch (err) {
             showFeedback('error', err?.message || copy.feedback.bracketGenerateFail);
         }
     }, [canManagePanel, bracketEventId, bracketMode, brackets, events, generateBrackets, athletes, showFeedback, copy.feedback, copy.bracketsPanel.event, isEnglish, setBracketOrderByEvent, addNews]);
+
+    const handleDeleteBracket = useCallback((bracketId) => {
+        if (!canManagePanel) {
+            showFeedback('error', copy.feedback.accessDeniedAdmin);
+            return;
+        }
+        if (window.confirm(isEnglish ? 'Delete this bracket? This action cannot be undone.' : 'Excluir esta chave? Esta ação não pode ser desfeita.')) {
+            deleteBracket(bracketId);
+            showFeedback('success', isEnglish ? 'Bracket deleted.' : 'Chave excluída.');
+        }
+    }, [canManagePanel, deleteBracket, showFeedback, isEnglish, copy.feedback.accessDeniedAdmin]);
+
 
     const handleExportBracketsPdf = useCallback(async () => {
         if (!orderedFilteredBrackets.length) {
@@ -3427,9 +3868,150 @@ const PainelDeControle = () => {
         athletes,
         showFeedback,
         copy.feedback,
-        copy.bracketsPanel.event,
-        isEnglish
     ]);
+
+    const handlePublishBrackets = useCallback(async () => {
+        if (!canManagePanel) return;
+        if (!bracketEventId) {
+            showFeedback('error', isEnglish ? 'Select an event first.' : 'Selecione um evento primeiro.');
+            return;
+        }
+
+        if (!orderedFilteredBrackets.length) {
+            showFeedback('error', isEnglish ? 'No brackets found to publish. Generate brackets first.' : 'Nenhum chaveamento encontrado para publicar. Gere as chaves primeiro.');
+            return;
+        }
+
+        publishBrackets(bracketEventId, bracketMode);
+        
+        showFeedback('success', isEnglish ? 'Brackets published successfully!' : 'Chaves publicadas com sucesso!');
+
+        const eventMeta = events.find((event) => event.id === bracketEventId);
+        const modeLabelMap = {
+            ALL: isEnglish ? 'Overall' : 'Geral',
+            GI: isEnglish ? 'GI (weight)' : 'GI (peso)',
+            'NO-GI': isEnglish ? 'NO-GI (weight)' : 'NO-GI (peso)',
+            'ABS-GI': 'ABS GI',
+            'ABS-NO-GI': 'ABS NO-GI'
+        };
+
+        if (addNews) {
+            try {
+                addNews({
+                    title: `Chaveamento liberado: ${eventMeta?.name || 'Campeonato'}`,
+                    summary: `As chaves da modalidade ${modeLabelMap[bracketMode] || bracketMode} foram publicadas e estão disponíveis. Confira seus confrontos!`,
+                    body: `Atletas, o sistema acaba de publicar os chaveamentos da modalidade **${modeLabelMap[bracketMode] || bracketMode}** para o evento **${eventMeta?.name || 'Campeonato'}**.\n\nAcessem a aba do campeonato para verificar a estrutura das lutas e confirmar o seu primeiro adversário. Boa sorte no tatame!`,
+                    category: 'eventos',
+                    tags: ['chaveamento', 'eventos'],
+                    imageUrl: eventMeta?.flyerUrl || eventMeta?.coverUrl || '',
+                    eventId: bracketEventId || null,
+                    status: 'published',
+                    publishedAt: new Date().toISOString()
+                });
+            } catch (e) {
+                console.error('Erro ao adicionar notícia de chaveamento:', e);
+            }
+        }
+
+        try {
+            await handleExportBracketsPdf();
+        } catch (err) {
+            console.error('Erro ao exportar PDF das chaves:', err);
+        }
+    }, [canManagePanel, bracketEventId, bracketMode, publishBrackets, showFeedback, isEnglish, events, addNews, handleExportBracketsPdf, orderedFilteredBrackets]);
+
+    const handleAutoGenerateSchedule = useCallback(() => {
+        if (!scheduleEventId) {
+            showFeedback('error', copy.schedulePanel.selectEvent);
+            return;
+        }
+        
+        const eventBrackets = brackets
+            .filter(b => String(b.eventId) === String(scheduleEventId))
+            .sort((a, b) => {
+                const aNum = parseInt(a.number, 10) || Number.MAX_SAFE_INTEGER;
+                const bNum = parseInt(b.number, 10) || Number.MAX_SAFE_INTEGER;
+                return aNum - bNum;
+            });
+            
+        if (!eventBrackets.length) {
+            showFeedback('error', isEnglish ? 'No brackets found for this event. Generate brackets first.' : 'Nenhum chaveamento encontrado para este evento. Gere as chaves primeiro.');
+            return;
+        }
+
+        let currentMinute = 540; // 09:00 AM
+        const defaultFightMinutes = 5;
+
+        const groupedBrackets = {};
+        
+        eventBrackets.forEach((bracket) => {
+            const titleStr = bracket.label || 'Categoria';
+            const parts = titleStr.split(' - ').map(s => s.trim()).filter(Boolean);
+            
+            let groupName = titleStr;
+            if (parts.length >= 3) {
+                const age = parts[0];
+                const belt = parts[1];
+                const gender = parts[parts.length - 1];
+                groupName = `${age} - ${belt} - ${gender}`;
+            }
+
+            if (!groupedBrackets[groupName]) {
+                groupedBrackets[groupName] = {
+                    title: groupName,
+                    brackets: [],
+                    totalFights: 0
+                };
+            }
+            
+            const athletesCount = (bracket.seedIds || []).length;
+            const fightsCount = Math.max(1, athletesCount - 1);
+            
+            groupedBrackets[groupName].brackets.push(bracket);
+            groupedBrackets[groupName].totalFights += fightsCount;
+        });
+
+        const newRows = Object.values(groupedBrackets).map((group) => {
+            const duration = group.totalFights * defaultFightMinutes;
+            
+            const startStr = formatMinutesToClock(currentMinute);
+            currentMinute += duration;
+            const endStr = formatMinutesToClock(currentMinute);
+
+            const bracketsNumbers = group.brackets.map(b => b.number).filter(Boolean).join(', ');
+
+            return {
+                id: 'row-' + Date.now() + Math.random().toString(36).substr(2, 5),
+                title: group.title,
+                type: 'FIGHT',
+                typeLabel: isEnglish ? 'FIGHT' : 'LUTA',
+                area: 'Area 1',
+                startLabel: startStr,
+                endLabel: endStr,
+                durationMinutes: duration,
+                notes: bracketsNumbers ? (isEnglish ? `Brackets ${bracketsNumbers}` : `Chaves ${bracketsNumbers}`) : '',
+                fightCount: group.totalFights
+            };
+        });
+
+        updateManualScheduleRows(scheduleEventId, () => newRows);
+        
+        const eventMeta = events.find((event) => event.id === scheduleEventId);
+        if (eventMeta) {
+            try {
+                savePublishedEventSchedule(scheduleEventId, {
+                    eventName: eventMeta.name || copy.bracketsPanel.event,
+                    eventDate: eventMeta.date || '',
+                    eventLocation: eventMeta.location || '',
+                    rows: newRows
+                });
+            } catch (err) {
+                console.error("Failed to auto-publish schedule", err);
+            }
+        }
+        
+        showFeedback('success', isEnglish ? 'Schedule automatically generated and published based on brackets.' : 'Cronograma gerado automaticamente e publicado com base nos chaveamentos.');
+    }, [scheduleEventId, brackets, isEnglish, showFeedback, copy, updateManualScheduleRows, events]);
 
     const handleExportSchedulePdf = useCallback(async (layoutMode = 'table') => {
         if (!manualScheduleData.rows.length) {
@@ -3465,7 +4047,7 @@ const PainelDeControle = () => {
                 label: row.notes ? `${row.title} - ${row.notes}` : row.title,
                 mode: row.typeLabel,
                 participants: row.type === 'FIGHT' ? 2 : 0,
-                fightCount: row.type === 'FIGHT' ? 1 : 0,
+                fightCount: row.fightCount !== undefined ? row.fightCount : (row.type === 'FIGHT' ? 1 : 0),
                 startLabel: row.startLabel,
                 endLabel: row.endLabel,
                 durationLabel: formatDurationLabel(row.durationMinutes, isEnglish),
@@ -3543,6 +4125,9 @@ const PainelDeControle = () => {
             });
 
             showFeedback('success', isEnglish ? 'Schedule published successfully!' : 'Cronograma publicado com sucesso!');
+
+            // Trigger PDF download after publishing, just like brackets do
+            handleExportSchedulePdf('table');
         } catch (err) {
             showFeedback('error', err?.message || (isEnglish ? 'Failed to publish schedule.' : 'Falha ao publicar cronograma.'));
         }
@@ -3553,7 +4138,8 @@ const PainelDeControle = () => {
         isEnglish,
         showFeedback,
         copy.feedback,
-        copy.bracketsPanel.event
+        copy.bracketsPanel.event,
+        handleExportSchedulePdf
     ]);
 
     const handleExportApprovedAthletesCsv = useCallback(() => {
@@ -4098,6 +4684,88 @@ const PainelDeControle = () => {
         copy
     ]);
 
+    const handleToggleCheckIn = useCallback(async (registration) => {
+        if (!registration?.id) return;
+        setRegistrationStatusUpdatingId(registration.id);
+        try {
+            const nextState = !registration.checkedIn;
+            const nowIso = nextState ? new Date().toISOString() : '';
+
+            try {
+                await publicRegistrationService.toggleCheckIn(registration.id);
+            } catch {
+                // Fallback for local store athletes
+            }
+
+            if (typeof updateAthlete === 'function') {
+                updateAthlete(registration.id, { checkedIn: nextState, checkedInAt: nowIso });
+            }
+
+            setPublicRegistrations((prev) => prev.map((item) => (
+                item.id === registration.id ? { ...item, checkedIn: nextState, checkedInAt: nowIso } : item
+            )));
+            showFeedback(
+                'success',
+                nextState ? `Check-in realizado para ${registration.nome}!` : `Check-in desfeito para ${registration.nome}.`
+            );
+        } catch (err) {
+            showFeedback('error', err?.message || 'Falha ao atualizar Check-in.');
+        } finally {
+            setRegistrationStatusUpdatingId('');
+        }
+    }, [showFeedback, updateAthlete]);
+
+    const [editingRegistration, setEditingRegistration] = useState(null);
+    const [editRegForm, setEditRegForm] = useState({
+        nome: '',
+        academia: '',
+        faixa: '',
+        categoria: '',
+        peso: '',
+        modalidade: '',
+        status: ''
+    });
+
+    const handleOpenEditRegistrationModal = useCallback((item) => {
+        setEditingRegistration(item);
+        setEditRegForm({
+            nome: item.nome || '',
+            academia: item.academia || '',
+            faixa: item.faixa || '',
+            categoria: item.categoria || '',
+            peso: item.peso || '',
+            modalidade: item.modalidade || 'GI',
+            status: item.status || 'PAYMENT_CONFIRMED'
+        });
+    }, []);
+
+    const handleSaveRegistrationDetails = useCallback(async (e) => {
+        e.preventDefault();
+        if (!editingRegistration?.id) return;
+        setRegistrationStatusUpdatingId(editingRegistration.id);
+        try {
+            try {
+                await publicRegistrationService.updateRegistrationDetails(editingRegistration.id, editRegForm);
+            } catch {
+                // Fallback for local store athletes
+            }
+
+            if (typeof updateAthlete === 'function') {
+                updateAthlete(editingRegistration.id, { ...editRegForm });
+            }
+
+            setPublicRegistrations((prev) => prev.map((item) => (
+                item.id === editingRegistration.id ? { ...item, ...editRegForm } : item
+            )));
+            showFeedback('success', `Dados de ${editRegForm.nome} atualizados com sucesso!`);
+            setEditingRegistration(null);
+        } catch (err) {
+            showFeedback('error', err?.message || 'Falha ao atualizar inscrição.');
+        } finally {
+            setRegistrationStatusUpdatingId('');
+        }
+    }, [editingRegistration, editRegForm, showFeedback, updateAthlete]);
+
     const handleExportRegistrationsSpreadsheet = useCallback(() => {
         const eventMapForExport = events.reduce((acc, event) => {
             if (event?.id) acc[event.id] = event;
@@ -4542,6 +5210,11 @@ const PainelDeControle = () => {
                 !registrationPendingOnly || item.isPendingSync || item.isPendingPaymentReview
             ))
             .filter((item) => {
+                if (registrationCheckInFilter === 'checked') return item.checkedIn;
+                if (registrationCheckInFilter === 'pending') return !item.checkedIn;
+                return true;
+            })
+            .filter((item) => {
                 if (!term) return true;
                 const searchable = [
                     item.nome,
@@ -4562,7 +5235,8 @@ const PainelDeControle = () => {
         parsedPublicRegistrations,
         deferredRegistrationSearch,
         registrationEventFilter,
-        registrationPendingOnly
+        registrationPendingOnly,
+        registrationCheckInFilter
     ]);
 
     const registrationGroups = useMemo(() => {
@@ -4696,22 +5370,35 @@ const PainelDeControle = () => {
     }, [athletes, assignSearch]);
 
     const totals = useMemo(() => {
-        const totalPoints = athletes.reduce((acc, athlete) => acc + (Number(athlete?.pontos) || 0), 0);
+        const filteredAthletes = overviewEventFilter === 'all'
+            ? athletes
+            : athletes.filter(a => String(a.eventId) === String(overviewEventFilter));
+
+        const totalPoints = filteredAthletes.reduce((acc, athlete) => acc + (Number(athlete?.pontos) || 0), 0);
         // "Ativo" no painel = atleta vinculado a algum campeonato/evento.
-        const activeAthletes = athletes.filter((athlete) => Boolean((athlete.eventId || '').toString().trim())).length;
-        const averagePoints = athletes.length ? Math.round(totalPoints / athletes.length) : 0;
+        const activeAthletes = filteredAthletes.filter((athlete) => Boolean((athlete.eventId || '').toString().trim())).length;
+        const averagePoints = filteredAthletes.length ? Math.round(totalPoints / filteredAthletes.length) : 0;
 
         let valorArrecadado = 0;
-        athletes.forEach(athlete => {
+        const now = new Date();
+        filteredAthletes.forEach(athlete => {
             if (athlete.eventId) {
-                const event = events.find(e => e.id === athlete.eventId);
+                const event = events.find(e => String(e.id) === String(athlete.eventId));
                 if (event) {
-                    valorArrecadado += Number(event.feeOver15 || 0);
+                    const modalitiesCount = ((athlete.modality && athlete.modality.toLowerCase().includes('combo')) || (athlete.isNoGi && athlete.isGi) || (athlete.modalidade === 'Combo GI + NO-GI')) ? 2 : 1;
+                    const priceInfo = resolveAthleteEventPrice({
+                        event,
+                        athlete,
+                        modalitiesCount,
+                        absolute: athlete.isAbsolute || athlete.absoluto,
+                        now
+                    });
+                    valorArrecadado += Number(priceInfo.total || 0);
                 }
             }
         });
 
-        const academyMap = athletes.reduce((acc, athlete) => {
+        const academyMap = filteredAthletes.reduce((acc, athlete) => {
             const key = athlete.academia || copy.modalAssign.noAcademy;
             if (!acc[key]) acc[key] = { count: 0, points: 0 };
             acc[key].count += 1;
@@ -4719,16 +5406,17 @@ const PainelDeControle = () => {
             return acc;
         }, {});
 
-        const topAcademy = Object.entries(academyMap).sort((a, b) => b[1].points - a[1].points)[0];
+        const topAcademy = Object.keys(academyMap).length > 0 ? Object.entries(academyMap).sort((a, b) => b[1].points - a[1].points)[0] : null;
 
         return {
             totalPoints,
             averagePoints,
             activeAthletes,
             topAcademy,
-            valorArrecadado
+            valorArrecadado,
+            enrolledAthletes: filteredAthletes.length
         };
-    }, [athletes, events, copy.modalAssign.noAcademy]);
+    }, [athletes, events, copy.modalAssign.noAcademy, overviewEventFilter]);
 
     const eventStats = useMemo(() => (
         events.map((event) => {
@@ -5181,6 +5869,58 @@ const PainelDeControle = () => {
         return <LoginOverlay />;
     }
 
+    const handleBackupData = () => {
+        try {
+            const data = { athletes, events, exportDate: new Date().toISOString(), version: '1.0' };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `backup_sistema_bjj_${new Date().toISOString().slice(0,10)}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showFeedback('success', 'Backup exportado com sucesso.');
+        } catch (err) {
+            showFeedback('error', 'Falha ao exportar backup.');
+        }
+    };
+
+    const handleToggleFullscreen = () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch((err) => {
+                showFeedback('error', `Erro ao tentar tela cheia: ${err.message}`);
+            });
+        } else {
+            document.exitFullscreen();
+        }
+    };
+
+    const handleSpinRoulette = () => {
+        if (!rouletteInput.trim()) {
+            showFeedback('error', 'Cole alguns nomes para sortear!');
+            return;
+        }
+        const names = rouletteInput.split('\n').map(n => n.trim()).filter(n => n);
+        if (names.length === 0) return;
+        
+        setIsRouletteSpinning(true);
+        setRouletteWinner('');
+        
+        let counter = 0;
+        const maxSpins = 30;
+        const interval = setInterval(() => {
+            const randomName = names[Math.floor(Math.random() * names.length)];
+            setRouletteWinner(randomName);
+            counter++;
+            if (counter >= maxSpins) {
+                clearInterval(interval);
+                setIsRouletteSpinning(false);
+            }
+        }, 100);
+    };
+
     return (
         <div className="admin-shell">
             <AnimatePresence>
@@ -5322,6 +6062,21 @@ const PainelDeControle = () => {
                     <div style={{ position: 'absolute', bottom: '-5%', right: '-5%', width: '400px', height: '400px', background: 'radial-gradient(circle, rgba(168,85,247,0.1) 0%, rgba(0,0,0,0) 70%)', filter: 'blur(60px)', zIndex: 0, borderRadius: '50%' }}></div>
                     
                     <div style={{ position: 'relative', zIndex: 1 }}>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
+                            <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '12px', padding: '12px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <span style={{ color: '#94a3b8', fontSize: '14px', fontWeight: 500 }}>Visualizar dados de:</span>
+                                <select 
+                                    value={overviewEventFilter} 
+                                    onChange={(e) => setOverviewEventFilter(e.target.value)}
+                                    style={{ background: 'transparent', color: '#f8fafc', border: '1px solid rgba(255,255,255,0.2)', padding: '8px 12px', borderRadius: '8px', outline: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: 600 }}
+                                >
+                                    <option value="all" style={{ color: '#000' }}>Visão Geral (Todos os Eventos)</option>
+                                    {events.map(ev => (
+                                        <option key={ev.id} value={ev.id} style={{ color: '#000' }}>{ev.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
                         <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '32px' }}>
                     {/* Inscritos */}
                     <div style={{ background: 'linear-gradient(135deg, rgba(56,189,248,0.1) 0%, rgba(14,165,233,0.05) 100%)', border: '1px solid rgba(56,189,248,0.2)', borderRadius: '16px', padding: '24px', position: 'relative', overflow: 'hidden', backdropFilter: 'blur(12px)', transition: 'transform 0.2s', cursor: 'default' }}>
@@ -5332,7 +6087,7 @@ const PainelDeControle = () => {
                             </div>
                             <div style={{ color: '#94a3b8', fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{copy.stats.enrolled}</div>
                         </div>
-                        <div style={{ fontSize: '36px', fontWeight: 800, color: '#f8fafc', marginBottom: '8px', lineHeight: 1 }}>{athletes.length}</div>
+                        <div style={{ fontSize: '36px', fontWeight: 800, color: '#f8fafc', marginBottom: '8px', lineHeight: 1 }}>{totals.enrolledAthletes}</div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#38bdf8', fontSize: '13px', fontWeight: 500 }}>
                             <TrendingUp size={14} />
                             <span>{totals.activeAthletes} {copy.stats.activeTrend}</span>
@@ -5388,6 +6143,37 @@ const PainelDeControle = () => {
                             <span>{copy.stats.average} {totals.averagePoints} pts</span>
                         </div>
                     </div>
+                    {/* Vagas do Evento */}
+                    {(() => {
+                        const displayEvent = overviewEventFilter === 'all' ? activeEvent : events.find(e => String(e.id) === String(overviewEventFilter));
+                        if (!displayEvent || !displayEvent.maxAthletes || Number(displayEvent.maxAthletes) <= 0) return null;
+                        const occupied = athletes.filter(a => String(a.eventId) === String(displayEvent.id)).length;
+                        const max = Number(displayEvent.maxAthletes);
+                        const percent = Math.min(100, (occupied / max) * 100);
+                        const isFull = occupied >= max;
+                        return (
+                            <div style={{ background: 'linear-gradient(135deg, rgba(239,68,68,0.1) 0%, rgba(220,38,38,0.05) 100%)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '16px', padding: '24px', position: 'relative', overflow: 'hidden', backdropFilter: 'blur(12px)', transition: 'transform 0.2s', cursor: 'default' }}>
+                                <div style={{ position: 'absolute', top: '-10%', right: '-10%', width: '100px', height: '100px', background: 'rgba(239,68,68,0.1)', borderRadius: '50%', filter: 'blur(30px)' }}></div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                                    <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(239,68,68,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444' }}>
+                                        <Users size={20} />
+                                    </div>
+                                    <div style={{ color: '#94a3b8', fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Vagas do Evento</div>
+                                </div>
+                                <div style={{ fontSize: '36px', fontWeight: 800, color: '#f8fafc', marginBottom: '8px', lineHeight: 1 }}>
+                                    {Math.min(occupied, max)} / {max}
+                                </div>
+                                <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden', marginBottom: '8px' }}>
+                                    <div style={{ width: `${percent}%`, height: '100%', background: isFull ? '#ef4444' : '#38bdf8', transition: 'width 0.5s ease' }}></div>
+                                </div>
+                                {isFull && (
+                                    <div style={{ fontSize: '12px', color: '#ef4444', fontWeight: 700, textAlign: 'center' }}>
+                                        LOTAÇÃO MÁXIMA ATINGIDA
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })()}
                 </section>
                 {/* INÍCIO NOVOS WIDGETS TECNOLÓGICOS */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '24px', marginBottom: '32px' }}>
@@ -5745,6 +6531,16 @@ const PainelDeControle = () => {
                                     <option key={event.id} value={event.id}>{event.name}</option>
                                 ))}
                             </select>
+                            <select
+                                className="input select-compact"
+                                value={registrationCheckInFilter}
+                                onChange={(event) => setRegistrationCheckInFilter(event.target.value)}
+                                style={{ background: '#18181b', color: '#fff', border: '1px solid #27272a' }}
+                            >
+                                <option value="all">Filtro Check-in (Todos)</option>
+                                <option value="checked">✓ Checked-in (Presentes)</option>
+                                <option value="pending">🔳 Sem Check-in (Pendentes)</option>
+                            </select>
                             <button
                                 type="button"
                                 className="btn btn-secondary"
@@ -5861,7 +6657,18 @@ const PainelDeControle = () => {
                                                 )}
                                             </div>
                                             <div className="registration-card__profile">
-                                                <div className="registration-card__name">{item.nome}</div>
+                                                <div className="registration-card__name" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                    <span>{item.nome}</span>
+                                                    {item.checkedIn ? (
+                                                        <span style={{ background: 'rgba(34, 197, 94, 0.2)', color: '#22c55e', fontSize: '10px', fontWeight: 800, padding: '2px 8px', borderRadius: '12px', border: '1px solid rgba(34,197,94,0.3)' }}>
+                                                            ✓ CHECK-IN OK
+                                                        </span>
+                                                    ) : (
+                                                        <span style={{ background: 'rgba(148, 163, 184, 0.1)', color: '#94a3b8', fontSize: '10px', fontWeight: 600, padding: '2px 8px', borderRadius: '12px', border: '1px solid rgba(148, 163, 184, 0.2)' }}>
+                                                            SEM CHECK-IN
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <div className="registration-card__academy">{item.academia || copy.modalAssign.noAcademy}</div>
                                                 
                                                 <div className="registration-card__pipeline" role="list" aria-label={copy.registrationsPanel.tablePipeline}>
@@ -5962,23 +6769,54 @@ const PainelDeControle = () => {
                                             )}
                                             
                                             {!item.isPendingSync && canManagePanel && (
-                                                <div className="registration-card__actions">
+                                                <div className="registration-card__actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
                                                     <button
                                                         type="button"
-                                                        className="btn btn-secondary"
-                                                        onClick={() => handleUpdateRegistrationPaymentStatus(item, REGISTRATION_STATUS.PAYMENT_CONFIRMED)}
-                                                        disabled={registrationStatusUpdatingId === item.id || item.isPaymentConfirmed}
+                                                        className={`btn ${item.checkedIn ? 'btn-success' : 'btn-primary'}`}
+                                                        style={{
+                                                            background: item.checkedIn ? 'rgba(34, 197, 94, 0.2)' : 'var(--brand-primary, #00c2cb)',
+                                                            color: item.checkedIn ? '#22c55e' : '#000',
+                                                            border: item.checkedIn ? '1px solid #22c55e' : 'none',
+                                                            fontWeight: 700,
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: '6px'
+                                                        }}
+                                                        onClick={() => handleToggleCheckIn(item)}
+                                                        disabled={registrationStatusUpdatingId === item.id}
                                                     >
-                                                        <CheckCircle2 size={14} /> Confirmar
+                                                        <CheckCircle2 size={14} />
+                                                        {item.checkedIn ? 'Checked-in ✓' : 'Fazer Check-in'}
                                                     </button>
                                                     <button
                                                         type="button"
                                                         className="btn btn-secondary"
-                                                        onClick={() => handleUpdateRegistrationPaymentStatus(item, REGISTRATION_STATUS.PAYMENT_ERROR)}
-                                                        disabled={registrationStatusUpdatingId === item.id || item.isPaymentError}
+                                                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#38bdf8' }}
+                                                        onClick={() => handleOpenEditRegistrationModal(item)}
+                                                        title="Editar Inscrição / Categoria"
                                                     >
-                                                        <AlertCircle size={14} /> Erro
+                                                        <Pencil size={14} /> Editar
                                                     </button>
+                                                    {!item.isPaymentConfirmed && (
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-secondary"
+                                                            onClick={() => handleUpdateRegistrationPaymentStatus(item, REGISTRATION_STATUS.PAYMENT_CONFIRMED)}
+                                                            disabled={registrationStatusUpdatingId === item.id}
+                                                        >
+                                                            <CheckCircle2 size={14} /> Confirmar Pago
+                                                        </button>
+                                                    )}
+                                                    {!item.isPaymentError && (
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-secondary"
+                                                            onClick={() => handleUpdateRegistrationPaymentStatus(item, REGISTRATION_STATUS.PAYMENT_ERROR)}
+                                                            disabled={registrationStatusUpdatingId === item.id}
+                                                        >
+                                                            <AlertCircle size={14} /> Erro Pago
+                                                        </button>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>
@@ -6033,6 +6871,17 @@ const PainelDeControle = () => {
                                 >
                                     <ClipboardList size={14} />
                                     {copy.bracketsPanel.generate}
+                                </button>
+                            )}
+                            {canManagePanel && (
+                                <button
+                                    type="button"
+                                    className="btn btn-primary"
+                                    onClick={handlePublishBrackets}
+                                    disabled={!orderedFilteredBrackets.length}
+                                >
+                                    <CheckCircle2 size={14} />
+                                    {copy.bracketsPanel.publish}
                                 </button>
                             )}
                             <button
@@ -6184,7 +7033,7 @@ const PainelDeControle = () => {
                                 .map((id) => athleteMap.get(id))
                                 .filter(Boolean);
                             const matches = bracketAthletes.length
-                                ? buildBracketMatches(bracket.seedIds || [], bracket.size || 0)
+                                ? buildBracketMatches(bracket.seedIds || [], bracket.size || 0, null, true)
                                 : [];
                             const eventLabel = eventMap[bracket.eventId]?.name || copy.common.noEvent;
                             const applied = Boolean(bracket.appliedAt);
@@ -6206,7 +7055,23 @@ const PainelDeControle = () => {
                                         </div>
                                         <div className="bracket-tags">
                                             <span className="tag">{bracket.mode || 'GI'}</span>
+                                            {(bracket.isPublished || bracket.published) && (
+                                                <span className="tag bracket-tag--published" style={{ background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', border: '1px solid rgba(34, 197, 94, 0.3)', fontWeight: 600 }}>
+                                                    {isEnglish ? 'Published (Locked)' : 'Publicada (Mantida)'}
+                                                </span>
+                                            )}
                                             {applied && <span className="tag bracket-tag--applied">{copy.bracketsPanel.applied}</span>}
+                                            {canManagePanel && (
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-ghost btn-sm"
+                                                    style={{ color: '#ef4444', padding: '0 8px', minHeight: '24px', height: '24px' }}
+                                                    onClick={() => handleDeleteBracket(bracket.id)}
+                                                    title={isEnglish ? 'Delete Bracket' : 'Excluir Chave'}
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                     <div className="bracket-card__meta">
@@ -6215,19 +7080,42 @@ const PainelDeControle = () => {
                                     <div className="bracket-grid">
                                         <div className="bracket-matches">
                                             <div className="bracket-section-title">{copy.bracketsPanel.round1}</div>
-                                            {matches.map((match, index) => {
-                                                const athleteA = match.slotA ? athleteMap.get(match.slotA) : null;
-                                                const athleteB = match.slotB ? athleteMap.get(match.slotB) : null;
+                                            {matches
+                                                .filter(match => match.stage === matches[0]?.stage) // Only first round
+                                                .filter(match => match.slotA || match.slotB) // Must have at least one slot
+                                                .map((match, index) => {
+                                                const athleteA = match.slotA && !match.slotA.startsWith('__') ? athleteMap.get(match.slotA) : null;
+                                                const athleteB = match.slotB && !match.slotB.startsWith('__') ? athleteMap.get(match.slotB) : null;
+                                                
+                                                // If both resolved to null (or 'BYE'), and it's an empty match, skip it completely
+                                                if (!athleteA && !athleteB) return null;
+                                                
                                                 return (
                                                     <div key={match.id} className="bracket-match">
-                                                        <span className="bracket-seed">
+                                                        <span 
+                                                            className={`bracket-seed ${dragSeedContext.bracketId === bracket.id && dragSeedContext.athleteId === athleteA?.id ? 'is-dragging' : ''}`}
+                                                            draggable={!!athleteA}
+                                                            onDragStart={(event) => athleteA && handleSeedDragStart(event, bracket.id, athleteA.id)}
+                                                            onDragOver={(event) => event.preventDefault()}
+                                                            onDrop={(event) => athleteA && handleMatchSeedDrop(event, bracket, athleteA.id)}
+                                                            onDragEnd={handleSeedDragEnd}
+                                                            style={{ cursor: athleteA ? 'grab' : 'default' }}
+                                                        >
                                                             <span className="bracket-seed__name">{athleteA?.nome || 'BYE'}</span>
                                                             {athleteA?.academia && (
                                                                 <span className="bracket-seed__academy">{athleteA.academia}</span>
                                                             )}
                                                         </span>
                                                         <span className="bracket-vs">vs</span>
-                                                        <span className="bracket-seed">
+                                                        <span 
+                                                            className={`bracket-seed ${dragSeedContext.bracketId === bracket.id && dragSeedContext.athleteId === athleteB?.id ? 'is-dragging' : ''}`}
+                                                            draggable={!!athleteB}
+                                                            onDragStart={(event) => athleteB && handleSeedDragStart(event, bracket.id, athleteB.id)}
+                                                            onDragOver={(event) => event.preventDefault()}
+                                                            onDrop={(event) => athleteB && handleMatchSeedDrop(event, bracket, athleteB.id)}
+                                                            onDragEnd={handleSeedDragEnd}
+                                                            style={{ cursor: athleteB ? 'grab' : 'default' }}
+                                                        >
                                                             <span className="bracket-seed__name">{athleteB?.nome || 'BYE'}</span>
                                                             {athleteB?.academia && (
                                                                 <span className="bracket-seed__academy">{athleteB.academia}</span>
@@ -6265,65 +7153,6 @@ const PainelDeControle = () => {
                                                 </div>
                                             )}
                                         </div>
-                                        <div className="bracket-podium">
-                                            <div className="bracket-section-title">{copy.bracketsPanel.podium}</div>
-                                            <label className="bracket-field">
-                                                <span>{copy.bracketsPanel.firstPlace}</span>
-                                                <select
-                                                    className="input bracket-select"
-                                                    value={bracket.podium?.goldId || ''}
-                                                    onChange={(event) => setBracketPodium(bracket.id, { goldId: event.target.value })}
-                                                    disabled={bracketAthletes.length === 0}
-                                                >
-                                                    <option value="">{copy.bracketsPanel.selectAthlete}</option>
-                                                    {bracketAthletes.map((athlete) => (
-                                                        <option key={athlete.id} value={athlete.id}>
-                                                            {athlete.academia ? `${athlete.nome} - ${athlete.academia}` : athlete.nome}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            </label>
-                                            <label className="bracket-field">
-                                                <span>{copy.bracketsPanel.secondPlace}</span>
-                                                <select
-                                                    className="input bracket-select"
-                                                    value={bracket.podium?.silverId || ''}
-                                                    onChange={(event) => setBracketPodium(bracket.id, { silverId: event.target.value })}
-                                                    disabled={bracketAthletes.length < 2}
-                                                >
-                                                    <option value="">{copy.bracketsPanel.selectAthlete}</option>
-                                                    {bracketAthletes.map((athlete) => (
-                                                        <option key={athlete.id} value={athlete.id}>
-                                                            {athlete.academia ? `${athlete.nome} - ${athlete.academia}` : athlete.nome}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            </label>
-                                            <label className="bracket-field">
-                                                <span>{copy.bracketsPanel.thirdPlace}</span>
-                                                <select
-                                                    className="input bracket-select"
-                                                    value={bracket.podium?.bronzeId || ''}
-                                                    onChange={(event) => setBracketPodium(bracket.id, { bronzeId: event.target.value })}
-                                                    disabled={bracketAthletes.length < 3}
-                                                >
-                                                    <option value="">{copy.bracketsPanel.selectAthlete}</option>
-                                                    {bracketAthletes.map((athlete) => (
-                                                        <option key={athlete.id} value={athlete.id}>
-                                                            {athlete.academia ? `${athlete.nome} - ${athlete.academia}` : athlete.nome}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            </label>
-                                            <button
-                                                type="button"
-                                                className="btn btn-primary bracket-apply"
-                                                onClick={() => handleApplyBracketPodium(bracket.id)}
-                                                disabled={bracketAthletes.length === 0}
-                                            >
-                                                {applied ? copy.bracketsPanel.reapply : copy.bracketsPanel.apply}
-                                            </button>
-                                        </div>
                                     </div>
                                 </div>
                             );
@@ -6355,6 +7184,15 @@ const PainelDeControle = () => {
                                     ))}
                                 </select>
                             )}
+                            <button
+                                type="button"
+                                className="btn btn-secondary"
+                                onClick={handleAutoGenerateSchedule}
+                                disabled={!scheduleEventId}
+                            >
+                                <Sparkles size={14} />
+                                {isEnglish ? 'Auto-Generate' : 'Gerar Cronograma'}
+                            </button>
                             <button
                                 type="button"
                                 className="btn btn-primary"
@@ -6999,10 +7837,30 @@ const PainelDeControle = () => {
                         )}
                     </div>
                     <div className="action-grid">
-                        <div className="action-card">
-                            <strong>{copy.automation.importFile}</strong>
-                            <span>{copy.automation.importFileDesc}</span>
-                            <div className="action-card__footer">
+                        <div className="action-card cyber-card" style={{ gridColumn: 'span 2' }}>
+                            <strong>{copy.automation.importFile} (Inscrições)</strong>
+                            <span>Selecione o evento e o PDF para importar atletas direto para as inscrições.</span>
+                            <div style={{ marginTop: '12px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <select 
+                                    className="input" 
+                                    style={{ flex: 1 }}
+                                    value={importEventId} 
+                                    onChange={(event) => setImportEventId(event.target.value)}
+                                >
+                                    <option value="">Selecione um evento...</option>
+                                    {events.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                                </select>
+                                <select 
+                                    className="input" 
+                                    style={{ width: '100px' }}
+                                    value={importMode} 
+                                    onChange={(event) => setImportMode(event.target.value)}
+                                >
+                                    <option value="GI">GI</option>
+                                    <option value="NO-GI">NO-GI</option>
+                                </select>
+                            </div>
+                            <div className="action-card__footer" style={{ marginTop: '12px' }}>
                                 <button type="button" className="btn btn-ghost" onClick={handleImportRanking}>
                                     <Upload size={14} />
                                     {copy.automation.select}
@@ -7354,7 +8212,10 @@ const PainelDeControle = () => {
                                             {log.type}
                                         </span>
                                         <div>
-                                            <strong>{translateLogAction(log.action)}</strong>
+                                            <strong>
+                                                {translateLogAction(log.action)}
+                                                {log.user && <span style={{ marginLeft: '8px', fontSize: '0.85em', color: '#94a3b8', fontWeight: 'normal' }}>por @{log.user}</span>}
+                                            </strong>
                                             <div className="table-meta">{translateLogDetails(log.details)}</div>
                                         </div>
                                     </div>
@@ -7597,7 +8458,10 @@ const PainelDeControle = () => {
                                                 {log.type}
                                             </span>
                                             <div>
-                                                <strong>{translateLogAction(log.action)}</strong>
+                                                <strong>
+                                                    {translateLogAction(log.action)}
+                                                    {log.user && <span style={{ marginLeft: '8px', fontSize: '0.85em', color: '#94a3b8', fontWeight: 'normal' }}>por @{log.user}</span>}
+                                                </strong>
                                                 <div className="table-meta">{translateLogDetails(log.details)}</div>
                                             </div>
                                         </div>
@@ -7626,12 +8490,13 @@ const PainelDeControle = () => {
                             exit={{ opacity: 0, y: 12 }}
                             style={{ padding: 0 }}
                         >
-                            <div className="modal-panel" style={{ padding: 0, overflow: 'hidden', width: '100vw', height: '100vh', maxWidth: '100vw', maxHeight: '100vh', borderRadius: 0 }}>
+                            <div className="modal-panel" style={{ padding: 0, overflow: 'hidden', width: '100vw', height: '100vh', maxWidth: '100vw', maxHeight: '100vh', borderRadius: 0, display: 'flex', flexDirection: 'column', background: '#0b1120' }}>
                                 {/* ── Header ─────────────────────────────────── */}
                                 <div style={{
+                                    flexShrink: 0,
                                     background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
                                     borderBottom: '1px solid rgba(255,255,255,0.08)',
-                                    padding: '32px 40px 0 40px',
+                                    padding: '24px 40px 0 40px',
                                 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
                                         <div>
@@ -7691,16 +8556,19 @@ const PainelDeControle = () => {
                                     </div>
                                 )}
 
-                                <form onSubmit={handleUpdateEvent}>
-                                    <div style={{ padding: '32px 40px', minHeight: '520px', maxHeight: '65vh', overflowY: 'auto' }}>
+                                <form onSubmit={handleUpdateEvent} style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+                                    <div style={{ flex: 1, padding: '24px 40px', overflowY: 'auto' }}>
 
                                         {/* ── TAB 1: Informações Básicas ──────── */}
                                         {eventModalTab === 'info' && (
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                                                 <div>
-                                                    <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px', display: 'block', color: '#94a3b8' }}>
+                                                    <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>
                                                         NOME DO EVENTO *
                                                     </label>
+                                                    <span style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '8px' }}>
+                                                        Nome oficial do campeonato exibido aos atletas, inscrições e certificados.
+                                                    </span>
                                                     <input
                                                         className="input"
                                                         type="text"
@@ -7714,9 +8582,12 @@ const PainelDeControle = () => {
 
                                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                                                     <div>
-                                                        <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px', display: 'block', color: '#94a3b8' }}>
+                                                        <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>
                                                             DATA DO EVENTO
                                                         </label>
+                                                        <span style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '8px' }}>
+                                                            Data oficial de realização das lutas.
+                                                        </span>
                                                         <input
                                                             className="input"
                                                             type="date"
@@ -7726,9 +8597,12 @@ const PainelDeControle = () => {
                                                         />
                                                     </div>
                                                     <div>
-                                                        <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px', display: 'block', color: '#94a3b8' }}>
+                                                        <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>
                                                             LOCAL / ARENA
                                                         </label>
+                                                        <span style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '8px' }}>
+                                                            Nome do ginásio, centro esportivo ou endereço completo.
+                                                        </span>
                                                         <input
                                                             className="input"
                                                             type="text"
@@ -7740,10 +8614,31 @@ const PainelDeControle = () => {
                                                     </div>
                                                 </div>
 
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px', padding: '16px', background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.2)', borderRadius: '10px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            id="isPremiumCheckbox"
+                                                            checked={eventEditForm.isPremium || false}
+                                                            onChange={(e) => setEventEditForm({ ...eventEditForm, isPremium: e.target.checked })}
+                                                            style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#eab308' }}
+                                                        />
+                                                        <label htmlFor="isPremiumCheckbox" style={{ fontSize: '14px', fontWeight: 700, color: '#fef08a', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                            <span>Evento Premium / Destaque Especial na Página Inicial</span>
+                                                        </label>
+                                                    </div>
+                                                    <span style={{ fontSize: '12px', color: '#fef08acc', marginLeft: '28px' }}>
+                                                        Ao ativar, este evento fica em destaque principal no topo da página inicial do site para atração máxima de inscritos.
+                                                    </span>
+                                                </div>
+
                                                 <div>
-                                                    <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px', display: 'block', color: '#94a3b8' }}>
+                                                    <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>
                                                         DESCRIÇÃO DO EVENTO (Informações Gerais)
                                                     </label>
+                                                    <span style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '8px' }}>
+                                                        Detalhes do evento: horários de abertura de portões, regras oficiais da federação, premiações e orientações gerais.
+                                                    </span>
                                                     <textarea
                                                         className="input"
                                                         rows="4"
@@ -7754,10 +8649,64 @@ const PainelDeControle = () => {
                                                     ></textarea>
                                                 </div>
 
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                                                    <div>
+                                                        <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>
+                                                            WEBSITE (Opcional)
+                                                        </label>
+                                                        <span style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '8px' }}>
+                                                            Link do site oficial da organização.
+                                                        </span>
+                                                        <input
+                                                            className="input"
+                                                            type="url"
+                                                            value={eventEditForm.eventSocialWebsite || ''}
+                                                            onChange={(event) => setEventEditForm({ ...eventEditForm, eventSocialWebsite: event.target.value })}
+                                                            placeholder="https://..."
+                                                            style={{ fontSize: '15px' }}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>
+                                                            WHATSAPP (Opcional)
+                                                        </label>
+                                                        <span style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '8px' }}>
+                                                            Contato de suporte aos atletas (com DDD).
+                                                        </span>
+                                                        <input
+                                                            className="input"
+                                                            type="text"
+                                                            value={eventEditForm.eventSocialWhatsapp || ''}
+                                                            onChange={(event) => setEventEditForm({ ...eventEditForm, eventSocialWhatsapp: event.target.value })}
+                                                            placeholder="Ex: 11999999999"
+                                                            style={{ fontSize: '15px' }}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>
+                                                            INSTAGRAM (Opcional)
+                                                        </label>
+                                                        <span style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '8px' }}>
+                                                            Perfil oficial no Instagram.
+                                                        </span>
+                                                        <input
+                                                            className="input"
+                                                            type="url"
+                                                            value={eventEditForm.eventSocialInstagram || ''}
+                                                            onChange={(event) => setEventEditForm({ ...eventEditForm, eventSocialInstagram: event.target.value })}
+                                                            placeholder="https://instagram.com/..."
+                                                            style={{ fontSize: '15px' }}
+                                                        />
+                                                    </div>
+                                                </div>
+
                                                 <div>
-                                                    <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px', display: 'block', color: '#94a3b8' }}>
+                                                    <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>
                                                         LOCAL NO MAPA (URL Iframe do Google Maps - opcional)
                                                     </label>
+                                                    <span style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '8px' }}>
+                                                        Link de incorporação (embed iframe) gerado no Google Maps para exibir o mapa interativo na página do evento.
+                                                    </span>
                                                     <input
                                                         className="input"
                                                         type="text"
@@ -7781,9 +8730,12 @@ const PainelDeControle = () => {
                                                 </div>
 
                                                 <div>
-                                                    <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px', display: 'block', color: '#94a3b8' }}>
+                                                    <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '2px', display: 'block', color: '#94a3b8' }}>
                                                         ENVIAR ARQUIVO DO CARTAZ
                                                     </label>
+                                                    <span style={{ fontSize: '12px', color: '#38bdf8', display: 'block', marginBottom: '8px', fontWeight: 500 }}>
+                                                        💡 Dica: A proporção recomendada é 3:1 (ex: 1200x400px) para o cartaz horizontal.
+                                                    </span>
                                                     <input
                                                         className="input"
                                                         type="file"
@@ -7884,9 +8836,12 @@ const PainelDeControle = () => {
                                                 {/* External registration URL (only when not internal) */}
                                                 {!eventEditForm.internalRegistration && (
                                                     <div>
-                                                        <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px', display: 'block', color: '#94a3b8' }}>
+                                                        <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>
                                                             URL DE INSCRIÇÃO EXTERNA (obrigatório se modo externo)
                                                         </label>
+                                                        <span style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '8px' }}>
+                                                            Link do sistema externo para onde os atletas serão redirecionados para se inscrever.
+                                                        </span>
                                                         <input
                                                             className="input"
                                                             type="text"
@@ -7897,11 +8852,47 @@ const PainelDeControle = () => {
                                                     </div>
                                                 )}
 
+                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                                    <div>
+                                                        <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>
+                                                            DATA LIMITE P/ INSCRIÇÃO
+                                                        </label>
+                                                        <span style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '8px' }}>
+                                                            Data final limite em que o sistema aceitará novas inscrições.
+                                                        </span>
+                                                        <input
+                                                            className="input"
+                                                            type="date"
+                                                            value={eventEditForm.registrationCloseDate || ''}
+                                                            onChange={(event) => setEventEditForm({ ...eventEditForm, registrationCloseDate: event.target.value })}
+                                                            style={{ fontSize: '15px' }}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>
+                                                            DATA LIMITE P/ CHECK-IN
+                                                        </label>
+                                                        <span style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '8px' }}>
+                                                            Após esta data, os atletas não conseguirão mais fazer check-in ou trocar de categoria pelo perfil.
+                                                        </span>
+                                                        <input
+                                                            className="input"
+                                                            type="date"
+                                                            value={eventEditForm.checkinEndDate || ''}
+                                                            onChange={(event) => setEventEditForm({ ...eventEditForm, checkinEndDate: event.target.value })}
+                                                            style={{ fontSize: '15px' }}
+                                                        />
+                                                    </div>
+                                                </div>
+
                                                 {/* PIX Key */}
                                                 <div>
-                                                    <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px', display: 'block', color: '#94a3b8' }}>
+                                                    <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>
                                                         CHAVE PIX (responsável pelo campeonato) *
                                                     </label>
+                                                    <span style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '8px' }}>
+                                                        Chave PIX bancária da organização que receberá os pagamentos dos inscritos.
+                                                    </span>
                                                     <input
                                                         className="input"
                                                         type="text"
@@ -7917,49 +8908,108 @@ const PainelDeControle = () => {
                                                 <div>
                                                     <div style={{ fontSize: '12px', fontWeight: 700, color: '#94a3b8', marginBottom: '14px', letterSpacing: '0.08em' }}>
                                                         TABELA DE TAXAS DE INSCRIÇÃO (R$)
+                                                        {(() => {
+                                                            const active = resolveCurrentEventBatch(eventEditForm, new Date());
+                                                            if (active) return <span style={{ color: 'var(--brand-primary,#00c2cb)', marginLeft: '8px', fontWeight: 400 }}>— Lote Atual: {active.name || 'Ativo'}</span>;
+                                                            return null;
+                                                        })()}
                                                     </div>
+
                                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px' }}>
-                                                        {[
-                                                            { label: 'Sub-15 (até 14 anos)', key: 'feeUnder15', emoji: '🧒', color: '#3b82f6' },
-                                                            { label: 'Adulto (15+ anos)', key: 'feeOver15', emoji: '🥋', color: '#00c2cb' },
-                                                            { label: 'Combo (Gi + No-Gi)', key: 'feeCombo', emoji: '🎯', color: '#f59e0b' },
-                                                            { label: 'Absoluto (+valor base)', key: 'feeAbsolute', emoji: '🏆', color: '#a78bfa' },
-                                                        ].map(fee => (
-                                                            <div key={fee.key} style={{
-                                                                background: `${fee.color}11`,
-                                                                border: `1px solid ${fee.color}33`,
-                                                                borderRadius: '12px',
-                                                                padding: '16px',
-                                                            }}>
-                                                                <div style={{ fontSize: '20px', marginBottom: '8px' }}>{fee.emoji}</div>
-                                                                <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '10px', lineHeight: 1.4, fontWeight: 600 }}>
-                                                                    {fee.label}
-                                                                </div>
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                                    <span style={{ color: '#64748b', fontSize: '13px', fontWeight: 700 }}>R$</span>
-                                                                    <input
-                                                                        className="input"
-                                                                        type="number"
-                                                                        min="0"
-                                                                        step="0.01"
-                                                                        value={eventEditForm[fee.key]}
-                                                                        onChange={(event) => setEventEditForm({ ...eventEditForm, [fee.key]: event.target.value })}
-                                                                        required
-                                                                        style={{
-                                                                            fontSize: '20px',
-                                                                            fontWeight: 800,
-                                                                            color: fee.color,
-                                                                            background: 'transparent',
-                                                                            border: 'none',
-                                                                            borderBottom: `2px solid ${fee.color}55`,
-                                                                            borderRadius: '0',
-                                                                            padding: '4px 0',
-                                                                            width: '100%',
-                                                                        }}
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                        ))}
+                                                        {(() => {
+                                                            const activeBatch = resolveCurrentEventBatch(eventEditForm, new Date());
+                                                            const activeBatchIndex = activeBatch ? (eventEditForm.batches || []).findIndex(b => b === activeBatch) : -1;
+                                                            return [
+                                                                { label: 'Sub-15 (até 14 anos)', key: 'feeUnder15', emoji: '🧒', color: '#3b82f6' },
+                                                                { label: 'Adulto (15+ anos)', key: 'feeOver15', emoji: '🥋', color: '#00c2cb' },
+                                                                { label: 'Combo (Gi + No-Gi)', key: 'feeCombo', emoji: '🎯', color: '#f59e0b' },
+                                                                { label: 'Absoluto (+valor base)', key: 'feeAbsolute', emoji: '🏆', color: '#a78bfa' },
+                                                            ].map(fee => {
+                                                                const isNoGiFee = fee.key === 'feeCombo';
+                                                                const isAbsoluteFee = fee.key === 'feeAbsolute';
+                                                                const isEnabled = isNoGiFee
+                                                                    ? eventEditForm.noGiEnabled !== false
+                                                                    : isAbsoluteFee
+                                                                        ? eventEditForm.absoluteEnabled !== false
+                                                                        : true;
+                                                                const cardColor = isEnabled ? fee.color : '#71717a';
+
+                                                                return (
+                                                                    <div key={fee.key} style={{
+                                                                        background: isEnabled ? `${fee.color}11` : 'rgba(255, 255, 255, 0.02)',
+                                                                        border: `1px solid ${isEnabled ? `${fee.color}44` : '#27272a'}`,
+                                                                        borderRadius: '12px',
+                                                                        padding: '16px',
+                                                                        opacity: isEnabled ? 1 : 0.45,
+                                                                        transition: 'all 0.2s ease'
+                                                                    }}>
+                                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                                                            <div style={{ fontSize: '20px' }}>{fee.emoji}</div>
+                                                                            {isNoGiFee && (
+                                                                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: 700, color: isEnabled ? '#f59e0b' : '#71717a', cursor: 'pointer' }}>
+                                                                                    <input
+                                                                                        type="checkbox"
+                                                                                        checked={eventEditForm.noGiEnabled !== false}
+                                                                                        onChange={(e) => setEventEditForm({ ...eventEditForm, noGiEnabled: e.target.checked })}
+                                                                                        style={{ width: '14px', height: '14px', accentColor: '#f59e0b', cursor: 'pointer' }}
+                                                                                    />
+                                                                                    Ativo
+                                                                                </label>
+                                                                            )}
+                                                                            {isAbsoluteFee && (
+                                                                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: 700, color: isEnabled ? '#a78bfa' : '#71717a', cursor: 'pointer' }}>
+                                                                                    <input
+                                                                                        type="checkbox"
+                                                                                        checked={eventEditForm.absoluteEnabled !== false}
+                                                                                        onChange={(e) => setEventEditForm({ ...eventEditForm, absoluteEnabled: e.target.checked })}
+                                                                                        style={{ width: '14px', height: '14px', accentColor: '#a78bfa', cursor: 'pointer' }}
+                                                                                    />
+                                                                                    Ativo
+                                                                                </label>
+                                                                            )}
+                                                                        </div>
+                                                                        <div style={{ fontSize: '11px', color: isEnabled ? '#94a3b8' : '#71717a', marginBottom: '10px', lineHeight: 1.4, fontWeight: 600 }}>
+                                                                            {fee.label}
+                                                                            {!isEnabled && <span style={{ display: 'block', fontSize: '10px', color: '#ef4444', fontWeight: 700 }}>[Desativado]</span>}
+                                                                        </div>
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                            <span style={{ color: isEnabled ? '#64748b' : '#3f3f46', fontSize: '13px', fontWeight: 700 }}>R$</span>
+                                                                            <input
+                                                                                className="input"
+                                                                                type="number"
+                                                                                min="0"
+                                                                                step="0.01"
+                                                                                disabled={!isEnabled}
+                                                                                value={activeBatchIndex >= 0 && activeBatch ? (activeBatch[fee.key] ?? eventEditForm[fee.key] ?? '') : (eventEditForm[fee.key] ?? '')}
+                                                                                onChange={(event) => {
+                                                                                    const val = event.target.value;
+                                                                                    if (activeBatchIndex >= 0) {
+                                                                                        const newBatches = [...(eventEditForm.batches || [])];
+                                                                                        newBatches[activeBatchIndex] = { ...newBatches[activeBatchIndex], [fee.key]: val };
+                                                                                        setEventEditForm({ ...eventEditForm, batches: newBatches, [fee.key]: val });
+                                                                                    } else {
+                                                                                        setEventEditForm({ ...eventEditForm, [fee.key]: val });
+                                                                                    }
+                                                                                }}
+                                                                                required={isEnabled}
+                                                                                style={{
+                                                                                    fontSize: '20px',
+                                                                                    fontWeight: 800,
+                                                                                    color: cardColor,
+                                                                                    background: 'transparent',
+                                                                                    border: 'none',
+                                                                                    borderBottom: `2px solid ${isEnabled ? `${fee.color}55` : '#3f3f46'}`,
+                                                                                    borderRadius: '0',
+                                                                                    padding: '4px 0',
+                                                                                    width: '100%',
+                                                                                    cursor: isEnabled ? 'text' : 'not-allowed'
+                                                                                }}
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            });
+                                                        })()}
                                                     </div>
                                                 </div>
 
@@ -8145,31 +9195,51 @@ const PainelDeControle = () => {
                                         borderTop: '1px solid rgba(255,255,255,0.06)',
                                         background: 'rgba(0,0,0,0.2)',
                                     }}>
-                                        <button type="button" className="btn btn-danger" onClick={handleDeleteEvent}>
-                                            <Trash2 size={14} />
-                                            {copy.modalEventEdit.deleteEvent}
+                                        <button
+                                            type="button"
+                                            className="btn btn-danger"
+                                            onClick={handleDeleteEvent}
+                                            style={{
+                                                fontSize: '14px',
+                                                padding: '10px 22px',
+                                                borderRadius: '30px',
+                                                background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                                                color: '#fff',
+                                                border: 'none',
+                                                fontWeight: 700,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                cursor: 'pointer',
+                                                boxShadow: '0 4px 12px rgba(37,99,235,0.3)'
+                                            }}
+                                        >
+                                            <Trash2 size={16} />
+                                            {copy.modalEventEdit.deleteEvent || 'Apagar evento'}
                                         </button>
-                                        <div style={{ display: 'flex', gap: '10px' }}>
+                                        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                                             {eventModalTab !== 'info' && (
                                                 <button
                                                     type="button"
                                                     className="btn btn-ghost"
                                                     onClick={() => setEventModalTab(eventModalTab === 'documents' ? 'registration' : 'info')}
+                                                    style={{ fontSize: '15px', padding: '10px 18px' }}
                                                 >
                                                     ← Anterior
                                                 </button>
                                             )}
-                                            {eventModalTab !== 'documents' ? (
+                                            {eventModalTab !== 'documents' && (
                                                 <button
                                                     type="button"
                                                     className="btn btn-secondary"
                                                     onClick={() => setEventModalTab(eventModalTab === 'info' ? 'registration' : 'documents')}
+                                                    style={{ fontSize: '15px', padding: '10px 20px' }}
                                                 >
                                                     Próxima Aba →
                                                 </button>
-                                            ) : null}
-                                            <button type="submit" className="btn btn-primary" style={{ minWidth: '140px' }}>
-                                                {copy.modalEventEdit.saveChanges}
+                                            )}
+                                            <button type="submit" className="btn btn-primary" style={{ minWidth: '160px', fontSize: '15px', padding: '10px 24px', fontWeight: 800 }}>
+                                                {copy.modalEventEdit.saveChanges || 'Salvar alterações'}
                                             </button>
                                         </div>
                                     </div>
@@ -8246,15 +9316,55 @@ const PainelDeControle = () => {
                                                         onChange={(event) => setNewAthlete({ ...newAthlete, pais: event.target.value })}
                                                     />
                                                 </div>
-                                                <div style={{ gridColumn: '1 / -1' }}>
+                                                <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                                     <label className="table-meta">{copy.modalAthlete.photoUrl}</label>
-                                                    <input
-                                                        className="input"
-                                                        type="url"
-                                                        placeholder="https://..."
-                                                        value={newAthlete.photoUrl || ''}
-                                                        onChange={(event) => setNewAthlete({ ...newAthlete, photoUrl: event.target.value })}
-                                                    />
+                                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                                        <input
+                                                            className="input"
+                                                            type="url"
+                                                            style={{ flex: 1, minWidth: '200px' }}
+                                                            placeholder="https://... (ou envie uma foto do computador)"
+                                                            value={newAthlete.photoUrl || ''}
+                                                            onChange={(event) => setNewAthlete({ ...newAthlete, photoUrl: event.target.value })}
+                                                        />
+                                                        <label className="btn btn-ghost" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap', padding: '8px 14px', fontSize: '13px' }}>
+                                                            <Upload size={14} />
+                                                            {isEnglish ? 'Upload from PC' : 'Enviar do PC'}
+                                                            <input
+                                                                type="file"
+                                                                accept="image/*"
+                                                                style={{ display: 'none' }}
+                                                                onChange={(e) => {
+                                                                    const file = e.target.files?.[0];
+                                                                    if (!file) return;
+                                                                    const reader = new FileReader();
+                                                                    reader.onload = (ev) => {
+                                                                        if (ev.target?.result) {
+                                                                            setNewAthlete((prev) => ({ ...prev, photoUrl: ev.target.result }));
+                                                                        }
+                                                                    };
+                                                                    reader.readAsDataURL(file);
+                                                                }}
+                                                            />
+                                                        </label>
+                                                    </div>
+                                                    {newAthlete.photoUrl && (
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px' }}>
+                                                            <img
+                                                                src={newAthlete.photoUrl}
+                                                                alt="Preview"
+                                                                style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary-color)' }}
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-ghost"
+                                                                style={{ fontSize: '12px', color: '#ef4444', padding: '4px 8px' }}
+                                                                onClick={() => setNewAthlete((prev) => ({ ...prev, photoUrl: '' }))}
+                                                            >
+                                                                {isEnglish ? 'Remove photo' : 'Remover foto'}
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -8297,7 +9407,7 @@ const PainelDeControle = () => {
                                                         value={newAthlete.faixa}
                                                         onChange={(event) => setNewAthlete({ ...newAthlete, faixa: event.target.value })}
                                                     >
-                                                        {['Branca', 'Cinza', 'Laranja', 'Verde', 'Azul', 'Roxa', 'Marrom', 'Preta', 'Branca/Cinza'].map((faixa) => (
+                                                        {['Branca', 'Cinza', 'Amarela', 'Laranja', 'Verde', 'Azul', 'Roxa', 'Marrom', 'Preta'].map((faixa) => (
                                                             <option key={faixa} value={faixa}>{localizeBelt(faixa, faixa)}</option>
                                                         ))}
                                                     </select>
@@ -8337,40 +9447,52 @@ const PainelDeControle = () => {
                                                     </select>
                                                 </div>
                                                 <div>
-                                                    <label className="table-meta">{copy.modalAthlete.age}</label>
+                                                    <label className="table-meta">{isEnglish ? 'Birth Year / Age' : 'Ano de Nasc. / Idade'}</label>
                                                     <input
                                                         className="input"
                                                         type="number"
-                                                        min="0"
-                                                        placeholder={copy.modalAthlete.agePlaceholder}
-                                                        value={newAthlete.idade}
-                                                        onChange={(event) => setNewAthlete({ ...newAthlete, idade: event.target.value })}
+                                                        min="1940"
+                                                        max="2026"
+                                                        placeholder="Ex: 2015 ou 11"
+                                                        value={newAthlete.idade || ''}
+                                                        onChange={(event) => {
+                                                            const val = event.target.value;
+                                                            const autoCat = getCategoryFromBirthYearOrAge(val);
+                                                            setNewAthlete((prev) => ({
+                                                                ...prev,
+                                                                idade: val,
+                                                                categoria: autoCat || prev.categoria
+                                                            }));
+                                                        }}
                                                     />
+                                                </div>
+                                                <div>
+                                                    <label className="table-meta">{copy.modalAthlete.category}</label>
+                                                    <select
+                                                        className="input"
+                                                        value={newAthlete.categoria || ''}
+                                                        onChange={(event) => setNewAthlete({ ...newAthlete, categoria: event.target.value })}
+                                                    >
+                                                        <option value="">Selecione a categoria...</option>
+                                                        {['Pré-Mirim 4', 'Pré-Mirim 5', 'Pré-Mirim 6', 'Mirim 7', 'Mirim 8', 'Mirim 9', 'Infantil 10', 'Infantil 11', 'Infantil 12', 'Infanto-Juvenil 13', 'Infanto-Juvenil 14', 'Infanto-Juvenil 15', 'Juvenil 16', 'Juvenil 17', 'Adulto', 'Master 1', 'Master 2', 'Master 3', 'Master 4', 'Master 5', 'Master 6'].map((catOp) => (
+                                                            <option key={catOp} value={catOp}>{catOp}</option>
+                                                        ))}
+                                                    </select>
                                                 </div>
                                                 <div>
                                                     <label className="table-meta">{copy.modalAthlete.weight}</label>
                                                     <select
                                                         className="input"
-                                                        value={newAthlete.isAbsolute ? 'Absoluto' : newAthlete.peso}
+                                                        value={newAthlete.isAbsolute ? 'Absoluto' : (newAthlete.peso || '')}
                                                         disabled={newAthlete.isAbsolute}
                                                         onChange={(event) => setNewAthlete({ ...newAthlete, peso: event.target.value })}
                                                     >
                                                         <option value="">{copy.modalAthlete.selectWeight}</option>
                                                         {newAthlete.isAbsolute && <option value="Absoluto">{copy.modalAthlete.absoluteWeightPlaceholder}</option>}
-                                                        {['Galo', 'Pluma', 'Pena', 'Leve', 'Médio', 'Meio-Pesado', 'Pesado', 'Super-Pesado', 'Pesadíssimo'].map((pesoOp) => (
-                                                            <option key={pesoOp} value={pesoOp}>{pesoOp}</option>
+                                                        {getDynamicWeightOptions(newAthlete.categoria, newAthlete.genero, newAthlete.idade).map((opt) => (
+                                                            <option key={opt.label} value={opt.label}>{opt.label}</option>
                                                         ))}
                                                     </select>
-                                                </div>
-                                                <div>
-                                                    <label className="table-meta">{copy.modalAthlete.category}</label>
-                                                    <input
-                                                        className="input"
-                                                        type="text"
-                                                        placeholder={copy.modalAthlete.categoryPlaceholder}
-                                                        value={newAthlete.categoria}
-                                                        onChange={(event) => setNewAthlete({ ...newAthlete, categoria: event.target.value })}
-                                                    />
                                                 </div>
                                             </div>
                                         </div>
@@ -9106,6 +10228,182 @@ const PainelDeControle = () => {
                             </div>
                         </motion.div>
                     </>
+                )}
+            </AnimatePresence>
+            <AnimatePresence>
+                {showRouletteModal && (
+                    <>
+                        <motion.div
+                            className="modal-backdrop"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => !isRouletteSpinning && setShowRouletteModal(false)}
+                        />
+                        <motion.div
+                            className="modal-card roulette-modal"
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.9 }}
+                        >
+                            <div className="modal-panel modal-panel--wide" style={{ textAlign: 'center', padding: '3rem' }}>
+                                <div className="roulette-header">
+                                    <Zap size={32} className="roulette-icon" />
+                                    <h2>Sorteio Oficial</h2>
+                                    <p>Cole a lista de @nomes do Instagram abaixo (um por linha)</p>
+                                </div>
+                                {!rouletteWinner && !isRouletteSpinning && (
+                                    <textarea
+                                        className="input roulette-textarea"
+                                        placeholder="@joaobjj&#10;@mariasilva&#10;@carlosfight..."
+                                        value={rouletteInput}
+                                        onChange={(e) => setRouletteInput(e.target.value)}
+                                        rows={6}
+                                    />
+                                )}
+                                
+                                {isRouletteSpinning && (
+                                    <div className="roulette-display spinning">
+                                        <div className="roulette-name">{rouletteWinner}</div>
+                                    </div>
+                                )}
+
+                                {!isRouletteSpinning && rouletteWinner && (
+                                    <div className="roulette-display winner">
+                                        <div className="winner-label">🏆 VENCEDOR! 🏆</div>
+                                        <div className="roulette-name glow">{rouletteWinner}</div>
+                                    </div>
+                                )}
+
+                                <div className="form-actions" style={{ justifyContent: 'center', marginTop: '2rem' }}>
+                                    {!isRouletteSpinning && (
+                                        <button 
+                                            type="button" 
+                                            className="btn btn-ghost" 
+                                            onClick={() => setShowRouletteModal(false)}
+                                        >
+                                            Fechar
+                                        </button>
+                                    )}
+                                    <button 
+                                        type="button" 
+                                        className="btn btn-primary btn-spin" 
+                                        onClick={handleSpinRoulette}
+                                        disabled={isRouletteSpinning}
+                                    >
+                                        {isRouletteSpinning ? 'Sorteando...' : (rouletteWinner ? 'Sortear Novamente' : 'GIRAR ROLETA')}
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </>
+                )}
+            </AnimatePresence>
+
+            {/* MODAL DE EDIÇÃO DE INSCRIÇÃO / CHECK-IN */}
+            <AnimatePresence>
+                {editingRegistration && (
+                    <div className="modal-backdrop" onClick={() => setEditingRegistration(null)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+                        <div className="modal-card" style={{ maxWidth: '550px', width: '100%', background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+                            <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                                <h3 style={{ margin: 0, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.2rem' }}>
+                                    <Pencil size={20} style={{ color: '#38bdf8' }} />
+                                    Editar Inscrição de {editingRegistration.nome}
+                                </h3>
+                                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditingRegistration(null)} style={{ color: '#94a3b8' }}>
+                                    <X size={18} />
+                                </button>
+                            </div>
+                            <form onSubmit={handleSaveRegistrationDetails} style={{ padding: '24px' }}>
+                                <div style={{ marginBottom: '14px' }}>
+                                    <label className="table-meta" style={{ display: 'block', marginBottom: '6px' }}>Nome do Atleta *</label>
+                                    <input
+                                        type="text"
+                                        className="input"
+                                        required
+                                        value={editRegForm.nome}
+                                        onChange={e => setEditRegForm({ ...editRegForm, nome: e.target.value })}
+                                        style={{ width: '100%', padding: '10px 14px' }}
+                                    />
+                                </div>
+                                <div style={{ marginBottom: '14px' }}>
+                                    <label className="table-meta" style={{ display: 'block', marginBottom: '6px' }}>Academia / Equipe</label>
+                                    <input
+                                        type="text"
+                                        className="input"
+                                        value={editRegForm.academia}
+                                        onChange={e => setEditRegForm({ ...editRegForm, academia: e.target.value })}
+                                        style={{ width: '100%', padding: '10px 14px' }}
+                                    />
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+                                    <div>
+                                        <label className="table-meta" style={{ display: 'block', marginBottom: '6px' }}>Faixa / Graduação</label>
+                                        <input
+                                            type="text"
+                                            className="input"
+                                            value={editRegForm.faixa}
+                                            onChange={e => setEditRegForm({ ...editRegForm, faixa: e.target.value })}
+                                            style={{ width: '100%', padding: '10px 14px' }}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="table-meta" style={{ display: 'block', marginBottom: '6px' }}>Peso / Categoria de Peso</label>
+                                        <input
+                                            type="text"
+                                            className="input"
+                                            value={editRegForm.peso}
+                                            onChange={e => setEditRegForm({ ...editRegForm, peso: e.target.value })}
+                                            style={{ width: '100%', padding: '10px 14px' }}
+                                        />
+                                    </div>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+                                    <div>
+                                        <label className="table-meta" style={{ display: 'block', marginBottom: '6px' }}>Categoria (Ex: Adulto, Master)</label>
+                                        <input
+                                            type="text"
+                                            className="input"
+                                            value={editRegForm.categoria}
+                                            onChange={e => setEditRegForm({ ...editRegForm, categoria: e.target.value })}
+                                            style={{ width: '100%', padding: '10px 14px' }}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="table-meta" style={{ display: 'block', marginBottom: '6px' }}>Modalidade</label>
+                                        <select
+                                            className="select-pro"
+                                            value={editRegForm.modalidade}
+                                            onChange={e => setEditRegForm({ ...editRegForm, modalidade: e.target.value })}
+                                            style={{ width: '100%', padding: '10px 14px', background: '#18181b', color: '#fff', border: '1px solid #27272a', borderRadius: '8px' }}
+                                        >
+                                            <option value="GI">GI (Com Kimono)</option>
+                                            <option value="NO-GI">NO-GI (Sem Kimono)</option>
+                                            <option value="ABSOLUTO">ABSOLUTO</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div style={{ marginBottom: '20px' }}>
+                                    <label className="table-meta" style={{ display: 'block', marginBottom: '6px' }}>Status de Pagamento (Mercado Pago)</label>
+                                    <select
+                                        className="select-pro"
+                                        value={editRegForm.status}
+                                        onChange={e => setEditRegForm({ ...editRegForm, status: e.target.value })}
+                                        style={{ width: '100%', padding: '10px 14px', background: '#18181b', color: '#fff', border: '1px solid #27272a', borderRadius: '8px' }}
+                                    >
+                                        <option value="PAYMENT_CONFIRMED">✓ Confirmado (Pago via Mercado Pago)</option>
+                                        <option value="PENDING">⏳ Pendente de Pagamento</option>
+                                        <option value="PAYMENT_ERROR">❌ Erro no Pagamento</option>
+                                    </select>
+                                </div>
+
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '16px' }}>
+                                    <button type="button" className="btn btn-ghost" onClick={() => setEditingRegistration(null)}>Cancelar</button>
+                                    <button type="submit" className="btn btn-primary" disabled={registrationStatusUpdatingId === editingRegistration.id}>Salvar Alterações</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
                 )}
             </AnimatePresence>
         </div>

@@ -1,7 +1,7 @@
 import { authService } from './authService';
 import { resolveBatchFee } from '../utils/eventPricing';
 
-const ENV_API_BASE_URL = ("" || '').trim();
+const ENV_API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL || 'http://localhost:8080').trim();
 const API_BASE_URL = ENV_API_BASE_URL ? ENV_API_BASE_URL.replace(/\/$/, '') : '';
 
 const buildApiUrl = (path) => {
@@ -58,8 +58,14 @@ const normalizePayload = (payload = {}) => ({
   name: (payload.name || '').toString().trim(),
   date: (payload.date || '').toString().trim() || null,
   endDate: (payload.endDate || '').toString().trim() || null,
+  registrationCloseDate: (payload.registrationCloseDate || '').toString().trim() || null,
+  checkinEndDate: (payload.checkinEndDate || '').toString().trim() || null,
   location: (payload.location || '').toString().trim() || null,
+  isPremium: payload.isPremium === true,
   eventDescription: (payload.eventDescription || '').toString().trim() || null,
+  eventSocialWebsite: (payload.eventSocialWebsite || '').toString().trim() || null,
+  eventSocialWhatsapp: (payload.eventSocialWhatsapp || '').toString().trim() || null,
+  eventSocialInstagram: (payload.eventSocialInstagram || '').toString().trim() || null,
   accommodationEnabled: payload.accommodationEnabled === true,
   accommodationTitle: (payload.accommodationTitle || '').toString().trim() || null,
   accommodationDescription: (payload.accommodationDescription || '').toString().trim() || null,

@@ -56,7 +56,7 @@ export const seedSlotsWithRankingAwareByes = (seedIds = [], bracketSize = 0) => 
 
 export const buildBracketMatches = (seedIds, bracketSize, manualSlots = null, directOrder = false, matchResults = {}) => {
     const validSeeds = Array.isArray(seedIds) ? seedIds.filter(Boolean) : [];
-    if (!manualSlots && !directOrder && validSeeds.length === 3 && (!bracketSize || bracketSize <= 4)) {
+    if (!manualSlots && validSeeds.length === 3 && (!bracketSize || bracketSize <= 4)) {
         const A = validSeeds[0];
         const B = validSeeds[1];
         const C = validSeeds[2];

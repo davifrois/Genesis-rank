@@ -10,8 +10,8 @@ import br.com.genesis.ranking.model.enums.HistoryType;
 @Service
 public class ScoringService {
   public static final int WIN_POINTS = 0;
-  public static final int PODIUM_1ST = 3;
-  public static final int PODIUM_2ND = 2;
+  public static final int PODIUM_1ST = 9;
+  public static final int PODIUM_2ND = 3;
   public static final int PODIUM_3RD = 1;
 
   public int calculateTotalPoints(List<AthleteHistory> history) {

@@ -1,6 +1,7 @@
 package br.com.genesis.ranking.model;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -95,6 +96,33 @@ public class Event extends BaseEntity {
 
   @Column(columnDefinition = "boolean default true")
   private Boolean internalRegistration = true;
+
+  @Column(columnDefinition = "boolean default false")
+  private Boolean promotionExecuted = false;
+
+  private LocalDateTime checkinEndDate;
+
+  @Column(columnDefinition = "boolean default true")
+  private Boolean noGiEnabled = true;
+
+  @Column(columnDefinition = "boolean default true")
+  private Boolean absoluteEnabled = true;
+
+  public Boolean getNoGiEnabled() {
+    return noGiEnabled != null ? noGiEnabled : true;
+  }
+
+  public void setNoGiEnabled(Boolean noGiEnabled) {
+    this.noGiEnabled = noGiEnabled;
+  }
+
+  public Boolean getAbsoluteEnabled() {
+    return absoluteEnabled != null ? absoluteEnabled : true;
+  }
+
+  public void setAbsoluteEnabled(Boolean absoluteEnabled) {
+    this.absoluteEnabled = absoluteEnabled;
+  }
 
   public String getName() {
     return name;
@@ -262,6 +290,22 @@ public class Event extends BaseEntity {
 
   public void setInternalRegistration(Boolean internalRegistration) {
     this.internalRegistration = internalRegistration;
+  }
+
+  public Boolean getPromotionExecuted() {
+    return promotionExecuted != null ? promotionExecuted : false;
+  }
+
+  public void setPromotionExecuted(Boolean promotionExecuted) {
+    this.promotionExecuted = promotionExecuted;
+  }
+
+  public LocalDateTime getCheckinEndDate() {
+    return checkinEndDate;
+  }
+
+  public void setCheckinEndDate(LocalDateTime checkinEndDate) {
+    this.checkinEndDate = checkinEndDate;
   }
 
   public LocalDate getEndDate() {

@@ -1,7 +1,7 @@
 [
   {
     "username": "simone",
-    "password": "simone123",
+    "password": "12345678",
     "name": "Simone",
     "role": "admin"
   },
@@ -12,9 +12,21 @@
     "role": "admin"
   },
   {
-    "username": "mesario1",
-    "password": "mesario123",
-    "name": "Mesario 1",
-    "role": "mesario"
+    "username": "vinicius",
+    "password": "12345678",
+    "name": "Vinicius",
+    "role": "admin"
+  },
+  {
+    "username": "gabriel",
+    "password": "12345678",
+    "name": "Gabriel",
+    "role": "admin"
+  },
+  {
+    "username": "tarciso",
+    "password": "12345678",
+    "name": "Tarciso",
+    "role": "admin"
   }
 ]

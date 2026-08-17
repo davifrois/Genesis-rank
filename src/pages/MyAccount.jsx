@@ -569,35 +569,8 @@ const MyAccount = () => {
 
   return (
     <div className="public-page profile-page profile-page--account profile-settings-page">
-      <section className="profile-header">
-        <div>
-          <span className="section-kicker">Conta</span>
-          <h1 className="profile-title">Meu Perfil</h1>
-          <p className="profile-subtitle">
-            Visualize os dados do seu perfil publico que os outros verao.
-          </p>
-        </div>
-        <div className="profile-settings-toolbar">
-          <button type="button" className="btn btn-primary profile-settings-toolbar__btn is-active">
-            Meu perfil
-          </button>
-          <button type="button" className="btn btn-secondary profile-settings-toolbar__btn" onClick={handleShareProfile}>
-            Compartilhar dados do usuario
-          </button>
-          <Link to="/configuracoes" className="btn btn-secondary profile-settings-toolbar__btn">
-            Editar configurações
-          </Link>
-          {(currentUser?.role === 'coach' || currentUser?.role === 'professor') && (
-            <Link to="/gerente-treinador" className="btn btn-secondary profile-settings-toolbar__btn" style={{ borderColor: 'var(--brand-primary)', color: 'var(--brand-primary)' }}>
-              Gerente de treinador
-            </Link>
-          )}
-        </div>
-        {shareError && <div className="login-error profile-share-feedback"><p>{shareError}</p></div>}
-        {shareSuccess && <div className="profile-success profile-share-feedback">{shareSuccess}</div>}
-      </section>
 
-      <div className="profile-preview-wrapper" style={{ marginBottom: '40px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #1f2937' }}>
+      <div className="profile-preview-wrapper" style={{ marginBottom: '40px' }}>
         <PublicProfile profileOverride={previewProfile} isPreview={true} />
       </div>
 

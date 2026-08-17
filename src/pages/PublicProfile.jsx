@@ -14,6 +14,7 @@ import {
 import { normalizeRegistrationStatus, REGISTRATION_STATUS } from '../utils/registrationStatus';
 import AthleteCheckinModal from '../components/AthleteCheckinModal';
 import { publicRegistrationService } from '../services/publicRegistrationService';
+import { resolveAgeNumber } from '../utils/eventPricing';
 import './PublicProfile.css';
 
 /* ── helpers ─────────────────────────────────────────────── */
@@ -74,9 +75,17 @@ const buildProfileFromAthlete = (athlete = {}) => ({
 });
 
 const BELT_COLORS = {
-  preta: '#111827', marrom: '#92400e', roxa: '#7c3aed',
-  azul: '#1d4ed8', verde: '#15803d', laranja: '#c2410c',
-  amarela: '#b45309', cinza: '#6b7280', branca: '#d1d5db',
+  // Faixas adulto BJJ - cores reais
+  preta:   '#1a1a1a',  // Preta
+  marrom:  '#5c3317',  // Marrom real
+  roxa:    '#4a1a7a',  // Roxa real (violeta escuro)
+  azul:    '#1a3a8f',  // Azul real (azul royal escuro)
+  branca:  '#e8e8e8',  // Branca
+  // Faixas infanto-juvenil
+  amarela: '#d4a017',  // Amarela
+  laranja: '#c85a00',  // Laranja
+  verde:   '#1a6b2a',  // Verde
+  cinza:   '#6b7280',  // Cinza
 };
 const getBeltColor = (belt = '') => {
   const b = belt.toLowerCase();
@@ -151,6 +160,7 @@ const PublicProfile = ({ profileOverride, isPreview = false }) => {
 
   const [isCheckinModalOpen, setIsCheckinModalOpen] = useState(false);
   const [selectedAthleteForCheckin, setSelectedAthleteForCheckin] = useState(null);
+  const [isBeltModalOpen, setIsBeltModalOpen] = useState(false);
 
   const { athleteId } = useParams();
   const [searchParams] = useSearchParams();
@@ -247,6 +257,29 @@ const PublicProfile = ({ profileOverride, isPreview = false }) => {
         || targetAcademy.includes(athleteAcademy);
     });
   }, [athletes, profile]);
+
+  const topCheckinAthlete = useMemo(() => {
+    if (!matchedProfileAthletes || matchedProfileAthletes.length === 0) return null;
+    const openAthletes = matchedProfileAthletes.filter(athlete => {
+      const eventObj = events.find(e => e.id === athlete.eventId);
+      if (!eventObj) return true;
+      if (eventObj.checkinEndDate) {
+        return new Date() <= new Date(eventObj.checkinEndDate);
+      }
+      const batches = eventObj.batches || [];
+      let lastDate = eventObj.date;
+      if (batches.length > 0 && batches[batches.length - 1].endDate) {
+        lastDate = batches[batches.length - 1].endDate;
+      }
+      if (lastDate) {
+        const lastDateObj = new Date(lastDate);
+        lastDateObj.setHours(23, 59, 59, 999);
+        return new Date() <= lastDateObj;
+      }
+      return true;
+    });
+    return openAthletes.length > 0 ? openAthletes[0] : null;
+  }, [matchedProfileAthletes, events]);
 
   const fightHistoryByEvent = useMemo(() => {
     if (!profile) return new Map();
@@ -383,6 +416,23 @@ const PublicProfile = ({ profileOverride, isPreview = false }) => {
     return accUser === username || createdBy === username || email === username || currentUser.id === profile.id;
   }, [currentUser, profile]);
 
+  /* 6 – per-event performance for bar chart */
+  const perEventStats = useMemo(() => {
+    const snapshotRows = (snapshot?.rows || []).map((row) => ({
+      ...row,
+      fights: fightHistoryByEvent.get(row.eventId) || []
+    }));
+    const map = {};
+    fightHistoryByEvent.forEach((fights, eventId) => {
+      const ev = (Array.isArray(events) ? events : []).find(e => String(e.id) === String(eventId));
+      const evName = ev?.name || snapshotRows.find(r => r.eventId === eventId)?.eventName || 'Evento';
+      const wins = fights.filter(f => f.result === 'WIN').length;
+      const losses = fights.filter(f => f.result === 'LOSS').length;
+      map[eventId] = { name: evName, wins, losses, total: wins + losses };
+    });
+    return Object.values(map).filter(e => e.total > 0).slice(0, 6);
+  }, [fightHistoryByEvent, events, snapshot]);
+
   /* ── error state ─────────────────────────────────────── */
   if (!profile) {
     return (
@@ -403,7 +453,8 @@ const PublicProfile = ({ profileOverride, isPreview = false }) => {
   }));
   const summary  = snapshot?.summary  || {};
   const beltColor    = getBeltColor(profile.belt);
-  const countryFlag = flagFromCountryCode(countryCodeFromValue(profile.country || 'Brasil', 'BR'));
+  const countryCode = countryCodeFromValue(profile.country || 'Brasil', 'BR');
+  const countryFlag = flagFromCountryCode(countryCode);
   const totalGold    = summary.podium1   || 0;
   const totalPodiums = summary.totalPodiums || 0;
   const totalEvents  = totalRegisteredEvents > 0 ? totalRegisteredEvents : (summary.eventsFought || rows.length);
@@ -413,14 +464,24 @@ const PublicProfile = ({ profileOverride, isPreview = false }) => {
   const submissionWins = allFightRows.filter((fight) => (
     fight.result === 'WIN' && /submission|finaliza|mata|arm|choke|estrang/i.test(fight.method || '')
   )).length;
-  const primaryWinMethodLabel = submissionWins > 0
-    ? `${submissionWins} Wins by Submission`
-    : `${totalWins} Wins by Points`;
+  const pointsWins = totalWins > 0 ? (totalWins - submissionWins) : 0;
+  const subPercent = totalWins > 0 ? (submissionWins / totalWins) * 100 : 0;
+  const ptsPercent = totalWins > 0 ? (pointsWins / totalWins) * 100 : 0;
+  
+  // Circumference of r=48 is 2 * PI * 48 = 301.59
+  const circ = 301.59;
+  const subDash = (subPercent / 100) * circ;
+  const ptsDash = (ptsPercent / 100) * circ;
 
-  const stats = [
-    { icon: <Calendar size={16}/>, val: totalEvents, label: 'Eventos' },
-    { icon: <TrendingUp size={16}/>, val: totalWins, label: 'Vitórias', win: true },
-    { icon: <Target   size={16}/>, val: `${winRate}%`, label: 'Win Rate' },
+  const maxFights = Math.max(...perEventStats.map(e => e.total), 1);
+
+  const statsCards = [
+    { val: totalEvents,  label: 'Eventos',   color: '#60a5fa', icon: '📅' },
+    { val: totalWins,    label: 'Vitórias',  color: '#22c55e', icon: '✅' },
+    { val: totalLosses,  label: 'Derrotas',  color: '#ef4444', icon: '❌' },
+    { val: totalPodiums, label: 'Pódios',    color: '#fbbf24', icon: '🏅' },
+    { val: totalGold,    label: 'Ouros',     color: '#f59e0b', icon: '🥇' },
+    { val: fights,       label: 'Lutas',     color: '#a78bfa', icon: '⚔️' },
   ];
 
   return (
@@ -429,14 +490,7 @@ const PublicProfile = ({ profileOverride, isPreview = false }) => {
       {/* ── HERO ──────────────────────────────────────── */}
       <section 
         className="pp-hero" 
-        style={{ 
-          '--belt': beltColor,
-          ...(profile.coverUrl ? { 
-            backgroundImage: `linear-gradient(to bottom, rgba(17, 17, 17, 0.5), #111), url(${profile.coverUrl})`,
-            backgroundSize: 'cover',
-            backgroundPosition: `center ${profile.coverPositionY ?? 50}%`
-          } : {})
-        }}
+        style={{ '--belt': beltColor }}
       >
         <div className="pp-hero__glow" />
         <div className="pp-hero__inner container">
@@ -456,69 +510,97 @@ const PublicProfile = ({ profileOverride, isPreview = false }) => {
                     {getInitials(profile.fullName)}
                   </div>
                 )}
-              <span className="pp-belt-ring" style={{ borderColor: beltColor }} />
             </div>
 
             {/* nome + meta */}
             <h1 className="pp-hero__name">
-              <span className="pp-flag-emoji" aria-hidden="true">{countryFlag}</span>
+              {countryCode && (
+                <img 
+                  src={`https://flagcdn.com/w40/${countryCode.toLowerCase()}.png`}
+                  alt={profile.country || ''}
+                  className="pp-flag-img"
+                  onError={(e) => { e.target.style.display='none'; }}
+                />
+              )}
               {profile.fullName}
             </h1>
 
-            <div className="pp-hero__meta-row">
-              {profile.country && (
-                <>
-                  <span className="pp-meta-badge">
-                    <span style={{ fontSize: '11px', opacity: 0.7 }}>NATIONALITY</span>
-                    <span style={{ fontWeight: 800 }}>{profile.country.toUpperCase()}</span>
-                  </span>
-                  <span className="pp-meta-divider">·</span>
-                </>
+            <div className="pp-hero__meta-row-new">
+              {(profile.country || profile.age || profile.birthDate) && (
+                <span className="pp-meta-inline">
+                  {profile.country && (
+                    <>
+                      <span className="pp-meta-label">NACIONALIDADE</span>
+                      <span className="pp-meta-value">{profile.country.toUpperCase()}</span>
+                    </>
+                  )}
+                  {(resolveAgeNumber(profile) !== null) && (
+                    <>
+                      <span className="pp-meta-sep">|</span>
+                      <span className="pp-meta-label">IDADE</span>
+                      <span className="pp-meta-value">{resolveAgeNumber(profile)}</span>
+                    </>
+                  )}
+                </span>
               )}
-              {profile.age || profile.birthDate ? (
-                <>
-                  <span className="pp-meta-badge">
-                    <span style={{ fontSize: '11px', opacity: 0.7 }}>AGE</span>
-                    <span style={{ fontWeight: 800 }}>{profile.age || (profile.birthDate ? new Date().getFullYear() - new Date(profile.birthDate).getFullYear() : '—')}</span>
-                  </span>
-                  <span className="pp-meta-divider">·</span>
-                </>
-              ) : null}
-              {profile.city && (
-                <span className="pp-meta-badge"><MapPin size={10} /> {profile.city}</span>
-              )}
-              {!profile.city && profile.academyName && (
-                <span className="pp-meta-badge"><ShieldCheck size={10} /> {profile.academyName}</span>
-              )}
+              {/* Optional actions for owner */}
               {isOwner && !isPreview && (
-                <Link to="/minha-conta" className="pp-meta-badge pp-meta-badge--action" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', border: '1px solid #4b5563', backgroundColor: 'transparent', padding: '4px 10px', borderRadius: '4px', color: '#e5e7eb', textDecoration: 'none', marginLeft: '8px' }}>
-                  <span style={{ fontSize: '12px' }}>⚙</span> CONFIGURAÇÕES
+                <Link to="/minha-conta" className="pp-owner-btn" style={{ marginLeft: '16px' }}>
+                  <span style={{ fontSize: '11px' }}>⚙</span> CONFIGURAÇÕES
                 </Link>
               )}
               {isOwner && (
-                <button 
-                  onClick={() => {
-                    const firstMatched = matchedProfileAthletes[0] || { id: profile.id, nome: profile.fullName, academia: profile.academyName, faixa: profile.belt };
-                    setSelectedAthleteForCheckin(firstMatched);
-                    setIsCheckinModalOpen(true);
-                  }}
-                  className="pp-meta-badge pp-meta-badge--action" 
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', border: '1px solid var(--primary-color)', backgroundColor: 'transparent', padding: '4px 10px', borderRadius: '4px', color: 'var(--primary-color)', cursor: 'pointer', marginLeft: '8px', fontSize: '12px', fontWeight: 'bold' }}
-                >
-                  <Target size={14} /> CHECK-IN
-                </button>
+                topCheckinAthlete ? (
+                  <button 
+                    onClick={() => {
+                      setSelectedAthleteForCheckin(topCheckinAthlete);
+                      setIsCheckinModalOpen(true);
+                    }}
+                    className="pp-owner-btn pp-owner-btn--primary"
+                    style={{ marginLeft: '8px' }}
+                  >
+                    <Target size={12} /> CHECK-IN
+                  </button>
+                ) : (
+                  <button 
+                    className="pp-owner-btn pp-owner-btn--primary"
+                    style={{ marginLeft: '8px', opacity: 0.5, cursor: 'not-allowed', backgroundColor: '#3f3f46', borderColor: '#3f3f46', color: '#a1a1aa' }}
+                    disabled
+                  >
+                    <Target size={12} /> CHECK-IN ENCERRADO
+                  </button>
+                )
               )}
             </div>
 
-            {/* belt card */}
+            {/* belt card novo estilo */}
             {profile.belt && (
-              <div className="pp-belt-bar">
-                <span className="pp-belt-bar__stripe" style={{ background: `linear-gradient(to bottom, ${beltColor} 50%, #e5e5e5 50%)` }} />
-                <span className="pp-belt-bar__text">
-                  <Award size={14} />
-                  {profile.belt.charAt(0).toUpperCase() + profile.belt.slice(1)} belt in {profile.modality || 'Jiu-Jitsu (BJJ)'}
-                </span>
-                <span className="pp-belt-bar__info"><Info size={14} /></span>
+              <div className="pp-belt-card">
+                <div className="pp-belt-card__left">
+                  {/* Faixa real BJJ: corpo colorido + ponta preta + barra vermelha */}
+                  <div className="pp-belt-graphic" style={{ '--belt-bg': beltColor }}>
+                    <div className="pp-belt-graphic__body" />
+                    <div className="pp-belt-graphic__tip" />
+                  </div>
+                  <div className="pp-belt-card__info">
+                    <span className="pp-belt-card__title">
+                      {profile.belt.charAt(0).toUpperCase() + profile.belt.slice(1)} belt in {profile.modality || 'Jiu-Jitsu (BJJ)'}
+                    </span>
+                    <span className="pp-belt-card__subtitle">
+                      <ShieldCheck size={12} /> COMPETED ON GENESIS
+                    </span>
+                  </div>
+                </div>
+                <div className="pp-belt-card__right">
+                  <button
+                    className="pp-belt-info-btn"
+                    title="Ver trajetória"
+                    onClick={() => setIsBeltModalOpen(true)}
+                    aria-label="Ver trajetória na plataforma"
+                  >
+                    <Info size={18} />
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -528,62 +610,201 @@ const PublicProfile = ({ profileOverride, isPreview = false }) => {
       {/* ── BODY ──────────────────────────────────────── */}
       <div className="pp-body container">
 
-        {/* STATS */}
-        <div className="pp-stats-grid">
-          {stats.map((s, i) => (
-            <div key={i} className={`pp-stat ${s.gold ? 'pp-stat--gold' : s.win ? 'pp-stat--win' : s.loss ? 'pp-stat--loss' : ''}`}>
-              <div className="pp-stat__icon">{s.icon}</div>
-              <div className="pp-stat__val">{s.val}</div>
-              <div className="pp-stat__label">{s.label}</div>
+        {/* ══════════════════════════════════════════════ */}
+        {/* STATISTICS SECTION                           */}
+        {/* ══════════════════════════════════════════════ */}
+        <div className="pp-stats-section">
+          <div className="pp-stats-section__header">
+            <TrendingUp size={20} />
+            <span>Estatísticas do Atleta</span>
+          </div>
+
+          {/* ROW 1: Gauge + Donut + Stat Cards */}
+          <div className="pp-stats-row">
+
+            {/* Win Rate Gauge */}
+            <div className="pp-stat-gauge-card">
+              <div className="pp-stat-gauge-label">Win Rate</div>
+              <div className="pp-stat-gauge-wrap">
+                <svg viewBox="0 0 120 80" className="pp-stat-gauge-svg">
+                  {/* Background arc (semicircle) */}
+                  <path
+                    d="M 12 68 A 48 48 0 0 1 108 68"
+                    fill="none"
+                    stroke="rgba(255,255,255,0.08)"
+                    strokeWidth="10"
+                    strokeLinecap="round"
+                  />
+                  {/* Filled arc */}
+                  <path
+                    d="M 12 68 A 48 48 0 0 1 108 68"
+                    fill="none"
+                    stroke={winRate >= 70 ? '#22c55e' : winRate >= 40 ? '#f59e0b' : '#ef4444'}
+                    strokeWidth="10"
+                    strokeLinecap="round"
+                    strokeDasharray={`${(winRate / 100) * 150.8} 150.8`}
+                    style={{ filter: `drop-shadow(0 0 6px ${winRate >= 70 ? '#22c55e' : winRate >= 40 ? '#f59e0b' : '#ef4444'})` }}
+                  />
+                  {/* Value */}
+                  <text x="60" y="62" textAnchor="middle" fill="#fff" fontSize="18" fontWeight="900">{winRate}%</text>
+                  <text x="60" y="76" textAnchor="middle" fill="#9ca3af" fontSize="7" fontWeight="700" letterSpacing="1">WIN RATE</text>
+                  {/* Min/Max labels */}
+                  <text x="12" y="78" textAnchor="middle" fill="#6b7280" fontSize="7">0%</text>
+                  <text x="108" y="78" textAnchor="middle" fill="#6b7280" fontSize="7">100%</text>
+                </svg>
+              </div>
+              <div className="pp-stat-gauge-sub">
+                <span className="pp-sg-wins">{totalWins}W</span>
+                <span className="pp-sg-sep"> / </span>
+                <span className="pp-sg-losses">{totalLosses}L</span>
+              </div>
             </div>
-          ))}
+
+            {/* Wins Donut */}
+            <div className="pp-stat-donut-card">
+              <div className="pp-stat-donut-title">Vitórias por Método</div>
+              <div className="pp-stat-donut-wrap">
+                <svg viewBox="0 0 120 120" className="pp-wins-chart">
+                  <circle cx="60" cy="60" r="48" className="pp-wins-chart__bg" />
+                  {totalWins > 0 ? (
+                    <>
+                      <circle
+                        cx="60" cy="60" r="48"
+                        className="pp-wins-chart__pts"
+                        strokeDasharray={`${ptsDash} ${circ - ptsDash}`}
+                        strokeDashoffset="0"
+                        transform="rotate(-90 60 60)"
+                      />
+                      <circle
+                        cx="60" cy="60" r="48"
+                        className="pp-wins-chart__sub"
+                        strokeDasharray={`${subDash} ${circ - subDash}`}
+                        strokeDashoffset={`-${ptsDash}`}
+                        transform="rotate(-90 60 60)"
+                      />
+                    </>
+                  ) : (
+                    <circle cx="60" cy="60" r="48" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="10" />
+                  )}
+                </svg>
+                <div className="pp-wins-chart__center">
+                  <strong>{totalWins}</strong>
+                  <span>WINS</span>
+                </div>
+              </div>
+              <div className="pp-stat-donut-legend">
+                <div className="pp-sdl-item">
+                  <span className="pp-sdl-dot" style={{ background: '#84cc16' }} />
+                  <span className="pp-sdl-num">{submissionWins}</span>
+                  <span className="pp-sdl-lbl">Finalização</span>
+                </div>
+                <div className="pp-sdl-item">
+                  <span className="pp-sdl-dot" style={{ background: '#0ea5e9' }} />
+                  <span className="pp-sdl-num">{pointsWins}</span>
+                  <span className="pp-sdl-lbl">Pontos</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Stat Cards Grid */}
+            <div className="pp-stat-cards-grid">
+              {statsCards.map((card) => (
+                <div className="pp-stat-mini-card" key={card.label} style={{ '--card-color': card.color }}>
+                  <span className="pp-smc-icon">{card.icon}</span>
+                  <strong className="pp-smc-val" style={{ color: card.color }}>{card.val}</strong>
+                  <span className="pp-smc-lbl">{card.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ROW 2: Per-Event Bar Chart */}
+          {perEventStats.length > 0 && (
+            <div className="pp-stat-bar-card">
+              <div className="pp-stat-bar-title">
+                <Award size={16} /> Performance por Evento
+              </div>
+              <div className="pp-stat-bar-chart">
+                {perEventStats.map((ev, idx) => (
+                  <div className="pp-bar-row" key={idx}>
+                    <div className="pp-bar-label" title={ev.name}>
+                      {ev.name.length > 22 ? ev.name.slice(0, 20) + '…' : ev.name}
+                    </div>
+                    <div className="pp-bar-track">
+                      <div
+                        className="pp-bar-fill pp-bar-fill--win"
+                        style={{ width: `${(ev.wins / maxFights) * 100}%` }}
+                      >
+                        {ev.wins > 0 && <span>{ev.wins}W</span>}
+                      </div>
+                      <div
+                        className="pp-bar-fill pp-bar-fill--loss"
+                        style={{ width: `${(ev.losses / maxFights) * 100}%` }}
+                      >
+                        {ev.losses > 0 && <span>{ev.losses}L</span>}
+                      </div>
+                    </div>
+                    <div className="pp-bar-total">{ev.total} luta{ev.total !== 1 ? 's' : ''}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ROW 3: Submission % Progress Bar */}
+          <div className="pp-stat-method-card">
+            <div className="pp-stat-bar-title"><Star size={16} /> Taxa de Finalização</div>
+            <div className="pp-stat-method-bars">
+              <div className="pp-method-row">
+                <span className="pp-method-lbl">Finalização</span>
+                <div className="pp-method-track">
+                  <div
+                    className="pp-method-fill"
+                    style={{
+                      width: `${subPercent}%`,
+                      background: 'linear-gradient(90deg, #84cc16, #22c55e)',
+                      boxShadow: '0 0 8px rgba(132,204,22,0.5)'
+                    }}
+                  />
+                </div>
+                <span className="pp-method-pct">{subPercent.toFixed(0)}%</span>
+              </div>
+              <div className="pp-method-row">
+                <span className="pp-method-lbl">Pontos/Dec.</span>
+                <div className="pp-method-track">
+                  <div
+                    className="pp-method-fill"
+                    style={{
+                      width: `${ptsPercent}%`,
+                      background: 'linear-gradient(90deg, #0ea5e9, #6366f1)',
+                      boxShadow: '0 0 8px rgba(14,165,233,0.5)'
+                    }}
+                  />
+                </div>
+                <span className="pp-method-pct">{ptsPercent.toFixed(0)}%</span>
+              </div>
+            </div>
+          </div>
+
         </div>
 
-        <div className="pp-performance-card">
-          <div className="pp-performance-ring" style={{ '--progress': winRate }}>
-            <svg viewBox="0 0 120 120" aria-hidden="true">
-              <circle className="pp-performance-ring__track" cx="60" cy="60" r="48" />
-              <circle className="pp-performance-ring__value" cx="60" cy="60" r="48" />
-            </svg>
-            <div className="pp-performance-ring__center">
-              <strong>{totalWins}</strong>
-              <span>WINS</span>
-            </div>
-          </div>
-          <div className="pp-performance-copy">
-            <span>Performance</span>
-            <strong>{primaryWinMethodLabel}</strong>
-            <p>{fights ? `${winRate}% de aproveitamento em ${fights} luta${fights !== 1 ? 's' : ''} registrada${fights !== 1 ? 's' : ''}.` : 'As vitorias oficiais entram aqui assim que o placar publicar os resultados.'}</p>
-          </div>
-        </div>
-
-        {/* WIN-RATE BAR */}
-        {fights > 0 && (
-          <div className="pp-winbar">
-            <div className="pp-winbar__labels">
-              <span className="pp-winbar__win">{totalWins}V</span>
-              <span className="pp-winbar__mid">Taxa de vitória</span>
-              <span className="pp-winbar__loss">{totalLosses}D</span>
-            </div>
-            <div className="pp-winbar__track">
-              <div className="pp-winbar__fill" style={{ width: `${winRate}%` }} />
-            </div>
-          </div>
-        )}
-
-        {/* ACADEMY CARD */}
+        {/* ACADEMIAS */}
         {profile.academyName && (
-          <div className="pp-academy-card">
-            <div className="pp-academy-card__logo">
-              {academy?.logoUrl
-                ? <img src={academy.logoUrl} alt={profile.academyName} />
-                : <ShieldCheck size={28} />}
+          <div className="pp-section-block">
+            <div className="pp-section-block__header">Academias</div>
+            <div className="pp-section-block__body">
+              <div className="pp-academy-item">
+                <div className="pp-academy-item__logo">
+                  {academy?.logoUrl
+                    ? <img src={academy.logoUrl} alt={profile.academyName} />
+                    : <span style={{ fontSize: '32px', color: '#fff' }}>S</span>}
+                </div>
+                <div className="pp-academy-item__name">
+                  {profile.academyName}<br/>
+                  {academy?.city && <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: 'normal' }}>{academy.city}</span>}
+                </div>
+              </div>
             </div>
-            <div>
-              <div className="pp-academy-card__name">{profile.academyName}</div>
-              {academy?.city && <div className="pp-academy-card__city"><MapPin size={11} /> {academy.city}</div>}
-            </div>
-            <span className="pp-academy-card__tag">Academia</span>
           </div>
         )}
 
@@ -608,118 +829,122 @@ const PublicProfile = ({ profileOverride, isPreview = false }) => {
               return (
                 <div key={row.id} className={`pp-champ ${pod ? pod.cls : ''}`}>
 
-                  {/* poster */}
-                  <div className="pp-champ__poster-wrap">
-                    {ev?.posterUrl
-                      ? <img src={ev.posterUrl} alt={row.eventName} className="pp-champ__poster" />
-                      : (
-                        <div className="pp-champ__poster pp-champ__poster--placeholder">
-                          <Trophy size={28} />
-                        </div>
-                      )}
+                  {/* header: Event Name and Date */}
+                  <div className="pp-champ__header">
+                    <div className="pp-champ__name">{row.eventName}</div>
+                    <div className="pp-champ__date">{fmt(row.eventDate)}</div>
                   </div>
 
-                  {/* main */}
-                  <div className="pp-champ__body">
-                    <div className="pp-champ__top">
-                      <div>
-                        <div className="pp-champ__name">{row.eventName}</div>
-                        <div className="pp-champ__meta">
-                          <span><Calendar size={11} /> {fmt(row.eventDate)}</span>
-                          {row.eventLocation && <span><MapPin size={11} /> {row.eventLocation}</span>}
-                        </div>
+                  <div className="pp-champ__flex">
+                    {/* main content (left) */}
+                    <div className="pp-champ__body">
+                      
+                      <div className="pp-champ__category-title">
+                        {[row.modality, profile.belt, row.category, row.weight, row.isAbsolute ? 'Absolute' : ''].filter(Boolean).join(' / ')}
                       </div>
+
+                      {/* Tags/Check-in action if owner */}
+                      <div className="pp-champ__owner-actions">
+                        {isOwner && (
+                          <div style={{ marginTop: '14px', marginBottom: '14px' }}>
+                            {(() => {
+                              const eventObj = events.find(e => e.id === row.eventId);
+                              let isRegistrationClosed = false;
+                              if (eventObj) {
+                                if (eventObj.checkinEndDate) {
+                                  const checkinEndObj = new Date(eventObj.checkinEndDate);
+                                  if (new Date() > checkinEndObj) {
+                                    isRegistrationClosed = true;
+                                  }
+                                } else {
+                                  const batches = eventObj.batches || [];
+                                  let lastDate = eventObj.date;
+                                  if (batches.length > 0 && batches[batches.length - 1].endDate) {
+                                    lastDate = batches[batches.length - 1].endDate;
+                                  }
+                                  if (lastDate) {
+                                    const lastDateObj = new Date(lastDate);
+                                    lastDateObj.setHours(23, 59, 59, 999);
+                                    if (new Date() > lastDateObj) {
+                                      isRegistrationClosed = true;
+                                    }
+                                  }
+                                }
+                              }
+
+                              if (isRegistrationClosed) {
+                                return (
+                                  <button 
+                                    className="btn btn-primary"
+                                    style={{ padding: '8px 16px', fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', opacity: 0.5, cursor: 'not-allowed', backgroundColor: '#3f3f46', borderColor: '#3f3f46', color: '#a1a1aa' }}
+                                    disabled
+                                  >
+                                    <Target size={14} /> Edição Encerrada (Data Limite)
+                                  </button>
+                                );
+                              }
+
+                              return (
+                                <button 
+                                  className="btn btn-primary"
+                                  style={{ padding: '8px 16px', fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}
+                                  onClick={() => {
+                                    const athleteRecord = matchedProfileAthletes.find(a => a.eventId === row.eventId) || { id: row.id, eventId: row.eventId, nome: profile.fullName, academia: profile.academyName };
+                                    setSelectedAthleteForCheckin(athleteRecord);
+                                    setIsCheckinModalOpen(true);
+                                  }}
+                                >
+                                  <Target size={14} /> Fazer Check-in da Inscrição
+                                </button>
+                              );
+                            })()}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Matches */}
+                      {row.fights?.length > 0 && (
+                        <div className="pp-fight-results">
+                          {row.fights.map((fight) => (
+                            <div className="pp-fight-result" key={fight.id}>
+                              <span className={`pp-fight-result__tag is-${fight.result.toLowerCase()}`}>
+                                {fight.result}
+                              </span>
+                              <div className="pp-fight-result__text">
+                                <strong>{fight.opponentName}</strong> 
+                                <span>
+                                  {fight.result === 'WIN' ? 'Won by' : fight.result === 'LOSS' ? 'Lost by' : ''} {fight.method || 'Decision'}
+                                  {fight.score ? ` (${fight.score})` : ''}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Medal */}
                       {pod && (
-                        <div className={`pp-podium-tag ${pod.cls}`}>
+                        <div className={`pp-podium-badge ${pod.cls}`}>
                           {podiumPublicLabel(row.podiumPlace)}
                         </div>
                       )}
+
+                      {/* Points */}
+                      <div className="pp-champ__pts-line">
+                        Earned <span className="pp-champ__pts-val">{(row.points || 0).toFixed(2)} pts</span> to ranking {[row.modality, profile.belt, row.category].filter(Boolean).join(' / ')} – {new Date(row.eventDate).getFullYear()}
+                      </div>
                     </div>
 
-                    <div className="pp-champ__tags">
-                      {(!row.status || normalizeRegistrationStatus(row.status) === REGISTRATION_STATUS.PAYMENT_CONFIRMED) && <span className="pp-tag" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e', borderColor: 'rgba(34,197,94,0.3)', fontWeight: 600 }}>✅ Confirmado</span>}
-                      {normalizeRegistrationStatus(row.status) === REGISTRATION_STATUS.PAYMENT_ERROR && <span className="pp-tag" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)', fontWeight: 600 }}>⚠️ Pendente</span>}
-                      {(normalizeRegistrationStatus(row.status) === REGISTRATION_STATUS.PENDING || normalizeRegistrationStatus(row.status) === REGISTRATION_STATUS.PENDING_SYNC) && <span className="pp-tag" style={{ background: 'rgba(234,179,8,0.1)', color: '#eab308', borderColor: 'rgba(234,179,8,0.3)', fontWeight: 600 }}>⏳ Confirmando pagamento</span>}
-
-                      {row.category  && <span className="pp-tag">{row.category}</span>}
-                      {row.modality  && <span className="pp-tag pp-tag--mod">{row.modality}</span>}
-                      {row.weight    && <span className="pp-tag">{row.weight}</span>}
-                      {row.isAbsolute && <span className="pp-tag pp-tag--abs">Absoluto</span>}
-                    </div>
-
-                    {isOwner && (
-                      <div style={{ marginTop: '14px', marginBottom: '8px' }}>
-                        {(() => {
-                          const eventObj = events.find(e => e.id === row.eventId);
-                          let isRegistrationClosed = false;
-                          if (eventObj) {
-                            const batches = eventObj.batches || [];
-                            let lastDate = eventObj.date;
-                            if (batches.length > 0 && batches[batches.length - 1].endDate) {
-                              lastDate = batches[batches.length - 1].endDate;
-                            }
-                            if (lastDate) {
-                              const lastDateObj = new Date(lastDate);
-                              lastDateObj.setHours(23, 59, 59, 999);
-                              if (new Date() > lastDateObj) {
-                                isRegistrationClosed = true;
-                              }
-                            }
-                          }
-
-                          if (isRegistrationClosed) {
-                            return (
-                              <button 
-                                className="btn btn-primary"
-                                style={{ padding: '10px 20px', fontSize: '14px', display: 'inline-flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', opacity: 0.5, cursor: 'not-allowed', backgroundColor: '#3f3f46', borderColor: '#3f3f46', color: '#a1a1aa' }}
-                                disabled
-                              >
-                                <Target size={16} /> Edição Encerrada (Data Limite)
-                              </button>
-                            );
-                          }
-
-                          return (
-                            <button 
-                              className="btn btn-primary"
-                              style={{ padding: '10px 20px', fontSize: '14px', display: 'inline-flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}
-                              onClick={() => {
-                                const athleteRecord = matchedProfileAthletes.find(a => a.eventId === row.eventId) || { id: row.id, eventId: row.eventId, nome: profile.fullName, academia: profile.academyName };
-                                setSelectedAthleteForCheckin(athleteRecord);
-                                setIsCheckinModalOpen(true);
-                              }}
-                            >
-                              <Target size={16} /> Fazer Check-in da Inscrição
-                            </button>
-                          );
-                        })()}
-                      </div>
-                    )}
-
-                    {row.points > 0 && (
-                      <div className="pp-champ__pts">
-                        <Star size={12} /> +{row.points} pts no ranking Genesis
-                      </div>
-                    )}
-
-                    {row.fights?.length > 0 && (
-                      <div className="pp-fight-results">
-                        {row.fights.map((fight) => (
-                          <div className="pp-fight-result" key={fight.id}>
-                            <span className={`pp-fight-result__tag is-${fight.result.toLowerCase()}`}>
-                              {fight.result}
-                            </span>
-                            <div>
-                              <strong>{fight.opponentName}</strong>
-                              <small>
-                                {fight.method || 'resultado'}
-                                {fight.score ? ` / ${fight.score}` : ''}
-                              </small>
-                            </div>
+                    {/* poster (right) */}
+                    <div className="pp-champ__poster-wrap">
+                      {ev?.posterUrl
+                        ? <img src={ev.posterUrl} alt={row.eventName} className="pp-champ__poster" />
+                        : (
+                          <div className="pp-champ__poster pp-champ__poster--placeholder">
+                            <Trophy size={48} />
                           </div>
-                        ))}
-                      </div>
-                    )}
+                        )}
+                    </div>
                   </div>
                 </div>
               );
@@ -742,6 +967,59 @@ const PublicProfile = ({ profileOverride, isPreview = false }) => {
           }
         }}
       />
+
+      {/* ── MODAL TRAJETÓRIA DE FAIXA ─────────────────── */}
+      {isBeltModalOpen && (
+        <div className="pp-belt-modal-overlay" onClick={() => setIsBeltModalOpen(false)}>
+          <div className="pp-belt-modal-wrap" onClick={(e) => e.stopPropagation()}>
+
+            {/* Card: faixa vertical + conteúdo */}
+            <div className="pp-belt-modal">
+              {/* Faixa vertical */}
+              <div className="pp-belt-modal__vert-belt" style={{ '--belt-bg': beltColor }}>
+                <div className="pp-belt-modal__vert-body" />
+                <div className="pp-belt-modal__vert-tip" />
+              </div>
+
+              {/* Conteúdo */}
+              <div className="pp-belt-modal__content">
+                <h2 className="pp-belt-modal__title">
+                  {profile.belt?.charAt(0).toUpperCase() + profile.belt?.slice(1)} belt
+                </h2>
+                <p className="pp-belt-modal__sub">
+                  <ShieldCheck size={13} />
+                  COMPETIU COMO {(profile.belt || '').toUpperCase()} BELT NA GENESIS
+                </p>
+
+                <div className="pp-belt-modal__events">
+                  {rows.length === 0 && (
+                    <p className="pp-belt-modal__empty">Nenhuma competição registrada ainda.</p>
+                  )}
+                  {rows.slice(0, 5).map((row, idx) => {
+                    const ev = events.find(e => String(e.id) === String(row.eventId));
+                    const dateStr = ev?.date || ev?.startDate || row.eventDate || '';
+                    return (
+                      <div key={row.eventId || idx} className="pp-belt-modal__event-row">
+                        {dateStr && <span className="pp-belt-modal__date">{dateStr}</span>}
+                        <span className="pp-belt-modal__sep">–</span>
+                        <span className="pp-belt-modal__event-name">{ev?.name || row.eventName || `Evento ${idx + 1}`}</span>
+                      </div>
+                    );
+                  })}
+                  {rows.length > 5 && (
+                    <p className="pp-belt-modal__more">e mais {rows.length - 5}...</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Botão fechar FORA do card */}
+            <button className="pp-belt-modal__close" onClick={() => setIsBeltModalOpen(false)}>
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

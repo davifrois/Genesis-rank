@@ -1018,11 +1018,45 @@ const RankGeral = () => {
                         {isEnglish ? "WOMEN'S" : "FEMININO"}
                     </button>
                 </div>
+
+                {/* SEARCH ATHLETE */}
+                <div 
+                    className="ajp-header-search" 
+                    style={{ 
+                        marginTop: '24px', 
+                        display: 'inline-flex', 
+                        alignItems: 'center', 
+                        gap: '8px', 
+                        background: 'rgba(255, 255, 255, 0.05)', 
+                        border: '1px solid rgba(255, 255, 255, 0.1)', 
+                        borderRadius: '4px', 
+                        padding: '8px 16px',
+                        width: '100%',
+                        maxWidth: '300px'
+                    }}
+                >
+                    <Search size={16} color="#aaa" />
+                    <input
+                        type="text"
+                        placeholder={copy.searchPlaceholder || 'Buscar atleta'}
+                        value={searchTerm}
+                        onChange={(event) => setSearchTerm(event.target.value)}
+                        aria-label={copy.searchAria || 'Buscar atleta'}
+                        style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#fff',
+                            fontSize: '14px',
+                            outline: 'none',
+                            width: '100%'
+                        }}
+                    />
+                </div>
             </div>
 
             {/* CATEGORY GRID */}
             <div className="ajp-category-grid" style={{ padding: '0 40px 40px', maxWidth: '1400px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(500px, 1fr))', gap: '32px' }}>
-                {groupedAthletes.map(group => {
+                {searchedGroups.map(group => {
                     const top5 = group.entries.slice(0, 5);
                     return (
                         <div key={group.key} className="ajp-category-card">

@@ -1,0 +1,544 @@
+/* Container Geral */
+.genesis-bracket-container {
+  padding: 40px;
+  background-color: transparent;
+  color: #ffffff;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  min-height: 100vh;
+  overflow-x: auto;
+}
+
+/* 0. HEADER DO EVENTO */
+.event-header-section {
+  margin-bottom: 40px;
+}
+
+.event-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+}
+
+.event-logo-title {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+/* Tooltip Styles */
+.match-card-wrapper {
+  position: relative;
+}
+
+.match-tooltip {
+  position: absolute;
+  left: calc(100% + 15px);
+  top: 50%;
+  transform: translateY(-50%);
+  background-color: #f8fafc;
+  border-radius: 8px;
+  padding: 12px 16px;
+  width: 140px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+  z-index: 50;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.2s ease-in-out;
+  pointer-events: none;
+}
+
+/* Tooltip arrow/triangle */
+.match-tooltip::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-width: 6px 6px 6px 0;
+  border-style: solid;
+  border-color: transparent #f8fafc transparent transparent;
+}
+
+.match-card-wrapper:hover .match-tooltip {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  left: calc(100% + 10px);
+}
+
+.tooltip-header {
+  color: #0f172a;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.tooltip-method {
+  color: #334155;
+  font-size: 0.75rem;
+  margin-bottom: 6px;
+  line-height: 1.3;
+}
+
+.tooltip-method span {
+  color: #0f172a;
+  font-weight: 500;
+}
+
+.tooltip-score {
+  color: #0f172a;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.tooltip-time {
+  color: #475569;
+  font-size: 0.75rem;
+  margin-bottom: 2px;
+}
+
+.tooltip-endtime {
+  color: #94a3b8;
+  font-size: 0.7rem;
+  margin-bottom: 10px;
+}
+
+.tooltip-btn {
+  background-color: #94a3b8;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  width: 100%;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.tooltip-btn:hover {
+  background-color: #64748b;
+}
+
+/* Position tooltip for the final match differently so it doesn't go off-screen */
+.final-column .match-tooltip {
+  left: auto;
+  right: calc(100% + 15px);
+}
+.final-column .match-tooltip::before {
+  left: auto;
+  right: -6px;
+  border-width: 6px 0 6px 6px;
+  border-color: transparent transparent transparent #f8fafc;
+}
+.final-column .match-card-wrapper:hover .match-tooltip {
+  left: auto;
+  right: calc(100% + 10px);
+}
+
+.event-logo-box {
+  width: 50px;
+  height: 50px;
+  background-color: #990000;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.event-title-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.event-main-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  margin: 0;
+  color: #ffffff;
+}
+
+.event-date {
+  font-size: 0.85rem;
+  color: #999999;
+}
+
+.event-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: #2b2b2b;
+  border: none;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.subscribe-btn {
+  background-color: #3b3bff;
+  color: #ffffff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  margin-left: 5px;
+}
+
+.event-tabs-bar {
+  display: flex;
+  align-items: center;
+  gap: 25px;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.tab-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #a0a0a0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 12px 0;
+  cursor: pointer;
+  position: relative;
+}
+
+.tab-item.active-tab {
+  color: #ffffff;
+}
+
+.tab-item.active-tab::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background-color: #ffffff;
+}
+
+.tab-badge {
+  background-color: #333333;
+  color: #ffffff;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+}
+
+/* 1. Título do Chaveamento */
+.bracket-division-title {
+  font-size: 22px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0;
+  margin-bottom: 20px;
+  color: #ffffff;
+}
+
+/* 2. Barra de Metadados */
+.bracket-metadata-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 24px;
+  background-color: #27272a;
+  padding: 14px 28px;
+  border-radius: 8px;
+  margin-bottom: 50px;
+  width: 100%;
+  max-width: 1300px;
+  border: none;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+.meta-pill {
+  background-color: #4b5563;
+  color: #ffffff;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.pill-highlight {
+  background-color: #52525b;
+}
+
+/* 3. Estrutura em Árvore (Colunas) */
+.bracket-tree-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.bracket-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 320px;
+}
+
+.column-header-title {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin-bottom: 15px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.matches-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+}
+
+/* Cartão de Luta */
+.match-card-wrapper {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.match-id-badge {
+  background-color: #2b2b2b;
+  color: #a0a0a0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 5px 8px;
+  border-radius: 12px;
+  position: absolute;
+  left: -15px;
+  z-index: 2;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.match-card {
+  background-color: #242424;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  width: 300px;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  margin-left: 10px;
+}
+
+/* Linha de Cada Atleta no Card */
+.athlete-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 15px;
+  transition: background 0.2s ease;
+}
+
+.athlete-row.is-loser {
+  opacity: 0.45;
+}
+
+.athlete-avatar-box {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+}
+
+.athlete-avatar-box img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.win-checkmark {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  background-color: #00c853;
+  color: #ffffff;
+  font-size: 0.65rem;
+  font-weight: bold;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #242424;
+}
+
+.athlete-info {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.athlete-name {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.athlete-team {
+  font-size: 0.75rem;
+  color: #999999;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.match-divider {
+  height: 1px;
+  background-color: rgba(255, 255, 255, 0.05);
+  width: 100%;
+}
+
+/* Conectores Linhas (Colchetes) */
+.bracket-connectors-column {
+  width: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.connector-line-wrapper {
+  width: 100%;
+  height: 140px;
+  border-right: 2px solid #444444;
+  border-top: 2px solid #444444;
+  border-bottom: 2px solid #444444;
+  border-radius: 0 8px 8px 0;
+}
+
+/* Alinhamento da Luta Final */
+.final-column {
+  justify-content: center;
+  margin-top: 25px;
+}
+
+/* 4. Badges do Pódio (1º e 2º lugar) */
+.podium-badges {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  height: 100%;
+  margin-left: 12px;
+  gap: 25px;
+}
+
+.podium-badge {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.85rem;
+  color: #000000;
+}
+
+.gold-medal {
+  background-color: #ffb800;
+}
+
+.silver-medal {
+  background-color: #8c969e;
+}
+
+/* 5. Seção de Resultados */
+.bracket-results-section {
+  margin-top: 80px;
+  width: 100%;
+  max-width: 900px;
+}
+
+.results-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin-bottom: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.results-table-container {
+  background-color: #1a1a1a;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.results-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.results-table th {
+  padding: 12px 16px;
+  font-size: 0.8rem;
+  color: #888888;
+  font-weight: 600;
+  background-color: #2a2a2a;
+}
+
+.results-table th .th-subtitle {
+  display: block;
+  font-size: 0.7rem;
+  color: #555555;
+  margin-top: 2px;
+  font-weight: 400;
+}
+
+.results-table th:first-child,
+.results-table td:first-child {
+  text-align: center;
+  width: 100px;
+}
+
+.results-table td {
+  padding: 14px 16px;
+  font-size: 0.85rem;
+  color: #dddddd;
+  border-bottom: 1px solid #2a2a2a;
+  font-weight: 500;
+}
+
+.results-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* 6. Rodapé */
+.bracket-footer {
+  margin-top: 60px;
+  text-align: center;
+  font-size: 0.75rem;
+  color: #ffffff;
+  font-weight: 400;
+  padding-bottom: 20px;
+}

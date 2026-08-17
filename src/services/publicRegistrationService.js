@@ -2,7 +2,7 @@ import { REGISTRATION_STATUS, normalizeRegistrationStatus } from '../utils/regis
 import { authService } from './authService';
 import localforage from 'localforage';
 
-const ENV_API_BASE_URL = ("" || '').trim();
+const ENV_API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL || 'http://localhost:8080').trim();
 const API_BASE_URL = ENV_API_BASE_URL.includes('sua-url-do-ngrok') ? '' : ENV_API_BASE_URL.replace(/\/$/, '');
 const LOCAL_PENDING_REGISTRATIONS_KEY = 'genesis_public_registration_pending_v1';
 const LOCAL_SYNC_DIAGNOSTICS_KEY = 'genesis_public_registration_sync_diag_v1';
@@ -13,7 +13,7 @@ const DEFAULT_NETWORK_ERROR_MESSAGE = (
   'Servidor de inscrição indisponível no momento. '
   + 'Inicie o backend na porta 8080 ou configure VITE_API_BASE_URL.'
 );
-const UNAVAILABLE_HTTP_STATUSES = new Set([500, 502, 503, 504]);
+const UNAVAILABLE_HTTP_STATUSES = new Set([404, 500, 502, 503, 504]);
 
 const generateClientRequestId = () => {
   try {
@@ -465,18 +465,11 @@ export const publicRegistrationService = {
         cache: 'no-store'
       });
       if (!response.ok) {
-        throw await buildHttpError(response, DEFAULT_NETWORK_ERROR_MESSAGE);
+        return [];
       }
       return response.json();
     } catch (error) {
-      if (isNetworkError(error) || isUnavailableHttpError(error)) {
-        updateSyncDiagnostics('failure', {
-          message: error?.message || DEFAULT_NETWORK_ERROR_MESSAGE,
-          traceId: error?.traceId || ''
-        });
-        throw new Error(DEFAULT_NETWORK_ERROR_MESSAGE);
-      }
-      throw error;
+      return [];
     }
   },
 
@@ -510,6 +503,37 @@ export const publicRegistrationService = {
     }
   },
 
+  createDirectPix: async ({ registrationIds, athleteName, email, amount }) => {
+    try {
+      const response = await fetch(buildApiUrl('/api/webhooks/payment/pix'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true'
+        },
+        body: JSON.stringify({ registrationIds, athleteName, email, amount })
+      });
+      if (!response.ok) {
+        throw await buildHttpError(response, 'Falha ao gerar PIX.');
+      }
+      return response.json();
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  checkPaymentStatus: async (paymentId) => {
+    try {
+      const response = await fetch(buildApiUrl(`/api/webhooks/payment/status/${paymentId}`), {
+        headers: { 'ngrok-skip-browser-warning': 'true' }
+      });
+      if (!response.ok) return { approved: false, status: 'pending' };
+      return response.json();
+    } catch {
+      return { approved: false, status: 'pending' };
+    }
+  },
+
   listRegistrations: async (eventId = '') => {
     await flushPendingRegistrations();
     const query = eventId ? `?eventId=${encodeURIComponent(eventId)}` : '';
@@ -533,8 +557,7 @@ export const publicRegistrationService = {
           traceId: error?.traceId || ''
         });
         const pendingRows = await listPendingRows(eventId);
-        if (pendingRows.length) return pendingRows;
-        throw new Error(DEFAULT_NETWORK_ERROR_MESSAGE);
+        return pendingRows || [];
       }
       throw error;
     }
@@ -653,6 +676,38 @@ export const publicRegistrationService = {
         });
         throw new Error(DEFAULT_NETWORK_ERROR_MESSAGE);
       }
+      throw error;
+    }
+  },
+
+  toggleCheckIn: async (registrationId) => {
+    const normalizedId = (registrationId || '').toString().trim();
+    if (!normalizedId) throw new Error('Inscrição inválida.');
+
+    let token = normalizeAuthToken();
+    if (!token && authService?.ensureApiAdminToken) {
+      try {
+        token = await authService.ensureApiAdminToken();
+      } catch {
+        token = '';
+      }
+    }
+
+    try {
+      const response = await fetch(buildApiUrl(`/api/admin/registrations/${encodeURIComponent(normalizedId)}/checkin`), {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          'ngrok-skip-browser-warning': 'true'
+        }
+      });
+      if (!response.ok) {
+        throw await buildHttpError(response, 'Falha ao atualizar o status de Check-in.');
+      }
+      return response.json();
+    } catch (error) {
+      console.error('Checkin error:', error);
       throw error;
     }
   },

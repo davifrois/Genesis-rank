@@ -27,6 +27,7 @@ import filmmakerVenue from '../../img/filmmaker-venue.jpg';
 import jjfaLogo from '../../img/JJFA.png';
 import openSarzedoLogo from '../../img/Open sarzedo.jpg';
 import organizersHero from '../assets/organizadores-novo.jpg';
+import mesaImage from '../../img/mesa.jpeg';
 import placarImage from '../../img/placar.png';
 import {
   buildFilmmakerWhatsappLink,
@@ -88,7 +89,7 @@ const showcases = [
   {
     title: 'Visão da mesa',
     text: 'Cronograma, chamadas e categorias ficam organizados para a equipe trabalhar sem improviso.',
-    image: organizersHero,
+    image: mesaImage,
     icon: ClipboardCheck
   },
   {

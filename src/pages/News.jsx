@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, ExternalLink, ImageOff, Newspaper, PlayCircle, RefreshCcw } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ChevronLeft, ChevronRight, ExternalLink, ImageOff, Newspaper, PlayCircle, RefreshCcw, Network } from 'lucide-react';
 import { useI18n } from '../hooks/useI18n';
 import { useStore } from '../hooks/useStore';
 import { socialMediaService } from '../services/socialMediaService';
@@ -112,6 +112,8 @@ const News = () => {
   const [canScrollSocialNext, setCanScrollSocialNext] = useState(false);
   const [isSocialCarouselHovered, setIsSocialCarouselHovered] = useState(false);
   const [isSocialDragging, setIsSocialDragging] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 12;
   const [selectedNews, setSelectedNews] = useState(null);
   const [isMobileNewsOpenMode, setIsMobileNewsOpenMode] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -405,6 +407,40 @@ const News = () => {
     return parts;
   }, [athleteMentionTargets]);
 
+  const navigate = useNavigate();
+
+  const isBracketNews = React.useCallback((item) => {
+    if (!item) return false;
+    const title = (item.title || '').toLowerCase();
+    const summary = (item.summary || '').toLowerCase();
+    const body = (item.body || '').toLowerCase();
+    const tags = Array.isArray(item.tags) ? item.tags.map(t => String(t).toLowerCase()) : [];
+    return (
+      tags.includes('chaveamento') ||
+      tags.includes('chaveamentos') ||
+      title.includes('chaveamento') ||
+      title.includes('chaveamentos') ||
+      title.includes('chaves') ||
+      summary.includes('chaveamento') ||
+      body.includes('chaveamento')
+    );
+  }, []);
+
+  const resolveBracketEventId = React.useCallback((item) => {
+    if (!item) return null;
+    if (item.eventId) return item.eventId;
+    if (item.event_id) return item.event_id;
+    const title = (item.title || '').toLowerCase();
+    const body = (item.body || '').toLowerCase();
+    const summary = (item.summary || '').toLowerCase();
+    const found = (events || []).find((e) => {
+      if (!e || !e.name) return false;
+      const name = e.name.trim().toLowerCase();
+      return title.includes(name) || body.includes(name) || summary.includes(name);
+    });
+    return found ? found.id : null;
+  }, [events]);
+
   const openFullNews = React.useCallback((item) => {
     if (!item || typeof item !== 'object') return;
     setSelectedNews(item);
@@ -413,6 +449,13 @@ const News = () => {
   const closeFullNews = React.useCallback(() => {
     setSelectedNews(null);
   }, []);
+
+  const handleViewBrackets = React.useCallback(() => {
+    const targetId = resolveBracketEventId(selectedNews);
+    if (!targetId) return;
+    closeFullNews();
+    navigate(`/eventos/${targetId}?tab=brackets`);
+  }, [selectedNews, resolveBracketEventId, closeFullNews, navigate]);
 
   React.useEffect(() => {
     if (!selectedNews) return undefined;
@@ -609,86 +652,43 @@ const News = () => {
     };
   }, [isSocialDragging, endSocialDrag]);
 
-  const featuredNews = items[0] || null;
-  const secondaryNews = items.slice(1);
   const selectedMentionedEvent = selectedNews ? getMentionedFutureEvent(selectedNews) : null;
 
+  // --- PAGINATION LOGIC ---
+  const totalPages = Math.ceil(items.length / ITEMS_PER_PAGE);
+  const currentItems = items.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+  const getPaginationGroup = () => {
+    const pages = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      if (currentPage <= 4) {
+        pages.push(1, 2, 3, 4, 5, '...', totalPages - 1, totalPages);
+      } else if (currentPage > totalPages - 4) {
+        pages.push(1, 2, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+      } else {
+        pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
+      }
+    }
+    return pages;
+  };
+
   return (
-    <div className="public-page news-page" style={{ padding: 0 }}>
-      <section className="news-portal-container" style={{ paddingLeft: 'clamp(1.5rem, 4vw, 4rem)', paddingRight: 'clamp(1.5rem, 4vw, 4rem)' }}>
-        <div className="news-header" style={{ width: '100vw', marginLeft: 'calc(-50vw + 50%)', paddingLeft: 'clamp(1.5rem, 4vw, 4rem)', paddingRight: 'clamp(1.5rem, 4vw, 4rem)' }}>
-          <img
-            src={bgHero}
-            alt=""
-            aria-hidden="true"
-            style={{
-              position: 'absolute',
-              inset: 0,
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              objectPosition: 'center 30%',
-              opacity: 0.25,
-              pointerEvents: 'none',
-              zIndex: 0,
-              filter: 'grayscale(30%)'
-            }}
-          />
-          <div style={{
-            position: 'absolute',
-            inset: 0,
-            background: 'linear-gradient(90deg, rgba(5,7,11,0.95) 0%, rgba(5,7,11,0.7) 50%, rgba(5,7,11,0.3) 100%)',
-            pointerEvents: 'none',
-            zIndex: 1,
-          }} />
-          <div style={{ position: 'relative', zIndex: 2 }}>
-            <span className="section-kicker" style={{ color: '#00c2cb' }}>{copy.kicker}</span>
-            <h2>Genesis Newsroom</h2>
-            <p>{copy.description}</p>
-          </div>
-        </div>
+    <div className="public-page news-page">
+      <section className="news-portal-container">
+        <header className="news-header-simple">
+          <h1 className="news-title-simple">News</h1>
+        </header>
 
         {items.length ? (
-          <div className="news-main-grid">
-            {featuredNews && (() => {
-              const tag = getNewsTag(featuredNews, 0);
-              return (
+          <>
+            <div className="news-main-grid">
+              {currentItems.map((item, index) => (
                 <article
-                  className="news-card news-card--interactive featured-news"
-                  key={featuredNews.id}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={copy.openFullNews}
-                  onClick={() => openFullNews(featuredNews)}
-                  onDoubleClick={() => openFullNews(featuredNews)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      openFullNews(featuredNews);
-                    }
-                  }}
-                >
-                  <div className="news-image-wrapper">
-                    <img src={featuredNews.imageUrl || defaultNewsCover} alt={featuredNews.title} loading="lazy" />
-                  </div>
-                  <div className="news-content-overlay">
-                    <span className={`news-tag ${tag.className}`}>{tag.label}</span>
-                    <h3>{featuredNews.title}</h3>
-                    <p>{featuredNews.summary}</p>
-                    <div className="news-meta">
-                      {formatDate(featuredNews.publishedAt || featuredNews.createdAt, locale, copy.fallbackDate)}
-                      {' '}• {getReadMinutes(featuredNews)} min de leitura
-                    </div>
-                  </div>
-                </article>
-              );
-            })()}
-
-            {secondaryNews.map((item, index) => {
-              const tag = getNewsTag(item, index + 1);
-              return (
-                <article
-                  className="news-card news-card--interactive standard-news"
+                  className="news-card-simple"
                   key={item.id}
                   role="button"
                   tabIndex={0}
@@ -702,50 +702,118 @@ const News = () => {
                     }
                   }}
                 >
-                  <div className="news-image-wrapper">
+                  <div className="news-card-image">
                     <img src={item.imageUrl || defaultNewsCover} alt={item.title} loading="lazy" />
                   </div>
-                  <div className="news-content">
-                    <span className={`news-tag ${tag.className}`}>{tag.label}</span>
-                    <h4>{item.title}</h4>
-                    <p>{truncateText(item.summary, 132)}</p>
-                    <div className="news-meta">
-                      {formatDate(item.publishedAt || item.createdAt, locale, copy.fallbackDate)}
-                      {' '}• {getReadMinutes(item)} min de leitura
-                    </div>
+                  <div className="news-card-content">
+                    <h3 className="news-card-headline">{item.title}</h3>
                   </div>
                 </article>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+            
+            {totalPages > 1 && (
+              <div className="news-pagination-container">
+                <div className="news-pagination">
+                  <button 
+                    className="page-btn nav-btn" 
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    &lt;
+                  </button>
+                  
+                  {getPaginationGroup().map((page, idx) => (
+                    page === '...' ? (
+                      <span key={`dots-${idx}`} className="page-btn dots">...</span>
+                    ) : (
+                      <button
+                        key={page}
+                        className={`page-btn ${currentPage === page ? 'active' : ''}`}
+                        onClick={() => setCurrentPage(page)}
+                      >
+                        {page}
+                      </button>
+                    )
+                  ))}
+                  
+                  <button 
+                    className="page-btn nav-btn" 
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    &gt;
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         ) : (
           <div className="empty-state">{copy.emptyNews}</div>
         )}
       </section>
 
       {selectedNews && (
-        <>
-          <div className="modal-backdrop" onClick={closeFullNews} />
-          <div className="modal-card" role="dialog" aria-modal="true" aria-label={selectedNews.title || copy.openFullNews}>
-            <article className="modal-panel modal-panel--wide news-read-modal">
-              <div className="modal-header">
-                <div className="modal-title">{selectedNews.title}</div>
-                <button type="button" className="btn btn-ghost" onClick={closeFullNews}>
-                  {copy.closeModal}
-                </button>
-              </div>
-              {selectedNews.imageUrl && (
-                <div className="news-read-modal__cover">
-                  <img src={selectedNews.imageUrl} alt={selectedNews.title || copy.openFullNews} loading="lazy" />
-                </div>
-              )}
-              <div className="news-card__meta">
+        <div className="news-fullscreen-reader" role="dialog" aria-modal="true">
+          <button type="button" className="news-reader-close-btn" onClick={closeFullNews} aria-label={copy.closeModal}>
+            ✕
+          </button>
+          
+          <div className="news-reader-header-dark">
+            <img src={selectedNews.imageUrl || defaultNewsCover} alt={selectedNews.title || copy.openFullNews} loading="lazy" />
+          </div>
+          
+          <div className="news-reader-content-white">
+            <div className="news-reader-content-inner">
+              <h1 className="news-reader-title">{selectedNews.title}</h1>
+              <div className="news-reader-date">
                 {formatDate(selectedNews.publishedAt || selectedNews.createdAt, locale, copy.fallbackDate)}
               </div>
-              <div className={`news-read-modal__body ${selectedMentionedEvent ? 'has-event-widget' : ''}`}>
-                <p className="news-read-modal__summary">
+              
+              <div className={`news-reader-body ${selectedMentionedEvent ? 'has-event-widget' : ''}`}>
+                <p className="news-reader-text">
                   {renderSmartNewsText(selectedNews.body || selectedNews.summary || '')}
                 </p>
+
+                {(() => {
+                  const isBracket = isBracketNews(selectedNews);
+                  const targetId = resolveBracketEventId(selectedNews);
+                  if (!targetId) return null;
+
+                  const matchedEvent = (events || []).find(e => e.id === targetId);
+
+                  let label = 'Ver Detalhes do Evento';
+                  let targetUrl = `/eventos/${targetId}`;
+
+                  if (isBracket) {
+                    label = 'Ver Chaveamentos';
+                    targetUrl = `/eventos/${targetId}?tab=brackets`;
+                  } else if (matchedEvent) {
+                    if (matchedEvent.registrationOpen !== false) {
+                      label = 'Garantir Vaga';
+                      targetUrl = `/eventos/${targetId}/inscricao`;
+                    } else {
+                      label = 'Ver Detalhes do Evento';
+                      targetUrl = `/eventos/${targetId}`;
+                    }
+                  }
+
+                  return (
+                    <div className="news-bracket-cta">
+                      <button
+                        type="button"
+                        className="news-bracket-cta-btn"
+                        onClick={() => {
+                          closeFullNews();
+                          navigate(targetUrl);
+                        }}
+                      >
+                        {label}
+                      </button>
+                    </div>
+                  );
+                })()}
+                
                 {selectedMentionedEvent && (
                   <aside className="news-event-widget">
                     <span>Inscricoes abertas</span>
@@ -757,167 +825,10 @@ const News = () => {
                   </aside>
                 )}
               </div>
-            </article>
+            </div>
           </div>
-        </>
+        </div>
       )}
-
-      <section className="public-section" id="midias-sociais">
-        <div className="section-heading">
-          <div>
-            <span className="section-kicker">{copy.socialKicker}</span>
-            <h2>{copy.socialTitle}</h2>
-          </div>
-          <a
-            className="text-link"
-            href="https://www.instagram.com/genesis_esportes/"
-            target="_blank"
-            rel="noreferrer"
-          >
-            {copy.socialOpenProfile}
-          </a>
-        </div>
-
-        <div
-          className={`social-feed-carousel ${isSocialDragging ? 'is-dragging' : ''}`}
-          onMouseEnter={() => setIsSocialCarouselHovered(true)}
-          onMouseLeave={() => {
-            setIsSocialCarouselHovered(false);
-            endSocialDrag();
-          }}
-        >
-          {!socialLoading && socialItems.length > 0 && (
-            <>
-              <button
-                type="button"
-                className="social-feed-arrow social-feed-arrow--prev"
-                onClick={() => scrollSocialFeed('prev')}
-                disabled={!canScrollSocialPrev}
-                aria-label={copy.socialPrev}
-              >
-                <ChevronLeft size={18} />
-              </button>
-              <button
-                type="button"
-                className="social-feed-arrow social-feed-arrow--next"
-                onClick={() => scrollSocialFeed('next')}
-                disabled={!canScrollSocialNext}
-                aria-label={copy.socialNext}
-              >
-                <ChevronRight size={18} />
-              </button>
-            </>
-          )}
-
-          <div
-            className={`social-media-grid ${isSocialDragging ? 'is-dragging' : ''}`}
-            ref={socialFeedRef}
-            onMouseDown={handleSocialMouseDown}
-            onMouseMove={handleSocialMouseMove}
-            onMouseUp={endSocialDrag}
-            onClickCapture={handleSocialClickCapture}
-          >
-            {socialLoading && (
-              <div className="skeleton-row" aria-label={copy.socialLoading}>
-                {Array.from({ length: 4 }).map((_, index) => (
-                  <div className="skeleton-card" key={`social-skeleton-${index}`}>
-                    <div className="skeleton-card__media" />
-                    <div className="skeleton-line skeleton-line--meta" />
-                    <div className="skeleton-line" />
-                    <div className="skeleton-line skeleton-line--short" />
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {!socialLoading && socialItems.length > 0 && (
-              socialItems.map((item) => {
-                const mediaType = (item.mediaType || '').toString().toUpperCase();
-                const isVideo = mediaType.includes('VIDEO') || mediaType.includes('REEL');
-                const rawCoverUrl = (item.thumbnailUrl || item.mediaUrl || '').toString().trim();
-                const proxiedCoverUrl = socialMediaService.resolveInstagramMediaUrl(rawCoverUrl);
-                const publicProxyCoverUrl = socialMediaService.resolveInstagramMediaPublicProxyUrl(rawCoverUrl);
-                const permalink = item.permalink || 'https://www.instagram.com/genesis_esportes/';
-                const postKey = item.id || permalink;
-                const mode = mediaRenderModeByPostKey[postKey] || 'direct';
-                const canFallbackToProxy = Boolean(rawCoverUrl) && Boolean(proxiedCoverUrl) && rawCoverUrl !== proxiedCoverUrl;
-                const canFallbackToPublic = Boolean(publicProxyCoverUrl)
-                  && publicProxyCoverUrl !== rawCoverUrl
-                  && publicProxyCoverUrl !== proxiedCoverUrl;
-                const baseCoverUrl = mode === 'proxy'
-                  ? proxiedCoverUrl
-                  : mode === 'public'
-                    ? publicProxyCoverUrl
-                    : rawCoverUrl;
-                const retryTick = mediaRetryTickByPostKey[postKey] || 0;
-                const isRetryingMedia = Boolean(mediaRetryingByPostKey[postKey]);
-                const isRetryTimedOut = Boolean(mediaRetryTimedOutByPostKey[postKey]);
-                const resolveNextMode = (currentMode) => {
-                  const normalizedMode = (currentMode || 'direct').toString();
-                  if (normalizedMode === 'direct') {
-                    if (canFallbackToProxy) return 'proxy';
-                    if (canFallbackToPublic) return 'public';
-                    return 'failed';
-                  }
-                  if (normalizedMode === 'proxy') {
-                    if (canFallbackToPublic) return 'public';
-                    return 'failed';
-                  }
-                  return 'failed';
-                };
-                const coverUrl = retryTick > 0 && baseCoverUrl
-                  ? `${baseCoverUrl}${baseCoverUrl.includes('?') ? '&' : '?'}retry=${retryTick}`
-                  : baseCoverUrl;
-                const hasUsableCover = Boolean(baseCoverUrl) && mode !== 'failed';
-                const caption = truncateText(item.caption, 180) || copy.socialCaptionFallback;
-                return (
-                  <a href={permalink} target="_blank" rel="noreferrer" className="social-card" key={postKey} aria-label={copy.socialOpenPost}>
-                    {hasUsableCover ? (
-                      <img
-                        src={coverUrl}
-                        alt=""
-                        loading="lazy"
-                        referrerPolicy="no-referrer"
-                        onLoad={() => clearMediaRetryFlags(postKey)}
-                        onError={() => {
-                          const nextMode = resolveNextMode(mode);
-                          setMediaRenderModeByPostKey((prev) => {
-                            const currentMode = prev[postKey] || 'direct';
-                            const computedNextMode = resolveNextMode(currentMode);
-                            if (currentMode === computedNextMode) return prev;
-                            return { ...prev, [postKey]: computedNextMode };
-                          });
-                          if (nextMode === 'failed') clearMediaRetryFlags(postKey);
-                        }}
-                      />
-                    ) : (
-                      <div className="social-card-fallback">
-                        <Newspaper size={48} />
-                        <span>{isRetryTimedOut ? copy.socialRetryTimeout : copy.socialImageUnavailable}</span>
-                      </div>
-                    )}
-                    
-                    <div className="social-card__icon">
-                      {isVideo ? <PlayCircle size={24} /> : <ExternalLink size={24} />}
-                    </div>
-
-                    <div className="social-card__overlay">
-                      <p className="social-card__caption">{caption}</p>
-                      <div className="news-meta" style={{ marginTop: '12px' }}>
-                        {formatDate(item.publishedAt, locale, copy.fallbackDate)}
-                      </div>
-                    </div>
-                  </a>
-                );
-              })
-            )}
-
-            {!socialLoading && !socialItems.length && (
-              <div className="empty-state">{socialError || copy.socialEmpty}</div>
-            )}
-          </div>
-        </div>
-      </section>
     </div>
   );
 };

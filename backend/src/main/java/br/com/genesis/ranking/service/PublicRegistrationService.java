@@ -372,7 +372,21 @@ public class PublicRegistrationService {
     response.setPaymentReviewedAt(
         registration.getPaymentReviewedAt() != null ? registration.getPaymentReviewedAt().toString() : null
     );
+    response.setCheckedIn(registration.getCheckedIn());
+    response.setCheckedInAt(
+        registration.getCheckedInAt() != null ? registration.getCheckedInAt().toString() : null
+    );
     return response;
+  }
+
+  public PublicRegistrationResponse toggleCheckIn(String registrationId) {
+    EventRegistration reg = registrationRepository.findById(registrationId)
+        .orElseThrow(() -> new IllegalArgumentException("Inscrição não encontrada."));
+    boolean nextState = !reg.getCheckedIn();
+    reg.setCheckedIn(nextState);
+    reg.setCheckedInAt(nextState ? Instant.now() : null);
+    EventRegistration saved = registrationRepository.save(reg);
+    return toResponse(saved, null);
   }
 
   private Optional<EventRegistration> findDuplicateRegistration(

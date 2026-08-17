@@ -1,7 +1,7 @@
 import React, { useMemo, useEffect, useRef, useState } from 'react';
 import './Home.css';
-import { Link } from 'react-router-dom';
-import { Calendar, MapPin, Newspaper, Trophy, Users, Star, Zap, Shield, TrendingUp, X } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Calendar, MapPin, Newspaper, Trophy, Users, Star, Zap, Shield, TrendingUp, X, Network } from 'lucide-react';
 import { useStore } from '../hooks/useStore';
 import { useI18n } from '../hooks/useI18n';
 import { rankAthletes, groupAthletesByName } from '../services/scoringService';
@@ -92,8 +92,8 @@ const avatarGradients = [
 ];
 
 const Home = () => {
-  const { athletes, events, news, academies, favoriteEvents = [] } = useStore();
   const { locale, uiLanguage, uiVariant } = useI18n();
+  const navigate = useNavigate();
   const statsRef = useRef(null);
   const [statsVisible, setStatsVisible] = useState(false);
   const [selectedNews, setSelectedNews] = useState(null);
@@ -154,14 +154,14 @@ const Home = () => {
       pointsSuffix: 'pts',
       emptyAthletes: 'Nenhum atleta cadastrado ainda. O ranking aparece aqui automaticamente.',
       eventsKicker: 'Eventos',
-      eventsTitle: 'Proximos eventos com inscricao direta.',
-      fullCalendar: 'Ver calendario completo',
+      eventsTitle: 'Proximos eventos',
+      fullCalendar: 'Ver mais eventos',
       dayLeftSingular: 'dia restante',
       dayLeftPlural: 'dias restantes',
       todayLabel: 'hoje',
       finishedLabel: 'encerrado',
       newsKicker: 'Noticias',
-      newsTitle: 'Ultimas atualizacoes',
+      newsTitle: 'News',
       newsCta: 'Abrir pagina de noticias',
       newsEmpty: 'Nenhuma noticia publicada ainda.',
       eventFallback: 'Evento oficial',
@@ -223,7 +223,7 @@ const Home = () => {
       emptyAthletes: 'No athletes registered yet. Ranking appears here automatically.',
       eventsKicker: 'Events',
       eventsTitle: 'Upcoming events with direct registration.',
-      fullCalendar: 'View full calendar',
+      fullCalendar: 'View more events',
       dayLeftSingular: 'day left',
       dayLeftPlural: 'days left',
       todayLabel: 'today',
@@ -291,7 +291,7 @@ const Home = () => {
       emptyAthletes: 'Todavia no hay atletas registrados. El ranking aparecera aqui automaticamente.',
       eventsKicker: 'Eventos',
       eventsTitle: 'Proximos eventos con inscripcion directa.',
-      fullCalendar: 'Ver calendario completo',
+      fullCalendar: 'Ver más eventos',
       dayLeftSingular: 'dia restante',
       dayLeftPlural: 'dias restantes',
       todayLabel: 'hoy',
@@ -397,10 +397,23 @@ const Home = () => {
   };
   const copy = copyByLanguage[uiVariant] || copyByLanguage.pt;
 
+  const { athletes, events, news, academies, favoriteEvents = [], memberProfiles = [] } = useStore();
+
   const topAthletes = useMemo(() => {
     if (!athletes.length) return [];
-    return rankAthletes(groupAthletesByName(athletes)).slice(0, 5);
-  }, [athletes]);
+    const ranked = rankAthletes(groupAthletesByName(athletes)).slice(0, 5);
+    
+    return ranked.map(athlete => {
+      const profile = memberProfiles.find(p => 
+        (p.fullName || '').toLowerCase() === (athlete.nome || '').toLowerCase() || 
+        (p.id && p.id === athlete.profileId)
+      );
+      return {
+        ...athlete,
+        photoUrl: profile?.photoUrl || profile?.fotoUrl || athlete.photoUrl || ''
+      };
+    });
+  }, [athletes, memberProfiles]);
 
   const topAcademies = useMemo(() => {
     if (!athletes.length) return [];
@@ -411,7 +424,7 @@ const Home = () => {
     });
     return Object.entries(academyMap)
       .map(([name, pontos]) => {
-        const academyData = (academies || []).find(ac => ac.name === name);
+        const academyData = (academies || []).find(ac => (ac.name || '').trim().toLowerCase() === name.trim().toLowerCase());
         return { name, pontos, logoUrl: academyData?.logoUrl };
       })
       .sort((a, b) => b.pontos - a.pontos)
@@ -422,22 +435,12 @@ const Home = () => {
     if (!events.length) return [];
     
     return [...events]
-      .map((event) => ({
-        ...event,
-        parsedDate: parseDate(event.date)
-      }))
-      .filter((event) => {
-        // Exclude explicitly closed events
-        if (event.registrationOpen === false) return false;
-        
+      .map((event) => {
+        const parsedDate = parseDate(event.date);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        
-        // Exclude past events
-        const isPastDate = event.parsedDate && event.parsedDate.getTime() < today.getTime();
-        if (isPastDate) return false;
-        
-        // Exclude events past their registration close date
+        const isPastDate = parsedDate && parsedDate.getTime() < today.getTime();
+
         let isRegistrationClosedByDate = false;
         if (event.registrationCloseDate) {
           const closeDate = new Date(event.registrationCloseDate);
@@ -448,21 +451,31 @@ const Home = () => {
             }
           }
         }
-        if (isRegistrationClosedByDate) return false;
-        
-        return true;
+        const isOpen = event.registrationOpen !== false && !isPastDate && !isRegistrationClosedByDate;
+        return {
+          ...event,
+          parsedDate,
+          isOpen
+        };
       })
       .sort((a, b) => {
+        // 1. Inscrições abertas entram primeiro
+        if (a.isOpen !== b.isOpen) {
+          return a.isOpen ? -1 : 1;
+        }
+
+        // 2. Favoritados
         const aFav = favoriteEvents.includes(a.id) ? 1 : 0;
         const bFav = favoriteEvents.includes(b.id) ? 1 : 0;
-        if (aFav !== bFav) return bFav - aFav; // Favoritados primeiro
+        if (aFav !== bFav) return bFav - aFav;
 
+        // 3. Data do evento
         const aTime = a.parsedDate ? a.parsedDate.getTime() : 0;
         const bTime = b.parsedDate ? b.parsedDate.getTime() : 0;
         if (aTime && bTime) return aTime - bTime;
         if (aTime) return -1;
         if (bTime) return 1;
-        return a.name.localeCompare(b.name);
+        return (a.name || '').localeCompare(b.name || '');
       });
   }, [events, favoriteEvents]);
 
@@ -596,10 +609,25 @@ const Home = () => {
 
                   {/* Body */}
                   <div className="home-event-card__body">
-                    <h3 className="home-event-card__title">{event.name || copy.eventFallback}</h3>
-                    <div className="home-event-card__location">
-                      <MapPin size={13} />
-                      <span>{eventLocation}</span>
+                    <div className="home-event-card__header-row">
+                      <div className="home-event-card__info-col">
+                        <h3 className="home-event-card__title">{event.name || copy.eventFallback}</h3>
+                        <div className="home-event-card__location">
+                          <MapPin size={13} />
+                          <span>{eventLocation}</span>
+                        </div>
+                      </div>
+                      {isOpen && (
+                        <Link
+                          to={event.internalRegistration !== false ? `/eventos/${event.id}/inscricao?step=entradas` : (event.registrationUrl || '#')}
+                          target={event.internalRegistration === false && event.registrationUrl ? '_blank' : undefined}
+                          rel={event.internalRegistration === false && event.registrationUrl ? 'noreferrer' : undefined}
+                          className="home-event-card__subscribe-btn"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          Inscrever-se
+                        </Link>
+                      )}
                     </div>
                     <div className="home-event-card__footer">
                       <span className="home-event-card__date-text">
@@ -692,132 +720,7 @@ const Home = () => {
         )}
       </section>
 
-      {/* ─── RANKINGS (ATHLETES + ACADEMIES) ─── */}
-      <section className="home-section home-animate">
-        <div className="home-ranking-grid">
-          
-          {/* COLUMN 1: TOP ATHLETES */}
-          <div className="home-ranking-col">
-            <div className="home-section__header">
-              <div>
-                <span className="home-kicker">{copy.topKicker}</span>
-                <h2 className="home-section__title">{copy.topTitle}</h2>
-              </div>
-              <Link className="home-text-link" to="/ranking">{copy.fullRanking}</Link>
-            </div>
 
-            <div className="home-ranking-list">
-              {topAthletes.length ? (
-                topAthletes.map((athlete, index) => {
-                  const descriptor = buildCategoryDescriptor(athlete);
-                  const categoryLabel = translateCompositeLabel(
-                    descriptor?.label || [athlete.faixa, athlete.peso].filter(Boolean).join(' • '),
-                    uiLanguage
-                  );
-                  const medal = getMedal(index);
-                  const progressPct = Math.round((athlete.pontos / maxPoints) * 100);
-
-                  return (
-                    <div className={`home-rank-row ${index < 3 ? 'home-rank-row--podium' : ''}`} key={athlete.id || index}>
-                      <div className="home-rank-pos">
-                        {medal ? (
-                          <span className="home-rank-medal">{medal}</span>
-                        ) : (
-                          <span className="home-rank-number">{index + 1}</span>
-                        )}
-                      </div>
-
-                      <div
-                        className="home-rank-avatar"
-                        style={{ background: avatarGradients[index % avatarGradients.length] }}
-                      >
-                        {athlete.photoUrl ? (
-                          <img src={athlete.photoUrl} alt={athlete.nome} />
-                        ) : (
-                          <span>{getInitials(athlete.nome)}</span>
-                        )}
-                      </div>
-
-                      <div className="home-rank-info">
-                        <div className="home-rank-name">{athlete.nome || copy.athleteFallback}</div>
-                        <div className="home-rank-meta">{athlete.academia || copy.academyFallback}{categoryLabel ? ` • ${categoryLabel}` : ''}</div>
-                        <div className="home-rank-progress">
-                          <div className="home-rank-progress-bar" style={{ width: `${progressPct}%` }} />
-                        </div>
-                      </div>
-
-                      <div className="home-rank-score">
-                        <span className="home-rank-pts">{athlete.pontos}</span>
-                        <span className="home-rank-pts-label">{copy.pointsSuffix}</span>
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="home-empty">{copy.emptyAthletes}</div>
-              )}
-            </div>
-          </div>
-
-          {/* COLUMN 2: TOP ACADEMIES */}
-          <div className="home-ranking-col">
-            <div className="home-section__header">
-              <div>
-                <span className="home-kicker">TOP 5</span>
-                <h2 className="home-section__title">{copy.topAcademiesTitle}</h2>
-              </div>
-            </div>
-
-            <div className="home-ranking-list">
-              {topAcademies.length ? (
-                topAcademies.map((academy, index) => {
-                  const medal = getMedal(index);
-                  const maxAcademyPoints = topAcademies[0]?.pontos || 1;
-                  const progressPct = Math.round((academy.pontos / maxAcademyPoints) * 100);
-
-                  return (
-                    <div className={`home-rank-row home-academy-row ${index < 3 ? 'home-rank-row--podium' : ''}`} key={academy.name || index}>
-                      <div className="home-rank-pos">
-                        {medal ? (
-                          <span className="home-rank-medal">{medal}</span>
-                        ) : (
-                          <span className="home-rank-number">{index + 1}</span>
-                        )}
-                      </div>
-
-                      <div
-                        className="home-rank-avatar home-academy-avatar"
-                      >
-                        {academy.logoUrl ? (
-                          <img src={academy.logoUrl} alt={academy.name} />
-                        ) : (
-                          <Shield size={24} color="#fff" />
-                        )}
-                      </div>
-
-                      <div className="home-rank-info">
-                        <div className="home-rank-name">{academy.name}</div>
-                        <div className="home-rank-meta">Academia / Equipe</div>
-                        <div className="home-rank-progress">
-                          <div className="home-rank-progress-bar" style={{ width: `${progressPct}%` }} />
-                        </div>
-                      </div>
-
-                      <div className="home-rank-score">
-                        <span className="home-rank-pts">{academy.pontos}</span>
-                        <span className="home-rank-pts-label">{copy.pointsSuffix}</span>
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="home-empty">Sem dados de equipes</div>
-              )}
-            </div>
-          </div>
-
-        </div>
-      </section>
 
       <FilmmakerShowcase />
 
@@ -854,6 +757,83 @@ const Home = () => {
               <div style={{ color: '#d4d4d8', fontSize: '1.05rem', lineHeight: 1.7, whiteSpace: 'pre-line' }}>
                 {selectedNews.body || selectedNews.summary || 'Conteúdo da notícia indisponível.'}
               </div>
+
+              {/* Botão de Ação (Chaveamento / Garantir Vaga / Ver Detalhes) */}
+              {(() => {
+                const title = (selectedNews.title || '').toLowerCase();
+                const summary = (selectedNews.summary || '').toLowerCase();
+                const body = (selectedNews.body || '').toLowerCase();
+                const tags = Array.isArray(selectedNews.tags) ? selectedNews.tags.map(t => String(t).toLowerCase()) : [];
+                
+                const isBracket = tags.includes('chaveamento') || tags.includes('chaveamentos') || title.includes('chaveamento') || title.includes('chaveamentos') || summary.includes('chaveamento') || body.includes('chaveamento');
+                
+                let matchedEvent = null;
+                let targetEventId = selectedNews.eventId || selectedNews.event_id;
+                
+                if (events && events.length) {
+                  if (targetEventId) {
+                    matchedEvent = events.find(e => e.id === targetEventId);
+                  }
+                  if (!matchedEvent) {
+                    matchedEvent = events.find(e => e?.name && (title.includes(e.name.trim().toLowerCase()) || body.includes(e.name.trim().toLowerCase())));
+                  }
+                }
+
+                if (matchedEvent && !targetEventId) {
+                  targetEventId = matchedEvent.id;
+                }
+
+                if (!targetEventId) return null;
+
+                let btnLabel = 'Ver Detalhes do Evento';
+                let btnTargetUrl = `/eventos/${targetEventId}`;
+
+                if (isBracket) {
+                  btnLabel = 'Ver Chaveamentos';
+                  btnTargetUrl = `/eventos/${targetEventId}?tab=brackets`;
+                } else if (matchedEvent) {
+                  const isRegOpen = matchedEvent.registrationOpen !== false;
+                  if (isRegOpen) {
+                    btnLabel = 'Garantir Vaga';
+                    btnTargetUrl = `/eventos/${targetEventId}/inscricao`;
+                  } else {
+                    btnLabel = 'Ver Detalhes do Evento';
+                    btnTargetUrl = `/eventos/${targetEventId}`;
+                  }
+                }
+
+                return (
+                  <div style={{ marginTop: '28px' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedNews(null);
+                        navigate(btnTargetUrl);
+                      }}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '12px 24px',
+                        background: '#2563eb',
+                        color: '#ffffff',
+                        fontSize: '0.95rem',
+                        fontWeight: 700,
+                        letterSpacing: '0.02em',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 14px rgba(37, 99, 235, 0.4)',
+                        transition: 'transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease'
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = '#1d4ed8'; e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(37, 99, 235, 0.6)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = '#2563eb'; e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 4px 14px rgba(37, 99, 235, 0.4)'; }}
+                    >
+                      {btnLabel}
+                    </button>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>

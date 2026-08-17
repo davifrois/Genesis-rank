@@ -11,7 +11,7 @@ import {
   Zap
 } from 'lucide-react';
 import './About.css';
-import aboutHeroImage from '../../img/organizers-command-center.png';
+// aboutHeroImage removed – image file no longer exists
 import trabalhoImage from '../../img/trabalho.jpeg.jpeg';
 import placarImage from '../../img/placar.png';
 import podioImage from '../../img/Podio.jpeg';
@@ -80,7 +80,7 @@ const values = [
 const About = () => (
   <main className="public-page about-tech-page">
     <section className="about-tech-hero">
-      <img className="about-tech-hero__image" src={aboutHeroImage} alt="" aria-hidden="true" />
+      <img className="about-tech-hero__image" src="/paixao-banner.jpeg" alt="" aria-hidden="true" />
       <div className="about-tech-hero__shade" aria-hidden="true" />
       <div className="about-tech-hero__content">
         <span className="about-tech-kicker">Sobre a Genesis</span>

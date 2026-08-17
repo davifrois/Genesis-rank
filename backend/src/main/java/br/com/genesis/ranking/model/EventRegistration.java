@@ -71,6 +71,12 @@ public class EventRegistration extends BaseEntity {
 
   @Column(columnDefinition = "TEXT")
   private String pixCopyPaste;
+
+  @Column(nullable = false)
+  private Boolean checkedIn = false;
+
+  private Instant checkedInAt;
+
   public Event getEvent() {
     return event;
   }
@@ -229,5 +235,21 @@ public class EventRegistration extends BaseEntity {
 
   public void setPixCopyPaste(String pixCopyPaste) {
     this.pixCopyPaste = pixCopyPaste;
+  }
+
+  public Boolean getCheckedIn() {
+    return checkedIn != null && checkedIn;
+  }
+
+  public void setCheckedIn(Boolean checkedIn) {
+    this.checkedIn = checkedIn != null && checkedIn;
+  }
+
+  public Instant getCheckedInAt() {
+    return checkedInAt;
+  }
+
+  public void setCheckedInAt(Instant checkedInAt) {
+    this.checkedInAt = checkedInAt;
   }
 }

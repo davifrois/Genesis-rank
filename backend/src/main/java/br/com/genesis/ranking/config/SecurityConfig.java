@@ -32,6 +32,7 @@ public class SecurityConfig {
             .requestMatchers("/api/auth/**").permitAll()
             .requestMatchers("/api/ranking/**").permitAll()
             .requestMatchers("/api/public/**").permitAll()
+            .requestMatchers("/api/webhooks/payment/**").permitAll()
             .requestMatchers("/api/health").permitAll()
             .requestMatchers("/ws/**").permitAll()
             .anyRequest().authenticated()

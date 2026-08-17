@@ -44,4 +44,12 @@ public class InscricaoCampeonatoAdminController {
   ) {
     return registrationService.updateRegistrationDetails(registrationId, request);
   }
+
+  // Alterna o status de Check-in (presença/pesagem) do atleta
+  @PatchMapping("/{registrationId}/checkin")
+  public PublicRegistrationResponse toggleCheckIn(
+      @PathVariable String registrationId
+  ) {
+    return registrationService.toggleCheckIn(registrationId);
+  }
 }

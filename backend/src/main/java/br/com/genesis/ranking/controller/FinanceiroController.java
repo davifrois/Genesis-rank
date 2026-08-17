@@ -2,6 +2,10 @@ package br.com.genesis.ranking.controller;
 
 import br.com.genesis.ranking.model.EventRegistration;
 import br.com.genesis.ranking.service.PublicRegistrationService;
+import br.com.genesis.ranking.service.MercadoPagoService;
+import com.mercadopago.client.payment.PaymentClient;
+import com.mercadopago.resources.payment.Payment;
+import com.mercadopago.resources.preference.Preference;
 import com.stripe.exception.SignatureVerificationException;
 import com.stripe.model.Event;
 import com.stripe.model.checkout.Session;
@@ -11,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.Map;
 import java.util.HashMap;
 
@@ -22,12 +27,14 @@ import java.util.HashMap;
 public class FinanceiroController {
 
     private final PublicRegistrationService publicRegistrationService;
+    private final MercadoPagoService mercadoPagoService;
 
     @Value("${app.stripe.webhook-secret:whsec_placeholder}")
     private String endpointSecret;
 
-    public FinanceiroController(PublicRegistrationService publicRegistrationService) {
+    public FinanceiroController(PublicRegistrationService publicRegistrationService, MercadoPagoService mercadoPagoService) {
         this.publicRegistrationService = publicRegistrationService;
+        this.mercadoPagoService = mercadoPagoService;
     }
 
     // Processa os webhooks do Stripe
@@ -98,52 +105,160 @@ public class FinanceiroController {
         Map<String, String> response = new HashMap<>();
         
         try {
-            // -- SEU CÓDIGO COMEÇA AQUI --
-
-            // 1. Obter dados
-            // String registrationIds = (String) requestData.get("registrationIds");
-            // Number rawAmount = (Number) requestData.get("amount");
-            // Long amountEmCentavos = rawAmount.longValue() * 100;
-
-            // 2. Montar Parâmetros da Stripe
-            // SessionCreateParams params = SessionCreateParams.builder()
-            //     .setMode(SessionCreateParams.Mode.PAYMENT)
-            //     .setSuccessUrl("http://localhost:5173/eventos?payment=success") // Ajustar para o domínio de produção depois
-            //     .setCancelUrl("http://localhost:5173/eventos?payment=cancel")
-            //     .putMetadata("registrationId", registrationIds) // <-- Muito Importante!
-            //     .addLineItem(
-            //         SessionCreateParams.LineItem.builder()
-            //             .setQuantity(1L)
-            //             .setPriceData(
-            //                 SessionCreateParams.LineItem.PriceData.builder()
-            //                     .setCurrency("brl")
-            //                     .setUnitAmount(amountEmCentavos)
-            //                     .setProductData(
-            //                         SessionCreateParams.LineItem.PriceData.ProductData.builder()
-            //                             .setName("Inscrição Campeonato")
-            //                             .build()
-            //                     )
-            //                     .build()
-            //             )
-            //             .build()
-            //     )
-            //     .build();
-
-            // 3. Criar e retornar
-            // Session session = Session.create(params);
-            // response.put("url", session.getUrl());
+            String registrationIds = (String) requestData.get("registrationIds");
+            String athleteName = (String) requestData.get("athleteName");
+            Number rawAmount = (Number) requestData.get("amount");
             
-            // -- SEU CÓDIGO TERMINA AQUI --
+            if (registrationIds == null || athleteName == null || rawAmount == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Missing parameters"));
+            }
+
+            BigDecimal amountInBrl = BigDecimal.valueOf(rawAmount.doubleValue());
+
+            // Create Mercado Pago Preference
+            Preference preference = mercadoPagoService.createCheckoutPreference(registrationIds, athleteName, amountInBrl);
             
-            // REMOVA este exemplo estático quando integrar a API real:
-            response.put("url", "https://checkout.stripe.com/pay/test_xyz123");
-            
+            String initPoint = preference.getInitPoint();
+            if (initPoint == null || initPoint.isEmpty()) {
+                initPoint = preference.getSandboxInitPoint();
+            }
+
+            response.put("url", initPoint); // Checkout Pro URL
             return ResponseEntity.ok(response);
             
+        } catch (com.mercadopago.exceptions.MPApiException e) {
+            e.printStackTrace();
+            String detail = (e.getApiResponse() != null && e.getApiResponse().getContent() != null) 
+                    ? e.getApiResponse().getContent() 
+                    : e.getMessage();
+            System.err.println("[MercadoPago Error Details] " + detail);
+            response.put("error", detail);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         } catch (Exception e) {
             e.printStackTrace();
             response.put("error", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
+    }
+
+    // Endpoint de confirmação ao retornar do checkout (backup para quando webhook não puder ser chamado)
+    @GetMapping("/confirm-return")
+    public ResponseEntity<Map<String, Object>> confirmPaymentReturn(
+            @RequestParam("registrationIds") String registrationIds,
+            @RequestParam(name = "paymentId", required = false) String paymentId) {
+        
+        Map<String, Object> result = new HashMap<>();
+        if (registrationIds != null && !registrationIds.isBlank()) {
+            String[] regIds = registrationIds.split(",");
+            for (String rId : regIds) {
+                rId = rId.trim();
+                if (rId.isEmpty()) continue;
+                publicRegistrationService.approveRegistration(rId, paymentId != null ? paymentId : "MP_RETURN");
+                System.out.println("Confirm-return: Inscrição " + rId + " aprovada com sucesso.");
+            }
+            result.put("success", true);
+            return ResponseEntity.ok(result);
+        }
+        result.put("success", false);
+        return ResponseEntity.badRequest().body(result);
+    }
+
+    // Gerar PIX Direto (Sem redirecionar para o Mercado Pago)
+    @PostMapping("/pix")
+    public ResponseEntity<Map<String, Object>> createPixPayment(@RequestBody Map<String, Object> requestData) {
+        try {
+            String registrationIds = (String) requestData.get("registrationIds");
+            String athleteName = (String) requestData.get("athleteName");
+            String email = (String) requestData.get("email");
+            Number rawAmount = (Number) requestData.get("amount");
+
+            if (registrationIds == null || athleteName == null || rawAmount == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Parâmetros ausentes"));
+            }
+
+            BigDecimal amountInBrl = BigDecimal.valueOf(rawAmount.doubleValue());
+            Map<String, Object> pixData = mercadoPagoService.createDirectPixPayment(registrationIds, athleteName, email, amountInBrl);
+            return ResponseEntity.ok(pixData);
+        } catch (com.mercadopago.exceptions.MPApiException e) {
+            e.printStackTrace();
+            String detail = (e.getApiResponse() != null && e.getApiResponse().getContent() != null)
+                    ? e.getApiResponse().getContent()
+                    : e.getMessage();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", detail));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // Consulta de status do pagamento PIX em tempo real
+    @GetMapping("/status/{paymentId}")
+    public ResponseEntity<Map<String, Object>> checkPaymentStatus(@PathVariable("paymentId") Long paymentId) {
+        try {
+            PaymentClient paymentClient = new PaymentClient();
+            Payment payment = paymentClient.get(paymentId);
+            boolean isApproved = "approved".equals(payment.getStatus());
+
+            if (isApproved) {
+                String registrationIds = payment.getExternalReference();
+                if (registrationIds != null && !registrationIds.isBlank()) {
+                    String[] regIds = registrationIds.split(",");
+                    for (String rId : regIds) {
+                        rId = rId.trim();
+                        if (rId.isEmpty()) continue;
+                        publicRegistrationService.approveRegistration(rId, String.valueOf(paymentId));
+                    }
+                }
+            }
+
+            return ResponseEntity.ok(Map.of(
+                "status", payment.getStatus() != null ? payment.getStatus() : "pending",
+                "approved", isApproved,
+                "externalReference", payment.getExternalReference() != null ? payment.getExternalReference() : ""
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.ok(Map.of("status", "pending", "approved", false, "error", e.getMessage()));
+        }
+    }
+
+    // Processa os webhooks do Mercado Pago
+    @PostMapping("/mercadopago")
+    public ResponseEntity<String> handleMercadoPagoWebhook(
+            @RequestParam(name = "data.id", required = false) Long dataId,
+            @RequestParam(name = "type", required = false) String type,
+            @RequestBody(required = false) Map<String, Object> payload) {
+        
+        System.out.println("Mercado Pago Webhook recebido: " + type + " / ID: " + dataId);
+
+        try {
+            if ("payment".equals(type) && dataId != null) {
+                PaymentClient paymentClient = new PaymentClient();
+                Payment payment = paymentClient.get(dataId);
+                
+                if ("approved".equals(payment.getStatus())) {
+                    String registrationIds = payment.getExternalReference();
+                    String transactionId = String.valueOf(payment.getId());
+                    
+                    if (registrationIds != null && !registrationIds.isEmpty()) {
+                        String[] regIds = registrationIds.split(",");
+                        for (String rId : regIds) {
+                            rId = rId.trim();
+                            if (rId.isEmpty()) continue;
+                            EventRegistration registration = publicRegistrationService.approveRegistration(rId, transactionId);
+                            if (registration != null) {
+                                System.out.println("Webhook MP: Inscrição " + rId + " aprovada com sucesso. TX: " + transactionId);
+                            } else {
+                                System.err.println("Webhook MP: Inscrição " + rId + " não encontrada.");
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error processing MP webhook");
+        }
+
+        return ResponseEntity.ok("Success");
     }
 }

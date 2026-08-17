@@ -3,7 +3,9 @@ import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } f
 import { z } from 'zod';
 import {
   AlertCircle,
+  Building2,
   ChevronDown,
+  ClipboardList,
   ExternalLink,
   Facebook,
   Instagram,
@@ -16,6 +18,7 @@ import {
   Settings,
   Trophy,
   User,
+  UserCog,
   Users,
   X,
   Youtube,
@@ -40,6 +43,7 @@ import Regulations from './pages/Regulations';
 import RankGeral from './pages/RankGeral';
 import RankEquipes from './pages/RankEquipes';
 import EventRegistration from './pages/EventRegistration';
+import RankAcademia from './pages/RankAcademia';
 import SettingsPage from './pages/Settings';
 import AcademyRegistration from './pages/AcademyRegistration';
 import CoachManagerPage from './pages/CoachManagerPage';
@@ -50,6 +54,7 @@ import PaymentCancel from './pages/PaymentCancel';
 import { useStore } from './hooks/useStore';
 import { useI18n } from './hooks/useI18n';
 import LoginOverlay from './components/LoginOverlay';
+import PwaInstallBanner from './components/PwaInstallBanner';
 import { DEFAULT_EVENT_FEES, DEFAULT_EVENT_PIX_KEY } from './utils/eventPricing';
 import { compressImage } from './utils/imageUtils';
 import './index.css';
@@ -70,7 +75,10 @@ const createEventFormState = () => ({
   name: '',
   date: '',
   endDate: '',
+  registrationCloseDate: '',
+  checkinEndDate: '',
   location: '',
+  isPremium: false,
   eventDescription: '',
   posterUrl: '',
   registrationUrl: '',
@@ -211,6 +219,7 @@ const AppLayout = () => {
     eventModalOpen,
     closeEventModal,
     addEvent,
+    deleteEvent,
     logout
   } = useStore();
   const location = useLocation();
@@ -301,8 +310,9 @@ const AppLayout = () => {
   const isOrganizersRoute = location.pathname.startsWith('/organizadores');
   const isAboutRoute = location.pathname.startsWith('/institucional');
   const isRegulationsRoute = location.pathname.startsWith('/regulamento');
-  const isRankingRoute = location.pathname.startsWith('/ranking');
+  const isRankingRoute = location.pathname.startsWith('/rank');
   const isAthletesRoute = location.pathname.startsWith('/atletas');
+  const isMembershipRoute = location.pathname.startsWith('/filiacao') || location.pathname.startsWith('/academia');
   const { language, setLanguage, currentLanguage, languages, uiLanguage } = useI18n();
   const isEnglish = uiLanguage === 'en-US';
   const isSpanish = uiLanguage === 'es-ES';
@@ -369,7 +379,7 @@ const AppLayout = () => {
             myAccount: 'My account',
             academy: 'Academy',
             settings: 'Settings',
-            manageProfiles: 'Manage profiles',
+            manageProfiles: 'Admin panel',
             logout: 'Log out',
             login: 'Login',
             register: 'Register'
@@ -492,7 +502,7 @@ const AppLayout = () => {
               myAccount: 'Mi cuenta',
               academy: 'Academia',
               settings: 'Configuracion',
-              manageProfiles: 'Gestionar perfiles',
+              manageProfiles: 'Panel de adm',
               logout: 'Salir',
               login: 'Iniciar sesion',
               register: 'Crear cuenta'
@@ -615,7 +625,7 @@ const AppLayout = () => {
                 myAccount: 'Mon compte',
                 academy: 'Academie',
                 settings: 'Parametres',
-                manageProfiles: 'Gerer les profils',
+                manageProfiles: "Panneau d'administration",
                 logout: 'Se deconnecter',
                 login: 'Se connecter',
                 register: "S'inscrire"
@@ -736,8 +746,8 @@ const AppLayout = () => {
               accountMenu: {
                 myAccount: 'Minha conta',
                 academy: 'Academia',
-                settings: 'Configuracoes',
-                manageProfiles: 'Gerenciar perfis',
+                settings: 'Configurações',
+                manageProfiles: 'Painel do adm',
                 logout: 'Sair',
                 login: 'Entrar',
                 register: 'Cadastrar'
@@ -831,19 +841,52 @@ const AppLayout = () => {
       const parsed = new Date(value);
       return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
     };
-    return [...events]
-      .sort((a, b) => getTime(b.date || b.createdAt) - getTime(a.date || a.createdAt))
-      .map((event) => ({
-        label: event.name,
-        path: `/ranking?event=${event.id}`
-      }))
-      .slice(0, 6);
+
+    const sortedEvents = [...events]
+      .sort((a, b) => getTime(b.date || b.createdAt) - getTime(a.date || a.createdAt));
+
+    const grouped = {};
+    sortedEvents.slice(0, 15).forEach((event) => {
+      const ts = getTime(event.date || event.createdAt);
+      const year = ts > 0 ? new Date(ts).getFullYear() : new Date().getFullYear();
+      if (!grouped[year]) grouped[year] = [];
+      grouped[year].push(event);
+    });
+
+    const items = [];
+    const sortedYears = Object.keys(grouped).sort((a, b) => b - a);
+    sortedYears.forEach((year) => {
+      items.push({ type: 'label', label: `Temporada ${year}` });
+      grouped[year].forEach((event) => {
+        items.push({
+          label: event.name,
+          path: `/ranking?event=${event.id}`
+        });
+      });
+    });
+
+    if (sortedEvents.length > 15) {
+      items.push({ type: 'divider' });
+      items.push({ label: 'Ver todos os eventos...', path: '/eventos' });
+    }
+
+    return items;
   }, [events]);
 
   const navLeft = useMemo(() => {
     const rankingItems = rankingEventItems.length
-      ? rankingEventItems
-      : [{ type: 'label', label: copy.rankingMenu.emptyEvents }];
+      ? [
+          { label: 'Ranking Geral (Atletas)', path: '/ranking' },
+          { label: 'Ranking Geral (Equipes)', path: '/ranking-equipes' },
+          { type: 'divider' },
+          ...rankingEventItems
+        ]
+      : [
+          { label: 'Ranking Geral (Atletas)', path: '/ranking' },
+          { label: 'Ranking Geral (Equipes)', path: '/ranking-equipes' },
+          { type: 'divider' },
+          { type: 'label', label: copy.rankingMenu.emptyEvents }
+        ];
 
     return [
       {
@@ -857,7 +900,7 @@ const AppLayout = () => {
       },
       {
         label: copy.nav.rankings,
-        activePaths: ['/ranking', '/ranking-equipes'],
+        activePaths: ['/ranking', '/ranking-equipes', '/rank-academia'],
         items: rankingItems
       },
       { label: copy.nav.athletes, path: '/atletas', activePaths: ['/atletas'] }
@@ -996,10 +1039,11 @@ const AppLayout = () => {
           );
         }
       } else {
-        if (isEnglish) setEventSuccess('Event created successfully.');
-        else if (isSpanish) setEventSuccess('Evento creado con exito.');
-        else if (isFrench) setEventSuccess('Evenement cree avec succes.');
-        else setEventSuccess('Evento criado com sucesso.');
+        const isEditing = Boolean(eventForm?.id);
+        if (isEnglish) setEventSuccess(isEditing ? 'Event updated successfully.' : 'Event created successfully.');
+        else if (isSpanish) setEventSuccess(isEditing ? 'Evento actualizado con éxito.' : 'Evento creado con éxito.');
+        else if (isFrench) setEventSuccess(isEditing ? 'Événement mis à jour avec succès.' : 'Événement créé avec succès.');
+        else setEventSuccess(isEditing ? 'Evento atualizado com sucesso!' : 'Evento criado com sucesso!');
       }
 
       setEventForm(createEventFormState());
@@ -1010,6 +1054,22 @@ const AppLayout = () => {
     } catch (err) {
       setEventError(err?.message || copy.eventModal.error);
       setEventSuccess('');
+    }
+  };
+
+  const handleDeleteEventInModal = async () => {
+    if (!eventForm.id) return;
+    const confirmDelete = window.confirm(`Tem certeza que deseja apagar o evento "${eventForm.name}"? Esta ação não pode ser desfeita.`);
+    if (!confirmDelete) return;
+
+    try {
+      if (typeof deleteEvent === 'function') {
+        await deleteEvent(eventForm.id);
+      }
+      handleCloseEventModal();
+      alert('Evento apagado com sucesso.');
+    } catch (err) {
+      alert('Erro ao apagar evento: ' + (err?.message || 'Tente novamente.'));
     }
   };
 
@@ -1124,13 +1184,13 @@ const AppLayout = () => {
         { label: copy.accountMenu.myAccount, path: '/minha-conta', icon: User },
         ...(isCoachUser
           ? [
-              { label: copy.accountMenu.academy, path: '/academia', icon: Users },
-              { label: 'Gerente de Inscrições', path: '/gerente-treinador', icon: Users }
+              { label: copy.accountMenu.academy, path: '/academia', icon: Building2 },
+              { label: 'Gerente de Inscrições', path: '/gerente-treinador', icon: ClipboardList }
             ]
           : []),
         { label: copy.accountMenu.settings, path: '/configuracoes', icon: Settings },
         ...(canAccessDashboard
-          ? [{ label: copy.accountMenu.manageProfiles, path: '/admin', icon: Users }]
+          ? [{ label: copy.accountMenu.manageProfiles, path: '/admin', icon: UserCog }]
           : []),
         { label: copy.accountMenu.logout, onClick: logout, icon: LogOut }
       ]
@@ -1219,6 +1279,7 @@ const AppLayout = () => {
 
   return (
     <div className="app-shell">
+      <PwaInstallBanner />
       <header className="app-topbar ajp-header">
         <div className="topbar-utility">
           <div className="container topbar-utility__inner">
@@ -1265,8 +1326,21 @@ const AppLayout = () => {
                 </div>
               </div>
               <div className="utility-dropdown">
-                <button className="utility-link" type="button">
-                  {copy.utility.account}
+                <button className="utility-link" type="button" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {currentUser ? (
+                    <>
+                      <div className="account-dropdown-avatar" style={{ width: '24px', height: '24px', fontSize: '0.8rem', margin: 0, padding: 0 }}>
+                        {finalAvatar ? (
+                          <img src={finalAvatar} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                        ) : (
+                          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', borderRadius: '50%', backgroundColor: '#333', color: '#fff' }}>{(finalName || 'U').charAt(0).toUpperCase()}</span>
+                        )}
+                      </div>
+                      <span style={{ fontWeight: 600 }}>{finalName ? finalName.split(' ')[0] : 'Conta'}</span>
+                    </>
+                  ) : (
+                    copy.utility.account
+                  )}
                   <ChevronDown size={12} />
                 </button>
                 <div className="utility-dropdown__panel utility-dropdown__panel--account">
@@ -1591,8 +1665,8 @@ const AppLayout = () => {
         </div>
       </div>
 
-      <main className={`app-main ${isAdminRoute ? 'app-main--admin' : ''} ${(isEventsRoute || isOrganizersRoute || isAboutRoute || isRegulationsRoute || isRankingRoute || isAthletesRoute) ? 'app-main--full' : ''}`}>
-        <div className={`container ${isAdminRoute ? 'container--admin' : ''} ${isHomeRoute ? 'container--home' : ''} ${(isEventsRoute || isOrganizersRoute || isAboutRoute || isRegulationsRoute || isRankingRoute || isAthletesRoute) ? 'container--full' : ''}`}>
+      <main className={`app-main ${isAdminRoute ? 'app-main--admin' : ''} ${(isEventsRoute || isOrganizersRoute || isAboutRoute || isRegulationsRoute || isRankingRoute || isAthletesRoute || isMembershipRoute) ? 'app-main--full' : ''}`}>
+        <div className={`container ${isAdminRoute ? 'container--admin' : ''} ${isHomeRoute ? 'container--home' : ''} ${(isEventsRoute || isOrganizersRoute || isAboutRoute || isRegulationsRoute || isRankingRoute || isAthletesRoute || isMembershipRoute) ? 'container--full' : ''}`}>
           <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}
@@ -1620,6 +1694,7 @@ const AppLayout = () => {
                 <Route path="/perfil-publico/:athleteId" element={<PublicProfile />} />
                 <Route path="/ranking" element={<RankGeral />} />
                 <Route path="/ranking-equipes" element={<RankEquipes />} />
+                <Route path="/rank-academia" element={<RankAcademia />} />
                 <Route path="/atletas" element={<Athletes />} />
                 <Route path="/equipes" element={<Teams />} />
                 <Route path="/equipe/:academyId" element={<TeamProfile />} />
@@ -1640,7 +1715,7 @@ const AppLayout = () => {
       </main>
 
       {isHomeRoute && (
-        <div className="genesis-cta-section" style={{ backgroundImage: 'url(/cta_background.png)' }}>
+        <div className="genesis-cta-section" style={{ backgroundImage: 'url(/menina.jpeg)', backgroundPosition: 'center 60%' }}>
           <div className="genesis-cta-overlay"></div>
           <div className="genesis-cta-content">
             <h2 className="genesis-cta-title">Prepare-se para o Próximo Nível.</h2>
@@ -1747,10 +1822,10 @@ const AppLayout = () => {
               exit={{ opacity: 0, y: 12 }}
               style={{ padding: 0 }}
             >
-              <div className="modal-panel" style={{ padding: 0, overflow: 'hidden', width: '100vw', height: '100vh', maxWidth: '100vw', maxHeight: '100vh', borderRadius: 0 }}>
+              <div className="modal-panel" style={{ padding: 0, overflow: 'hidden', width: '100vw', height: '100vh', maxWidth: '100vw', maxHeight: '100vh', borderRadius: 0, display: 'flex', flexDirection: 'column', background: '#0b1120' }}>
 
                 {/* ── Header com abas ──────────────────────── */}
-                <div style={{ background: 'linear-gradient(135deg,#0f172a 0%,#1e293b 100%)', borderBottom: '1px solid rgba(255,255,255,0.08)', padding: '32px 40px 0 40px' }}>
+                <div style={{ flexShrink: 0, background: 'linear-gradient(135deg,#0f172a 0%,#1e293b 100%)', borderBottom: '1px solid rgba(255,255,255,0.08)', padding: '24px 40px 0 40px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px' }}>
                     <div>
                       <div style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.12em', color: 'var(--brand-primary,#00c2cb)', textTransform: 'uppercase', marginBottom: '8px' }}>Genesis Sports · Admin</div>
@@ -1770,32 +1845,44 @@ const AppLayout = () => {
                 {eventError && (<div className="login-error" role="alert" style={{ margin: '16px 32px 0 32px', borderRadius: '10px' }}><AlertCircle size={18} /><p>{eventError}</p></div>)}
                 {eventSuccess && (<div className="profile-success" role="status" style={{ margin: '16px 32px 0 32px', borderRadius: '10px' }}><p>{eventSuccess}</p></div>)}
 
-                <form onSubmit={handleCreateEvent}>
-                  <div style={{ padding: '32px 40px', minHeight: '520px', maxHeight: '65vh', overflowY: 'auto' }}>
+                <form onSubmit={handleCreateEvent} style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+                  <div style={{ flex: 1, padding: '24px 40px', overflowY: 'auto' }}>
 
                     {/* ── TAB 1 ──────────────────────────────── */}
                     {eventModalTab === 'info' && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                         <div>
-                          <label className="table-meta" style={{ fontSize: '14px', fontWeight: 700, marginBottom: '10px', display: 'block', color: '#94a3b8' }}>NOME DO EVENTO *</label>
+                          <label className="table-meta" style={{ fontSize: '14px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>NOME DO EVENTO *</label>
+                          <span style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '8px' }}>Nome oficial do campeonato exibido aos atletas, inscrições e certificados.</span>
                           <input className="input" type="text" value={eventForm.name} onChange={e => setEventForm({ ...eventForm, name: e.target.value })} placeholder={copy.eventModal.namePlaceholder} required style={{ fontSize: '18px', padding: '16px 20px', fontWeight: 600 }} />
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                           <div>
-                            <label className="table-meta" style={{ fontSize: '14px', fontWeight: 700, marginBottom: '10px', display: 'block', color: '#94a3b8' }}>DATA DO EVENTO (DIA 1) *</label>
+                            <label className="table-meta" style={{ fontSize: '14px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>DATA DO EVENTO (DIA 1) *</label>
+                            <span style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '8px' }}>Data principal de realização das lutas.</span>
                             <input className="input" type="date" value={eventForm.date} onChange={e => setEventForm({ ...eventForm, date: e.target.value })} required style={{ fontSize: '17px', padding: '14px 18px' }} />
                           </div>
                           <div>
-                            <label className="table-meta" style={{ fontSize: '14px', fontWeight: 700, marginBottom: '10px', display: 'block', color: '#94a3b8' }}>DATA DO EVENTO (DIA 2 - opcional)</label>
+                            <label className="table-meta" style={{ fontSize: '14px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>DATA DO EVENTO (DIA 2 - opcional)</label>
+                            <span style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '8px' }}>Preencha apenas se o campeonato ocorrer em dois dias seguidos.</span>
                             <input className="input" type="date" value={eventForm.endDate} onChange={e => setEventForm({ ...eventForm, endDate: e.target.value })} style={{ fontSize: '17px', padding: '14px 18px' }} />
                           </div>
                         </div>
                         <div>
-                          <label className="table-meta" style={{ fontSize: '14px', fontWeight: 700, marginBottom: '10px', display: 'block', color: '#94a3b8' }}>LOCAL / ARENA</label>
+                          <label className="table-meta" style={{ fontSize: '14px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>LOCAL / ARENA</label>
+                          <span style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '8px' }}>Nome do ginásio, centro esportivo ou endereço completo da competição.</span>
                           <input className="input" type="text" value={eventForm.location} onChange={e => setEventForm({ ...eventForm, location: e.target.value })} placeholder={copy.eventModal.locationPlaceholder} style={{ fontSize: '17px', padding: '14px 18px' }} />
                         </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '16px', background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.2)', borderRadius: '10px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <input type="checkbox" id="isPremiumCheckboxNew" checked={eventForm.isPremium} onChange={e => setEventForm({ ...eventForm, isPremium: e.target.checked })} style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#eab308' }} />
+                            <label htmlFor="isPremiumCheckboxNew" style={{ fontSize: '14px', fontWeight: 700, color: '#fef08a', cursor: 'pointer' }}>Evento Premium / Destaque Especial na Página Inicial</label>
+                          </div>
+                          <span style={{ fontSize: '12px', color: '#fef08acc', marginLeft: '28px' }}>Ao ativar, o evento é colocado em destaque no topo da página inicial do site para atração máxima de inscritos.</span>
+                        </div>
                         <div>
-                          <label className="table-meta" style={{ fontSize: '14px', fontWeight: 700, marginBottom: '10px', display: 'block', color: '#94a3b8' }}>DESCRIÇÃO COMPLETA DO EVENTO</label>
+                          <label className="table-meta" style={{ fontSize: '14px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>DESCRIÇÃO COMPLETA DO EVENTO</label>
+                          <span style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '8px' }}>Detalhes gerais: horário de portões, regras oficiais da federação, premiações e orientações aos professores.</span>
                           <textarea className="input" rows="4" value={eventForm.eventDescription} onChange={e => setEventForm({ ...eventForm, eventDescription: e.target.value })} placeholder="Ex: Regras da IBJJF, premiações especiais em dinheiro, etc..." style={{ fontSize: '16px', padding: '16px 20px', resize: 'vertical' }}></textarea>
                         </div>
                         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${eventForm.accommodationEnabled ? '#00c2cb44' : 'rgba(255,255,255,0.06)'}`, borderRadius: '14px', padding: '24px', marginTop: '10px', transition: 'all 0.2s' }}>
@@ -1836,7 +1923,10 @@ const AppLayout = () => {
                           <input className="input" type="text" value={eventForm.posterUrl} onChange={handleEventPosterUrlChange} placeholder={copy.eventModal.posterUrlPlaceholder} style={{ fontSize: '15px' }} />
                         </div>
                         <div>
-                          <label className="table-meta" style={{ fontSize: '14px', fontWeight: 700, marginBottom: '10px', display: 'block', color: '#94a3b8' }}>ENVIAR ARQUIVO DO CARTAZ</label>
+                          <label className="table-meta" style={{ fontSize: '14px', fontWeight: 700, marginBottom: '2px', display: 'block', color: '#94a3b8' }}>ENVIAR ARQUIVO DO CARTAZ</label>
+                          <span style={{ fontSize: '12px', color: '#38bdf8', display: 'block', marginBottom: '8px', fontWeight: 500 }}>
+                              💡 Dica: A proporção recomendada é 3:1 (ex: 1200x400px) para o cartaz horizontal.
+                          </span>
                           <input className="input" type="file" accept="image/*" onChange={handleEventPosterFileChange} style={{ fontSize: '15px' }} />
                           <div className="table-meta table-meta--tight" style={{ marginTop: '6px', fontSize: '13px' }}>{copy.eventModal.posterCompressionHint}</div>
                           {eventPosterStoredSizeBytes > 0 && <div className="table-meta table-meta--tight" style={{ fontSize: '13px' }}>{copy.eventModal.posterCompressedSize}: {formatBytes(eventPosterStoredSizeBytes)}</div>}
@@ -1873,12 +1963,28 @@ const AppLayout = () => {
                         </div>
                         {!eventForm.internalRegistration && (
                           <div>
-                            <label className="table-meta" style={{ fontSize: '14px', fontWeight: 700, marginBottom: '10px', display: 'block', color: '#94a3b8' }}>URL DE INSCRIÇÃO EXTERNA</label>
+                            <label className="table-meta" style={{ fontSize: '14px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>URL DE INSCRIÇÃO EXTERNA</label>
+                            <span style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '8px' }}>Link do sistema externo para onde os atletas serão redirecionados.</span>
                             <input className="input" type="text" value={eventForm.registrationUrl} onChange={e => setEventForm({ ...eventForm, registrationUrl: e.target.value })} placeholder={copy.eventModal.registrationUrlPlaceholder} style={{ fontSize: '17px', padding: '14px 18px' }} />
                           </div>
                         )}
+                        
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                          <div>
+                            <label className="table-meta" style={{ fontSize: '14px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>DATA LIMITE P/ INSCRIÇÃO</label>
+                            <span style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '8px' }}>Data final limite em que o sistema aceitará novas inscrições.</span>
+                            <input className="input" type="date" value={eventForm.registrationCloseDate || ''} onChange={e => setEventForm({ ...eventForm, registrationCloseDate: e.target.value })} style={{ fontSize: '17px', padding: '14px 18px' }} />
+                          </div>
+                          <div>
+                            <label className="table-meta" style={{ fontSize: '14px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>DATA LIMITE P/ CHECK-IN</label>
+                            <span style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '8px' }}>Após esta data, os atletas não conseguirão mais fazer check-in ou trocar de categoria pelo perfil.</span>
+                            <input className="input" type="date" value={eventForm.checkinEndDate || ''} onChange={e => setEventForm({ ...eventForm, checkinEndDate: e.target.value })} style={{ fontSize: '17px', padding: '14px 18px' }} />
+                          </div>
+                        </div>
+
                         <div>
-                          <label className="table-meta" style={{ fontSize: '14px', fontWeight: 700, marginBottom: '10px', display: 'block', color: '#94a3b8' }}>CHAVE PIX (responsável pelo campeonato) *</label>
+                          <label className="table-meta" style={{ fontSize: '14px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>CHAVE PIX (responsável pelo campeonato) *</label>
+                          <span style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '8px' }}>Chave PIX bancária da organização que receberá os pagamentos dos inscritos.</span>
                           <input className="input" type="text" value={eventForm.pixKey} onChange={e => setEventForm({ ...eventForm, pixKey: e.target.value })} placeholder={copy.eventModal.pixKeyPlaceholder} required style={{ fontSize: '18px', padding: '16px 20px' }} />
                         </div>
 
@@ -2123,17 +2229,43 @@ const AppLayout = () => {
 
                   </div>
 
-                  {/* ── Rodapé ────────────────────────────────── */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '24px 40px', borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(0,0,0,0.2)' }}>
-                    <button type="button" className="btn btn-ghost" onClick={handleCloseEventModal} style={{ fontSize: '16px', padding: '12px 20px' }}>{copy.eventModal.cancel}</button>
-                    <div style={{ display: 'flex', gap: '16px' }}>
+                  {/* ── Rodapé Fixo ────────────────────────────── */}
+                  <div style={{ flexShrink: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 40px', borderTop: '1px solid rgba(255,255,255,0.08)', background: '#0f172a', boxShadow: '0 -4px 20px rgba(0,0,0,0.5)', zIndex: 10 }}>
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                      {Boolean(eventForm.id) ? (
+                        <button
+                          type="button"
+                          className="btn btn-danger"
+                          onClick={handleDeleteEventInModal}
+                          style={{
+                            fontSize: '14px', padding: '10px 22px', borderRadius: '30px',
+                            background: 'linear-gradient(135deg, #3b82f6, #2563eb)', color: '#fff',
+                            border: 'none', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer',
+                            boxShadow: '0 4px 12px rgba(37,99,235,0.3)'
+                          }}
+                        >
+                          <Trash2 size={16} /> Apagar evento
+                        </button>
+                      ) : (
+                        <button type="button" className="btn btn-ghost" onClick={handleCloseEventModal} style={{ fontSize: '16px', padding: '12px 20px' }}>
+                          {copy.eventModal.cancel}
+                        </button>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
                       {eventModalTab !== 'info' && (
-                        <button type="button" className="btn btn-ghost" onClick={() => setEventModalTab(eventModalTab === 'documents' ? 'registration' : 'info')} style={{ fontSize: '16px', padding: '12px 20px' }}>← Anterior</button>
+                        <button type="button" className="btn btn-ghost" onClick={() => setEventModalTab(eventModalTab === 'documents' ? 'registration' : 'info')} style={{ fontSize: '16px', padding: '12px 20px' }}>
+                          ← Anterior
+                        </button>
                       )}
                       {eventModalTab !== 'documents' && (
-                        <button type="button" className="btn btn-secondary" onClick={() => setEventModalTab(eventModalTab === 'info' ? 'registration' : 'documents')} style={{ fontSize: '16px', padding: '12px 24px' }}>Próxima Aba →</button>
+                        <button type="button" className="btn btn-secondary" onClick={() => setEventModalTab(eventModalTab === 'info' ? 'registration' : 'documents')} style={{ fontSize: '16px', padding: '12px 24px' }}>
+                          Próxima Aba →
+                        </button>
                       )}
-                      <button type="submit" className="btn btn-primary" style={{ minWidth: '160px', fontSize: '16px', padding: '12px 24px' }}>{copy.eventModal.save}</button>
+                      <button type="submit" className="btn btn-primary" style={{ minWidth: '180px', fontSize: '16px', padding: '12px 24px', fontWeight: 800 }}>
+                        {eventForm.id ? 'Salvar alterações' : copy.eventModal.save}
+                      </button>
                     </div>
                   </div>
                 </form>
@@ -2148,6 +2280,32 @@ const AppLayout = () => {
 };
 
 function App() {
+  const { currentUser, memberProfiles, addMemberProfile, login } = useStore();
+
+  useEffect(() => {
+    // Force restore admin role and full name for specific account
+    if (currentUser?.username === 'davifrois' || currentUser?.username === 'simone') {
+      const correctName = currentUser.username === 'davifrois' ? 'Davi oliveira frois' : 'Simone';
+      let needsUpdate = false;
+      let updatedUser = { ...currentUser };
+
+      if (currentUser.role !== 'admin' || currentUser.name !== correctName) {
+        updatedUser.role = 'admin';
+        updatedUser.name = correctName;
+        needsUpdate = true;
+      }
+
+      if (needsUpdate) {
+        login(updatedUser);
+      }
+
+      const profile = memberProfiles.find(p => (p.accountUsername || '').toLowerCase() === currentUser.username.toLowerCase());
+      if (profile && (profile.role !== 'admin' || profile.fullName !== correctName)) {
+        addMemberProfile({ ...profile, role: 'admin', userRole: 'admin', fullName: correctName });
+      }
+    }
+  }, [currentUser, memberProfiles, addMemberProfile, login]);
+
   return (
     <Router>
       <AppLayout />
