@@ -328,11 +328,11 @@ app.post('/api/webhooks/payment/checkout', async (req, res) => {
                 failure: `${origin}/payment/cancel`,
                 pending: `${origin}/payment/cancel`
             },
+            auto_return: 'approved',
             external_reference: String(registrationIds || '')
         };
 
         if (!isLocalhost) {
-            preferencePayload.auto_return = 'approved';
             preferencePayload.notification_url = 'https://genesisesportes.com.br/api/webhooks/payment/mercadopago';
         }
 
