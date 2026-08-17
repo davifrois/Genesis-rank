@@ -513,7 +513,7 @@
   }
 
   .about-tech-hero__image {
-    object-position: 64% center;
+    object-position: center 75%;
   }
 
   .about-tech-hero h1 {

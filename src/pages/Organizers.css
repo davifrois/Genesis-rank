@@ -569,11 +569,16 @@
 @media (max-width: 760px) {
   .organizers-pro-hero {
     min-height: auto;
-    padding: 360px 20px 36px;
+    padding: 140px 20px 36px;
   }
 
   .organizers-pro-hero__image {
-    object-position: 64% center;
+    object-position: center 82%;
+  }
+
+  .organizers-pro-hero__shade {
+    background:
+      linear-gradient(180deg, rgba(5, 7, 11, 0.45) 0%, rgba(5, 7, 11, 0.85) 45%, rgba(5, 7, 11, 0.98) 100%);
   }
 
   .organizers-pro-hero h1 {
