@@ -389,7 +389,47 @@ const TournamentRegistrationFlow = ({ event, onComplete }) => {
     absolute: false,
     price: 0,
     voucherCode: ''
-  });
+  const [pixModalData, setPixModalData] = useState(null);
+  const [pixCopied, setPixCopied] = useState(false);
+  const [pixApproved, setPixApproved] = useState(false);
+
+  // Polling em tempo real do status do PIX Mercado Pago
+  useEffect(() => {
+    if (!pixModalData?.paymentId || pixApproved) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await publicRegistrationService.checkPaymentStatus(pixModalData.paymentId);
+        if (res?.approved || res?.status === 'approved') {
+          setPixApproved(true);
+          clearInterval(interval);
+
+          try {
+            const regIds = (pixModalData.registrationIds || '').split(',').map(s => s.trim()).filter(Boolean);
+            const stored = JSON.parse(localStorage.getItem('genesis_registrations_v1') || '[]');
+            const newStored = stored.map(reg => {
+              if (regIds.includes(reg.id) || regIds.includes(reg.athleteId)) {
+                return { ...reg, status: 'APPROVED', paymentStatus: 'APPROVED', paymentMethod: 'Mercado Pago' };
+              }
+              return reg;
+            });
+            localStorage.setItem('genesis_registrations_v1', JSON.stringify(newStored));
+            window.dispatchEvent(new Event('storage'));
+          } catch (e) {
+            console.error('Erro ao atualizar localStorage no polling:', e);
+          }
+
+          setTimeout(() => {
+            window.location.href = `/payment/success?external_reference=${encodeURIComponent(pixModalData.registrationIds)}&payment_id=${encodeURIComponent(pixModalData.paymentId)}&status=approved`;
+          }, 1200);
+        }
+      } catch (e) {
+        console.warn('Erro ao checar status do PIX:', e);
+      }
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, [pixModalData, pixApproved]);
 
   // Scroll to top smoothly when changing steps (changing screens)
   useEffect(() => {
@@ -621,11 +661,39 @@ const TournamentRegistrationFlow = ({ event, onComplete }) => {
     localStorage.removeItem(`registration_progress_${event.id}`);
     if (onComplete) onComplete();
     
-    // MERCADO PAGO INTEGRATION: Redirect if Mercado Pago was chosen
+    // MERCADO PAGO INTEGRATION: Redirect/Modal if Mercado Pago was chosen
     if (proofData.useMercadoPago && activeRegData.price > 0) {
       try {
         const registrationIds = payloads.map(p => p.id).join(',');
         const athleteName = selectedProfile.fullName || selectedProfile.nome || 'Atleta';
+        const athleteEmail = currentUser?.email || selectedProfile.email || '';
+
+        // Tentar PIX Transparente Direto (não sai do site!)
+        try {
+          const pixRes = await publicRegistrationService.createDirectPix({
+            registrationIds,
+            athleteName,
+            email: athleteEmail,
+            amount: activeRegData.price
+          });
+
+          if (pixRes && (pixRes.qrCode || pixRes.qrCodeBase64)) {
+            setPixModalData({
+              paymentId: pixRes.paymentId,
+              qrCode: pixRes.qrCode,
+              qrCodeBase64: pixRes.qrCodeBase64,
+              ticketUrl: pixRes.ticketUrl,
+              registrationIds,
+              athleteName,
+              amount: activeRegData.price
+            });
+            return;
+          }
+        } catch (pixErr) {
+          console.warn("Direct PIX não disponível no momento, usando Checkout Pro:", pixErr);
+        }
+
+        // Fallback: Checkout Session
         const data = await publicRegistrationService.createCheckoutSession({
           registrationIds,
           athleteName,
@@ -738,7 +806,84 @@ const TournamentRegistrationFlow = ({ event, onComplete }) => {
             />
           )}
         </AnimatePresence>
-      </main>
+      {pixModalData && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(5, 7, 11, 0.88)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ background: '#121824', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '20px', padding: '2rem', maxWidth: '460px', width: '100%', textAlign: 'center', boxShadow: '0 25px 60px rgba(0,0,0,0.8)', color: '#fff' }}>
+            
+            {pixApproved ? (
+              <div style={{ padding: '1rem 0' }}>
+                <CheckCircle size={64} color="#22c55e" style={{ margin: '0 auto 1rem' }} />
+                <h2 style={{ color: '#fff', fontSize: '1.6rem', fontWeight: 800, marginBottom: '0.5rem' }}>PAGAMENTO CONFIRMADO!</h2>
+                <p style={{ color: '#a1a1aa', fontSize: '0.95rem' }}>Sua inscrição foi aprovada com sucesso. Redirecionando para seu comprovante...</p>
+              </div>
+            ) : (
+              <div>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(0, 194, 203, 0.12)', border: '1px solid rgba(0, 194, 203, 0.3)', padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', color: '#00c2cb', fontWeight: 700, textTransform: 'uppercase', marginBottom: '1rem' }}>
+                  <QrCode size={14} /> Pagamento PIX Mercado Pago
+                </div>
+
+                <h3 style={{ color: '#fff', fontSize: '1.35rem', fontWeight: 800, marginBottom: '0.4rem' }}>
+                  Inscrição - R$ {Number(pixModalData.amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </h3>
+                <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+                  Escaneie o QR Code ou copie o código PIX para pagar no seu banco.
+                </p>
+
+                {pixModalData.qrCodeBase64 ? (
+                  <div style={{ background: '#fff', padding: '12px', borderRadius: '14px', display: 'inline-block', marginBottom: '1.25rem', boxShadow: '0 8px 20px rgba(0,0,0,0.4)' }}>
+                    <img src={`data:image/png;base64,${pixModalData.qrCodeBase64}`} alt="QR Code PIX" style={{ width: '190px', height: '190px', display: 'block' }} />
+                  </div>
+                ) : null}
+
+                {pixModalData.qrCode ? (
+                  <div style={{ marginBottom: '1.25rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        try {
+                          navigator.clipboard.writeText(pixModalData.qrCode);
+                          setPixCopied(true);
+                          setTimeout(() => setPixCopied(false), 3000);
+                        } catch {
+                          alert('Código PIX: ' + pixModalData.qrCode);
+                        }
+                      }}
+                      style={{ width: '100%', padding: '0.85rem', background: pixCopied ? '#22c55e' : '#00c2cb', color: '#05070b', border: 'none', borderRadius: '10px', fontWeight: 800, cursor: 'pointer', fontSize: '0.9rem', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                    >
+                      {pixCopied ? '✓ CÓDIGO PIX COPIADO!' : 'COPIAR CÓDIGO PIX (COPIA E COLA)'}
+                    </button>
+                  </div>
+                ) : null}
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '0.8rem', color: '#fbbf24', background: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.2)', padding: '10px 14px', borderRadius: '8px', marginBottom: '1.25rem' }}>
+                  <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#fbbf24' }} />
+                  Aguardando confirmação do banco... (Atualização em tempo real)
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.location.href = `/payment/success?external_reference=${encodeURIComponent(pixModalData.registrationIds)}&payment_id=${encodeURIComponent(pixModalData.paymentId)}&status=approved`;
+                    }}
+                    style={{ flex: 1, padding: '0.75rem', background: 'rgba(255, 255, 255, 0.08)', color: '#fff', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '8px', fontWeight: 600, fontSize: '0.82rem', cursor: 'pointer' }}
+                  >
+                    Já Paguei! Ver Inscrição
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPixModalData(null)}
+                    style={{ padding: '0.75rem 1rem', background: 'transparent', color: '#64748b', border: 'none', fontSize: '0.82rem', cursor: 'pointer' }}
+                  >
+                    Fechar
+                  </button>
+                </div>
+              </div>
+            )}
+
+          </div>
+        </div>
+      )}
     </div>
   );
 };

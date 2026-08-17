@@ -363,6 +363,134 @@ app.post('/api/webhooks/payment/checkout', async (req, res) => {
     }
 });
 
+// Direct PIX Generation (Transparent Checkout)
+app.post('/api/webhooks/payment/pix', async (req, res) => {
+    try {
+        const { registrationIds, athleteName, email, amount } = req.body;
+        const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN || 'APP_USR-5076214841905920-081112-768e0648179ce52ceb48a90a14882388-1214160384';
+
+        const payload = {
+            transaction_amount: Number(amount || 0),
+            description: `Inscrição Campeonato - ${athleteName || 'Atleta'}`,
+            payment_method_id: 'pix',
+            external_reference: String(registrationIds || ''),
+            payer: {
+                email: email || 'atleta@genesisesportes.com.br',
+                first_name: athleteName || 'Atleta'
+            }
+        };
+
+        const mpRes = await fetch('https://api.mercadopago.com/v1/payments', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${accessToken}`
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await mpRes.json();
+        if (data.id && data.point_of_interaction) {
+            const qrCode = data.point_of_interaction.transaction_data.qr_code;
+            const qrCodeBase64 = data.point_of_interaction.transaction_data.qr_code_base64;
+            const ticketUrl = data.point_of_interaction.transaction_data.ticket_url;
+
+            res.json({
+                paymentId: data.id,
+                status: data.status,
+                qrCode,
+                qrCodeBase64,
+                ticketUrl,
+                externalReference: registrationIds
+            });
+        } else {
+            console.error('Erro ao gerar PIX Mercado Pago:', data);
+            res.status(500).json({ error: 'Erro ao gerar PIX', details: data });
+        }
+    } catch (e) {
+        console.error('Erro no PIX:', e);
+        res.status(500).json({ error: 'Erro interno ao gerar PIX.' });
+    }
+});
+
+// Direct Payment Status Polling
+app.get('/api/webhooks/payment/status/:paymentId', async (req, res) => {
+    try {
+        const { paymentId } = req.params;
+        const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN || 'APP_USR-5076214841905920-081112-768e0648179ce52ceb48a90a14882388-1214160384';
+
+        const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+
+        if (!mpRes.ok) {
+            return res.json({ approved: false, status: 'pending' });
+        }
+
+        const data = await mpRes.json();
+        const isApproved = data.status === 'approved';
+
+        if (isApproved && data.external_reference) {
+            const regIds = data.external_reference.split(',');
+            const db = readDb();
+            if (!db.publicRegistrations) db.publicRegistrations = [];
+
+            let updated = false;
+            regIds.forEach(rawId => {
+                const rId = rawId.trim();
+                const idx = db.publicRegistrations.findIndex(r => r.id === rId || r.clientRequestId === rId);
+                if (idx !== -1) {
+                    db.publicRegistrations[idx].status = 'APPROVED';
+                    db.publicRegistrations[idx].paymentMethod = 'Mercado Pago';
+                    db.publicRegistrations[idx].transactionId = String(paymentId);
+                    updated = true;
+                }
+            });
+
+            if (updated) {
+                writeDb(db);
+            }
+        }
+
+        res.json({
+            status: data.status,
+            approved: isApproved,
+            externalReference: data.external_reference || ''
+        });
+    } catch (e) {
+        res.json({ approved: false, status: 'pending' });
+    }
+});
+
+// Confirm Return endpoint
+app.get('/api/webhooks/payment/confirm-return', async (req, res) => {
+    try {
+        const { registrationIds, paymentId } = req.query;
+        if (registrationIds) {
+            const regIds = String(registrationIds).split(',');
+            const db = readDb();
+            if (!db.publicRegistrations) db.publicRegistrations = [];
+
+            let updated = false;
+            regIds.forEach(rawId => {
+                const rId = rawId.trim();
+                const idx = db.publicRegistrations.findIndex(r => r.id === rId || r.clientRequestId === rId);
+                if (idx !== -1) {
+                    db.publicRegistrations[idx].status = 'APPROVED';
+                    db.publicRegistrations[idx].paymentMethod = 'Mercado Pago';
+                    if (paymentId) db.publicRegistrations[idx].transactionId = String(paymentId);
+                    updated = true;
+                }
+            });
+
+            if (updated) writeDb(db);
+        }
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ success: false });
+    }
+});
+
 // Mercado Pago Webhook Handler
 app.post('/api/webhooks/payment/mercadopago', async (req, res) => {
     try {
