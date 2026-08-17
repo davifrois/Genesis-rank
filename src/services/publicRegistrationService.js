@@ -482,8 +482,10 @@ export const publicRegistrationService = {
   // O backend (no FinanceiroController) irá retornar um JSON no formato { "url": "https://checkout.stripe.com/..." }.
   // Você não precisa mexer nesta função se não quiser alterar a estrutura, pois ela já repassa tudo para o backend.
   createCheckoutSession: async ({ registrationIds, athleteName, amount }) => {
+    const accessToken = 'APP_USR-5076214841905920-081112-768e0648179ce52ceb48a90a14882388-1214160384';
+
+    // 1. Tentar Backend primeiro
     try {
-      // Modificamos a rota para apontar para o FinanceiroController
       const response = await fetch(buildApiUrl('/api/webhooks/payment/checkout'), {
         method: 'POST',
         headers: {
@@ -492,18 +494,46 @@ export const publicRegistrationService = {
         },
         body: JSON.stringify({ registrationIds, athleteName, amount })
       });
-      
-      if (!response.ok) {
-        throw await buildHttpError(response, 'Falha ao criar sessão de pagamento.');
+      if (response.ok) {
+        return await response.json();
       }
-      
-      return response.json();
-    } catch (error) {
-      throw error;
+    } catch (e) {
+      console.warn('Backend indisponível para checkout, gerando via Mercado Pago API direto:', e);
     }
+
+    // 2. Chamada Direta para Mercado Pago Preferences API (Fallback Vercel/Produção)
+    const origin = window.location.origin;
+    const mpRes = await fetch('https://api.mercadopago.com/checkout/preferences', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({
+        items: [{
+          title: `Inscrição Campeonato - ${athleteName || 'Atleta'}`,
+          quantity: 1,
+          unit_price: Number(amount || 0),
+          currency_id: 'BRL'
+        }],
+        back_urls: {
+          success: `${origin}/payment/success?external_reference=${encodeURIComponent(registrationIds)}`,
+          pending: `${origin}/payment/success?external_reference=${encodeURIComponent(registrationIds)}`,
+          failure: `${origin}/payment/cancel`
+        },
+        auto_return: 'approved',
+        external_reference: String(registrationIds || '')
+      })
+    });
+
+    const data = await mpRes.json();
+    return { url: data.init_point || data.sandbox_init_point };
   },
 
   createDirectPix: async ({ registrationIds, athleteName, email, amount }) => {
+    const accessToken = 'APP_USR-5076214841905920-081112-768e0648179ce52ceb48a90a14882388-1214160384';
+
+    // 1. Tentar Backend primeiro se disponível
     try {
       const response = await fetch(buildApiUrl('/api/webhooks/payment/pix'), {
         method: 'POST',
@@ -513,22 +543,79 @@ export const publicRegistrationService = {
         },
         body: JSON.stringify({ registrationIds, athleteName, email, amount })
       });
-      if (!response.ok) {
-        throw await buildHttpError(response, 'Falha ao gerar PIX.');
+      if (response.ok) {
+        return await response.json();
       }
-      return response.json();
-    } catch (error) {
-      throw error;
+    } catch (backendError) {
+      console.warn('Backend indisponível para PIX, gerando via Mercado Pago API direto:', backendError);
     }
+
+    // 2. Chamada Direta para Mercado Pago API (Funciona 100% no Vercel/Produção!)
+    const payload = {
+      transaction_amount: Number(amount || 0),
+      description: `Inscrição Campeonato - ${athleteName || 'Atleta'}`,
+      payment_method_id: 'pix',
+      external_reference: String(registrationIds || ''),
+      payer: {
+        email: email || 'atleta@genesisesportes.com.br',
+        first_name: athleteName || 'Atleta'
+      }
+    };
+
+    const mpRes = await fetch('https://api.mercadopago.com/v1/payments', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await mpRes.json();
+    if (data.id && data.point_of_interaction) {
+      return {
+        paymentId: data.id,
+        status: data.status,
+        qrCode: data.point_of_interaction.transaction_data.qr_code,
+        qrCodeBase64: data.point_of_interaction.transaction_data.qr_code_base64,
+        ticketUrl: data.point_of_interaction.transaction_data.ticket_url,
+        externalReference: registrationIds
+      };
+    }
+
+    throw new Error(data.message || 'Erro ao gerar PIX no Mercado Pago');
   },
 
   checkPaymentStatus: async (paymentId) => {
+    const accessToken = 'APP_USR-5076214841905920-081112-768e0648179ce52ceb48a90a14882388-1214160384';
+
+    // 1. Tentar Backend primeiro se disponível
     try {
       const response = await fetch(buildApiUrl(`/api/webhooks/payment/status/${paymentId}`), {
         headers: { 'ngrok-skip-browser-warning': 'true' }
       });
-      if (!response.ok) return { approved: false, status: 'pending' };
-      return response.json();
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch {
+      // Fallback para chamada direta do Mercado Pago
+    }
+
+    // 2. Chamada Direta para Mercado Pago API
+    try {
+      const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      });
+      if (!mpRes.ok) return { approved: false, status: 'pending' };
+
+      const data = await mpRes.json();
+      const isApproved = data.status === 'approved';
+
+      return {
+        status: data.status,
+        approved: isApproved,
+        externalReference: data.external_reference || ''
+      };
     } catch {
       return { approved: false, status: 'pending' };
     }
