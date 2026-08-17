@@ -568,3 +568,142 @@
     color: #fff;
     border-color: #555;
 }
+
+/* SEARCH ATHLETE BAR */
+.ajp-header-search {
+    margin-top: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    padding: 8px 16px;
+    width: 100%;
+    max-width: 300px;
+    box-sizing: border-box;
+}
+
+/* RESPONSIVE DESIGN FOR MOBILE & TABLETS */
+@media (max-width: 768px) {
+    .ajp-page-container {
+        width: 100%;
+        max-width: 100vw;
+        overflow-x: hidden;
+    }
+
+    .ajp-header-section {
+        padding: 24px 16px 20px;
+        margin-bottom: 24px;
+    }
+
+    .ajp-header-top {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 16px;
+        margin-bottom: 16px;
+    }
+
+    .ajp-header-title {
+        font-size: 1.4rem;
+        text-align: center;
+        letter-spacing: 1px;
+    }
+
+    .ajp-event-dropdown {
+        width: 100%;
+        min-width: 0;
+        justify-content: space-between;
+    }
+
+    .ajp-breadcrumb {
+        margin: 0 auto 16px;
+        padding: 10px 12px;
+        font-size: 0.7rem;
+        gap: 6px;
+        word-break: break-word;
+    }
+
+    .ajp-gender-toggles {
+        width: 100%;
+        gap: 10px;
+        padding-bottom: 0;
+        margin: 12px 0 0;
+    }
+
+    .ajp-gender-btn {
+        flex: 1;
+        justify-content: center;
+        padding: 10px 12px;
+        font-size: 0.78rem;
+    }
+
+    .ajp-header-search {
+        max-width: 100%;
+        margin-top: 16px;
+    }
+
+    .ajp-category-grid {
+        grid-template-columns: 1fr !important;
+        padding: 0 16px 30px !important;
+        gap: 20px !important;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .ajp-category-card {
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .ajp-category-row {
+        padding: 10px 8px;
+    }
+
+    .ajp-category-avatar {
+        width: 34px;
+        height: 34px;
+        margin-right: 8px;
+    }
+
+    .ajp-category-rank {
+        width: 18px;
+        font-size: 0.8rem;
+    }
+
+    .ajp-category-stats {
+        gap: 6px;
+        margin-left: 4px;
+    }
+
+    .ajp-stat-col {
+        min-width: 18px;
+    }
+
+    .ajp-stat-val {
+        font-size: 0.75rem;
+    }
+
+    .ajp-stat-label {
+        font-size: 0.52rem;
+    }
+
+    .ajp-category-name {
+        font-size: 0.78rem;
+    }
+}
+
+@media (max-width: 400px) {
+    .ajp-category-stats {
+        gap: 4px;
+    }
+
+    .ajp-stat-col {
+        min-width: 14px;
+    }
+
+    .ajp-stat-val {
+        font-size: 0.7rem;
+    }
+}
+

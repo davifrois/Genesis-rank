@@ -1020,21 +1020,7 @@ const RankGeral = () => {
                 </div>
 
                 {/* SEARCH ATHLETE */}
-                <div 
-                    className="ajp-header-search" 
-                    style={{ 
-                        marginTop: '24px', 
-                        display: 'inline-flex', 
-                        alignItems: 'center', 
-                        gap: '8px', 
-                        background: 'rgba(255, 255, 255, 0.05)', 
-                        border: '1px solid rgba(255, 255, 255, 0.1)', 
-                        borderRadius: '4px', 
-                        padding: '8px 16px',
-                        width: '100%',
-                        maxWidth: '300px'
-                    }}
-                >
+                <div className="ajp-header-search">
                     <Search size={16} color="#aaa" />
                     <input
                         type="text"
@@ -1055,7 +1041,7 @@ const RankGeral = () => {
             </div>
 
             {/* CATEGORY GRID */}
-            <div className="ajp-category-grid" style={{ padding: '0 40px 40px', maxWidth: '1400px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(500px, 1fr))', gap: '32px' }}>
+            <div className="ajp-category-grid">
                 {searchedGroups.map(group => {
                     const top5 = group.entries.slice(0, 5);
                     return (
