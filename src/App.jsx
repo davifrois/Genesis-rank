@@ -1363,24 +1363,7 @@ const AppLayout = () => {
                   <div className="account-dropdown-group">
                     {accountItems.map(renderAccountItem)}
                   </div>
-                  
-                  {currentUser && otherProfiles.length > 0 && (
-                    <div className="account-dropdown-linked">
-                      <div className="linked-label">PERFIS LIGADOS</div>
-                      {otherProfiles.map(profile => (
-                        <Link to={`/minha-conta?profileId=${profile.id}`} key={profile.id} className="linked-profile" style={{ marginBottom: otherProfiles.length > 1 ? '8px' : 0 }}>
-                          <div className="account-dropdown-avatar account-dropdown-avatar--small">
-                            {profile.photoUrl || profile.avatarUrl ? (
-                              <img src={profile.photoUrl || profile.avatarUrl} alt="" />
-                            ) : (
-                              <span>{(profile.fullName || 'U').charAt(0).toUpperCase()}</span>
-                            )}
-                          </div>
-                          <span>{profile.fullName}</span>
-                        </Link>
-                      ))}
-                    </div>
-                  )}
+
                 </div>
               </div>
               <div className="utility-dropdown utility-dropdown--language">
@@ -1484,24 +1467,7 @@ const AppLayout = () => {
                       <div className="account-dropdown-group" onClick={() => setShowMobileUserMenu(false)}>
                         {accountItems.map(renderAccountItem)}
                       </div>
-                      
-                      {otherProfiles.length > 0 && (
-                        <div className="account-dropdown-linked" onClick={() => setShowMobileUserMenu(false)}>
-                          <div className="linked-label">PERFIS LIGADOS</div>
-                          {otherProfiles.map(profile => (
-                            <Link to={`/minha-conta?profileId=${profile.id}`} key={profile.id} className="linked-profile" style={{ marginBottom: otherProfiles.length > 1 ? '8px' : 0 }}>
-                              <div className="account-dropdown-avatar account-dropdown-avatar--small">
-                                {profile.photoUrl || profile.avatarUrl ? (
-                                  <img src={profile.photoUrl || profile.avatarUrl} alt="" />
-                                ) : (
-                                  <span>{(profile.fullName || 'U').charAt(0).toUpperCase()}</span>
-                                )}
-                              </div>
-                              <span>{profile.fullName}</span>
-                            </Link>
-                          ))}
-                        </div>
-                      )}
+
                     </div>
                   </>
                 )}
