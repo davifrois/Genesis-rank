@@ -383,6 +383,13 @@ const InscricaoCampeonatoFluxo = ({ event, onComplete }) => {
   const { currentUser, memberProfiles = [], academies = [], addMemberProfile, addAthlete, athletes = [], deleteMemberProfile } = useStore() || {};
   const [step, setStep] = useState(1); // 1: Profile Select, 1.5: Profile Confirm, 2: Category, 3: Payment
   const [showLogin, setShowLogin] = useState(!currentUser);
+
+  // Scroll to top whenever step changes
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, [step]);
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [registrationData, setRegistrationData] = useState({
     category: '',

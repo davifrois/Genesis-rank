@@ -431,9 +431,11 @@ const TournamentRegistrationFlow = ({ event, onComplete }) => {
     return () => clearInterval(interval);
   }, [pixModalData, pixApproved]);
 
-  // Scroll to top smoothly when changing steps (changing screens)
+  // Scroll to top when changing steps
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
   }, [step]);
 
   const handleRemoveProfile = (profileId) => {
