@@ -16494,21 +16494,25 @@ textarea:focus-visible {
   }
 
   .panel-header {
-    flex-direction: column !important;
-    align-items: stretch !important;
-    gap: 12px !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    flex-wrap: wrap !important;
+    gap: 10px !important;
   }
 
   .panel-actions {
     display: flex !important;
-    flex-direction: column !important;
-    width: 100% !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
     gap: 8px !important;
+    width: auto !important;
   }
 
   .panel-actions > * {
-    width: 100% !important;
-    flex: 1 1 100% !important;
+    width: auto !important;
+    flex: 0 0 auto !important;
   }
 
   .panel-actions .search-box {
@@ -16517,8 +16521,17 @@ textarea:focus-visible {
 
   .panel-actions .btn,
   .panel-actions select {
-    width: 100% !important;
+    width: auto !important;
+    max-width: 100% !important;
+    height: 38px !important;
+    min-height: 38px !important;
+    max-height: 38px !important;
+    padding: 6px 14px !important;
+    font-size: 0.82rem !important;
+    border-radius: 8px !important;
+    white-space: nowrap !important;
     justify-content: center !important;
+    align-self: center !important;
   }
 
   .view-toggle {
