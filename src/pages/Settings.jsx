@@ -1005,6 +1005,32 @@ const Settings = () => {
             </div>
           </article>
 
+          <article className="profile-card profile-card--dark">
+            <div className="profile-card__header profile-card__header--dark">
+              <h2>Academia e Equipe</h2>
+            </div>
+            <div className="profile-card__body">
+              <div className="profile-fields">
+                <div className="profile-field profile-field--full">
+                  <label>Academia</label>
+                  <AcademySelect 
+                    academies={academies} 
+                    value={form.academyId} 
+                    onChange={(value) => setForm((previous) => ({ ...previous, academyId: value }))} 
+                    onRegisterNew={() => navigate('/registro-academia')} 
+                    theme="light"
+                  />
+                </div>
+                <div className="profile-field profile-field--full" style={{ marginTop: '10px' }}>
+                  <label>Afiliação/Equipe Selecionada</label>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', fontWeight: 500, margin: 0 }}>
+                    {selectedAcademy ? selectedAcademy.name : 'Sem equipe/afiliação'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </article>
+
           {error && <div className="login-error" style={{ marginTop: '12px' }}><p>{error}</p></div>}
           {success && (
             <div className="profile-success" style={{
@@ -1102,45 +1128,6 @@ const Settings = () => {
               </div>
             </article>
           )}
-
-          <article className="profile-card profile-card--dark">
-            <div className="profile-card__header profile-card__header--dark">
-              <h2>Junte-se a equipe</h2>
-            </div>
-            <div className="profile-card__body">
-              <div className="profile-fields">
-                <div className="profile-field profile-field--full">
-                  <label>Academia</label>
-                  <AcademySelect 
-                    academies={academies} 
-                    value={form.academyId} 
-                    onChange={(value) => setForm((previous) => ({ ...previous, academyId: value }))} 
-                    onRegisterNew={() => navigate('/registro-academia')} 
-                    theme="light"
-                  />
-                </div>
-                <div className="profile-field profile-field--full" style={{ marginTop: '10px' }}>
-                  <label>Afiliação/Equipe</label>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', fontWeight: 500, margin: 0 }}>
-                    {selectedAcademy ? selectedAcademy.name : 'Sem equipe/afiliação'}
-                  </p>
-                </div>
-              </div>
-              <div className="profile-actions-row" style={{ marginTop: '24px' }}>
-                <button 
-                  type="button" 
-                  className="btn btn-primary"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    const evt = new Event('submit', { cancelable: true, bubbles: true });
-                    document.querySelector('.profile-settings-main').dispatchEvent(evt);
-                  }}
-                >
-                  Junte-se a equipe
-                </button>
-              </div>
-            </div>
-          </article>
 
           <article className="profile-card profile-card--dark">
             <div className="profile-card__header profile-card__header--dark"><h2>Zona de risco</h2></div>
