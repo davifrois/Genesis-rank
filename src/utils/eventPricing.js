@@ -175,14 +175,17 @@ export const resolveCurrentEventBatch = (event = {}, now = new Date()) => {
 };
 
 export const resolveAgeNumber = (athlete = {}, referenceDate = new Date()) => {
-  const directAge = Number(athlete.age ?? athlete.idade ?? '');
-  if (Number.isFinite(directAge) && directAge >= 0) {
-    if (directAge > 1900) {
-      const reference = referenceDate instanceof Date ? referenceDate : new Date(referenceDate);
-      const safeReference = Number.isNaN(reference.getTime()) ? new Date() : reference;
-      return Math.max(0, safeReference.getUTCFullYear() - directAge);
+  const rawAge = athlete.age ?? athlete.idade;
+  if (rawAge !== undefined && rawAge !== null && rawAge !== '') {
+    const directAge = Number(rawAge);
+    if (Number.isFinite(directAge) && directAge > 0) {
+      if (directAge > 1900) {
+        const reference = referenceDate instanceof Date ? referenceDate : new Date(referenceDate);
+        const safeReference = Number.isNaN(reference.getTime()) ? new Date() : reference;
+        return Math.max(0, safeReference.getUTCFullYear() - directAge);
+      }
+      return Math.floor(directAge);
     }
-    return Math.floor(directAge);
   }
 
   const birthDate = (athlete.birthDate || athlete.dataNascimento || '').toString().trim();
@@ -198,7 +201,7 @@ export const resolveAgeNumber = (athlete = {}, referenceDate = new Date()) => {
     parsed.getUTCDate()
   ));
   if (safeReference.getTime() < birthdayThisYear.getTime()) age -= 1;
-  return Math.max(0, age);
+  return age > 0 ? age : null;
 };
 
 export const resolveAthleteEventPrice = ({

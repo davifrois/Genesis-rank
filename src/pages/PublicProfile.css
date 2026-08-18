@@ -1156,3 +1156,74 @@
   text-align: right;
 }
 
+/* --- Mobile Responsiveness Overhaul --- */
+@media (max-width: 640px) {
+  .pp-page {
+    zoom: 1 !important; /* Disable desktop 1.35 zoom on mobile */
+  }
+
+  .pp-hero {
+    padding: 40px 16px 30px !important;
+    min-height: auto !important;
+  }
+
+  .pp-avatar-wrap {
+    width: 130px !important;
+    height: 130px !important;
+  }
+
+  .pp-hero__name {
+    font-size: 1.8rem !important;
+    flex-wrap: wrap !important;
+    text-align: center !important;
+    gap: 8px !important;
+  }
+
+  .pp-belt-card {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 14px !important;
+    padding: 16px 18px !important;
+    position: relative !important;
+  }
+
+  .pp-belt-card__left {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+    width: 100% !important;
+  }
+
+  .pp-belt-graphic {
+    width: 100% !important;
+    max-width: 200px !important;
+    height: 38px !important;
+  }
+
+  .pp-belt-card__info {
+    width: 100% !important;
+  }
+
+  .pp-belt-card__title {
+    font-size: 0.95rem !important;
+    line-height: 1.35 !important;
+    word-break: break-word !important;
+  }
+
+  .pp-belt-card__subtitle {
+    font-size: 0.72rem !important;
+    margin-top: 4px !important;
+  }
+
+  .pp-belt-card__right {
+    position: absolute !important;
+    top: 14px !important;
+    right: 14px !important;
+  }
+
+  .pp-body {
+    padding: 24px 12px !important;
+  }
+}
+
+
