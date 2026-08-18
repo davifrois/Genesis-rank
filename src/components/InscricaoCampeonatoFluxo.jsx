@@ -648,29 +648,36 @@ const InscricaoCampeonatoFluxo = ({ event, onComplete }) => {
       }
     }));
 
-    // Clean temp cache and advance UI
+    // Clean temp cache
     localStorage.removeItem(`registration_progress_${event.id}`);
-    if (onComplete) onComplete();
-    
-    // ========================================== //
-    // TODO: DEV MERCADO PAGO - REDIRECIONAMENTO //
-    // ========================================== //
-    // Caro desenvolvedor, se o atleta escolheu pagar com Mercado Pago (proofData.useMercadoPago == true):
-    // Fazemos um POST para o backend criar a sessão do checkout e redirecionamos o usuário. 'createCheckoutSession' que baterá no FinanceiroController.
-    // 3. Se a API Java retornar uma { url: '...' }, nós fazemos o redirecionamento automático (window.location.href).
-    // O seu foco não precisa ser aqui, pois isso já está funcionando. O seu foco deve ser em gerar essa URL corretamente lá no Java.
-    if (proofData.useMercadoPago && activeRegData.price > 0) {
+
+    // If event specifies external registration URL and internal registration is disabled, redirect directly
+    if (event.registrationUrl && (event.internalRegistration === false || event.internalRegistration === 'false')) {
+      if (onComplete) onComplete();
+      window.location.href = event.registrationUrl;
+      return;
+    }
+
+    const isMercadoPagoSelected = proofData?.useMercadoPago !== false;
+    const registrationPrice = Number(activeRegData.price || 0);
+
+    if (isMercadoPagoSelected && registrationPrice > 0) {
       try {
         const registrationIds = payloads.map(p => p.id).join(',');
         const athleteName = selectedProfile.fullName || selectedProfile.nome || 'Atleta';
         const data = await publicRegistrationService.createCheckoutSession({
           registrationIds,
           athleteName,
-          amount: activeRegData.price
+          amount: registrationPrice
         });
         
-        if (data.url) {
+        if (data && data.url) {
+          if (onComplete) onComplete();
           window.location.href = data.url;
+          return;
+        } else if (event.registrationUrl) {
+          if (onComplete) onComplete();
+          window.location.href = event.registrationUrl;
           return;
         } else {
           console.error('Failed to create Mercado Pago Checkout session, no url returned', data);
@@ -678,10 +685,16 @@ const InscricaoCampeonatoFluxo = ({ event, onComplete }) => {
         }
       } catch (err) {
         console.error('Mercado Pago error:', err);
-        alert('Erro ao conectar com Mercado Pago: ' + err.message);
+        if (event.registrationUrl) {
+          if (onComplete) onComplete();
+          window.location.href = event.registrationUrl;
+          return;
+        }
+        alert('Erro ao conectar com Mercado Pago: ' + (err.message || 'Falha de conexão'));
       }
     }
-    
+
+    if (onComplete) onComplete();
     setStep(4);
     } catch (criticalError) {
       alert(`Critical error in InscricaoCampeonatoFluxo handleFinish: ${criticalError.message}`);
