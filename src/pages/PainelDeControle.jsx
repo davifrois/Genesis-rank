@@ -8498,18 +8498,18 @@ const PainelDeControle = () => {
                                     flexShrink: 0,
                                     background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
                                     borderBottom: '1px solid rgba(255,255,255,0.08)',
-                                    padding: '24px 40px 0 40px',
+                                    padding: '16px 20px 0 20px',
                                 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                                         <div>
-                                            <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.12em', color: 'var(--brand-primary,#00c2cb)', textTransform: 'uppercase', marginBottom: '6px' }}>
+                                            <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.12em', color: 'var(--brand-primary,#00c2cb)', textTransform: 'uppercase', marginBottom: '4px' }}>
                                                 Genesis Sports · Painel Admin
                                             </div>
-                                            <div className="modal-title" style={{ fontSize: '28px', margin: 0 }}>
+                                            <div className="modal-title" style={{ fontSize: '1.5rem', margin: 0 }}>
                                                 {copy.modalEventEdit.title}
                                             </div>
                                             {eventEditForm.name && (
-                                                <div style={{ fontSize: '13px', color: '#94a3b8', marginTop: '4px' }}>
+                                                <div style={{ fontSize: '13px', color: '#94a3b8', marginTop: '2px' }}>
                                                     {eventEditForm.name}
                                                 </div>
                                             )}
@@ -8519,8 +8519,8 @@ const PainelDeControle = () => {
                                         </button>
                                     </div>
 
-                                    {/* Tab bar */}
-                                    <div style={{ display: 'flex', gap: '4px' }}>
+                                    {/* Tab bar - scrollable on mobile */}
+                                    <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', paddingBottom: '2px' }}>
                                         {[
                                             { id: 'info', label: '📋 Informações Básicas' },
                                             { id: 'registration', label: '💰 Inscrições e Valores' },
@@ -8531,8 +8531,8 @@ const PainelDeControle = () => {
                                                 type="button"
                                                 onClick={() => setEventModalTab(tab.id)}
                                                 style={{
-                                                    padding: '12px 24px',
-                                                    fontSize: '15px',
+                                                    padding: '10px 16px',
+                                                    fontSize: '14px',
                                                     fontWeight: eventModalTab === tab.id ? 700 : 500,
                                                     color: eventModalTab === tab.id ? 'var(--brand-primary,#00c2cb)' : '#64748b',
                                                     background: 'transparent',
@@ -8542,6 +8542,7 @@ const PainelDeControle = () => {
                                                     cursor: 'pointer',
                                                     transition: 'all 0.15s',
                                                     whiteSpace: 'nowrap',
+                                                    flexShrink: 0
                                                 }}
                                             >
                                                 {tab.label}
@@ -8552,14 +8553,14 @@ const PainelDeControle = () => {
 
                                 {/* ── Body ─────────────────────────────────── */}
                                 {eventEditError && (
-                                    <div className="login-error" role="alert" style={{ margin: '16px 32px 0 32px', borderRadius: '10px' }}>
+                                    <div className="login-error" role="alert" style={{ margin: '16px 20px 0 20px', borderRadius: '10px' }}>
                                         <AlertCircle size={18} />
                                         <p>{eventEditError}</p>
                                     </div>
                                 )}
 
                                 <form onSubmit={handleUpdateEvent} style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
-                                    <div style={{ flex: 1, padding: '24px 40px', overflowY: 'auto' }}>
+                                    <div style={{ flex: 1, padding: '20px 20px', overflowY: 'auto' }}>
 
                                         {/* ── TAB 1: Informações Básicas ──────── */}
                                         {eventModalTab === 'info' && (
@@ -8582,7 +8583,7 @@ const PainelDeControle = () => {
                                                     />
                                                 </div>
 
-                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                                                     <div>
                                                         <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>
                                                             DATA DO EVENTO
@@ -8768,8 +8769,8 @@ const PainelDeControle = () => {
                                         {eventModalTab === 'registration' && (
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
-                                                {/* Toggle switches */}
-                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                                 {/* Toggle switches */}
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
                                                     {[
                                                         {
                                                             label: 'Lutas Casadas',
@@ -8854,7 +8855,7 @@ const PainelDeControle = () => {
                                                     </div>
                                                 )}
 
-                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                                                     <div>
                                                         <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>
                                                             DATA LIMITE P/ INSCRIÇÃO
@@ -8917,7 +8918,7 @@ const PainelDeControle = () => {
                                                         })()}
                                                     </div>
 
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px' }}>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px' }}>
                                                         {(() => {
                                                             const activeBatch = resolveCurrentEventBatch(eventEditForm, new Date());
                                                             const activeBatchIndex = activeBatch ? (eventEditForm.batches || []).findIndex(b => b === activeBatch) : -1;
@@ -9029,7 +9030,7 @@ const PainelDeControle = () => {
                                                                     <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--brand-primary,#00c2cb)' }}>Lote {index + 1}</div>
                                                                     <button type="button" className="btn btn-ghost btn-sm" onClick={() => handleRemoveBatchEdit(index)} style={{ color: '#ef4444' }}>Remover</button>
                                                                 </div>
-                                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+                                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '20px' }}>
                                                                     <div>
                                                                         <label className="table-meta" style={{ fontSize: '11px', marginBottom: '6px', display: 'block' }}>Nome do Lote</label>
                                                                         <input className="input" type="text" value={batch.name} onChange={e => handleBatchChangeEdit(index, 'name', e.target.value)} required />
@@ -9043,7 +9044,7 @@ const PainelDeControle = () => {
                                                                         <input className="input" type="datetime-local" value={batch.endDate || ''} onChange={e => handleBatchChangeEdit(index, 'endDate', e.target.value)} />
                                                                     </div>
                                                                 </div>
-                                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px' }}>
+                                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '12px' }}>
                                                                     {[
                                                                         { label: 'Sub-15', key: 'feeUnder15', color: '#3b82f6' },
                                                                         { label: 'Adulto', key: 'feeOver15', color: '#00c2cb' },
@@ -9071,7 +9072,7 @@ const PainelDeControle = () => {
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
                                                 {/* Weight tables */}
-                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '24px' }}>
                                                     {/* GI */}
                                                     <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', padding: '20px' }}>
                                                         <div style={{ fontSize: '14px', fontWeight: 700, color: '#e2e8f0', marginBottom: '16px' }}>
@@ -9160,7 +9161,7 @@ const PainelDeControle = () => {
                                                     <div style={{ fontSize: '14px', fontWeight: 700, color: '#e2e8f0', marginBottom: '16px' }}>
                                                         📄 Circular / Regulamento do Evento
                                                     </div>
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                                                         <div>
                                                             <label className="table-meta" style={{ fontSize: '11px', marginBottom: '6px', display: 'block' }}>URL da Circular (PDF opcional)</label>
                                                             <input
