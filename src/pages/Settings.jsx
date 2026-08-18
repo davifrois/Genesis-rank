@@ -24,6 +24,7 @@ import {
 } from '../utils/profileShare';
 import { compressImage } from '../utils/imageUtils';
 import { BRAZIL_CITIES } from '../utils/brazilCities';
+import { formatCep, fetchAddressByCep } from '../utils/cep';
 
 const BRAZIL_STATES = [
   { sigla: 'AC', nome: 'Acre' },
@@ -380,6 +381,30 @@ const Settings = () => {
     ),
     [currentProfile?.fullName, currentUser?.name, form.firstName, form.lastName, form.middleName]
   );
+
+  const [isFetchingCep, setIsFetchingCep] = useState(false);
+
+  const handleCepChange = async (event) => {
+    const formatted = formatCep(event.target.value);
+    setForm((prev) => ({ ...prev, postalCode: formatted }));
+
+    const digits = formatted.replace(/\D/g, '');
+    if (digits.length === 8) {
+      setIsFetchingCep(true);
+      const result = await fetchAddressByCep(digits);
+      setIsFetchingCep(false);
+      if (result) {
+        setForm((prev) => ({
+          ...prev,
+          postalCode: result.cep || formatted,
+          address: result.address || prev.address,
+          state: result.state || prev.state,
+          city: result.city || prev.city,
+          country: 'Brasil'
+        }));
+      }
+    }
+  };
 
   const shareCode = useMemo(() => {
     return buildProfileShareCode({
@@ -829,8 +854,17 @@ const Settings = () => {
                   <input className="profile-input profile-input--dark" type="tel" inputMode="numeric" autoComplete="tel-national" value={form.phone} onChange={(event) => setForm((previous) => ({ ...previous, phone: formatBrazilPhone(event.target.value) }))} />
                 </div>
                 <div className="profile-field">
-                  <label>CEP</label>
-                  <input className="profile-input profile-input--dark" value={form.postalCode} onChange={(event) => setForm((previous) => ({ ...previous, postalCode: event.target.value }))} />
+                  <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>CEP</span>
+                    {isFetchingCep && <span style={{ fontSize: '11px', color: '#00c2cb', fontWeight: 600 }}>Buscando CEP...</span>}
+                  </label>
+                  <input 
+                    className="profile-input profile-input--dark" 
+                    placeholder="00000-000"
+                    maxLength={9}
+                    value={form.postalCode || ''} 
+                    onChange={handleCepChange} 
+                  />
                 </div>
                 <div className="profile-field profile-field--full">
                   <label>Endereco</label>
