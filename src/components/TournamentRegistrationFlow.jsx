@@ -721,7 +721,9 @@ const TournamentRegistrationFlow = ({ event, onComplete }) => {
           return;
         } else {
           console.error('Failed to create Mercado Pago Checkout session, no url returned', data);
-          alert('Erro ao iniciar pagamento via Mercado Pago. Tente novamente mais tarde.');
+          alert('Erro ao iniciar pagamento via Mercado Pago. Direcionando para pagamento via PIX...');
+          setStep(3);
+          return;
         }
       } catch (err) {
         console.error('Mercado Pago error:', err);
@@ -730,7 +732,9 @@ const TournamentRegistrationFlow = ({ event, onComplete }) => {
           window.location.href = event.registrationUrl;
           return;
         }
-        alert('Erro ao conectar com Mercado Pago: ' + (err.message || 'Falha de conexão'));
+        alert('Erro ao conectar com Mercado Pago. Direcionando para pagamento via PIX...');
+        setStep(3);
+        return;
       }
     }
 

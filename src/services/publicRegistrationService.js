@@ -521,7 +521,6 @@ export const publicRegistrationService = {
           pending: `${origin}/payment/success?external_reference=${encodeURIComponent(registrationIds)}`,
           failure: `${origin}/payment/cancel`
         },
-        auto_return: 'approved',
         external_reference: String(registrationIds || '')
       })
     });

@@ -50,8 +50,11 @@ public class MercadoPagoService {
         PreferenceRequest.PreferenceRequestBuilder builder = PreferenceRequest.builder()
                 .items(items)
                 .backUrls(backUrls)
-                .autoReturn("approved")
                 .externalReference(registrationIds);
+
+        if (successUrl != null && successUrl.startsWith("https")) {
+            builder.autoReturn("approved");
+        }
 
         // Só configura notificationUrl se estiver definida
         if (notificationUrl != null && !notificationUrl.isBlank()) {
