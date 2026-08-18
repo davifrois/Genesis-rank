@@ -16400,6 +16400,193 @@ textarea:focus-visible {
   input[type="text"], input[type="email"], input[type="password"], select {
     font-size: 16px !important; /* Prevents unwanted auto-zoom on iOS Safari */
   }
+
+  /* 7. COMPLETE MOBILE RESPONSIVENESS & SAFE-AREA OVERHAUL */
+  .brand-block--center .brand-mark {
+    width: 44px !important;
+    height: 44px !important;
+  }
+  .brand-block--center .brand-mark::before,
+  .brand-block--center .brand-mark::after {
+    display: none !important;
+  }
+  .brand-block--center .brand-logo {
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
+  }
+
+  .admin-shell {
+    width: 100% !important;
+    max-width: 100% !important;
+    left: 0 !important;
+    right: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    margin-top: 0 !important;
+    padding: 12px 12px calc(6rem + env(safe-area-inset-bottom, 0px)) 12px !important;
+    box-sizing: border-box !important;
+  }
+
+  .admin-main {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .admin-hero {
+    padding: 1rem 0.9rem !important;
+    margin-top: 0 !important;
+    border-radius: 12px !important;
+  }
+
+  .admin-sidebar {
+    display: none !important;
+  }
+
+  .admin-sidebar.is-open {
+    display: flex !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 99999 !important;
+    background: rgba(10, 16, 28, 0.98) !important;
+    backdrop-filter: blur(12px) !important;
+    flex-direction: column !important;
+    padding: 24px 20px !important;
+    overflow-y: auto !important;
+    gap: 16px !important;
+  }
+
+  .admin-sidebar.is-open .admin-sidebar__nav {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    gap: 10px !important;
+  }
+
+  .admin-sidebar.is-open .sidebar-link {
+    width: 100% !important;
+    justify-content: flex-start !important;
+    padding: 14px 16px !important;
+    font-size: 1rem !important;
+  }
+
+  .mobile-quickbar,
+  .mobile-quickbar.mobile-only {
+    position: fixed !important;
+    left: 0.5rem !important;
+    right: 0.5rem !important;
+    bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px)) !important;
+    z-index: 9990 !important;
+    padding: 0.35rem !important;
+    gap: 0.35rem !important;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6) !important;
+  }
+
+  .mobile-quickbar__btn {
+    min-height: 42px !important;
+    font-size: 0.55rem !important;
+    padding: 4px 2px !important;
+  }
+
+  .panel-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+  }
+
+  .panel-actions {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    gap: 8px !important;
+  }
+
+  .panel-actions > * {
+    width: 100% !important;
+    flex: 1 1 100% !important;
+  }
+
+  .panel-actions .search-box {
+    width: 100% !important;
+  }
+
+  .panel-actions .btn,
+  .panel-actions select {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  .view-toggle {
+    display: flex !important;
+    justify-content: center !important;
+    width: 100% !important;
+  }
+
+  .view-toggle .toggle-btn {
+    flex: 1 !important;
+    justify-content: center !important;
+  }
+
+  .data-table-wrapper,
+  .table-scroll {
+    width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    display: block !important;
+  }
+
+  .athlete-card {
+    padding: 14px !important;
+    border-radius: 12px !important;
+    margin-bottom: 12px !important;
+    word-break: break-word !important;
+  }
+
+  .athlete-card__actions {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    margin-top: 12px !important;
+  }
+
+  .athlete-card__actions .points-editor {
+    width: 100% !important;
+    display: flex !important;
+    gap: 6px !important;
+  }
+
+  .athlete-card__actions .points-editor input {
+    flex: 1 !important;
+  }
+
+  .athlete-card__actions .action-btn {
+    flex: 1 !important;
+    justify-content: center !important;
+    min-height: 38px !important;
+  }
+
+  .modal-card {
+    width: 95% !important;
+    max-width: 95% !important;
+    max-height: 90vh !important;
+    margin: 10px auto !important;
+  }
+
+  .modal-panel {
+    padding: 16px !important;
+  }
+
+  .filter-bar,
+  .ajp-filters {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+  }
 }
+
 
 

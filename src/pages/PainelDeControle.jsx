@@ -7506,6 +7506,7 @@ const PainelDeControle = () => {
                     </div>
 
                     {viewMode === 'table' ? (
+                        <div className="table-scroll">
                         <table className="data-table">
                             <thead>
                                 <tr>
@@ -7630,6 +7631,7 @@ const PainelDeControle = () => {
                                 })}
                             </tbody>
                         </table>
+                        </div>
                     ) : (
                         <div className="card-grid">
                             {pagedAthleteRows.map(({ athlete, profile, eventLabel, photoUrl }) => {
