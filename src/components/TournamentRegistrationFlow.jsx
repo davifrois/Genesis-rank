@@ -379,6 +379,7 @@ const ProgressBar = ({ currentStep }) => {
 
 const TournamentRegistrationFlow = ({ event, onComplete }) => {
   const { currentUser, memberProfiles = [], academies = [], addMemberProfile, addAthlete, athletes = [], deleteMemberProfile } = useStore() || {};
+  const navigate = useNavigate();
   const [step, setStep] = useState(1); // 1: Profile Select, 1.5: Profile Confirm, 2: Category, 3: Payment
   const [showLogin, setShowLogin] = useState(!currentUser);
   const [selectedProfile, setSelectedProfile] = useState(null);
@@ -420,7 +421,7 @@ const TournamentRegistrationFlow = ({ event, onComplete }) => {
           }
 
           setTimeout(() => {
-            window.location.href = `/payment/success?external_reference=${encodeURIComponent(pixModalData.registrationIds)}&payment_id=${encodeURIComponent(pixModalData.paymentId)}&status=approved`;
+            navigate(`/payment/success?external_reference=${encodeURIComponent(pixModalData.registrationIds)}&payment_id=${encodeURIComponent(pixModalData.paymentId)}&status=approved`);
           }, 1200);
         }
       } catch (e) {
@@ -891,7 +892,7 @@ const TournamentRegistrationFlow = ({ event, onComplete }) => {
                   <button
                     type="button"
                     onClick={() => {
-                      window.location.href = `/payment/success?external_reference=${encodeURIComponent(pixModalData.registrationIds)}&payment_id=${encodeURIComponent(pixModalData.paymentId)}&status=approved`;
+                      navigate(`/payment/success?external_reference=${encodeURIComponent(pixModalData.registrationIds)}&payment_id=${encodeURIComponent(pixModalData.paymentId)}&status=approved`);
                     }}
                     style={{ flex: 1, padding: '0.75rem', background: 'rgba(255, 255, 255, 0.08)', color: '#fff', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '8px', fontWeight: 600, fontSize: '0.82rem', cursor: 'pointer' }}
                   >
