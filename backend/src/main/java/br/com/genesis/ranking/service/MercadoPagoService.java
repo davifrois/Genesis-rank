@@ -38,28 +38,32 @@ public class MercadoPagoService {
                 .build();
         items.add(item);
 
-        String successUrl = getBaseClientUrl() + "/payment/success";
-        String cancelUrl  = getBaseClientUrl() + "/payment/cancel";
+        String baseUrl = getBaseClientUrl();
+        if (baseUrl == null || baseUrl.contains("localhost")) {
+            baseUrl = "https://genesis-rank.vercel.app";
+        }
+        String successUrl = baseUrl + "/sucesso";
+        String cancelUrl  = baseUrl + "/falha";
+        String pendingUrl = baseUrl + "/pendente";
 
         PreferenceBackUrlsRequest backUrls = PreferenceBackUrlsRequest.builder()
                 .success(successUrl)
                 .failure(cancelUrl)
-                .pending(cancelUrl)
+                .pending(pendingUrl)
                 .build();
 
         PreferenceRequest.PreferenceRequestBuilder builder = PreferenceRequest.builder()
                 .items(items)
                 .backUrls(backUrls)
+                .autoReturn("approved")
                 .externalReference(registrationIds);
 
-        if (successUrl != null && successUrl.startsWith("https")) {
-            builder.autoReturn("approved");
-        }
+        String effectiveNotificationUrl = (notificationUrl != null && !notificationUrl.isBlank()) 
+                ? notificationUrl 
+                : "https://genesis-rank.vercel.app/api/webhook-mercadopago";
 
-        // Só configura notificationUrl se estiver definida
-        if (notificationUrl != null && !notificationUrl.isBlank()) {
-            builder.notificationUrl(notificationUrl);
-        }
+        builder.notificationUrl(effectiveNotificationUrl);
+
 
         try {
             return client.create(builder.build());

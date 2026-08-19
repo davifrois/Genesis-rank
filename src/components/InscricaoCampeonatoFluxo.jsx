@@ -668,6 +668,7 @@ const InscricaoCampeonatoFluxo = ({ event, onComplete }) => {
         const data = await publicRegistrationService.createCheckoutSession({
           registrationIds,
           athleteName,
+          athleteEmail: selectedProfile.email || '',
           amount: registrationPrice
         });
         

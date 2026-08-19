@@ -303,11 +303,11 @@ app.patch('/api/admin/registrations/:id/details', (req, res) => {
 
 app.post('/api/webhooks/payment/checkout', async (req, res) => {
     try {
-        const { registrationIds, athleteName, amount } = req.body;
+        const { registrationIds, athleteName, athleteEmail, amount } = req.body;
         const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN || 'APP_USR-5076214841905920-081112-768e0648179ce52ceb48a90a14882388-1214160384';
         
-        const origin = req.headers.origin || 'http://localhost:5173';
-        const isLocalhost = origin.includes('localhost') || origin.includes('127.0.0.1');
+        const origin = req.headers.origin || 'https://genesis-rank.vercel.app';
+        const baseSiteUrl = origin.includes('localhost') ? 'https://genesis-rank.vercel.app' : origin;
 
         const preferencePayload = {
             items: [
@@ -321,20 +321,17 @@ app.post('/api/webhooks/payment/checkout', async (req, res) => {
             ],
             payer: {
                 name: athleteName || 'Atleta Genesis',
-                email: req.body.athleteEmail || 'contato@genesisesportes.com.br'
+                email: athleteEmail || 'contato@genesisesportes.com.br'
             },
             back_urls: {
-                success: `${origin}/payment/success`,
-                failure: `${origin}/payment/cancel`,
-                pending: `${origin}/payment/cancel`
+                success: `${baseSiteUrl}/sucesso`,
+                failure: `${baseSiteUrl}/falha`,
+                pending: `${baseSiteUrl}/pendente`
             },
             auto_return: 'approved',
+            notification_url: `${baseSiteUrl}/api/webhook-mercadopago`,
             external_reference: String(registrationIds || '')
         };
-
-        if (!isLocalhost) {
-            preferencePayload.notification_url = 'https://genesisesportes.com.br/api/webhooks/payment/mercadopago';
-        }
 
         const mpResponse = await fetch('https://api.mercadopago.com/checkout/preferences', {
             method: 'POST',
@@ -347,15 +344,14 @@ app.post('/api/webhooks/payment/checkout', async (req, res) => {
 
         const mpData = await mpResponse.json();
         
-        if (accessToken.startsWith('APP_USR') && mpData.init_point) {
-            res.json({ url: mpData.init_point });
-        } else if (mpData.sandbox_init_point) {
-            res.json({ url: mpData.sandbox_init_point });
-        } else if (mpData.init_point) {
-            res.json({ url: mpData.init_point });
+        if (mpData.init_point || mpData.sandbox_init_point) {
+            res.json({ 
+                url: mpData.init_point || mpData.sandbox_init_point,
+                id: mpData.id 
+            });
         } else {
             console.error('Mercado Pago Erro:', mpData);
-            res.status(500).json({ error: 'Falha ao gerar link do Mercado Pago' });
+            res.status(500).json({ error: 'Falha ao gerar link do Mercado Pago', details: mpData });
         }
     } catch (e) {
         console.error('Erro no checkout:', e);
@@ -463,9 +459,11 @@ app.get('/api/webhooks/payment/status/:paymentId', async (req, res) => {
 });
 
 // Confirm Return endpoint
-app.get('/api/webhooks/payment/confirm-return', async (req, res) => {
+app.all(['/api/webhooks/payment/confirm-return', '/api/payment/confirm-return'], async (req, res) => {
     try {
-        const { registrationIds, paymentId } = req.query;
+        const registrationIds = req.query.registrationIds || req.body?.registrationIds;
+        const paymentId = req.query.paymentId || req.body?.paymentId;
+
         if (registrationIds) {
             const regIds = String(registrationIds).split(',');
             const db = readDb();
@@ -485,20 +483,23 @@ app.get('/api/webhooks/payment/confirm-return', async (req, res) => {
 
             if (updated) writeDb(db);
         }
-        res.json({ success: true });
+        res.json({ success: true, status: 'APPROVED' });
     } catch (e) {
         res.status(500).json({ success: false });
     }
 });
 
-// Mercado Pago Webhook Handler
-app.post('/api/webhooks/payment/mercadopago', async (req, res) => {
+// Mercado Pago Webhook Handler (Suporta /api/webhook-mercadopago e /api/webhooks/payment/mercadopago)
+app.all(['/api/webhook-mercadopago', '/api/webhooks/payment/mercadopago'], async (req, res) => {
     try {
         const { type, data } = req.body || {};
-        const paymentId = data?.id || req.query['data.id'];
+        const paymentId = data?.id || req.body?.id || req.query['data.id'] || req.query?.id;
         
-        console.log(`Webhook Mercado Pago recebido: tipo=${type}, paymentId=${paymentId}`);
+        console.log(`[Mercado Pago Webhook] Recebido: tipo=${type}, paymentId=${paymentId}`);
         
+        // Imediatamente responder 200 OK
+        res.status(200).json({ received: true, paymentId });
+
         if (paymentId) {
             const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN || 'APP_USR-5076214841905920-081112-768e0648179ce52ceb48a90a14882388-1214160384';
             const payRes = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
@@ -507,6 +508,8 @@ app.post('/api/webhooks/payment/mercadopago', async (req, res) => {
             
             if (payRes.ok) {
                 const paymentInfo = await payRes.json();
+                console.log(`[Mercado Pago Webhook] Status pagamento ${paymentId}: ${paymentInfo.status}`);
+
                 if (paymentInfo.status === 'approved' && paymentInfo.external_reference) {
                     const regIds = paymentInfo.external_reference.split(',');
                     const db = readDb();
@@ -532,17 +535,16 @@ app.post('/api/webhooks/payment/mercadopago', async (req, res) => {
                     
                     if (updated) {
                         writeDb(db);
-                        console.log(`Inscrições [${paymentInfo.external_reference}] aprovadas automaticamente via Mercado Pago!`);
+                        console.log(`Inscrições [${paymentInfo.external_reference}] aprovadas com sucesso via Webhook Mercado Pago!`);
                     }
                 }
             }
         }
-        res.status(200).send('OK');
     } catch (e) {
         console.error('Erro no webhook Mercado Pago:', e);
-        res.status(500).send('Webhook Error');
     }
 });
+
 
 app.listen(PORT, () => {
     console.log(`Backend server running on http://localhost:${PORT}`);

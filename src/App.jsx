@@ -1674,7 +1674,12 @@ const AppLayout = () => {
                 <Route path="/noticias" element={<News />} />
                 <Route path="/payment/success" element={<PaymentSuccess />} />
                 <Route path="/payment/cancel" element={<PaymentCancel />} />
+                <Route path="/payment/pending" element={<PaymentSuccess />} />
+                <Route path="/sucesso" element={<PaymentSuccess />} />
+                <Route path="/falha" element={<PaymentCancel />} />
+                <Route path="/pendente" element={<PaymentSuccess />} />
               </Routes>
+
             </motion.div>
           </AnimatePresence>
         </div>
