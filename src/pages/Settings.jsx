@@ -383,28 +383,52 @@ const Settings = () => {
   );
 
   const [isFetchingCep, setIsFetchingCep] = useState(false);
+  const [cepSuccess, setCepSuccess] = useState('');
+
+  const triggerCepLookup = async (cepValue) => {
+    const digits = (cepValue || '').toString().replace(/\D/g, '');
+    if (digits.length === 8) {
+      setIsFetchingCep(true);
+      setCepSuccess('');
+      try {
+        const result = await fetchAddressByCep(digits);
+        if (result) {
+          const stateCode = result.state?.toUpperCase() || '';
+          const stateCities = BRAZIL_CITIES[stateCode] || [];
+          
+          // Match city name case-insensitively with BRAZIL_CITIES
+          const matchedCity = stateCities.find(
+            (c) => c.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') === 
+                   result.city.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          ) || result.city;
+
+          setForm((prev) => ({
+            ...prev,
+            postalCode: result.cep || formatCep(digits),
+            address: result.address || prev.address,
+            state: stateCode || prev.state,
+            city: matchedCity || prev.city,
+            country: 'Brasil'
+          }));
+          setCepSuccess(`${matchedCity} - ${stateCode}`);
+        }
+      } catch (err) {
+        console.warn('Erro ao consultar CEP:', err);
+      } finally {
+        setIsFetchingCep(false);
+      }
+    }
+  };
 
   const handleCepChange = async (event) => {
     const formatted = formatCep(event.target.value);
     setForm((prev) => ({ ...prev, postalCode: formatted }));
-
     const digits = formatted.replace(/\D/g, '');
     if (digits.length === 8) {
-      setIsFetchingCep(true);
-      const result = await fetchAddressByCep(digits);
-      setIsFetchingCep(false);
-      if (result) {
-        setForm((prev) => ({
-          ...prev,
-          postalCode: result.cep || formatted,
-          address: result.address || prev.address,
-          state: result.state || prev.state,
-          city: result.city || prev.city,
-          country: 'Brasil'
-        }));
-      }
+      await triggerCepLookup(digits);
     }
   };
+
 
   const shareCode = useMemo(() => {
     return buildProfileShareCode({
@@ -857,34 +881,41 @@ const Settings = () => {
                   <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span>CEP</span>
                     {isFetchingCep && <span style={{ fontSize: '11px', color: '#00c2cb', fontWeight: 600 }}>Buscando CEP...</span>}
+                    {!isFetchingCep && cepSuccess && <span style={{ fontSize: '11px', color: '#22c55e', fontWeight: 600 }}>✓ {cepSuccess}</span>}
                   </label>
                   <input 
                     className="profile-input profile-input--dark" 
                     placeholder="00000-000"
                     maxLength={9}
                     value={form.postalCode || ''} 
-                    onChange={handleCepChange} 
+                    onChange={handleCepChange}
+                    onBlur={() => triggerCepLookup(form.postalCode)}
                   />
                 </div>
                 <div className="profile-field profile-field--full">
                   <label>Endereco</label>
-                  <input className="profile-input profile-input--dark" value={form.address} onChange={(event) => setForm((previous) => ({ ...previous, address: event.target.value }))} />
+                  <input 
+                    className="profile-input profile-input--dark" 
+                    placeholder="Rua / Avenida, Bairro, Número"
+                    value={form.address || ''} 
+                    onChange={(event) => setForm((previous) => ({ ...previous, address: event.target.value }))} 
+                  />
                 </div>
                 <div className="profile-field">
                   <label>Estado / provincia</label>
                   {form.country?.toLowerCase() === 'brasil' ? (
                     <select 
                       className="profile-input profile-input--dark"
-                      value={form.state}
+                      value={form.state || ''}
                       onChange={e => setForm(prev => ({ ...prev, state: e.target.value, city: '' }))}
                     >
                       <option value="">Selecione o estado</option>
-                      {brStates.map(st => <option key={st.sigla} value={st.sigla}>{st.nome}</option>)}
+                      {BRAZIL_STATES.map(st => <option key={st.sigla} value={st.sigla}>{st.nome} ({st.sigla})</option>)}
                     </select>
                   ) : (
                     <input 
                       className="profile-input profile-input--dark" 
-                      value={form.state} 
+                      value={form.state || ''} 
                       onChange={e => setForm(prev => ({ ...prev, state: e.target.value, city: '' }))} 
                     />
                   )}
@@ -894,11 +925,14 @@ const Settings = () => {
                   {form.country?.toLowerCase() === 'brasil' ? (
                     <select 
                       className="profile-input profile-input--dark"
-                      value={form.city}
+                      value={form.city || ''}
                       onChange={e => setForm(prev => ({ ...prev, city: e.target.value }))}
-                      disabled={!form.state || !BRAZIL_CITIES[form.state]}
+                      disabled={!form.state}
                     >
                       <option value="">Selecione a cidade</option>
+                      {form.city && (!BRAZIL_CITIES[form.state] || !BRAZIL_CITIES[form.state].some(c => c.toLowerCase() === form.city.toLowerCase())) && (
+                        <option value={form.city}>{form.city}</option>
+                      )}
                       {form.state && BRAZIL_CITIES[form.state] && BRAZIL_CITIES[form.state].map(cityName => (
                         <option key={cityName} value={cityName}>{cityName}</option>
                       ))}
@@ -906,11 +940,12 @@ const Settings = () => {
                   ) : (
                     <input 
                       className="profile-input profile-input--dark" 
-                      value={form.city} 
+                      value={form.city || ''} 
                       onChange={e => setForm(prev => ({ ...prev, city: e.target.value }))} 
                     />
                   )}
                 </div>
+
                 <div className="profile-field">
                   <label>Pais</label>
                   <input className="profile-input profile-input--dark" value={form.country} onChange={(event) => setForm((previous) => ({ ...previous, country: event.target.value }))} />
