@@ -20,11 +20,8 @@ export default async function handler(req, res) {
     const { registrationIds, athleteName, athleteEmail, amount } = req.body || {};
     const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN || 'APP_USR-5076214841905920-081112-768e0648179ce52ceb48a90a14882388-1214160384';
 
-    // Determinar o domínio base
-    const hostHeader = req.headers['x-forwarded-host'] || req.headers.host || 'genesis-rank.vercel.app';
-    const proto = req.headers['x-forwarded-proto'] || 'https';
-    const origin = `${proto}://${hostHeader}`;
-    const baseSiteUrl = origin.includes('localhost') ? 'https://genesis-rank.vercel.app' : origin;
+    // Determinar o domínio base oficial em produção
+    const baseSiteUrl = 'https://genesis-rank.vercel.app';
 
     const preferencePayload = {
       items: [
@@ -46,11 +43,12 @@ export default async function handler(req, res) {
         pending: `${baseSiteUrl}/pendente`
       },
       auto_return: 'approved',
+      binary_mode: true,
       notification_url: `${baseSiteUrl}/api/webhook-mercadopago`,
       external_reference: String(registrationIds || '')
     };
 
-    console.log('[Mercado Pago Checkout] Criando preferência:', preferencePayload);
+    console.log('[Mercado Pago Checkout] Criando preferência de produção:', preferencePayload);
 
     const mpResponse = await fetch('https://api.mercadopago.com/checkout/preferences', {
       method: 'POST',

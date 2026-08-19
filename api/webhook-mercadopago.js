@@ -17,7 +17,7 @@ export default async function handler(req, res) {
     const body = req.body || {};
     const query = req.query || {};
 
-    // O Mercado Pago pode enviar o ID de diferentes formas dependendo do tipo de notificação (Webhooks v1 vs IPN)
+    // Identificar o ID do pagamento enviado pelo Mercado Pago
     const paymentId = 
       body?.data?.id || 
       body?.id || 
@@ -27,10 +27,7 @@ export default async function handler(req, res) {
 
     const type = body?.type || body?.topic || query?.topic || query?.type || 'payment';
 
-    console.log(`[Mercado Pago Webhook] Recebido: tipo=${type}, paymentId=${paymentId}`, {
-      body,
-      query
-    });
+    console.log(`[Mercado Pago Webhook] Recebido: tipo=${type}, paymentId=${paymentId}`);
 
     const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN || 'APP_USR-5076214841905920-081112-768e0648179ce52ceb48a90a14882388-1214160384';
 
@@ -51,7 +48,7 @@ export default async function handler(req, res) {
           console.log(`[Mercado Pago Webhook] Pagamento ID ${paymentId} -> Status: ${paymentData.status}, Ref: ${externalRef}`);
 
           if (isApproved) {
-            console.log(`[Mercado Pago Webhook] Pagamento APROVADO para referência: ${externalRef}`);
+            console.log(`[Mercado Pago Webhook] ✅ Pagamento APROVADO para referência: ${externalRef}`);
           }
 
           return res.status(200).json({
@@ -71,7 +68,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ received: true, paymentId: paymentId || null });
   } catch (error) {
     console.error('[Mercado Pago Webhook] Erro ao processar:', error);
-    // Mesmo em caso de erro interno, responder 200 para evitar flood do webhook
     return res.status(200).json({ received: true, error: error.message });
   }
 }
