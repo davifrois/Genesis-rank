@@ -665,13 +665,41 @@ const InscricaoCampeonatoFluxo = ({ event, onComplete }) => {
     const registrationPrice = Number(activeRegData.price || 0);
 
     if (isMercadoPagoSelected && registrationPrice > 0) {
-      // Mostrar modal PIX dentro do site para evitar saída e garantir redirecionamento automático
-      const registrationIds = payloads.map(p => p.id).join(',');
-      const athleteName = selectedProfile.fullName || selectedProfile.nome || 'Atleta';
-      const athleteEmail = selectedProfile.email || '';
-      setPixModalData({ registrationIds, athleteName, athleteEmail, amount: registrationPrice });
-      setShowPixModal(true);
-      return;
+      try {
+        const registrationIds = payloads.map(p => p.id).join(',');
+        const athleteName = selectedProfile.fullName || selectedProfile.nome || 'Atleta';
+        const data = await publicRegistrationService.createCheckoutSession({
+          registrationIds,
+          athleteName,
+          athleteEmail: selectedProfile.email || '',
+          amount: registrationPrice
+        });
+        
+        if (data && data.url) {
+          if (onComplete) onComplete();
+          window.location.href = data.url;
+          return;
+        } else if (event.registrationUrl) {
+          if (onComplete) onComplete();
+          window.location.href = event.registrationUrl;
+          return;
+        } else {
+          console.error('Failed to create Mercado Pago Checkout session, no url returned', data);
+          alert('Erro ao iniciar pagamento via Mercado Pago. Direcionando para pagamento via PIX...');
+          setStep(3);
+          return;
+        }
+      } catch (err) {
+        console.error('Mercado Pago error:', err);
+        if (event.registrationUrl) {
+          if (onComplete) onComplete();
+          window.location.href = event.registrationUrl;
+          return;
+        }
+        alert('Erro ao conectar com Mercado Pago. Direcionando para pagamento via PIX...');
+        setStep(3);
+        return;
+      }
     }
 
     if (onComplete) onComplete();
