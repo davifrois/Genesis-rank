@@ -2,8 +2,22 @@ import { REGISTRATION_STATUS, normalizeRegistrationStatus } from '../utils/regis
 import { authService } from './authService';
 import localforage from 'localforage';
 
-const ENV_API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL || 'http://localhost:8080').trim();
-const API_BASE_URL = ENV_API_BASE_URL.includes('sua-url-do-ngrok') ? '' : ENV_API_BASE_URL.replace(/\/$/, '');
+const resolveApiBaseUrl = () => {
+  const envUrl = (import.meta.env?.VITE_API_BASE_URL || '').trim();
+  if (typeof window !== 'undefined') {
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (!isLocalhost && (envUrl.includes('localhost') || envUrl.includes('sua-url-do-ngrok') || !envUrl)) {
+      return '';
+    }
+  }
+  return envUrl.replace(/\/$/, '');
+};
+
+const buildApiUrl = (path) => {
+  const base = resolveApiBaseUrl();
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return `${base}${normalizedPath}`;
+};
 const LOCAL_PENDING_REGISTRATIONS_KEY = 'genesis_public_registration_pending_v1';
 const LOCAL_SYNC_DIAGNOSTICS_KEY = 'genesis_public_registration_sync_diag_v1';
 const MAX_PENDING_RECORDS = 20;
@@ -35,11 +49,6 @@ const ensurePayloadWithClientRequestId = (payload) => {
   }
   base.clientRequestId = generateClientRequestId();
   return base;
-};
-
-const buildApiUrl = (path) => {
-  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  return `${API_BASE_URL}${normalizedPath}`;
 };
 
 const isNetworkError = (error) => {
@@ -482,70 +491,47 @@ export const publicRegistrationService = {
   // O backend (no FinanceiroController) irá retornar um JSON no formato { "url": "https://checkout.stripe.com/..." }.
   // Você não precisa mexer nesta função se não quiser alterar a estrutura, pois ela já repassa tudo para o backend.
   createCheckoutSession: async ({ registrationIds, athleteName, athleteEmail, amount }) => {
-    const accessToken = 'APP_USR-5076214841905920-081112-768e0648179ce52ceb48a90a14882388-1214160384';
-    const origin = window.location.origin;
-    const baseSiteUrl = origin.includes('localhost') ? 'https://genesis-rank.vercel.app' : origin;
+    const endpoints = [
+      buildApiUrl('/api/webhooks/payment/checkout'),
+      '/api/webhooks/payment/checkout',
+      '/api/checkout'
+    ];
 
-    // 1. Tentar Backend primeiro (Vercel Serverless Function ou Backend Node/Java)
-    try {
-      const response = await fetch(buildApiUrl('/api/webhooks/payment/checkout'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': 'true'
-        },
-        body: JSON.stringify({
-          registrationIds,
-          athleteName,
-          athleteEmail,
-          amount
-        })
-      });
-      if (response.ok) {
-        const resJson = await response.json();
-        if (resJson && resJson.url) {
-          return resJson;
-        }
-      }
-    } catch (e) {
-      console.warn('Backend indisponível para checkout, gerando via Mercado Pago API direto:', e);
-    }
-
-    // 2. Chamada Direta para Mercado Pago Preferences API (Fallback Vercel/Produção)
-    const preferencePayload = {
-      items: [{
-        title: `Inscrição Campeonato - ${athleteName || 'Atleta'}`,
-        description: `Inscrição oficial no campeonato Genesis Sports para ${athleteName || 'Atleta'}`,
-        quantity: 1,
-        unit_price: Number(amount || 0),
-        currency_id: 'BRL'
-      }],
-      payer: {
-        name: athleteName || 'Atleta Genesis',
-        email: athleteEmail || 'contato@genesisesportes.com.br'
-      },
-      back_urls: {
-        success: `${baseSiteUrl}/sucesso`,
-        failure: `${baseSiteUrl}/falha`,
-        pending: `${baseSiteUrl}/pendente`
-      },
-      auto_return: 'approved',
-      notification_url: `${baseSiteUrl}/api/webhook-mercadopago`,
-      external_reference: String(registrationIds || '')
-    };
-
-    const mpRes = await fetch('https://api.mercadopago.com/checkout/preferences', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`
-      },
-      body: JSON.stringify(preferencePayload)
+    const bodyPayload = JSON.stringify({
+      registrationIds,
+      athleteName,
+      athleteEmail,
+      amount
     });
 
-    const data = await mpRes.json();
-    return { url: data.init_point || data.sandbox_init_point };
+    for (const endpoint of Array.from(new Set(endpoints))) {
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true'
+          },
+          body: bodyPayload
+        });
+
+        if (response.ok) {
+          const resJson = await response.json();
+          if (resJson && (resJson.url || resJson.initPoint || resJson.sandboxInitPoint)) {
+            return {
+              url: resJson.url || resJson.initPoint || resJson.sandboxInitPoint,
+              id: resJson.id
+            };
+          }
+        }
+      } catch (e) {
+        console.warn(`[Mercado Pago] Falha ao tentar endpoint ${endpoint}:`, e);
+      }
+    }
+
+    throw new Error('Não foi possível gerar a preferência de checkout do Mercado Pago.');
   },
+
 
 
   createDirectPix: async ({ registrationIds, athleteName, email, amount }) => {
