@@ -677,7 +677,7 @@ const EventDetails = () => {
                       borderRadius: '10px', background: 'rgba(239,68,68,0.12)',
                       border: '1px solid rgba(239,68,68,0.35)', color: '#f87171', cursor: 'not-allowed'
                     }}>
-                      {isCapacityFull ? `🔴 Vagas Esgotadas (${event?.maxAthletes || 0}/${event?.maxAthletes || 0})` : '🔒 Inscrições Encerradas'}
+                      {isCapacityFull ? `Vagas Esgotadas (${event?.maxAthletes || 0}/${event?.maxAthletes || 0})` : '🔒 Inscrições Encerradas'}
                     </div>
                   )}
                 </div>
@@ -1660,7 +1660,7 @@ const EventDetails = () => {
               border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', cursor: 'not-allowed',
               whiteSpace: 'nowrap'
             }}>
-              {isCapacityFull ? '🔴 Vagas Esgotadas' : '🔒 Encerradas'}
+              {isCapacityFull ? 'Vagas Esgotadas' : '🔒 Encerradas'}
             </div>
           )}
         </div>
