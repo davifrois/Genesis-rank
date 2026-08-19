@@ -650,7 +650,7 @@ const AcademyRegistration = () => {
         </motion.div>
       </div>
 
-      <div className="academy-modal-footer" style={{ padding: '24px 32px', background: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
+      <div className="academy-modal-footer" style={{ padding: '24px 32px', background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '10px' }}>
         <motion.button 
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
@@ -658,16 +658,36 @@ const AcademyRegistration = () => {
           onClick={() => navigate('/gerente-treinador')}
           style={{ 
             width: '100%', 
-            padding: '16px', 
-            fontSize: '1.125rem', 
-            fontWeight: '600',
-            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+            padding: '14px', 
+            fontSize: '1.05rem', 
+            fontWeight: '700',
+            background: 'linear-gradient(135deg, #00c2cb 0%, #009ca4 100%)',
+            color: '#05070b',
             border: 'none',
-            boxShadow: '0 4px 14px 0 rgba(37, 99, 235, 0.39)'
+            borderRadius: '10px',
+            boxShadow: '0 4px 14px 0 rgba(0, 194, 203, 0.35)',
+            cursor: 'pointer'
           }}
         >
-          Acessar Painel da Academia
+          Acessar Painel do Treinador
         </motion.button>
+        <button 
+          type="button"
+          onClick={() => navigate('/configuracoes')}
+          style={{ 
+            width: '100%', 
+            padding: '12px', 
+            fontSize: '0.95rem', 
+            fontWeight: '600',
+            background: 'transparent',
+            color: '#64748b',
+            border: '1px solid #cbd5e1',
+            borderRadius: '10px',
+            cursor: 'pointer'
+          }}
+        >
+          Voltar para Meu Perfil / Configurações
+        </button>
       </div>
     </motion.div>
   );

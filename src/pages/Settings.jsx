@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { 
   User, Mail, Phone, MapPin, Building2, Medal, 
   Calendar, Info, AlertTriangle, CheckCircle, 
-  Settings as SettingsIcon, LogOut, Camera, Share2, Copy, Trash2, Lock, Image, Save, UserRound, ScanLine, Trophy, ShieldCheck
+  Settings as SettingsIcon, LogOut, Camera, Share2, Copy, Trash2, Lock, Image, Save, UserRound, ScanLine, Trophy, ShieldCheck, PlusCircle
 } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import AthleteDigitalCard from '../components/AthleteDigitalCard';
@@ -1075,8 +1075,28 @@ const Settings = () => {
           </article>
 
           <article className="profile-card profile-card--dark">
-            <div className="profile-card__header profile-card__header--dark">
+            <div className="profile-card__header profile-card__header--dark" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <h2>Academia e Equipe</h2>
+              <button
+                type="button"
+                onClick={() => navigate('/registro-academia')}
+                style={{
+                  background: 'rgba(0, 194, 203, 0.12)',
+                  border: '1px solid rgba(0, 194, 203, 0.35)',
+                  borderRadius: '8px',
+                  padding: '6px 12px',
+                  color: '#00c2cb',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <PlusCircle size={15} />
+                Cadastrar Nova Academia
+              </button>
             </div>
             <div className="profile-card__body">
               <div className="profile-fields">
@@ -1086,9 +1106,29 @@ const Settings = () => {
                     academies={academies} 
                     value={form.academyId} 
                     onChange={(value) => setForm((previous) => ({ ...previous, academyId: value }))} 
-                    onRegisterNew={() => navigate('/registro-academia')} 
+                    onRegisterNew={(typedName) => navigate('/registro-academia', { state: { initialName: typedName || '' } })} 
                     theme="light"
                   />
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px' }}>
+                    <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+                      Não encontrou sua equipe na lista?
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/registro-academia')}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#00c2cb',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        textDecoration: 'underline'
+                      }}
+                    >
+                      + Cadastrar Nova Academia
+                    </button>
+                  </div>
                 </div>
                 <div className="profile-field profile-field--full" style={{ marginTop: '10px' }}>
                   <label>Afiliação/Equipe Selecionada</label>
