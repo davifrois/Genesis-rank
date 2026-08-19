@@ -309,7 +309,7 @@ const Events = () => {
     }
 
     const maxAthletes = Number(event?.maxAthletes || 0);
-    if (event?.closeOnCapacity === true && maxAthletes > 0) {
+    if (maxAthletes > 0) {
       const currentCount = eventRegistrationCounts.get(String(event?.id)) || 0;
       if (currentCount >= maxAthletes) return false;
     }

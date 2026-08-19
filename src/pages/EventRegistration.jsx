@@ -43,7 +43,7 @@ const EventRegistration = () => {
   const registrationCloseDate = event.registrationCloseDate ? new Date(`${event.registrationCloseDate}T23:59:59`) : null;
   const isDateClosed = registrationCloseDate && !Number.isNaN(registrationCloseDate.getTime()) && now > registrationCloseDate;
   const maxAthletes = Number(event.maxAthletes || 0);
-  const isCapacityClosed = event.closeOnCapacity === true && maxAthletes > 0 && registrationCount >= maxAthletes;
+  const isCapacityClosed = maxAthletes > 0 && registrationCount >= maxAthletes;
   
   let earliestStart = null;
   let isRegistrationNotStarted = false;

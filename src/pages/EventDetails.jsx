@@ -280,6 +280,29 @@ const EventDetails = () => {
     return [...storeAthletes, ...uniquePending];
   }, [athletes, eventId, publicRegistrations]);
 
+  // Verifica se inscricoes estao abertas (data, capacidade e flag manual)
+  const isCapacityFull = useMemo(() => {
+    const maxAthletes = Number(event?.maxAthletes || 0);
+    if (maxAthletes <= 0) return false;
+    const eventAthleteCount = (athletes || []).filter(a =>
+      String(a.eventId) === String(eventId) &&
+      !['cancelado', 'cancel', 'rejeit', 'reject'].some(s => (a.status || a.paymentStatus || '').toLowerCase().includes(s))
+    ).length;
+    return eventAthleteCount >= maxAthletes;
+  }, [event, athletes, eventId]);
+
+  const isRegistrationOpen = useMemo(() => {
+    if (!event) return false;
+    if (event.registrationOpen === false) return false;
+    if (isCapacityFull) return false;
+    const now = new Date();
+    const closeDate = event.registrationCloseDate ? new Date(`${event.registrationCloseDate}T23:59:59`) : null;
+    if (closeDate && !Number.isNaN(closeDate.getTime()) && now > closeDate) return false;
+    const eventDate = event.date ? new Date(event.date) : null;
+    if (eventDate && !Number.isNaN(eventDate.getTime()) && eventDate < new Date(now.toDateString())) return false;
+    return true;
+  }, [event, isCapacityFull]);
+
   const eventBrackets = useMemo(() => {
     let sortedBrackets = (brackets || []).filter(b => String(b.eventId) === String(eventId));
     
@@ -630,22 +653,33 @@ const EventDetails = () => {
 
                 {/* BOTÃO DE INSCRIÇÃO DIRETA NO FINAL DA DESCRIÇÃO */}
                 <div style={{ marginTop: '3.5rem', marginBottom: '1.5rem', display: 'flex', justifyContent: 'center', width: '100%' }}>
-                  <Link
-                    to={`/eventos/${eventId}/inscricao`}
-                    className="sc-btn-primary"
-                    style={{
-                      textDecoration: 'none',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '14px 36px',
-                      fontSize: '1.05rem',
-                      fontWeight: 800,
-                      borderRadius: '10px'
-                    }}
-                  >
-                    Inscrever-se
-                  </Link>
+                  {isRegistrationOpen ? (
+                    <Link
+                      to={`/eventos/${eventId}/inscricao`}
+                      className="sc-btn-primary"
+                      style={{
+                        textDecoration: 'none',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '14px 36px',
+                        fontSize: '1.05rem',
+                        fontWeight: 800,
+                        borderRadius: '10px'
+                      }}
+                    >
+                      Inscrever-se
+                    </Link>
+                  ) : (
+                    <div style={{
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      padding: '14px 36px', fontSize: '1.05rem', fontWeight: 800,
+                      borderRadius: '10px', background: 'rgba(239,68,68,0.12)',
+                      border: '1px solid rgba(239,68,68,0.35)', color: '#f87171', cursor: 'not-allowed'
+                    }}>
+                      {isCapacityFull ? `🔴 Vagas Esgotadas (${event?.maxAthletes || 0}/${event?.maxAthletes || 0})` : '🔒 Inscrições Encerradas'}
+                    </div>
+                  )}
                 </div>
               </div>
               {sidebarBlocks}
@@ -1616,7 +1650,19 @@ const EventDetails = () => {
           {/* GATILHO PARA A TELA DE INSCRIÇÃO          */}
           {/* Redireciona o usuário para o Flow de Registro */}
           {/* ========================================== */}
-          <Link to={`/eventos/${eventId}/inscricao`} className="sc-btn-primary" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Inscrever-se</Link>
+          {isRegistrationOpen ? (
+            <Link to={`/eventos/${eventId}/inscricao`} className="sc-btn-primary" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Inscrever-se</Link>
+          ) : (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '8px 18px', fontSize: '0.85rem', fontWeight: 700,
+              borderRadius: '8px', background: 'rgba(239,68,68,0.12)',
+              border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', cursor: 'not-allowed',
+              whiteSpace: 'nowrap'
+            }}>
+              {isCapacityFull ? '🔴 Vagas Esgotadas' : '🔒 Encerradas'}
+            </div>
+          )}
         </div>
       </div>
 
