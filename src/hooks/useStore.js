@@ -1048,70 +1048,50 @@ const useStoreState = (loadedState) => {
             seededAcademies = [DEFAULT_ACADEMIES[0], ...seededAcademies];
         }
 
-        // Seed: garantir que o perfil do Davi como Professor da Templum Fight exista
+        // Seed: garantir que o perfil padrão exista caso a lista esteja vazia
         const daviSeedProfile = DEFAULT_MEMBER_PROFILES[0];
         const hasDaviProfile = merged.memberProfiles.some((p) =>
-            p.accountUsername === 'davifrois' ||
-            (p.fullName && p.fullName.toLowerCase().replace(/\s+/g, ' ').trim() === 'davi oliveira frois')
+            (p.accountUsername && p.accountUsername.toLowerCase() === 'davifrois') ||
+            (p.fullName && p.fullName.toLowerCase().includes('davi'))
         );
-        const seededProfiles = hasDaviProfile
+        const seededProfiles = hasDaviProfile || merged.memberProfiles.length > 0
             ? merged.memberProfiles
-            : [daviSeedProfile, ...merged.memberProfiles];
-
-        const cleanedProfiles = seededProfiles.filter(p => {
-            if (!p || !p.fullName) return false;
-            const lowerName = p.fullName.toLowerCase().trim();
-            // Keep only the real athletes you mentioned wanting
-            if (lowerName === 'davi frois') return true;
-            if (lowerName === 'davi oliveira frois') return true;
-            if (lowerName === 'julia machado') return true;
-            return false;
-        });
+            : [daviSeedProfile];
 
         return {
             ...merged,
             academies: seededAcademies,
-            memberProfiles: cleanedProfiles,
+            memberProfiles: seededProfiles,
             rankHistory: ensureRankHistory(normalizedAthletes, merged.rankHistory)
         };
     });
 
-
     const [eventResults, setEventResults] = useState([]);
     const [uiState, setUiState] = useState({ eventModalOpen: false });
 
-    useEffect(() => {
-        // FORCE CLEANUP AFTER HOT RELOAD
-        setData(prev => {
-            const nextProfiles = prev.memberProfiles.filter(p => {
-                if (!p || !p.fullName) return false;
-                const lowerName = p.fullName.toLowerCase().trim();
-                if (lowerName === 'davi frois') return true;
-                if (lowerName === 'davi oliveira frois') return true;
-                if (lowerName === 'julia machado') return true;
-                return false;
-            });
-            if (nextProfiles.length === prev.memberProfiles.length) return prev;
-            return { ...prev, memberProfiles: nextProfiles };
-        });
-    }, []);
-
+    // Sincronização e persistência contínua e segura dos dados locais
     useEffect(() => {
         const timeout = setTimeout(() => {
             const payload = { ...data, schemaVersion: STORAGE_VERSION };
             const serialized = JSON.stringify(payload);
             
-            fetch((import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '') + '/api/data', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: serialized
-            }).catch(err => {
-                console.error('Falha ao sincronizar com o backend:', err);
-                try {
-                    localStorage.setItem(STORAGE_KEY, serialized);
-                } catch {}
-            });
-        }, 250);
+            // Persistir de forma imediata e síncrona no localStorage
+            try {
+                localStorage.setItem(STORAGE_KEY, serialized);
+                localStorage.setItem(STORAGE_BACKUP_KEY, serialized);
+            } catch (storageErr) {
+                console.warn('Erro ao salvar no localStorage:', storageErr);
+            }
+
+            const apiUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
+            if (apiUrl && !apiUrl.includes('localhost')) {
+                fetch(apiUrl.replace(/\/$/, '') + '/api/data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: serialized
+                }).catch(() => {});
+            }
+        }, 150);
 
         return () => clearTimeout(timeout);
     }, [data]);

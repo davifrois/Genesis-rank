@@ -604,6 +604,11 @@ const Settings = () => {
         createdByUsername: currentUser?.username || '',
         createdByName: currentUser?.name || ''
       });
+
+      if (typeof updateUser === 'function') {
+        updateUser({ name: fullName });
+      }
+
       setSuccess('✅ Perfil atualizado com sucesso!');
       setTimeout(() => {
         document.querySelector('.profile-success')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
