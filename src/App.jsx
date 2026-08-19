@@ -81,6 +81,7 @@ const createEventFormState = () => ({
   isPremium: false,
   eventDescription: '',
   posterUrl: '',
+  posterPositionY: 50,
   registrationUrl: '',
   accommodationEnabled: false,
   accommodationTitle: '',
@@ -1903,8 +1904,97 @@ const AppLayout = () => {
                           {eventPosterStoredSizeBytes > 0 && <div className="table-meta table-meta--tight" style={{ fontSize: '13px' }}>{copy.eventModal.posterCompressedSize}: {formatBytes(eventPosterStoredSizeBytes)}</div>}
                         </div>
                         {eventForm.posterUrl && (
-                          <div style={{ borderRadius: '14px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', maxHeight: '360px' }}>
-                            <img src={eventForm.posterUrl} alt="Poster preview" style={{ width: '100%', maxHeight: '360px', objectFit: 'cover', display: 'block' }} />
+                          <div style={{ marginTop: '12px', background: 'rgba(15,23,42,0.6)', padding: '16px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                              <span style={{ fontSize: '13px', color: '#00c2cb', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span>↕️</span> Arraste com o mouse para enquadrar a imagem ({Math.round(eventForm.posterPositionY ?? 50)}%)
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setEventForm(prev => ({ ...prev, posterPositionY: 50 }))}
+                                style={{
+                                  background: 'rgba(255,255,255,0.06)',
+                                  border: '1px solid rgba(255,255,255,0.15)',
+                                  borderRadius: '6px',
+                                  padding: '4px 10px',
+                                  color: '#cbd5e1',
+                                  fontSize: '12px',
+                                  fontWeight: 600,
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                ↺ Centralizar
+                              </button>
+                            </div>
+                            <div
+                              style={{
+                                height: '240px',
+                                overflow: 'hidden',
+                                cursor: 'ns-resize',
+                                position: 'relative',
+                                backgroundImage: `url(${eventForm.posterUrl})`,
+                                backgroundSize: 'cover',
+                                backgroundPosition: `center ${eventForm.posterPositionY ?? 50}%`,
+                                borderRadius: '12px',
+                                border: '2px solid rgba(0, 194, 203, 0.4)',
+                                boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                                userSelect: 'none',
+                                touchAction: 'none'
+                              }}
+                              onPointerDown={(e) => {
+                                e.currentTarget.setPointerCapture(e.pointerId);
+                                e.currentTarget.dataset.startY = e.clientY;
+                                e.currentTarget.dataset.startPosY = eventForm.posterPositionY ?? 50;
+                              }}
+                              onPointerMove={(e) => {
+                                if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+                                  const startY = parseFloat(e.currentTarget.dataset.startY);
+                                  const startPosY = parseFloat(e.currentTarget.dataset.startPosY);
+                                  const deltaY = e.clientY - startY;
+                                  let newPos = startPosY - (deltaY * 0.4);
+                                  newPos = Math.max(0, Math.min(100, newPos));
+                                  setEventForm(prev => ({ ...prev, posterPositionY: newPos }));
+                                }
+                              }}
+                              onPointerUp={(e) => {
+                                try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) {}
+                              }}
+                              onPointerCancel={(e) => {
+                                try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) {}
+                              }}
+                            >
+                              <div style={{
+                                position: 'absolute',
+                                bottom: '10px',
+                                right: '10px',
+                                background: 'rgba(0,0,0,0.75)',
+                                backdropFilter: 'blur(8px)',
+                                color: '#00c2cb',
+                                border: '1px solid rgba(0,194,203,0.3)',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                padding: '5px 12px',
+                                borderRadius: '20px',
+                                pointerEvents: 'none',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}>
+                                ↕️ Clique e arraste para posicionar
+                              </div>
+                            </div>
+                            <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>Topo (0%)</span>
+                              <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                value={eventForm.posterPositionY ?? 50}
+                                onChange={(e) => setEventForm(prev => ({ ...prev, posterPositionY: Number(e.target.value) }))}
+                                style={{ flex: 1, accentColor: '#00c2cb', cursor: 'pointer', height: '6px' }}
+                              />
+                              <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>Base (100%)</span>
+                            </div>
                           </div>
                         )}
                       </div>

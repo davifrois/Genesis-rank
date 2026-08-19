@@ -573,7 +573,12 @@ const Home = () => {
                   {/* Poster */}
                   <div className="home-event-card__poster">
                     {event.posterUrl ? (
-                      <img src={event.posterUrl} alt={event.name || copy.eventFallback} loading="lazy" />
+                      <img 
+                        src={event.posterUrl} 
+                        alt={event.name || copy.eventFallback} 
+                        loading="lazy" 
+                        style={{ objectPosition: `center ${event.posterPositionY ?? 50}%` }}
+                      />
                     ) : (
                       <div className="home-event-card__poster-fallback">
                         <Trophy size={40} />

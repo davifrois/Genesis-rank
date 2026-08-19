@@ -456,7 +456,19 @@ const Events = () => {
         {...linkProps}
       >
         <div style={{ position: 'relative', width: '100%', height: '140px', background: '#f4f4f5' }}>
-          <img src={event.posterUrl || '/header-bg-championship.jpg'} alt={event.name} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+          <img 
+            src={event.posterUrl || '/header-bg-championship.jpg'} 
+            alt={event.name} 
+            style={{ 
+              position: 'absolute', 
+              top: 0, 
+              left: 0, 
+              width: '100%', 
+              height: '100%', 
+              objectFit: 'cover',
+              objectPosition: `center ${event.posterPositionY ?? 50}%` 
+            }} 
+          />
         </div>
         <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', flex: 1, background: 'rgba(20,20,24,0.4)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '8px' }}>

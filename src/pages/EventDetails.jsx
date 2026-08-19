@@ -561,7 +561,12 @@ const EventDetails = () => {
             <div className="sc-hero-card">
               <div className="sc-hero-card__banner">
                 {event.posterUrl ? (
-                  <img src={event.posterUrl} alt={event.name} className="sc-hero-card__img" />
+                  <img 
+                    src={event.posterUrl} 
+                    alt={event.name} 
+                    className="sc-hero-card__img" 
+                    style={{ objectPosition: `center ${event.posterPositionY ?? 50}%` }}
+                  />
                 ) : (
                   <div className="sc-hero-card__img-fallback">
                     <span style={{ color: '#fff', fontWeight: 700, fontSize: '1.2rem', textAlign: 'center', padding: '1rem' }}>{event.name}</span>
@@ -1557,7 +1562,12 @@ const EventDetails = () => {
       <div className="sc-hero">
         <div className="sc-hero-left">
           {event.posterUrl && (
-            <img src={event.posterUrl} alt={event.name} className="sc-hero-poster" />
+            <img 
+              src={event.posterUrl} 
+              alt={event.name} 
+              className="sc-hero-poster" 
+              style={{ objectPosition: `center ${event.posterPositionY ?? 50}%` }}
+            />
           )}
           <div className="sc-hero-info">
             <h1>{event.name}</h1>
