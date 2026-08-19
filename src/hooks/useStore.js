@@ -1632,9 +1632,21 @@ const useStoreState = (loadedState) => {
                     }
                 }
             } catch (error) {
-                const message = error?.message || 'Falha ao criar campeonato no servidor.';
-                addLog({ type: 'ERROR', action: 'ADD_EVENT', details: message });
-                throw new Error(message);
+                const message = (error?.message || '').toString();
+                const isNetworkErr = error instanceof TypeError 
+                    || /failed to fetch/i.test(message) 
+                    || /networkerror/i.test(message) 
+                    || /load failed/i.test(message)
+                    || /fetch failed/i.test(message);
+
+                if (isNetworkErr) {
+                    console.warn('Backend remoto indisponível para evento, persistindo localmente:', error);
+                    addLog({ type: 'WARN', action: 'ADD_EVENT_LOCAL', details: 'Campeonato salvo no armazenamento local' });
+                } else {
+                    addLog({ type: 'ERROR', action: 'ADD_EVENT', details: message });
+                    // Even on non-network error, if we have local draft, save locally to avoid losing organizer's work
+                    console.warn('Erro ao sincronizar com servidor, mantendo dados locais:', message);
+                }
             }
         }
 

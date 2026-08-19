@@ -1,11 +1,20 @@
 import { authService } from './authService';
 
-const ENV_API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL || 'http://localhost:8080').trim();
-const API_BASE_URL = ENV_API_BASE_URL ? ENV_API_BASE_URL.replace(/\/$/, '') : '';
+const resolveApiBaseUrl = () => {
+  const envUrl = (import.meta.env?.VITE_API_BASE_URL || '').trim();
+  if (typeof window !== 'undefined') {
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (!isLocalhost && envUrl.includes('localhost')) {
+      return '';
+    }
+  }
+  return envUrl.replace(/\/$/, '');
+};
 
 const buildApiUrl = (path) => {
+  const base = resolveApiBaseUrl();
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  return `${API_BASE_URL}${normalizedPath}`;
+  return `${base}${normalizedPath}`;
 };
 
 const clampLimit = (value) => {

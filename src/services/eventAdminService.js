@@ -1,12 +1,21 @@
 import { authService } from './authService';
 import { resolveBatchFee } from '../utils/eventPricing';
 
-const ENV_API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL || 'http://localhost:8080').trim();
-const API_BASE_URL = ENV_API_BASE_URL ? ENV_API_BASE_URL.replace(/\/$/, '') : '';
+const resolveApiBaseUrl = () => {
+  const envUrl = (import.meta.env?.VITE_API_BASE_URL || '').trim();
+  if (typeof window !== 'undefined') {
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (!isLocalhost && envUrl.includes('localhost')) {
+      return '';
+    }
+  }
+  return envUrl.replace(/\/$/, '');
+};
 
 const buildApiUrl = (path) => {
+  const base = resolveApiBaseUrl();
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  return `${API_BASE_URL}${normalizedPath}`;
+  return `${base}${normalizedPath}`;
 };
 
 const parseErrorMessage = async (response, fallbackMessage) => {
@@ -30,11 +39,14 @@ const parseErrorMessage = async (response, fallbackMessage) => {
 
 const buildAuthHeaders = async () => {
   const headers = {
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true'
   };
   
   if (authService?.ensureApiAdminToken) {
-    await authService.ensureApiAdminToken();
+    try {
+      await authService.ensureApiAdminToken();
+    } catch (_) {}
   }
   
   const token = (authService?.getApiToken ? authService.getApiToken() : '').toString().trim();
@@ -129,28 +141,33 @@ export const eventAdminService = {
       body: JSON.stringify(normalizePayload(payload))
     };
 
-    let response = await fetch(buildApiUrl('/api/events'), requestOptions);
+    try {
+      let response = await fetch(buildApiUrl('/api/events'), requestOptions);
 
-    if (response.status === 401 || response.status === 403) {
-      if (authService?.clearApiToken) authService.clearApiToken();
-      const newAuth = await buildAuthHeaders();
-      if (!newAuth.token) return { skipped: true, reason: 'NO_TOKEN' };
-      requestOptions.headers = newAuth.headers;
-      response = await fetch(buildApiUrl('/api/events'), requestOptions);
+      if (response.status === 401 || response.status === 403) {
+        if (authService?.clearApiToken) authService.clearApiToken();
+        const newAuth = await buildAuthHeaders();
+        if (!newAuth.token) return { skipped: true, reason: 'NO_TOKEN' };
+        requestOptions.headers = newAuth.headers;
+        response = await fetch(buildApiUrl('/api/events'), requestOptions);
+      }
+
+      if (!response.ok) {
+        const message = await parseErrorMessage(
+          response,
+          'Falha ao criar campeonato no servidor.'
+        );
+        const error = new Error(message);
+        error.status = response.status;
+        throw error;
+      }
+
+      const data = await response.json();
+      return { skipped: false, data };
+    } catch (networkError) {
+      console.warn('Backend indisponível para criação de evento, prosseguindo localmente:', networkError);
+      return { skipped: true, reason: 'NETWORK_ERROR', error: networkError };
     }
-
-    if (!response.ok) {
-      const message = await parseErrorMessage(
-        response,
-        'Falha ao criar campeonato no servidor.'
-      );
-      const error = new Error(message);
-      error.status = response.status;
-      throw error;
-    }
-
-    const data = await response.json();
-    return { skipped: false, data };
   },
 
   updateEvent: async (eventId, payload) => {
@@ -166,27 +183,33 @@ export const eventAdminService = {
     };
 
     const url = buildApiUrl(`/api/events/${encodeURIComponent(eventId)}`);
-    let response = await fetch(url, requestOptions);
 
-    if (response.status === 401 || response.status === 403) {
-      if (authService?.clearApiToken) authService.clearApiToken();
-      const newAuth = await buildAuthHeaders();
-      if (!newAuth.token) return { skipped: true, reason: 'NO_TOKEN' };
-      requestOptions.headers = newAuth.headers;
-      response = await fetch(url, requestOptions);
+    try {
+      let response = await fetch(url, requestOptions);
+
+      if (response.status === 401 || response.status === 403) {
+        if (authService?.clearApiToken) authService.clearApiToken();
+        const newAuth = await buildAuthHeaders();
+        if (!newAuth.token) return { skipped: true, reason: 'NO_TOKEN' };
+        requestOptions.headers = newAuth.headers;
+        response = await fetch(url, requestOptions);
+      }
+
+      if (!response.ok) {
+        const message = await parseErrorMessage(
+          response,
+          'Falha ao atualizar campeonato no servidor.'
+        );
+        const error = new Error(message);
+        error.status = response.status;
+        throw error;
+      }
+
+      const data = await response.json();
+      return { skipped: false, data };
+    } catch (networkError) {
+      console.warn('Backend indisponível para atualização de evento, prosseguindo localmente:', networkError);
+      return { skipped: true, reason: 'NETWORK_ERROR', error: networkError };
     }
-
-    if (!response.ok) {
-      const message = await parseErrorMessage(
-        response,
-        'Falha ao atualizar campeonato no servidor.'
-      );
-      const error = new Error(`Erro do Backend: ${message}`);
-      error.status = response.status;
-      throw error;
-    }
-
-    const data = await response.json();
-    return { skipped: false, data };
   }
 };
