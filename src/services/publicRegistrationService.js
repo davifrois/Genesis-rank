@@ -535,59 +535,51 @@ export const publicRegistrationService = {
 
 
   createDirectPix: async ({ registrationIds, athleteName, email, amount }) => {
-    const accessToken = 'APP_USR-5076214841905920-081112-768e0648179ce52ceb48a90a14882388-1214160384';
+    // Chamar SEMPRE o backend — chamada direta ao MP é bloqueada por CORS no browser
+    const endpoints = [
+      buildApiUrl('/api/webhooks/payment/pix'),
+      '/api/webhooks/payment/pix'
+    ];
 
-    // 1. Tentar Backend primeiro se disponível
-    try {
-      const response = await fetch(buildApiUrl('/api/webhooks/payment/pix'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': 'true'
-        },
-        body: JSON.stringify({ registrationIds, athleteName, email, amount })
-      });
-      if (response.ok) {
-        return await response.json();
+    // Remover duplicatas
+    const uniqueEndpoints = [...new Set(endpoints)];
+
+    let lastError = 'Falha ao conectar com o servidor de pagamento.';
+
+    for (const endpoint of uniqueEndpoints) {
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true'
+          },
+          body: JSON.stringify({ registrationIds, athleteName, email, amount })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.paymentId) {
+          return {
+            paymentId: data.paymentId,
+            status: data.status,
+            qrCode: data.qrCode || null,
+            qrCodeBase64: data.qrCodeBase64 || null,
+            ticketUrl: data.ticketUrl || null,
+            externalReference: registrationIds
+          };
+        }
+
+        // Resposta não-ok: usar mensagem do servidor
+        lastError = data?.error || data?.message || `Erro do servidor (HTTP ${response.status})`;
+        console.warn(`[PIX] Endpoint ${endpoint} retornou erro:`, lastError, data);
+      } catch (e) {
+        lastError = e.message || 'Erro de conexão com o servidor.';
+        console.warn(`[PIX] Falha ao chamar ${endpoint}:`, e);
       }
-    } catch (backendError) {
-      console.warn('Backend indisponível para PIX, gerando via Mercado Pago API direto:', backendError);
     }
 
-    // 2. Chamada Direta para Mercado Pago API (Funciona 100% no Vercel/Produção!)
-    const payload = {
-      transaction_amount: Number(amount || 0),
-      description: `Inscrição Campeonato - ${athleteName || 'Atleta'}`,
-      payment_method_id: 'pix',
-      external_reference: String(registrationIds || ''),
-      payer: {
-        email: email || 'atleta@genesisesportes.com.br',
-        first_name: athleteName || 'Atleta'
-      }
-    };
-
-    const mpRes = await fetch('https://api.mercadopago.com/v1/payments', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`
-      },
-      body: JSON.stringify(payload)
-    });
-
-    const data = await mpRes.json();
-    if (data.id && data.point_of_interaction) {
-      return {
-        paymentId: data.id,
-        status: data.status,
-        qrCode: data.point_of_interaction.transaction_data.qr_code,
-        qrCodeBase64: data.point_of_interaction.transaction_data.qr_code_base64,
-        ticketUrl: data.point_of_interaction.transaction_data.ticket_url,
-        externalReference: registrationIds
-      };
-    }
-
-    throw new Error(data.message || 'Erro ao gerar PIX no Mercado Pago');
+    throw new Error(lastError);
   },
 
   checkPaymentStatus: async (paymentId) => {
