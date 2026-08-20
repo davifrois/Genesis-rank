@@ -52,10 +52,43 @@ const TeamProfile = () => {
 
   const professorProfile = useMemo(() => {
     if (!academy) return null;
-    const coachUsername = (academy.coachUsername || academy.ownerUsername || '').toLowerCase();
-    if (!coachUsername) return null;
-    return students.find(s => (s.accountUsername || '').toLowerCase() === coachUsername);
-  }, [academy, students]);
+    const coachUsername = (academy.coachUsername || academy.ownerUsername || academy.professorUsername || academy.responsavelUsername || '').toLowerCase();
+    const targetCoachName = (academy.coachName || academy.ownerName || academy.professorName || academy.responsavel || academy.professor || academy.coach || '').toLowerCase();
+    
+    // 1. Tenta achar pelo accountUsername
+    if (coachUsername) {
+      const found = (memberProfiles || []).find(s => (s.accountUsername || s.username || '').toLowerCase() === coachUsername);
+      if (found) return found;
+    }
+
+    // 2. Tenta achar pelo nome do professor nos perfis da plataforma
+    if (targetCoachName) {
+      const found = (memberProfiles || []).find(s => {
+        const name = (s.fullName || s.nome || '').toLowerCase();
+        return name && (name.includes(targetCoachName) || targetCoachName.includes(name));
+      });
+      if (found) return found;
+    }
+
+    // 3. Tenta achar admin/professor associado à academia
+    const foundAdmin = (memberProfiles || []).find(s => 
+      s.academyId === academy.id && (s.role === 'professor' || s.role === 'admin' || s.isProfessor)
+    );
+    if (foundAdmin) return foundAdmin;
+
+    // 4. Se o usuário atual logado for o professor/dono da academia
+    if (currentUser) {
+      const curName = (currentUser.name || currentUser.fullName || '').toLowerCase();
+      if (targetCoachName && curName && (curName.includes(targetCoachName) || targetCoachName.includes(curName))) {
+        return currentUser;
+      }
+      if (currentUser.academyId === academy.id || currentUser.teamId === academy.id) {
+        return currentUser;
+      }
+    }
+
+    return null;
+  }, [academy, memberProfiles, currentUser]);
 
   const normalize = (str = '') => 
     str.toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
@@ -435,7 +468,8 @@ const TeamProfile = () => {
     };
   }, []);
 
-  const coachName = professorProfile?.fullName || academy.coachName || academy.ownerName || 'Sebastian Torres';
+  const coachName = professorProfile?.fullName || professorProfile?.nome || academy.coachName || academy.ownerName || academy.professorName || academy.responsavel || (currentUser?.academyId === academy.id ? currentUser.name : 'Sebastian Torres');
+  const coachPhoto = professorProfile?.photoUrl || professorProfile?.avatarUrl || professorProfile?.foto || professorProfile?.fotoUrl || professorProfile?.profilePicture || professorProfile?.image || academy.coachPhotoUrl || academy.coachPhoto || academy.ownerPhotoUrl || academy.ownerPhoto || academy.professorPhoto || academy.responsavelPhoto || (currentUser && (currentUser.academyId === academy.id || (currentUser.name && coachName && currentUser.name.toLowerCase().includes(coachName.toLowerCase()))) ? (currentUser.photoUrl || currentUser.avatarUrl) : null);
   const phoneFormatted = academy.contactPhone || academy.phone || '+54 280 451-2663';
   const websiteFormatted = academy.website || 'www.instagram.com';
   const websiteUrl = websiteFormatted.startsWith('http') ? websiteFormatted : `https://${websiteFormatted}`;
@@ -736,14 +770,30 @@ const TeamProfile = () => {
                       borderBottom: '1px solid #f8fafc'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{
-                          width: '40px', height: '40px', borderRadius: '50%',
-                          background: '#03386e', color: '#fff',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontWeight: '700', fontSize: '14px'
-                        }}>
-                          {getInitials(coachName)}
-                        </div>
+                        {coachPhoto ? (
+                          <img 
+                            src={coachPhoto} 
+                            alt={coachName}
+                            style={{
+                              width: '42px',
+                              height: '42px',
+                              borderRadius: '50%',
+                              objectFit: 'cover',
+                              background: '#0e1015',
+                              border: '1.5px solid rgba(2, 132, 199, 0.3)',
+                              flexShrink: 0
+                            }}
+                          />
+                        ) : (
+                          <div style={{
+                            width: '42px', height: '42px', borderRadius: '50%',
+                            background: '#03386e', color: '#fff',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontWeight: '700', fontSize: '14px', flexShrink: 0
+                          }}>
+                            {getInitials(coachName)}
+                          </div>
+                        )}
                         <div>
                           <div style={{ fontSize: '15px', fontWeight: '700', color: '#0f172a' }}>{coachName}</div>
                           <div style={{ fontSize: '12px', color: '#64748b' }}>Professor Titular / Treinador</div>
