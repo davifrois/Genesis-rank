@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import {
   Trophy, ShieldCheck, Medal, Target, MapPin, Calendar,
-  Star, TrendingUp, Award, ChevronLeft, Swords, Users, Info
+  Star, TrendingUp, Award, ChevronLeft, Swords, Users, Info, CreditCard
 } from 'lucide-react';
 import { useStore } from '../hooks/useStore';
 import { countryCodeFromValue, flagFromCountryCode } from '../utils/countryFlags';
@@ -872,6 +872,10 @@ const PublicProfile = ({ profileOverride, isPreview = false }) => {
                                 }
                               }
 
+                              const athleteRecord = matchedProfileAthletes.find(a => String(a.eventId) === String(row.eventId)) || row;
+                              const regStatus = normalizeRegistrationStatus(athleteRecord?.status || row?.status);
+                              const isPaid = regStatus === REGISTRATION_STATUS.PAYMENT_CONFIRMED;
+
                               if (isRegistrationClosed) {
                                 return (
                                   <button 
@@ -884,13 +888,53 @@ const PublicProfile = ({ profileOverride, isPreview = false }) => {
                                 );
                               }
 
+                              if (!isPaid) {
+                                return (
+                                  <button 
+                                    className="btn"
+                                    style={{ 
+                                      padding: '8px 16px', 
+                                      fontSize: '13px', 
+                                      display: 'inline-flex', 
+                                      alignItems: 'center', 
+                                      gap: '8px', 
+                                      fontWeight: 'bold',
+                                      backgroundColor: '#f59e0b',
+                                      borderColor: '#f59e0b',
+                                      color: '#09090b',
+                                      cursor: 'pointer',
+                                      borderRadius: '6px'
+                                    }}
+                                    onClick={async () => {
+                                      try {
+                                        const checkoutRes = await publicRegistrationService.createCheckoutSession({
+                                          registrationIds: athleteRecord.id || row.id,
+                                          athleteName: profile.fullName || athleteRecord.nome || 'Atleta',
+                                          athleteEmail: profile.email || '',
+                                          amount: Number(athleteRecord.price || row.price || 0)
+                                        });
+                                        if (checkoutRes && checkoutRes.url) {
+                                          window.location.href = checkoutRes.url;
+                                        } else {
+                                          alert('Não foi possível iniciar o checkout. Tente novamente.');
+                                        }
+                                      } catch (err) {
+                                        alert(`Erro ao conectar com Mercado Pago: ${err.message}`);
+                                      }
+                                    }}
+                                  >
+                                    <CreditCard size={14} /> Pagar Inscrição (Mercado Pago)
+                                  </button>
+                                );
+                              }
+
                               return (
                                 <button 
                                   className="btn btn-primary"
                                   style={{ padding: '8px 16px', fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}
                                   onClick={() => {
-                                    const athleteRecord = matchedProfileAthletes.find(a => a.eventId === row.eventId) || { id: row.id, eventId: row.eventId, nome: profile.fullName, academia: profile.academyName };
-                                    setSelectedAthleteForCheckin(athleteRecord);
+                                    const athleteRecordToUse = matchedProfileAthletes.find(a => String(a.eventId) === String(row.eventId)) || { id: row.id, eventId: row.eventId, nome: profile.fullName, academia: profile.academyName };
+                                    setSelectedAthleteForCheckin(athleteRecordToUse);
                                     setIsCheckinModalOpen(true);
                                   }}
                                 >
