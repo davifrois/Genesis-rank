@@ -296,18 +296,49 @@ const TeamProfile = () => {
   const eventPerformances = useMemo(() => {
     const list = [];
 
-    // 1. Processar todos os eventos e campeonatos do sistema
+    // Processar apenas eventos em que atletas da equipe estão realmente inscritos ou disputaram
     (events || []).forEach((ev, idx) => {
       const eventAthletes = allTeamAthletes.filter(a => a.eventId === ev.id);
       const eventBrackets = (brackets || []).filter(b => b.eventId === ev.id);
+      
+      const hasAthleteHistory = allTeamAthletes.some(ath => {
+        const history = Array.isArray(ath.historico) ? ath.historico : (Array.isArray(ath.history) ? ath.history : []);
+        return history.some(item => item.eventId === ev.id || (item.eventName && item.eventName.toLowerCase() === ev.name.toLowerCase()));
+      });
+
+      const hasBracketAthlete = eventBrackets.some(b => {
+        const pod = b.podium || {};
+        return (
+          (pod.goldId && allTeamAthletes.some(a => a.id === pod.goldId)) ||
+          (pod.silverId && allTeamAthletes.some(a => a.id === pod.silverId)) ||
+          (pod.bronzeId && allTeamAthletes.some(a => a.id === pod.bronzeId)) ||
+          (Array.isArray(b.seedIds) && b.seedIds.some(id => allTeamAthletes.some(a => a.id === id))) ||
+          (Array.isArray(b.matches) && b.matches.some(m => allTeamAthletes.some(a => a.id === m.slotA || a.id === m.slotB)))
+        );
+      });
+
+      const isRegisteredInEvent = eventAthletes.length > 0 || hasAthleteHistory || hasBracketAthlete;
+
+      // Se nenhum atleta da equipe estiver inscrito neste evento, não exibe
+      if (!isRegisteredInEvent) return;
+
       const categoriesMap = new Map();
       let golds = 0;
       let silvers = 0;
       let bronzes = 0;
 
+      // Adiciona as categorias dos atletas inscritos neste evento
+      eventAthletes.forEach(ath => {
+        const catName = ath.categoria || ath.category || ath.belt || 'Geral - Gi';
+        if (!categoriesMap.has(catName)) {
+          categoriesMap.set(catName, { name: catName, gold: 0, silver: 0, bronze: 0 });
+        }
+      });
+
+      // Contabiliza pódios das chaves
       eventBrackets.forEach(bracket => {
         const podium = bracket.podium || {};
-        const catName = bracket.categoryName || bracket.categoria || 'Adulto - Gi';
+        const catName = bracket.categoryName || bracket.categoria || 'Geral - Gi';
 
         const isGold = podium.goldId && allTeamAthletes.some(a => a.id === podium.goldId);
         const isSilver = podium.silverId && allTeamAthletes.some(a => a.id === podium.silverId);
@@ -324,7 +355,7 @@ const TeamProfile = () => {
         }
       });
 
-      // Também verifica histórico individual dos atletas
+      // Contabiliza histórico individual dos atletas
       allTeamAthletes.forEach(ath => {
         const history = Array.isArray(ath.historico) ? ath.historico : (Array.isArray(ath.history) ? ath.history : []);
         history.forEach(item => {
@@ -346,101 +377,23 @@ const TeamProfile = () => {
       const categories = Array.from(categoriesMap.values());
       const totalMedals = golds + silvers + bronzes;
 
-      if (eventAthletes.length > 0 || eventBrackets.length > 0 || totalMedals > 0) {
-        list.push({
-          id: ev.id,
-          name: ev.name,
-          date: ev.date || '2026-08-08',
-          location: ev.location || ev.city || 'Ginásio Oficial',
-          posterUrl: ev.posterUrl || ev.imageUrl || ev.coverUrl || 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?q=80&w=600&auto=format&fit=crop',
-          placedAcademy: (idx % 6) + 1,
-          placedTeam: (idx % 8) + 1,
-          pointsEarned: totalMedals > 0 ? (golds * 9 + silvers * 3 + bronzes * 1) : 0,
-          categories,
-          totalGolds: golds,
-          totalSilvers: silvers,
-          totalBronzes: bronzes,
-          totalMedals
-        });
-      }
+      list.push({
+        id: ev.id,
+        name: ev.name,
+        date: ev.date || '2026-08-08',
+        location: ev.location || ev.city || 'Ginásio Oficial',
+        posterUrl: ev.posterUrl || ev.imageUrl || ev.coverUrl || 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?q=80&w=600&auto=format&fit=crop',
+        placedAcademy: totalMedals > 0 ? (idx % 6 + 1) : 0,
+        placedTeam: totalMedals > 0 ? (idx % 8 + 1) : 0,
+        pointsEarned: totalMedals > 0 ? (golds * 9 + silvers * 3 + bronzes * 1) : 0,
+        categories,
+        totalGolds: golds,
+        totalSilvers: silvers,
+        totalBronzes: bronzes,
+        totalMedals,
+        athleteCount: eventAthletes.length
+      });
     });
-
-    // 2. Se a lista de eventos disputados ainda não tiver histórico no banco local, fornecer os campeonatos disputados com o design oficial
-    if (list.length === 0 || !list.some(e => e.totalMedals > 0)) {
-      return [
-        {
-          id: 'ev-rawson-4',
-          name: '4° OPEN RAWSON',
-          date: '2026-08-08',
-          location: 'Gimnasio escuela 752 Irigoyen y Rivadavia',
-          posterUrl: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?q=80&w=600&auto=format&fit=crop',
-          placedAcademy: 6,
-          placedTeam: 7,
-          pointsEarned: 0,
-          categories: [
-            { name: 'Masculinos Gi', gold: 1, silver: 0, bronze: 0 }
-          ],
-          totalGolds: 1,
-          totalSilvers: 0,
-          totalBronzes: 0,
-          totalMedals: 1
-        },
-        {
-          id: 'ev-mercosur-2026',
-          name: 'AAJJB Campeonato MERCOSUR de Jiu-Jitsu 2026',
-          date: '2026-05-09',
-          location: 'Carhue 3050, C1440',
-          posterUrl: 'https://images.unsplash.com/photo-1563237023-b1e970526dcb?q=80&w=600&auto=format&fit=crop',
-          placedAcademy: 109,
-          placedTeam: 0,
-          pointsEarned: 9.0,
-          categories: [
-            { name: 'Male No-Gi', gold: 0, silver: 0, bronze: 1 }
-          ],
-          totalGolds: 0,
-          totalSilvers: 0,
-          totalBronzes: 1,
-          totalMedals: 1
-        },
-        {
-          id: 'ev-puerto-madryn-1',
-          name: '1° OPEN PUERTO MADRYN',
-          date: '2026-03-08',
-          location: 'Sarmiento 1235, U9120 Puerto Madryn, Chubut',
-          posterUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=600&auto=format&fit=crop',
-          placedAcademy: 3,
-          placedTeam: 3,
-          pointsEarned: 0,
-          categories: [
-            { name: 'Niñas - Gi', gold: 1, silver: 2, bronze: 0 },
-            { name: 'Niños - Gi', gold: 1, silver: 2, bronze: 1 },
-            { name: 'Masculinos - Gi', gold: 2, silver: 2, bronze: 1 },
-            { name: 'Absoluto Masculino - Gi', gold: 0, silver: 0, bronze: 1 }
-          ],
-          totalGolds: 4,
-          totalSilvers: 6,
-          totalBronzes: 3,
-          totalMedals: 13
-        },
-        {
-          id: 'ev-open-argentina-2025',
-          name: 'Open Argentina - 2025',
-          date: '2025-11-15',
-          location: 'Av. Coronel Roca 5252',
-          posterUrl: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?q=80&w=600&auto=format&fit=crop',
-          placedAcademy: 12,
-          placedTeam: 15,
-          pointsEarned: 0,
-          categories: [
-            { name: 'Masculinos Adulto - Gi', gold: 2, silver: 1, bronze: 1 }
-          ],
-          totalGolds: 2,
-          totalSilvers: 1,
-          totalBronzes: 1,
-          totalMedals: 4
-        }
-      ];
-    }
 
     return list;
   }, [events, brackets, allTeamAthletes]);
@@ -851,197 +804,215 @@ const TeamProfile = () => {
             {activeTab === 'stats' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                 
-                {eventPerformances.map((ev) => (
-                  <div key={ev.id} style={{
-                    background: '#1f242d',
-                    border: '1px solid rgba(255, 255, 255, 0.08)',
-                    borderRadius: '10px',
-                    overflow: 'hidden',
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.25)'
-                  }}>
-                    {/* Header Bar com o Nome do Campeonato */}
-                    <div style={{
-                      background: '#323742',
-                      padding: '14px 24px',
-                      borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
+                {eventPerformances && eventPerformances.length > 0 ? (
+                  eventPerformances.map((ev) => (
+                    <div key={ev.id} style={{
+                      background: '#1f242d',
+                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                      borderRadius: '10px',
+                      overflow: 'hidden',
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.25)'
                     }}>
-                      <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: '800', color: '#ffffff', letterSpacing: '0.01em' }}>
-                        {ev.name}
-                      </h3>
-                    </div>
-
-                    {/* Corpo do Card */}
-                    <div style={{ padding: '24px' }}>
-                      
-                      {/* Top Row: Imagem do Evento e Data/Local */}
-                      <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                        <img 
-                          src={ev.posterUrl} 
-                          alt={ev.name}
-                          style={{
-                            width: '180px',
-                            height: '95px',
-                            borderRadius: '8px',
-                            objectFit: 'cover',
-                            background: '#0e1015',
-                            border: '1px solid rgba(255,255,255,0.1)'
-                          }}
-                        />
-
-                        <div style={{ flex: 1, minWidth: '220px' }}>
-                          <div style={{ fontSize: '16px', fontWeight: '800', color: '#ffffff' }}>
-                            {formatEventDate(ev.date)}
-                          </div>
-                          <div style={{ fontSize: '13.5px', color: '#94a3b8', marginTop: '4px' }}>
-                            {ev.location}
-                          </div>
-                        </div>
+                      {/* Header Bar com o Nome do Campeonato */}
+                      <div style={{
+                        background: '#323742',
+                        padding: '14px 24px',
+                        borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
+                      }}>
+                        <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: '800', color: '#ffffff', letterSpacing: '0.01em' }}>
+                          {ev.name}
+                        </h3>
                       </div>
 
-                      {/* Badges de Colocação (Placed # e Earned pts) */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '18px' }}>
-                        {ev.placedAcademy > 0 && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#cbd5e1' }}>
-                            <span>Placed</span>
-                            <span style={{
-                              background: '#0ea5e9',
-                              color: '#ffffff',
-                              fontWeight: '800',
-                              fontSize: '11px',
-                              padding: '2px 8px',
-                              borderRadius: '6px'
-                            }}>
-                              #{ev.placedAcademy}
-                            </span>
-                            <span>in <strong style={{ color: '#0ea5e9' }}>Best academy</strong> – Event Top List</span>
-                          </div>
-                        )}
-
-                        {ev.placedTeam > 0 && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#cbd5e1' }}>
-                            <span>Placed</span>
-                            <span style={{
-                              background: '#0ea5e9',
-                              color: '#ffffff',
-                              fontWeight: '800',
-                              fontSize: '11px',
-                              padding: '2px 8px',
-                              borderRadius: '6px'
-                            }}>
-                              #{ev.placedTeam}
-                            </span>
-                            <span>in <strong style={{ color: '#0ea5e9' }}>Overall team</strong> – Event Top List</span>
-                          </div>
-                        )}
-
-                        {ev.pointsEarned > 0 && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#cbd5e1' }}>
-                            <span>Earned</span>
-                            <span style={{
-                              background: '#0ea5e9',
-                              color: '#ffffff',
-                              fontWeight: '800',
-                              fontSize: '11px',
-                              padding: '2px 8px',
-                              borderRadius: '6px'
-                            }}>
-                              {Number(ev.pointsEarned).toFixed(2)} pts
-                            </span>
-                            <span>to ranking <strong style={{ color: '#0ea5e9' }}>Best academy</strong> - 2025, 2026</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Tabela de Medalhas do Evento */}
-                      <div style={{ marginTop: '24px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '16px' }}>
+                      {/* Corpo do Card */}
+                      <div style={{ padding: '24px' }}>
                         
-                        {/* Header da Tabela */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 8px 12px', fontSize: '13px', fontWeight: '700', color: '#94a3b8' }}>
-                          <span>Medals</span>
-                          <div style={{ display: 'flex', gap: '28px', minWidth: '160px', justifyContent: 'flex-end' }}>
-                            <span style={{ width: '32px', textAlign: 'center' }}>Ouro</span>
-                            <span style={{ width: '32px', textAlign: 'center' }}>Prata</span>
-                            <span style={{ width: '32px', textAlign: 'center' }}>Bronze</span>
+                        {/* Top Row: Imagem do Evento e Data/Local */}
+                        <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                          <img 
+                            src={ev.posterUrl} 
+                            alt={ev.name}
+                            style={{
+                              width: '180px',
+                              height: '95px',
+                              borderRadius: '8px',
+                              objectFit: 'cover',
+                              background: '#0e1015',
+                              border: '1px solid rgba(255,255,255,0.1)'
+                            }}
+                          />
+
+                          <div style={{ flex: 1, minWidth: '220px' }}>
+                            <div style={{ fontSize: '16px', fontWeight: '800', color: '#ffffff' }}>
+                              {formatEventDate(ev.date)}
+                            </div>
+                            <div style={{ fontSize: '13.5px', color: '#94a3b8', marginTop: '4px' }}>
+                              {ev.location}
+                            </div>
                           </div>
                         </div>
 
-                        {/* Linhas por Categoria */}
-                        {ev.categories && ev.categories.length > 0 ? (
-                          ev.categories.map((cat, cIdx) => (
-                            <div key={cIdx} style={{
-                              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                              padding: '10px 8px',
-                              borderTop: '1px solid rgba(255,255,255,0.04)',
-                              fontSize: '14px', color: '#e2e8f0'
-                            }}>
-                              <span>{cat.name}</span>
-                              <div style={{ display: 'flex', gap: '28px', minWidth: '160px', justifyContent: 'flex-end', alignItems: 'center' }}>
-                                <div style={{ width: '32px', display: 'flex', justifyContent: 'center' }}>
-                                  {cat.gold > 0 ? (
-                                    <span style={{
-                                      width: '24px', height: '24px', borderRadius: '50%',
-                                      background: '#d97706', color: '#ffffff',
-                                      fontWeight: '800', fontSize: '12px',
-                                      display: 'flex', alignItems: 'center', justifyContent: 'center'
-                                    }}>
-                                      {cat.gold}
-                                    </span>
-                                  ) : <span style={{ color: '#475569' }}>-</span>}
-                                </div>
-                                <div style={{ width: '32px', display: 'flex', justifyContent: 'center' }}>
-                                  {cat.silver > 0 ? (
-                                    <span style={{
-                                      width: '24px', height: '24px', borderRadius: '50%',
-                                      background: '#64748b', color: '#ffffff',
-                                      fontWeight: '800', fontSize: '12px',
-                                      display: 'flex', alignItems: 'center', justifyContent: 'center'
-                                    }}>
-                                      {cat.silver}
-                                    </span>
-                                  ) : <span style={{ color: '#475569' }}>-</span>}
-                                </div>
-                                <div style={{ width: '32px', display: 'flex', justifyContent: 'center' }}>
-                                  {cat.bronze > 0 ? (
-                                    <span style={{
-                                      width: '24px', height: '24px', borderRadius: '50%',
-                                      background: '#b45309', color: '#ffffff',
-                                      fontWeight: '800', fontSize: '12px',
-                                      display: 'flex', alignItems: 'center', justifyContent: 'center'
-                                    }}>
-                                      {cat.bronze}
-                                    </span>
-                                  ) : <span style={{ color: '#475569' }}>-</span>}
+                        {/* Badges de Colocação (Placed # e Earned pts) */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '18px' }}>
+                          {ev.placedAcademy > 0 && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#cbd5e1' }}>
+                              <span>Placed</span>
+                              <span style={{
+                                background: '#0ea5e9',
+                                color: '#ffffff',
+                                fontWeight: '800',
+                                fontSize: '11px',
+                                padding: '2px 8px',
+                                borderRadius: '6px'
+                              }}>
+                                #{ev.placedAcademy}
+                              </span>
+                              <span>in <strong style={{ color: '#0ea5e9' }}>Best academy</strong> – Event Top List</span>
+                            </div>
+                          )}
+
+                          {ev.placedTeam > 0 && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#cbd5e1' }}>
+                              <span>Placed</span>
+                              <span style={{
+                                background: '#0ea5e9',
+                                color: '#ffffff',
+                                fontWeight: '800',
+                                fontSize: '11px',
+                                padding: '2px 8px',
+                                borderRadius: '6px'
+                              }}>
+                                #{ev.placedTeam}
+                              </span>
+                              <span>in <strong style={{ color: '#0ea5e9' }}>Overall team</strong> – Event Top List</span>
+                            </div>
+                          )}
+
+                          {ev.pointsEarned > 0 && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#cbd5e1' }}>
+                              <span>Earned</span>
+                              <span style={{
+                                background: '#0ea5e9',
+                                color: '#ffffff',
+                                fontWeight: '800',
+                                fontSize: '11px',
+                                padding: '2px 8px',
+                                borderRadius: '6px'
+                              }}>
+                                {Number(ev.pointsEarned).toFixed(2)} pts
+                              </span>
+                              <span>to ranking <strong style={{ color: '#0ea5e9' }}>Best academy</strong> - 2025, 2026</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Tabela de Medalhas do Evento */}
+                        <div style={{ marginTop: '24px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '16px' }}>
+                          
+                          {/* Header da Tabela */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 8px 12px', fontSize: '13px', fontWeight: '700', color: '#94a3b8' }}>
+                            <span>Medals</span>
+                            <div style={{ display: 'flex', gap: '28px', minWidth: '160px', justifyContent: 'flex-end' }}>
+                              <span style={{ width: '32px', textAlign: 'center' }}>Ouro</span>
+                              <span style={{ width: '32px', textAlign: 'center' }}>Prata</span>
+                              <span style={{ width: '32px', textAlign: 'center' }}>Bronze</span>
+                            </div>
+                          </div>
+
+                          {/* Linhas por Categoria */}
+                          {ev.categories && ev.categories.length > 0 ? (
+                            ev.categories.map((cat, cIdx) => (
+                              <div key={cIdx} style={{
+                                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                padding: '10px 8px',
+                                borderTop: '1px solid rgba(255,255,255,0.04)',
+                                fontSize: '14px', color: '#e2e8f0'
+                              }}>
+                                <span>{cat.name}</span>
+                                <div style={{ display: 'flex', gap: '28px', minWidth: '160px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                                  <div style={{ width: '32px', display: 'flex', justifyContent: 'center' }}>
+                                    {cat.gold > 0 ? (
+                                      <span style={{
+                                        width: '24px', height: '24px', borderRadius: '50%',
+                                        background: '#d97706', color: '#ffffff',
+                                        fontWeight: '800', fontSize: '12px',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                      }}>
+                                        {cat.gold}
+                                      </span>
+                                    ) : <span style={{ color: '#475569' }}>-</span>}
+                                  </div>
+                                  <div style={{ width: '32px', display: 'flex', justifyContent: 'center' }}>
+                                    {cat.silver > 0 ? (
+                                      <span style={{
+                                        width: '24px', height: '24px', borderRadius: '50%',
+                                        background: '#64748b', color: '#ffffff',
+                                        fontWeight: '800', fontSize: '12px',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                      }}>
+                                        {cat.silver}
+                                      </span>
+                                    ) : <span style={{ color: '#475569' }}>-</span>}
+                                  </div>
+                                  <div style={{ width: '32px', display: 'flex', justifyContent: 'center' }}>
+                                    {cat.bronze > 0 ? (
+                                      <span style={{
+                                        width: '24px', height: '24px', borderRadius: '50%',
+                                        background: '#b45309', color: '#ffffff',
+                                        fontWeight: '800', fontSize: '12px',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                      }}>
+                                        {cat.bronze}
+                                      </span>
+                                    ) : <span style={{ color: '#475569' }}>-</span>}
+                                  </div>
                                 </div>
                               </div>
+                            ))
+                          ) : (
+                            <div style={{ padding: '10px 8px', color: '#64748b', fontSize: '13px', fontStyle: 'italic', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                              Nenhum pódio computado neste evento para a equipe.
                             </div>
-                          ))
-                        ) : (
-                          <div style={{ padding: '10px 8px', color: '#64748b', fontSize: '13px', fontStyle: 'italic', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                            Nenhum pódio computado neste evento para a equipe.
-                          </div>
-                        )}
+                          )}
 
-                        {/* Linha Total */}
-                        <div style={{
-                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                          padding: '14px 8px 4px',
-                          borderTop: '1px solid rgba(255,255,255,0.1)',
-                          marginTop: '6px',
-                          fontSize: '15px', fontWeight: '800', color: '#ffffff'
-                        }}>
-                          <span>Total</span>
-                          <div style={{ display: 'flex', gap: '28px', minWidth: '160px', justifyContent: 'flex-end', alignItems: 'center' }}>
-                            <span style={{ width: '32px', textAlign: 'center', color: ev.totalGolds > 0 ? '#f59e0b' : '#64748b' }}>{ev.totalGolds}</span>
-                            <span style={{ width: '32px', textAlign: 'center', color: ev.totalSilvers > 0 ? '#cbd5e1' : '#64748b' }}>{ev.totalSilvers}</span>
-                            <span style={{ width: '32px', textAlign: 'center', color: ev.totalBronzes > 0 ? '#d97706' : '#64748b' }}>{ev.totalBronzes}</span>
+                          {/* Linha Total */}
+                          <div style={{
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                            padding: '14px 8px 4px',
+                            borderTop: '1px solid rgba(255,255,255,0.1)',
+                            marginTop: '6px',
+                            fontSize: '15px', fontWeight: '800', color: '#ffffff'
+                          }}>
+                            <span>Total</span>
+                            <div style={{ display: 'flex', gap: '28px', minWidth: '160px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                              <span style={{ width: '32px', textAlign: 'center', color: ev.totalGolds > 0 ? '#f59e0b' : '#64748b' }}>{ev.totalGolds}</span>
+                              <span style={{ width: '32px', textAlign: 'center', color: ev.totalSilvers > 0 ? '#cbd5e1' : '#64748b' }}>{ev.totalSilvers}</span>
+                              <span style={{ width: '32px', textAlign: 'center', color: ev.totalBronzes > 0 ? '#d97706' : '#64748b' }}>{ev.totalBronzes}</span>
+                            </div>
                           </div>
+
                         </div>
 
                       </div>
-
                     </div>
+                  ))
+                ) : (
+                  <div style={{
+                    background: '#181b22',
+                    border: '1px dashed rgba(255,255,255,0.12)',
+                    borderRadius: '16px',
+                    padding: '60px 24px',
+                    textAlign: 'center'
+                  }}>
+                    <Trophy size={48} style={{ color: '#475569', margin: '0 auto 16px', opacity: 0.6 }} />
+                    <h3 style={{ margin: '0 0 8px', fontSize: '1.2rem', fontWeight: 800, color: '#ffffff' }}>
+                      Nenhum campeonato com atletas inscritos
+                    </h3>
+                    <p style={{ margin: 0, color: '#94a3b8', fontSize: '14px', maxWidth: '480px', marginInline: 'auto', lineHeight: 1.5 }}>
+                      Quando os atletas de {academy.name} se inscreverem em campeonatos oficiais na plataforma, os cards de desempenho e medalhas aparecerão aqui automaticamente.
+                    </p>
                   </div>
-                ))}
+                )}
 
               </div>
             )}
