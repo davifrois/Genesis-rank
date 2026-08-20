@@ -923,7 +923,7 @@ const PublicProfile = ({ profileOverride, isPreview = false }) => {
                                       }
                                     }}
                                   >
-                                    <CreditCard size={14} /> Pagar Inscrição (Mercado Pago)
+                                    <CreditCard size={14} /> Pagar Inscrição
                                   </button>
                                 );
                               }
