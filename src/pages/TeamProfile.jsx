@@ -127,6 +127,13 @@ const TeamProfile = () => {
   const fallbackCover = 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?q=80&w=1200&auto=format&fit=crop';
   const coverUrl = academy.coverUrl || fallbackCover;
 
+  useEffect(() => {
+    document.body.classList.add('team-profile-active');
+    return () => {
+      document.body.classList.remove('team-profile-active');
+    };
+  }, []);
+
   const coachName = professorProfile?.fullName || academy.coachName || academy.ownerName || 'Sebastian Torres';
   const phoneFormatted = academy.contactPhone || academy.phone || '+54 280 451-2663';
   const websiteFormatted = academy.website || 'www.instagram.com';
@@ -135,14 +142,14 @@ const TeamProfile = () => {
   const affiliationName = academy.affiliation || academy.parentTeam || 'Nexo Jiu-Jitsu';
 
   return (
-    <div style={{ minHeight: '100vh', background: '#121418', color: '#ffffff', fontFamily: '"Inter", sans-serif' }}>
+    <div style={{ width: '100%', minHeight: '100vh', background: '#121418', color: '#ffffff', fontFamily: '"Inter", sans-serif', margin: 0, padding: 0, overflowX: 'hidden' }}>
       
       {/* ══ HEADER COVER ══════════════════════════════════════════ */}
       <div style={{
         position: 'relative',
         width: '100%',
-        height: '240px',
-        backgroundImage: `linear-gradient(to bottom, rgba(14, 16, 21, 0.4) 0%, rgba(14, 16, 21, 0.85) 100%), url(${coverUrl})`,
+        height: '260px',
+        backgroundImage: `linear-gradient(to bottom, rgba(14, 16, 21, 0.3) 0%, rgba(14, 16, 21, 0.85) 100%), url(${coverUrl})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
       }}>

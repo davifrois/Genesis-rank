@@ -16611,7 +16611,12 @@ textarea:focus-visible {
 }
 
 .container.container--full,
-.container--full {
+.container--full,
+body.team-profile-active .app-main,
+body.team-profile-active .app-main > .container,
+body.team-profile-active .container,
+body.team-profile-active #root > .app > .app-main,
+body.team-profile-active #root > .app > .app-main > .container {
   padding: 0 !important;
   margin: 0 !important;
   max-width: 100% !important;
