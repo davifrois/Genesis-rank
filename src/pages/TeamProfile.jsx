@@ -301,7 +301,7 @@ const TeamProfile = () => {
                 letterSpacing: '0.02em',
                 textShadow: '0 1px 2px rgba(0,0,0,0.5)'
               }}>
-                {academy.about || 'A equipe não forneceu uma descrição.'}
+                {academy.biography || academy.about || academy.bio || academy.description || 'A equipe não forneceu uma descrição.'}
               </p>
               {(academy.website || academy.contactEmail || academy.contactPhone) && (
                 <div style={{ marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>

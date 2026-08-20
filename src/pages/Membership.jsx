@@ -873,7 +873,8 @@ const Membership = () => {
       contactEmail: primaryAcademy.contactEmail || coachEmail,
       logoUrl: primaryAcademy.logoUrl || '',
       coverUrl: primaryAcademy.coverUrl || '',
-      biography: primaryAcademy.biography || ''
+      biography: primaryAcademy.biography || primaryAcademy.about || primaryAcademy.bio || primaryAcademy.description || '',
+      website: primaryAcademy.website || ''
     });
   }, [coachOwnedAcademies, currentUser?.name, currentUser?.username, isCoach, membershipView]);
 
@@ -1419,7 +1420,9 @@ const Membership = () => {
         contactPhone: academy.contactPhone || '',
         contactEmail: academy.contactEmail || '',
         logoUrl: academy.logoUrl || '',
-        coverUrl: academy.coverUrl || ''
+        coverUrl: academy.coverUrl || '',
+        biography: academy.biography || academy.about || academy.bio || academy.description || '',
+        website: academy.website || ''
       });
     } else {
       setAcademyForm(createAcademyForm());

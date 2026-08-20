@@ -613,6 +613,15 @@ const normalizeAcademy = (academy) => {
     const name = normalizeTextTrimmed(academy.name || academy.nome || '');
     if (!name) return null;
 
+    const biography = normalizeTextTrimmed(
+        academy.biography
+        || academy.about
+        || academy.bio
+        || academy.description
+        || academy.descricao
+        || ''
+    );
+
     return {
         ...academy,
         id: normalizeId(academy.id) || `academy-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -631,6 +640,11 @@ const normalizeAcademy = (academy) => {
         contactEmail: normalizeTextTrimmed(academy.contactEmail || academy.email || ''),
         logoUrl: normalizeOptionalUrl(academy.logoUrl || academy.fotoUrl || academy.imageUrl || ''),
         coverUrl: normalizeOptionalUrl(academy.coverUrl || ''),
+        biography,
+        about: biography,
+        bio: biography,
+        description: biography,
+        website: normalizeTextTrimmed(academy.website || academy.site || ''),
         createdAt: normalizeTextTrimmed(academy.createdAt || '') || new Date().toISOString()
     };
 };
@@ -2527,6 +2541,7 @@ const useStoreState = (loadedState) => {
         updateNews,
         deleteNews,
         addAcademy,
+        updateAcademy: (id, payload) => addAcademy({ ...payload, id }),
         deleteAcademy,
         addMemberProfile,
         deleteMemberProfile,
