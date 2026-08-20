@@ -71,8 +71,11 @@ const TeamProfile = () => {
     return (athletes || []).filter(a => {
       if (a.academyId && a.academyId === academy.id) return true;
       if (a.academia && normalize(a.academia) === academyNameNorm) return true;
+      if (a.equipe && normalize(a.equipe) === academyNameNorm) return true;
       if (a.team && normalize(a.team) === academyNameNorm) return true;
+      if (a.academy && normalize(a.academy) === academyNameNorm) return true;
       if (a.athleteId && students.some(s => s.id === a.athleteId)) return true;
+      if (a.id && students.some(s => s.id === a.id)) return true;
       return false;
     });
   }, [academy, athletes, academyNameNorm, students]);
@@ -81,7 +84,7 @@ const TeamProfile = () => {
   const allTeamAthletes = useMemo(() => {
     const map = new Map();
     [...students, ...academyAthletes].forEach(ath => {
-      const key = ath.id || ath.athleteId || ath.accountUsername || ath.fullName;
+      const key = ath.id || ath.athleteId || ath.accountUsername || ath.fullName || ath.nome;
       if (key && !map.has(key)) {
         map.set(key, ath);
       }
@@ -111,44 +114,75 @@ const TeamProfile = () => {
 
   // Estatísticas calculadas 100% reais segundo as chaves de campeonatos e atletas
   const stats = useMemo(() => {
-    let golds = 0;
-    let silvers = 0;
-    let bronzes = 0;
+    let golds = Number(academy?.golds || academy?.ouro || 0);
+    let silvers = Number(academy?.silvers || academy?.prata || 0);
+    let bronzes = Number(academy?.bronzes || academy?.bronze || 0);
     let totalWins = 0;
     let totalFights = 0;
-    let totalPoints = 0;
+    let totalPoints = Number(academy?.points || academy?.pontos || 0);
 
     const countedBracketPodiums = new Set();
+    const medalAchievements = [];
     const teamAthleteIds = new Set(allTeamAthletes.map(a => a.id).filter(Boolean));
 
     // 1. Contabilizar pódios oficiais e lutas das chaves (brackets)
     (brackets || []).forEach(bracket => {
       const podium = bracket.podium || {};
+      const eventObj = (events || []).find(e => e.id === bracket.eventId);
+      const eventName = eventObj?.name || bracket.eventName || 'Campeonato Oficial';
+      const categoryName = bracket.categoryName || bracket.categoria || 'Categoria Oficial';
       
       // Ouro
       if (podium.goldId && teamAthleteIds.has(podium.goldId)) {
+        const ath = allTeamAthletes.find(a => a.id === podium.goldId);
         const key = `gold_${bracket.id}_${podium.goldId}`;
         if (!countedBracketPodiums.has(key)) {
           countedBracketPodiums.add(key);
           golds++;
+          medalAchievements.push({
+            id: key,
+            athleteName: ath?.fullName || ath?.nome || 'Atleta da Equipe',
+            athleteId: podium.goldId,
+            eventName,
+            category: categoryName,
+            medal: 'gold'
+          });
         }
       }
 
       // Prata
       if (podium.silverId && teamAthleteIds.has(podium.silverId)) {
+        const ath = allTeamAthletes.find(a => a.id === podium.silverId);
         const key = `silver_${bracket.id}_${podium.silverId}`;
         if (!countedBracketPodiums.has(key)) {
           countedBracketPodiums.add(key);
           silvers++;
+          medalAchievements.push({
+            id: key,
+            athleteName: ath?.fullName || ath?.nome || 'Atleta da Equipe',
+            athleteId: podium.silverId,
+            eventName,
+            category: categoryName,
+            medal: 'silver'
+          });
         }
       }
 
       // Bronze
       if (podium.bronzeId && teamAthleteIds.has(podium.bronzeId)) {
+        const ath = allTeamAthletes.find(a => a.id === podium.bronzeId);
         const key = `bronze_${bracket.id}_${podium.bronzeId}`;
         if (!countedBracketPodiums.has(key)) {
           countedBracketPodiums.add(key);
           bronzes++;
+          medalAchievements.push({
+            id: key,
+            athleteName: ath?.fullName || ath?.nome || 'Atleta da Equipe',
+            athleteId: podium.bronzeId,
+            eventName,
+            category: categoryName,
+            medal: 'bronze'
+          });
         }
       }
 
@@ -172,17 +206,45 @@ const TeamProfile = () => {
       totalPoints += Number(ath.pontos || ath.points || 0);
 
       const history = Array.isArray(ath.historico) ? ath.historico : (Array.isArray(ath.history) ? ath.history : []);
-      history.forEach(item => {
+      history.forEach((item, idx) => {
         if (item.type === 'podium') {
-          if (Number(item.position) === 1 && !item.bracketId) golds++;
-          else if (Number(item.position) === 2 && !item.bracketId) silvers++;
-          else if (Number(item.position) === 3 && !item.bracketId) bronzes++;
+          if (Number(item.position) === 1 && !item.bracketId) {
+            golds++;
+            medalAchievements.push({
+              id: `hist_gold_${ath.id}_${idx}`,
+              athleteName: ath.fullName || ath.nome || 'Atleta da Equipe',
+              athleteId: ath.id,
+              eventName: item.eventName || item.event || 'Torneio Ranqueado',
+              category: item.category || ath.belt || 'Categoria Geral',
+              medal: 'gold'
+            });
+          } else if (Number(item.position) === 2 && !item.bracketId) {
+            silvers++;
+            medalAchievements.push({
+              id: `hist_silver_${ath.id}_${idx}`,
+              athleteName: ath.fullName || ath.nome || 'Atleta da Equipe',
+              athleteId: ath.id,
+              eventName: item.eventName || item.event || 'Torneio Ranqueado',
+              category: item.category || ath.belt || 'Categoria Geral',
+              medal: 'silver'
+            });
+          } else if (Number(item.position) === 3 && !item.bracketId) {
+            bronzes++;
+            medalAchievements.push({
+              id: `hist_bronze_${ath.id}_${idx}`,
+              athleteName: ath.fullName || ath.nome || 'Atleta da Equipe',
+              athleteId: ath.id,
+              eventName: item.eventName || item.event || 'Torneio Ranqueado',
+              category: item.category || ath.belt || 'Categoria Geral',
+              medal: 'bronze'
+            });
+          }
         } else if (item.type === 'match' || item.type === 'fight') {
           if (item.result === 'win' || item.result === 'vitoria') totalWins++;
         }
       });
 
-      // Propriedades diretas caso registradas
+      // Propriedades diretas caso registradas sem histórico detalhado
       if (ath.golds && !history.length) golds += Number(ath.golds) || 0;
       if (ath.silvers && !history.length) silvers += Number(ath.silvers) || 0;
       if (ath.bronzes && !history.length) bronzes += Number(ath.bronzes) || 0;
@@ -221,8 +283,9 @@ const TeamProfile = () => {
       totalPoints,
       totalAthletes,
       beltsCount,
+      medalAchievements,
     };
-  }, [brackets, allTeamAthletes]);
+  }, [brackets, allTeamAthletes, events, academy]);
 
   if (!academy) {
     return (
@@ -793,6 +856,70 @@ const TeamProfile = () => {
                       );
                     })}
                   </div>
+                </div>
+
+                {/* Quadro de Medalhas e Conquistas Oficiais */}
+                <div style={{
+                  background: '#181b22',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: '16px',
+                  padding: '24px 28px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: '800', color: '#ffffff', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Trophy size={18} style={{ color: '#f59e0b' }} />
+                      Quadro de Medalhas & Conquistas Oficiais
+                    </h3>
+                    <span style={{ fontSize: '13px', color: '#94a3b8', fontWeight: '600' }}>
+                      Total: {stats.totalMedals} {stats.totalMedals === 1 ? 'medalha' : 'medalhas'}
+                    </span>
+                  </div>
+
+                  {stats.medalAchievements && stats.medalAchievements.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {stats.medalAchievements.map((ach) => {
+                        const medalColor = ach.medal === 'gold' ? '#f59e0b' : ach.medal === 'silver' ? '#cbd5e1' : '#d97706';
+                        const medalBg = ach.medal === 'gold' ? 'rgba(217, 119, 6, 0.15)' : ach.medal === 'silver' ? 'rgba(100, 116, 139, 0.15)' : 'rgba(180, 83, 9, 0.15)';
+                        const medalLabel = ach.medal === 'gold' ? 'Ouro (1º Lugar)' : ach.medal === 'silver' ? 'Prata (2º Lugar)' : 'Bronze (3º Lugar)';
+                        
+                        return (
+                          <div key={ach.id} style={{
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                            padding: '12px 16px', borderRadius: '10px',
+                            background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)',
+                            flexWrap: 'wrap', gap: '8px'
+                          }}>
+                            <div>
+                              <div style={{ fontSize: '14px', fontWeight: '700', color: '#ffffff' }}>
+                                {ach.athleteName}
+                              </div>
+                              <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>
+                                {ach.eventName} • {ach.category}
+                              </div>
+                            </div>
+
+                            <span style={{
+                              background: medalBg,
+                              color: medalColor,
+                              border: `1px solid ${medalColor}40`,
+                              fontSize: '12px',
+                              fontWeight: '700',
+                              padding: '4px 10px',
+                              borderRadius: '20px'
+                            }}>
+                              {medalLabel}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div style={{ padding: '20px', textAlign: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', border: '1px dashed rgba(255,255,255,0.1)' }}>
+                      <p style={{ margin: 0, color: '#94a3b8', fontSize: '13.5px', lineHeight: 1.5 }}>
+                        Nenhuma medalha registrada em chaves de campeonatos para esta equipe até o momento. Conquistas no placar e encerramento de chaves serão somadas automaticamente aqui.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Campeonatos Ativos */}
