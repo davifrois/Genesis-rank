@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   CheckCircle, XCircle, Info, UserCheck, Users, ChevronDown,
-  ChevronUp, Edit3, Tag, ShieldCheck, AlertTriangle,
+  ChevronUp, Tag, ShieldCheck, AlertTriangle,
   X, Check, RotateCcw, CreditCard, Camera, Copy, AlertCircle, UserPlus
 } from 'lucide-react';
 import QRCode from 'qrcode';
@@ -240,10 +240,8 @@ const CategoryModal = ({ atleta, onClose, onChange, valorBase, valorAbsoluto, va
 };
 
 // ─── Linha de Atleta ──────────────────────────────────────────────────────
-const AtletaRow = ({ atleta, selecionado, onToggle, onCategoria, onCheckin, onValorChange, valorBase, valorAbsoluto, valorCombo, eventRegistrations = [], getSuggestedPrice }) => {
+const AtletaRow = ({ atleta, selecionado, onToggle, onCategoria, onCheckin, valorBase, valorAbsoluto, valorCombo, eventRegistrations = [], getSuggestedPrice }) => {
   const [expandido, setExpandido] = useState(false);
-  const [editandoValor, setEditandoValor] = useState(false);
-  const [valorLocal, setValorLocal] = useState(String(atleta.valor));
 
   const categoriaStr = describeCategoria(atleta.categoria || {});
   const temCategoria = atleta.categoria?.modalidade && atleta.categoria?.faixa && atleta.categoria?.categoriaEtaria && atleta.categoria?.peso;
@@ -267,20 +265,6 @@ const AtletaRow = ({ atleta, selecionado, onToggle, onCategoria, onCheckin, onVa
     });
     return Array.from(mods);
   }, [athleteRegistrations]);
-
-  const handleValorBlur = () => {
-    const parsed = parseFloat(valorLocal.replace(',', '.'));
-    if (!isNaN(parsed) && parsed >= 0) {
-      onValorChange(parsed);
-    } else {
-      setValorLocal(String(atleta.valor));
-    }
-    setEditandoValor(false);
-  };
-
-  useEffect(() => {
-    setValorLocal(String(atleta.valor));
-  }, [atleta.valor]);
 
   return (
     <motion.div
@@ -364,30 +348,9 @@ const AtletaRow = ({ atleta, selecionado, onToggle, onCategoria, onCheckin, onVa
         </div>
 
         <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
-          {editandoValor && !temCheckin ? (
-            <input
-              type="text"
-              value={valorLocal}
-              onChange={e => setValorLocal(e.target.value)}
-              onBlur={handleValorBlur}
-              autoFocus
-              style={{
-                width: '80px', padding: '6px 10px', borderRadius: '8px',
-                background: 'rgba(0,0,0,0.3)', border: '1px solid var(--brand-primary)', color: '#fff', textAlign: 'right', outline: 'none'
-              }}
-            />
-          ) : (
-            <>
-              <span style={{ fontSize: '20px', fontWeight: '900', color: '#ffffff', letterSpacing: '0.02em' }}>
-                {formatBRL(atleta.valor)}
-              </span>
-              {!temCheckin && (
-                <button onClick={() => setEditandoValor(true)} style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '6px', border: 'none', cursor: 'pointer', color: '#888', padding: '6px', transition: 'all 0.2s' }}>
-                  <Edit3 size={14} />
-                </button>
-              )}
-            </>
-          )}
+          <span style={{ fontSize: '20px', fontWeight: '900', color: '#ffffff', letterSpacing: '0.02em' }}>
+            {formatBRL(atleta.valor)}
+          </span>
         </div>
 
         <div style={{ textAlign: 'center' }}>
@@ -1039,7 +1002,6 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
                 atualizarCategoria(atleta.id, novaCategoria);
               }
             }}
-            onValorChange={(v) => atualizarValor(atleta.id, v)}
           />
         ))}
       </div>
