@@ -149,14 +149,33 @@ public class FinanceiroController {
         
         Map<String, Object> result = new HashMap<>();
         if (registrationIds != null && !registrationIds.isBlank()) {
-            String[] regIds = registrationIds.split(",");
-            for (String rId : regIds) {
-                rId = rId.trim();
-                if (rId.isEmpty()) continue;
-                publicRegistrationService.approveRegistration(rId, paymentId != null ? paymentId : "MP_RETURN");
-                System.out.println("Confirm-return: Inscrição " + rId + " aprovada com sucesso.");
+            if (paymentId != null && !paymentId.isBlank() && !paymentId.equalsIgnoreCase("null")) {
+                try {
+                    PaymentClient paymentClient = new PaymentClient();
+                    Payment payment = paymentClient.get(Long.valueOf(paymentId.trim()));
+                    if ("approved".equals(payment.getStatus())) {
+                        String[] regIds = registrationIds.split(",");
+                        for (String rId : regIds) {
+                            rId = rId.trim();
+                            if (rId.isEmpty()) continue;
+                            publicRegistrationService.approveRegistration(rId, String.valueOf(payment.getId()));
+                            System.out.println("Confirm-return: Inscrição " + rId + " aprovada com sucesso via MP Payment verificado.");
+                        }
+                        result.put("success", true);
+                        result.put("status", "APPROVED");
+                        return ResponseEntity.ok(result);
+                    } else {
+                        System.out.println("Confirm-return: Pagamento " + paymentId + " não aprovado (status: " + payment.getStatus() + ")");
+                        result.put("success", false);
+                        result.put("status", payment.getStatus());
+                        return ResponseEntity.ok(result);
+                    }
+                } catch (Exception e) {
+                    System.err.println("Confirm-return: Erro ao verificar pagamento MP: " + e.getMessage());
+                }
             }
-            result.put("success", true);
+            result.put("success", false);
+            result.put("message", "Pagamento não confirmado ou ID ausente");
             return ResponseEntity.ok(result);
         }
         result.put("success", false);

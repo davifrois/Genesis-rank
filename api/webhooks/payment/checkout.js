@@ -17,7 +17,13 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { registrationIds, athleteName, athleteEmail, amount } = req.body || {};
+    let body = req.body;
+    if (typeof body === 'string') {
+      try {
+        body = JSON.parse(body);
+      } catch (_) {}
+    }
+    const { registrationIds, athleteName, athleteEmail, amount } = body || {};
     const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN || 'APP_USR-5076214841905920-081112-768e0648179ce52ceb48a90a14882388-1214160384';
 
     // Determinar o domínio base oficial em produção

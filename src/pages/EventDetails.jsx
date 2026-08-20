@@ -798,7 +798,7 @@ const EventDetails = () => {
     const birthYear = fullProfile?.birthDate ? new Date(fullProfile.birthDate).getFullYear() : (age ? new Date().getFullYear() - age : '2014');
     const ageText = age ? `${age} ${copy.yearsOld}` : `11 ${copy.yearsOld}`;
 
-    const rawStatus = athlete.status || (!isUnapproved ? REGISTRATION_STATUS.PAYMENT_CONFIRMED : REGISTRATION_STATUS.PENDING);
+    const rawStatus = athlete.status || REGISTRATION_STATUS.PENDING;
     const regStatus = normalizeRegistrationStatus(rawStatus);
 
     let statusColor = '#22c55e';
@@ -913,11 +913,11 @@ const EventDetails = () => {
         {categories.map(catLabel => {
           const athletesInCat = groupedAthletes[catLabel];
           
-          const approvedAthletes = athletesInCat.filter(a => !a.status || normalizeRegistrationStatus(a.status) === REGISTRATION_STATUS.PAYMENT_CONFIRMED);
-            const isRegistrationOpen = event?.registrationOpen !== false;
-            const unapprovedAthletes = isRegistrationOpen 
-                ? athletesInCat.filter(a => a.status && normalizeRegistrationStatus(a.status) !== REGISTRATION_STATUS.PAYMENT_CONFIRMED)
-                : [];
+          const approvedAthletes = athletesInCat.filter(a => normalizeRegistrationStatus(a.status) === REGISTRATION_STATUS.PAYMENT_CONFIRMED);
+          const isRegistrationOpen = event?.registrationOpen !== false;
+          const unapprovedAthletes = isRegistrationOpen 
+              ? athletesInCat.filter(a => normalizeRegistrationStatus(a.status) !== REGISTRATION_STATUS.PAYMENT_CONFIRMED)
+              : [];
           
           const isUnapprovedExpanded = expandedUnapproved[catLabel];
 

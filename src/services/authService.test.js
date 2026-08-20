@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { authService } from './authService';
 
 describe('authService', () => {
@@ -25,7 +25,7 @@ describe('authService', () => {
     });
 
     it('should return user data on successful login', async () => {
-        const user = await authService.login('simone', 'simone123');
+        const user = await authService.login('simone', '12345678');
         expect(user).toHaveProperty('username', 'simone');
         expect(user).toHaveProperty('name', 'Simone');
         expect(user).toHaveProperty('lastLogin');

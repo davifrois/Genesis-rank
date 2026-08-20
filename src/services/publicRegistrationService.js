@@ -6,8 +6,10 @@ const resolveApiBaseUrl = () => {
   const envUrl = (import.meta.env?.VITE_API_BASE_URL || '').trim();
   if (typeof window !== 'undefined') {
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    if (!isLocalhost && (envUrl.includes('localhost') || envUrl.includes('sua-url-do-ngrok') || !envUrl)) {
-      return '';
+    if (!isLocalhost) {
+      if (!envUrl || envUrl.includes('localhost') || envUrl.includes('127.0.0.1') || envUrl.includes('ngrok')) {
+        return '';
+      }
     }
   }
   return envUrl.replace(/\/$/, '');
@@ -529,16 +531,71 @@ export const publicRegistrationService = {
       }
     }
 
+    // Fallback Direto: Criação de preferência de checkout diretamente via API do Mercado Pago
+    try {
+      const accessToken = 'APP_USR-5076214841905920-081112-768e0648179ce52ceb48a90a14882388-1214160384';
+      const baseSiteUrl = (typeof window !== 'undefined' && window.location.origin) 
+        ? window.location.origin 
+        : 'https://genesis-rank.vercel.app';
+
+      const preferencePayload = {
+        items: [
+          {
+            title: `Inscrição Campeonato - ${athleteName || 'Atleta'}`,
+            description: `Inscrição oficial no campeonato Genesis Sports para ${athleteName || 'Atleta'}`,
+            quantity: 1,
+            unit_price: Number(amount || 0),
+            currency_id: 'BRL'
+          }
+        ],
+        payer: {
+          name: athleteName || 'Atleta Genesis',
+          email: athleteEmail || 'contato@genesisesportes.com.br'
+        },
+        back_urls: {
+          success: `${baseSiteUrl}/sucesso`,
+          failure: `${baseSiteUrl}/falha`,
+          pending: `${baseSiteUrl}/pendente`
+        },
+        auto_return: 'approved',
+        binary_mode: true,
+        notification_url: `${baseSiteUrl}/api/webhook-mercadopago`,
+        external_reference: String(registrationIds || '')
+      };
+
+      console.log('[Mercado Pago Fallback] Criando preferência direta:', preferencePayload);
+
+      const mpResponse = await fetch('https://api.mercadopago.com/checkout/preferences', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify(preferencePayload)
+      });
+
+      if (mpResponse.ok) {
+        const mpData = await mpResponse.json();
+        if (mpData.init_point || mpData.sandbox_init_point) {
+          return {
+            url: mpData.init_point || mpData.sandbox_init_point,
+            id: mpData.id
+          };
+        }
+      }
+    } catch (fallbackErr) {
+      console.error('[Mercado Pago] Falha no fallback direto:', fallbackErr);
+    }
+
     throw new Error('Não foi possível gerar a preferência de checkout do Mercado Pago.');
   },
 
-
-
   createDirectPix: async ({ registrationIds, athleteName, email, amount }) => {
-    // Chamar SEMPRE o backend — chamada direta ao MP é bloqueada por CORS no browser
+    // Chamar backend ou serverless function da Vercel
     const endpoints = [
       buildApiUrl('/api/webhooks/payment/pix'),
-      '/api/webhooks/payment/pix'
+      '/api/webhooks/payment/pix',
+      '/api/pix'
     ];
 
     // Remover duplicatas

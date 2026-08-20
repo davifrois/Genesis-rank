@@ -567,7 +567,7 @@ const InscricaoCampeonatoFluxo = ({ event, onComplete }) => {
         isAbsolute: false,
         categoria: fullCategory,
         price: activeRegData.price,
-        status: 'APPROVED',
+        status: Number(activeRegData.price || 0) === 0 ? 'APPROVED' : 'PENDING',
         paymentMethod: 'Mercado Pago',
         notes: JSON.stringify({
           absolute: false,
@@ -589,6 +589,7 @@ const InscricaoCampeonatoFluxo = ({ event, onComplete }) => {
         const isNoGi = mod === 'NO-GI';
         // Absoluto category: age / gender / belt / Absoluto / GI (or NO-GI)
         const absCategory = [ageCategory, gender, belt, 'Absoluto', mod].filter(Boolean).join(' / ');
+        const absPrice = activeRegData.pricingBreakdown?.absoluteFee ?? activeRegData.price;
         payloads.push({
           ...baseFields,
           id: `reg-${now}-abs-${idx}`,
@@ -596,8 +597,8 @@ const InscricaoCampeonatoFluxo = ({ event, onComplete }) => {
           isNoGi,
           isAbsolute: true,
           categoria: absCategory,
-          price: activeRegData.pricingBreakdown?.absoluteFee ?? activeRegData.price,
-          status: 'APPROVED',
+          price: absPrice,
+          status: Number(absPrice || 0) === 0 ? 'APPROVED' : 'PENDING',
           paymentMethod: 'Mercado Pago',
           notes: JSON.stringify({
             absolute: true,
@@ -676,11 +677,9 @@ const InscricaoCampeonatoFluxo = ({ event, onComplete }) => {
         });
         
         if (data && data.url) {
-          if (onComplete) onComplete();
           window.location.href = data.url;
           return;
         } else if (event.registrationUrl) {
-          if (onComplete) onComplete();
           window.location.href = event.registrationUrl;
           return;
         } else {
@@ -692,7 +691,6 @@ const InscricaoCampeonatoFluxo = ({ event, onComplete }) => {
       } catch (err) {
         console.error('Mercado Pago error:', err);
         if (event.registrationUrl) {
-          if (onComplete) onComplete();
           window.location.href = event.registrationUrl;
           return;
         }

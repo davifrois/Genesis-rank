@@ -458,34 +458,51 @@ app.get('/api/webhooks/payment/status/:paymentId', async (req, res) => {
     }
 });
 
-// Confirm Return endpoint
+// Confirm Return endpoint - Valida status real no Mercado Pago antes de aprovar
 app.all(['/api/webhooks/payment/confirm-return', '/api/payment/confirm-return'], async (req, res) => {
     try {
         const registrationIds = req.query.registrationIds || req.body?.registrationIds;
         const paymentId = req.query.paymentId || req.body?.paymentId;
 
-        if (registrationIds) {
-            const regIds = String(registrationIds).split(',');
-            const db = readDb();
-            if (!db.publicRegistrations) db.publicRegistrations = [];
+        if (registrationIds && paymentId && paymentId !== 'null' && paymentId !== 'undefined') {
+            const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN || 'APP_USR-5076214841905920-081112-768e0648179ce52ceb48a90a14882388-1214160384';
+            try {
+                const payRes = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                if (payRes.ok) {
+                    const paymentInfo = await payRes.json();
+                    if (paymentInfo.status === 'approved') {
+                        const regIds = String(registrationIds).split(',');
+                        const db = readDb();
+                        if (!db.publicRegistrations) db.publicRegistrations = [];
 
-            let updated = false;
-            regIds.forEach(rawId => {
-                const rId = rawId.trim();
-                const idx = db.publicRegistrations.findIndex(r => r.id === rId || r.clientRequestId === rId);
-                if (idx !== -1) {
-                    db.publicRegistrations[idx].status = 'APPROVED';
-                    db.publicRegistrations[idx].paymentMethod = 'Mercado Pago';
-                    if (paymentId) db.publicRegistrations[idx].transactionId = String(paymentId);
-                    updated = true;
+                        let updated = false;
+                        regIds.forEach(rawId => {
+                            const rId = rawId.trim();
+                            const idx = db.publicRegistrations.findIndex(r => r.id === rId || r.clientRequestId === rId);
+                            if (idx !== -1) {
+                                db.publicRegistrations[idx].status = 'APPROVED';
+                                db.publicRegistrations[idx].paymentMethod = 'Mercado Pago';
+                                db.publicRegistrations[idx].transactionId = String(paymentId);
+                                updated = true;
+                            }
+                        });
+
+                        if (updated) writeDb(db);
+                        return res.json({ success: true, status: 'APPROVED' });
+                    } else {
+                        console.warn(`[Confirm-return] Pagamento ${paymentId} não aprovado. Status retornado pelo MP: ${paymentInfo.status}`);
+                        return res.json({ success: false, status: paymentInfo.status || 'pending' });
+                    }
                 }
-            });
-
-            if (updated) writeDb(db);
+            } catch (err) {
+                console.error('[Confirm-return] Erro ao consultar API Mercado Pago:', err);
+            }
         }
-        res.json({ success: true, status: 'APPROVED' });
+        res.json({ success: false, status: 'pending', message: 'Pagamento não confirmado ou ID ausente' });
     } catch (e) {
-        res.status(500).json({ success: false });
+        res.status(500).json({ success: false, error: e.message });
     }
 });
 

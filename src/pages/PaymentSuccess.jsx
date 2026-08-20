@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { CheckCircle, ShieldCheck, ArrowRight, Calendar, User, Trophy, CreditCard, Sparkles, ExternalLink, ArrowLeft } from 'lucide-react';
+import { CheckCircle, Clock, AlertTriangle, ShieldCheck, ArrowRight, Calendar, User, Trophy, CreditCard, Sparkles, ExternalLink, ArrowLeft, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import localforage from 'localforage';
+import { publicRegistrationService } from '../services/publicRegistrationService';
 
 const PaymentSuccess = () => {
   const navigate = useNavigate();
@@ -18,22 +19,93 @@ const PaymentSuccess = () => {
     searchParams.get('external_reference') || 
     searchParams.get('externalReference');
 
-  const status = 
-    searchParams.get('status') || 
+  const rawStatus = 
     searchParams.get('collection_status') || 
-    searchParams.get('payment_status') || 
-    'approved';
+    searchParams.get('status') || 
+    searchParams.get('payment_status');
 
+  const [paymentState, setPaymentState] = useState('checking'); // 'checking' | 'approved' | 'pending' | 'rejected'
   const [registration, setRegistration] = useState(null);
   const [countdown, setCountdown] = useState(8);
   const [autoRedirect, setAutoRedirect] = useState(true);
-  const [synced, setSynced] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
 
-    async function processApproval() {
-      // 1. Notificar backend / confirm-return
+    async function verifyAndProcess() {
+      // 1. Determinar status inicial a partir dos parâmetros de URL
+      const normalizedParamStatus = (rawStatus || '').toLowerCase().trim();
+      let isPaymentApproved = normalizedParamStatus === 'approved';
+      let isPaymentPending = normalizedParamStatus === 'pending' || normalizedParamStatus === 'in_process';
+      let isPaymentRejected = normalizedParamStatus === 'rejected' || normalizedParamStatus === 'cancelled' || normalizedParamStatus === 'null';
+
+      // 2. Se houver ID de pagamento, consultar status oficial na API
+      if (sessionId && sessionId !== 'null') {
+        try {
+          const statusCheck = await publicRegistrationService.checkPaymentStatus(sessionId);
+          if (statusCheck) {
+            if (statusCheck.approved || statusCheck.status === 'approved') {
+              isPaymentApproved = true;
+              isPaymentPending = false;
+              isPaymentRejected = false;
+            } else if (statusCheck.status === 'pending' || statusCheck.status === 'in_process') {
+              isPaymentApproved = false;
+              isPaymentPending = true;
+              isPaymentRejected = false;
+            } else if (statusCheck.status === 'rejected' || statusCheck.status === 'cancelled') {
+              isPaymentApproved = false;
+              isPaymentPending = false;
+              isPaymentRejected = true;
+            }
+          }
+        } catch (err) {
+          console.warn('[PaymentSuccess] Erro ao consultar status do pagamento:', err);
+        }
+      }
+
+      // Se nenhum parâmetro de URL foi passado e nenhum sessionId válido, não é aprovação
+      if (!rawStatus && !sessionId) {
+        isPaymentApproved = false;
+        isPaymentPending = true;
+      }
+
+      if (!isMounted) return;
+
+      // Se pagamento foi rejeitado ou cancelado
+      if (isPaymentRejected) {
+        setPaymentState('rejected');
+        return;
+      }
+
+      // Se pagamento está pendente (ex: boleto, PIX aguardando pagamento ou usuário retornou sem concluir)
+      if (!isPaymentApproved) {
+        setPaymentState('pending');
+
+        // Carregar dados da inscrição localmente sem alterar para aprovado
+        const targetIds = externalRef 
+          ? externalRef.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+          : [];
+
+        try {
+          const rawStored = localStorage.getItem('genesis_registrations_v1');
+          if (rawStored) {
+            const storedList = JSON.parse(rawStored);
+            if (Array.isArray(storedList)) {
+              const item = storedList.find(reg => {
+                const regId = (reg.id || reg.athleteId || reg.clientRequestId || '').toLowerCase();
+                return targetIds.some(t => regId.includes(t) || t.includes(regId));
+              });
+              if (item) setRegistration(item);
+            }
+          }
+        } catch (_) {}
+        return;
+      }
+
+      // 3. Pagamento genuinamente APROVADO: Notificar backend e atualizar caches
+      setPaymentState('approved');
+
+      // Notificar backend via confirm-return
       try {
         const baseApi = (import.meta.env?.VITE_API_BASE_URL || window.location.origin).replace(/\/$/, '');
         if (externalRef || sessionId) {
@@ -46,14 +118,14 @@ const PaymentSuccess = () => {
         console.warn('Falha no confirm-return:', e);
       }
 
-      // 2. Buscar inscrição nos armazenamentos locais (localStorage + localforage)
+      // Atualizar armazenamentos locais para APPROVED
       const targetIds = externalRef 
         ? externalRef.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
         : [];
 
       let found = null;
 
-      // A) Checar genesis_registrations_v1
+      // A) genesis_registrations_v1
       try {
         const rawStored = localStorage.getItem('genesis_registrations_v1');
         if (rawStored) {
@@ -80,7 +152,7 @@ const PaymentSuccess = () => {
         console.warn('Erro ao atualizar genesis_registrations_v1:', err);
       }
 
-      // B) Checar genesis_public_registration_pending_v1
+      // B) genesis_public_registration_pending_v1
       try {
         const rawPending = localStorage.getItem('genesis_public_registration_pending_v1');
         if (rawPending) {
@@ -108,7 +180,7 @@ const PaymentSuccess = () => {
         console.warn('Erro ao atualizar pending registrations:', err);
       }
 
-      // C) Checar genesis_ranking_data no LocalForage e localStorage
+      // C) genesis_ranking_data no LocalForage e localStorage
       try {
         const rawGlobal = localStorage.getItem('genesis_ranking_data');
         if (rawGlobal) {
@@ -143,38 +215,22 @@ const PaymentSuccess = () => {
         console.warn('Erro ao atualizar genesis_ranking_data:', err);
       }
 
-      // Se ainda não encontrou pelos IDs, pegar o último registrado
-      if (!found) {
-        try {
-          const rawStored = localStorage.getItem('genesis_registrations_v1');
-          if (rawStored) {
-            const list = JSON.parse(rawStored);
-            if (Array.isArray(list) && list.length > 0) {
-              found = list[list.length - 1];
-            }
-          }
-        } catch (_) {}
-      }
-
       if (isMounted) {
-        if (found) {
-          setRegistration(found);
-        }
-        setSynced(true);
+        if (found) setRegistration(found);
         window.dispatchEvent(new Event('storage'));
       }
     }
 
-    processApproval();
+    verifyAndProcess();
 
     return () => {
       isMounted = false;
     };
-  }, [externalRef, status, sessionId]);
+  }, [externalRef, rawStatus, sessionId]);
 
   // Contagem regressiva para redirecionamento automático
   useEffect(() => {
-    if (!autoRedirect) return;
+    if (!autoRedirect || paymentState === 'checking') return;
     if (countdown <= 0) {
       navigate('/minha-conta');
       return;
@@ -183,7 +239,93 @@ const PaymentSuccess = () => {
       setCountdown(prev => prev - 1);
     }, 1000);
     return () => clearTimeout(timer);
-  }, [countdown, autoRedirect, navigate]);
+  }, [countdown, autoRedirect, navigate, paymentState]);
+
+  // Tela de verificação em andamento
+  if (paymentState === 'checking') {
+    return (
+      <div className="public-page payment-result-page" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '85vh', padding: '2rem 1rem', background: '#090d16', color: '#fff' }}>
+        <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+          <Loader2 size={48} color="#00c2cb" className="animate-spin" />
+          <h2 style={{ fontSize: '1.4rem', fontWeight: 700 }}>Verificando status do pagamento...</h2>
+          <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Aguarde enquanto consultamos a confirmação com o Mercado Pago.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Tela de pagamento rejeitado
+  if (paymentState === 'rejected') {
+    return (
+      <div className="public-page payment-result-page" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '85vh', padding: '2rem 1rem', background: '#090d16', color: '#fff' }}>
+        <motion.div 
+          initial={{ scale: 0.85, opacity: 0 }} 
+          animate={{ scale: 1, opacity: 1 }} 
+          transition={{ type: 'spring', stiffness: 220, damping: 20 }}
+          style={{ width: '100%', maxWidth: '560px', background: 'linear-gradient(180deg, #161a26 0%, #0e121a 100%)', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '20px', padding: '2.5rem 2rem', textAlign: 'center', boxShadow: '0 25px 60px rgba(0, 0, 0, 0.7)' }}
+        >
+          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '84px', height: '84px', borderRadius: '50%', background: 'rgba(239, 68, 68, 0.12)', border: '2px solid rgba(239, 68, 68, 0.4)', marginBottom: '1.5rem' }}>
+            <AlertTriangle size={48} color="#ef4444" />
+          </div>
+          <h1 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '0.5rem', color: '#ffffff' }}>Pagamento Não Concluído</h1>
+          <p style={{ fontSize: '0.95rem', color: '#94a3b8', marginBottom: '1.8rem' }}>
+            A transação no Mercado Pago foi recusada ou cancelada. Sua vaga não foi confirmada.
+          </p>
+          <button 
+            onClick={() => navigate('/minha-conta')}
+            style={{ width: '100%', padding: '0.95rem', background: 'linear-gradient(135deg, #00c2cb 0%, #009ca4 100%)', color: '#05070b', border: 'none', borderRadius: '12px', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+          >
+            Ir para Minha Conta <ArrowRight size={19} />
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Tela de pagamento pendente (usuário voltou sem pagar ou aguardando PIX/Boleto)
+  if (paymentState === 'pending') {
+    return (
+      <div className="public-page payment-result-page" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '85vh', padding: '2rem 1rem', background: '#090d16', color: '#fff' }}>
+        <motion.div 
+          initial={{ scale: 0.85, opacity: 0 }} 
+          animate={{ scale: 1, opacity: 1 }} 
+          transition={{ type: 'spring', stiffness: 220, damping: 20 }}
+          style={{ width: '100%', maxWidth: '560px', background: 'linear-gradient(180deg, #191f2c 0%, #111622 100%)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '20px', padding: '2.5rem 2rem', textAlign: 'center', boxShadow: '0 25px 60px rgba(0, 0, 0, 0.7)' }}
+        >
+          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '84px', height: '84px', borderRadius: '50%', background: 'rgba(245, 158, 11, 0.12)', border: '2px solid rgba(245, 158, 11, 0.4)', marginBottom: '1.5rem' }}>
+            <Clock size={48} color="#f59e0b" />
+          </div>
+          <h1 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '0.5rem', color: '#ffffff' }}>Pagamento Pendente</h1>
+          <p style={{ fontSize: '0.95rem', color: '#94a3b8', marginBottom: '1.5rem', lineHeight: '1.5' }}>
+            Sua inscrição foi registrada, mas o pagamento no Mercado Pago ainda <strong>não foi confirmado</strong>. Assim que o pagamento for aprovado, sua vaga será confirmada automaticamente.
+          </p>
+          <div style={{ background: '#1c2230', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '12px', padding: '1.2rem', textAlign: 'left', marginBottom: '1.8rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f59e0b', fontSize: '0.88rem', fontWeight: 600, marginBottom: '0.4rem' }}>
+              <Clock size={17} />
+              Status: Aguardando Pagamento
+            </div>
+            <p style={{ fontSize: '0.84rem', color: '#cbd5e1', margin: 0 }}>
+              Você pode concluir o pagamento ou consultar o status a qualquer momento em <strong>Minha Conta</strong>.
+            </p>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <button 
+              onClick={() => navigate('/minha-conta')}
+              style={{ width: '100%', padding: '0.95rem', background: 'linear-gradient(135deg, #00c2cb 0%, #009ca4 100%)', color: '#05070b', border: 'none', borderRadius: '12px', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+            >
+              Ir para Minha Conta <ArrowRight size={19} />
+            </button>
+            <button 
+              onClick={() => navigate('/eventos')}
+              style={{ width: '100%', padding: '0.8rem', background: 'transparent', color: '#94a3b8', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '10px', fontWeight: 600, fontSize: '0.88rem', cursor: 'pointer' }}
+            >
+              Voltar aos Campeonatos
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="public-page payment-result-page" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '85vh', padding: '2rem 1rem', background: '#090d16', color: '#fff' }}>
