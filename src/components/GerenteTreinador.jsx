@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   CheckCircle, XCircle, Info, UserCheck, Users, ChevronDown,
   ChevronUp, Tag, ShieldCheck, AlertTriangle,
-  X, Check, RotateCcw, CreditCard, Camera, Copy, AlertCircle, UserPlus
+  X, Check, RotateCcw, CreditCard, Camera, Copy, AlertCircle, UserPlus,
+  Search, Filter, ArrowUpDown
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { publicRegistrationService } from '../services/publicRegistrationService';
@@ -662,6 +663,11 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
 
   // Estado dos atletas do roster
   const [roster, setRoster] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterFaixa, setFilterFaixa] = useState('');
+  const [filterCategoria, setFilterCategoria] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [sortBy, setSortBy] = useState('nome_asc');
 
   useEffect(() => {
     setRoster(
@@ -732,6 +738,50 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
     }));
     addToast('Seleções limpas (exceto alunos já enviados).', TOAST_TYPES.info);
   }, [addToast, getSuggestedPrice, academyAthletes]);
+
+  const filteredRoster = useMemo(() => {
+    let result = [...roster];
+    if (searchTerm.trim()) {
+      const q = searchTerm.toLowerCase().trim();
+      result = result.filter(a => (a.nome || '').toLowerCase().includes(q) || String(a.id || '').toLowerCase().includes(q));
+    }
+    if (filterFaixa) {
+      result = result.filter(a => (a.categoria?.faixa || a.graduacao || '').toLowerCase() === filterFaixa.toLowerCase());
+    }
+    if (filterCategoria) {
+      result = result.filter(a => (a.categoria?.categoriaEtaria || '').toLowerCase() === filterCategoria.toLowerCase());
+    }
+    if (filterStatus) {
+      if (filterStatus === 'enviado') result = result.filter(a => a.checkin);
+      if (filterStatus === 'pendente') result = result.filter(a => !a.categoria?.modalidade || !a.categoria?.faixa);
+      if (filterStatus === 'pronto') result = result.filter(a => a.categoria?.modalidade && a.categoria?.faixa && !a.checkin);
+    }
+    if (sortBy === 'nome_asc') {
+      result.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+    } else if (sortBy === 'nome_desc') {
+      result.sort((a, b) => (b.nome || '').localeCompare(a.nome || ''));
+    } else if (sortBy === 'idade_asc') {
+      result.sort((a, b) => (Number(a.idade) || 0) - (Number(b.idade) || 0));
+    } else if (sortBy === 'idade_desc') {
+      result.sort((a, b) => (Number(b.idade) || 0) - (Number(a.idade) || 0));
+    } else if (sortBy === 'categoria') {
+      result.sort((a, b) => (a.categoria?.categoriaEtaria || '').localeCompare(b.categoria?.categoriaEtaria || ''));
+    }
+    return result;
+  }, [roster, searchTerm, filterFaixa, filterCategoria, filterStatus, sortBy]);
+
+  const toggleSelectAllFiltered = useCallback(() => {
+    const elegiveis = filteredRoster.filter(a => !a.checkin);
+    const todosJaSelecionados = elegiveis.length > 0 && elegiveis.every(a => a.selecionado);
+    setRoster(prev => prev.map(a => {
+      if (a.checkin) return a;
+      const isFiltered = filteredRoster.some(f => f.id === a.id);
+      if (isFiltered) {
+        return { ...a, selecionado: !todosJaSelecionados };
+      }
+      return a;
+    }));
+  }, [filteredRoster]);
 
   // Cálculos
   const atletasSelecionados = useMemo(() => roster.filter(a => a.selecionado && !a.checkin), [roster]);
@@ -973,37 +1023,173 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
         </div>
       )}
 
-      {/* Ações globais */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-        <div style={{ fontSize: '18px', color: '#aaa', fontWeight: '500' }}><strong style={{ color: '#fff', fontWeight: '800' }}>{roster.length}</strong> alunos na academia</div>
-        <button onClick={resetarTodos} style={{
-          padding: '10px 20px', borderRadius: '12px', border: '1px solid #555',
-          background: 'rgba(255,255,255,0.03)', color: '#ccc', fontSize: '15px', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', gap: '10px', fontWeight: '700', transition: 'all 0.2s'
-        }}>
-          <RotateCcw size={18} /> Limpar seleção
-        </button>
+      {/* Barra de Filtros e Busca */}
+      <div style={{
+        background: 'rgba(15, 23, 42, 0.4)',
+        border: '1px solid rgba(255,255,255,0.07)',
+        borderRadius: '16px',
+        padding: '16px 20px',
+        marginBottom: '24px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '14px'
+      }}>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+          {/* Busca por Nome / ID */}
+          <div style={{ flex: '1 1 240px', position: 'relative', minWidth: '220px' }}>
+            <Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#888', pointerEvents: 'none' }} />
+            <input
+              type="text"
+              placeholder="Buscar atleta por nome ou ID..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '12px 14px 12px 42px',
+                borderRadius: '10px',
+                background: '#111',
+                border: '1px solid #333',
+                color: '#fff',
+                fontSize: '14px',
+                outline: 'none',
+                transition: 'border-color 0.2s'
+              }}
+              onFocus={e => e.target.style.borderColor = 'var(--brand-primary, #00c2cb)'}
+              onBlur={e => e.target.style.borderColor = '#333'}
+            />
+            {searchTerm && (
+              <button onClick={() => setSearchTerm('')} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#888', cursor: 'pointer' }}>
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          {/* Filtro por Faixa */}
+          <div style={{ flex: '0 1 150px', minWidth: '140px' }}>
+            <select
+              value={filterFaixa}
+              onChange={e => setFilterFaixa(e.target.value)}
+              style={{
+                width: '100%', padding: '12px 14px', borderRadius: '10px',
+                background: '#111', border: '1px solid #333', color: '#fff', fontSize: '14px', cursor: 'pointer'
+              }}
+            >
+              <option value="">Todas as faixas</option>
+              {FAIXAS.map(f => <option key={f} value={f}>{f}</option>)}
+            </select>
+          </div>
+
+          {/* Filtro por Categoria */}
+          <div style={{ flex: '0 1 160px', minWidth: '150px' }}>
+            <select
+              value={filterCategoria}
+              onChange={e => setFilterCategoria(e.target.value)}
+              style={{
+                width: '100%', padding: '12px 14px', borderRadius: '10px',
+                background: '#111', border: '1px solid #333', color: '#fff', fontSize: '14px', cursor: 'pointer'
+              }}
+            >
+              <option value="">Todas as categorias</option>
+              {CATEGORIAS_ETARIAS.map(c => <option key={c.label} value={c.label}>{c.label}</option>)}
+            </select>
+          </div>
+
+          {/* Filtro por Status */}
+          <div style={{ flex: '0 1 140px', minWidth: '130px' }}>
+            <select
+              value={filterStatus}
+              onChange={e => setFilterStatus(e.target.value)}
+              style={{
+                width: '100%', padding: '12px 14px', borderRadius: '10px',
+                background: '#111', border: '1px solid #333', color: '#fff', fontSize: '14px', cursor: 'pointer'
+              }}
+            >
+              <option value="">Todos os status</option>
+              <option value="pronto">Pronto</option>
+              <option value="pendente">Pendente</option>
+              <option value="enviado">Enviado</option>
+            </select>
+          </div>
+
+          {/* Ordenação */}
+          <div style={{ flex: '0 1 170px', minWidth: '160px' }}>
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value)}
+              style={{
+                width: '100%', padding: '12px 14px', borderRadius: '10px',
+                background: '#111', border: '1px solid #333', color: '#fff', fontSize: '14px', cursor: 'pointer'
+              }}
+            >
+              <option value="nome_asc">Nome (A - Z)</option>
+              <option value="nome_desc">Nome (Z - A)</option>
+              <option value="idade_asc">Idade (Crescente)</option>
+              <option value="idade_desc">Idade (Decrescente)</option>
+              <option value="categoria">Categoria</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Ações globais e contadores */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+          <div style={{ fontSize: '14px', color: '#aaa', fontWeight: '500' }}>
+            Exibindo <strong style={{ color: '#fff', fontWeight: '800' }}>{filteredRoster.length}</strong> de <strong style={{ color: '#fff' }}>{roster.length}</strong> alunos na academia
+          </div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button
+              onClick={toggleSelectAllFiltered}
+              disabled={isRegistrationClosed || filteredRoster.length === 0}
+              style={{
+                padding: '8px 16px', borderRadius: '10px', border: '1px solid rgba(0,194,203,0.3)',
+                background: 'rgba(0,194,203,0.1)', color: '#00c2cb', fontSize: '13px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '700', transition: 'all 0.2s',
+                opacity: (isRegistrationClosed || filteredRoster.length === 0) ? 0.5 : 1
+              }}
+            >
+              <Check size={14} /> Selecionar Filtrados
+            </button>
+            <button
+              onClick={resetarTodos}
+              style={{
+                padding: '8px 16px', borderRadius: '10px', border: '1px solid #555',
+                background: 'rgba(255,255,255,0.03)', color: '#ccc', fontSize: '13px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '700', transition: 'all 0.2s'
+              }}
+            >
+              <RotateCcw size={14} /> Limpar seleção
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Lista de atletas */}
       <div>
-        {roster.map(atleta => (
-          <AtletaRow
-            key={atleta.id}
-            atleta={atleta}
-            selecionado={atleta.selecionado}
-            valorBase={valorBase}
-            valorAbsoluto={valorAbsoluto}
-            valorCombo={valorCombo}
-            getSuggestedPrice={getSuggestedPrice}
-            onToggle={() => toggleSelecionado(atleta.id)}
-            onCategoria={(novaCategoria) => {
-              if (novaCategoria && typeof novaCategoria === 'object' && novaCategoria.faixa) {
-                atualizarCategoria(atleta.id, novaCategoria);
-              }
-            }}
-          />
-        ))}
+        {filteredRoster.length === 0 ? (
+          <div style={{
+            textAlign: 'center', padding: '40px 20px', background: 'rgba(255,255,255,0.02)',
+            borderRadius: '16px', border: '1px dashed rgba(255,255,255,0.1)', color: '#888'
+          }}>
+            <p style={{ margin: 0, fontSize: '16px' }}>Nenhum atleta encontrado com os filtros selecionados.</p>
+          </div>
+        ) : (
+          filteredRoster.map(atleta => (
+            <AtletaRow
+              key={atleta.id}
+              atleta={atleta}
+              selecionado={atleta.selecionado}
+              valorBase={valorBase}
+              valorAbsoluto={valorAbsoluto}
+              valorCombo={valorCombo}
+              getSuggestedPrice={getSuggestedPrice}
+              onToggle={() => toggleSelecionado(atleta.id)}
+              onCategoria={(novaCategoria) => {
+                if (novaCategoria && typeof novaCategoria === 'object' && novaCategoria.faixa) {
+                  atualizarCategoria(atleta.id, novaCategoria);
+                }
+              }}
+            />
+          ))
+        )}
       </div>
 
       {/* Rodapé de checkout */}
