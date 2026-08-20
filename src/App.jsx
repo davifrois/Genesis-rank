@@ -315,6 +315,7 @@ const AppLayout = () => {
   const isAthletesRoute = location.pathname.startsWith('/atletas');
   const isMembershipRoute = location.pathname.startsWith('/filiacao') || location.pathname.startsWith('/academia');
   const isCoachManagerRoute = location.pathname.startsWith('/gerente-treinador') || location.pathname.startsWith('/gerente');
+  const isTeamRoute = location.pathname.startsWith('/equipe');
   const { language, setLanguage, currentLanguage, languages, uiLanguage } = useI18n();
   const isEnglish = uiLanguage === 'en-US';
   const isSpanish = uiLanguage === 'es-ES';
@@ -1633,8 +1634,8 @@ const AppLayout = () => {
         </div>
       </div>
 
-      <main className={`app-main ${isAdminRoute ? 'app-main--admin' : ''} ${(isEventsRoute || isOrganizersRoute || isAboutRoute || isRegulationsRoute || isRankingRoute || isAthletesRoute || isMembershipRoute || isCoachManagerRoute) ? 'app-main--full' : ''}`}>
-        <div className={`container ${isAdminRoute ? 'container--admin' : ''} ${isHomeRoute ? 'container--home' : ''} ${(isEventsRoute || isOrganizersRoute || isAboutRoute || isRegulationsRoute || isRankingRoute || isAthletesRoute || isMembershipRoute || isCoachManagerRoute) ? 'container--full' : ''}`}>
+      <main className={`app-main ${isAdminRoute ? 'app-main--admin' : ''} ${(isEventsRoute || isOrganizersRoute || isAboutRoute || isRegulationsRoute || isRankingRoute || isAthletesRoute || isMembershipRoute || isCoachManagerRoute || isTeamRoute) ? 'app-main--full' : ''}`}>
+        <div className={`container ${isAdminRoute ? 'container--admin' : ''} ${isHomeRoute ? 'container--home' : ''} ${(isEventsRoute || isOrganizersRoute || isAboutRoute || isRegulationsRoute || isRankingRoute || isAthletesRoute || isMembershipRoute || isCoachManagerRoute || isTeamRoute) ? 'container--full' : ''}`}>
           <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}
