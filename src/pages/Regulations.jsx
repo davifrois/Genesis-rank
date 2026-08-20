@@ -418,12 +418,18 @@ const Regulations = () => {
             justifyContent: 'center',
             borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
           }}>
-            <div className="regulamento-hero__content" style={{ width: '100%', maxWidth: '900px', margin: '0 auto' }}>
-              <span className="section-kicker">{copy.kicker}</span>
-              <h1>{copy.title}</h1>
-              <p>{copy.description}</p>
+            <div className="regulamento-hero__content" style={{ width: '100%', maxWidth: '800px', margin: '0 auto', textAlign: 'center' }}>
+              <span className="section-kicker" style={{ display: 'inline-block', marginBottom: '8px' }}>
+                {copy.kicker}
+              </span>
+              <h1 style={{ fontSize: '2.5rem', fontWeight: '900', letterSpacing: '-0.02em', margin: '0 0 12px 0', color: '#ffffff' }}>
+                {copy.title}
+              </h1>
+              <p style={{ fontSize: '1.05rem', color: '#94a3b8', margin: '0 auto 28px auto', maxWidth: '640px', lineHeight: 1.5 }}>
+                {copy.description}
+              </p>
 
-              <label className="regulations-search" htmlFor="regulations-search">
+              <label className="regulations-search" htmlFor="regulations-search" style={{ margin: '0 auto', maxWidth: '680px' }}>
                 <span className="regulations-search__icon" aria-hidden="true">
                   <Search size={18} />
                 </span>
@@ -432,29 +438,17 @@ const Regulations = () => {
                   type="search"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder={copy.searchPlaceholder}
+                  placeholder="Buscar peso, regras, penalidades..."
                 />
               </label>
 
-              <div className="regulations-search__meta">
-                <span>{copy.searchHint}</span>
-                {normalizedQuery ? (
+              {normalizedQuery ? (
+                <div className="regulations-search__meta" style={{ marginTop: '12px', justifyContent: 'center' }}>
                   <strong>
                     {copy.resultsLabel}: {searchResultCount}
                   </strong>
-                ) : null}
-              </div>
-
-              <div className="regulations-hero__chips">
-                <span>Padrao Genesis</span>
-                <span>Leitura rapida</span>
-                <span>Consulta no celular</span>
-              </div>
-
-              <div className="regulamento-editor-note">
-                <strong>Editor do evento:</strong>
-                <span>o texto cadastrado no painel administrativo aparece formatado automaticamente na pagina de informacoes.</span>
-              </div>
+                </div>
+              ) : null}
             </div>
           </section>
 
