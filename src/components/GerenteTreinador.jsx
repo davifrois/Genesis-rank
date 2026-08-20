@@ -294,14 +294,14 @@ const AtletaRow = ({ atleta, selecionado, onToggle, onCategoria, onCheckin, valo
           gridTemplateColumns: '50px 1.6fr 1.5fr 150px 140px 60px',
           alignItems: 'center',
           gap: '20px',
-          padding: '22px 24px',
+          padding: '20px 24px',
           marginBottom: '12px',
-          border: selecionado ? '1px solid rgba(0,194,203,0.3)' : '1px solid rgba(255,255,255,0.05)',
+          border: selecionado ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(255,255,255,0.06)',
           borderRadius: '16px',
-          background: selecionado ? 'rgba(0,194,203,0.03)' : 'rgba(20,20,24,0.6)',
+          background: selecionado ? 'rgba(255,255,255,0.04)' : 'rgba(18, 20, 26, 0.65)',
           backdropFilter: 'blur(10px)',
-          boxShadow: selecionado ? '0 8px 30px rgba(0,194,203,0.1)' : '0 4px 15px rgba(0,0,0,0.2)',
-          transition: 'all 0.3s ease',
+          boxShadow: selecionado ? '0 8px 30px rgba(0,0,0,0.4)' : '0 4px 15px rgba(0,0,0,0.2)',
+          transition: 'all 0.2s ease',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -314,22 +314,21 @@ const AtletaRow = ({ atleta, selecionado, onToggle, onCategoria, onCheckin, valo
               disabled={temCheckin || (window.isRegistrationClosed)} 
             />
             <div style={{
-              width: '24px', height: '24px', borderRadius: '6px',
-              border: selecionado ? '2px solid var(--brand-primary, #00c2cb)' : '2px solid #555',
-              background: selecionado ? 'var(--brand-primary, #00c2cb)' : 'rgba(0,0,0,0.2)',
-              boxShadow: selecionado ? '0 0 10px rgba(0,194,203,0.5)' : 'none',
+              width: '22px', height: '22px', borderRadius: '6px',
+              border: selecionado ? '2px solid #ffffff' : '2px solid #555',
+              background: selecionado ? '#ffffff' : 'rgba(0,0,0,0.2)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'all 0.2s',
               opacity: temCheckin ? 0.5 : 1
             }}>
-              {selecionado && <Check size={16} color="#000" strokeWidth={3} />}
+              {selecionado && <Check size={14} color="#000" strokeWidth={3} />}
             </div>
           </label>
         </div>
 
         <div>
-          <div style={{ fontWeight: '800', fontSize: '19px', color: '#ffffff', letterSpacing: '0.02em' }}>{atleta.nome}</div>
-          <div style={{ fontSize: '14px', color: '#a0a0a0', marginTop: '6px', display: 'flex', gap: '12px', fontWeight: '600' }}>
+          <div style={{ fontWeight: '800', fontSize: '18px', color: '#ffffff', letterSpacing: '0.01em' }}>{atleta.nome}</div>
+          <div style={{ fontSize: '13px', color: '#94a3b8', marginTop: '5px', display: 'flex', gap: '10px', fontWeight: '500' }}>
             {atleta.idade ? <span style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '4px' }}>{atleta.idade} anos</span> : null}
             {atleta.graduacao ? <span style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '4px' }}>Faixa {atleta.graduacao}</span> : null}
           </div>
@@ -337,40 +336,40 @@ const AtletaRow = ({ atleta, selecionado, onToggle, onCategoria, onCheckin, valo
 
         <div style={{ textAlign: 'center' }}>
           <div style={{
-            fontSize: '14px',
-            color: temCategoria ? '#60a5fa' : '#777',
-            fontWeight: temCategoria ? '700' : '500',
-            background: temCategoria ? 'rgba(59, 130, 246, 0.1)' : 'rgba(255,255,255,0.02)',
-            padding: '8px 16px', borderRadius: '12px', display: 'inline-block',
-            border: temCategoria ? '1px solid rgba(59, 130, 246, 0.2)' : '1px solid rgba(255,255,255,0.05)'
+            fontSize: '13px',
+            color: temCategoria ? '#f1f5f9' : '#64748b',
+            fontWeight: temCategoria ? '600' : '400',
+            background: temCategoria ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)',
+            padding: '6px 14px', borderRadius: '10px', display: 'inline-block',
+            border: temCategoria ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(255,255,255,0.04)'
           }}>
             {categoriaStr}
           </div>
         </div>
 
         <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
-          <span style={{ fontSize: '20px', fontWeight: '900', color: '#ffffff', letterSpacing: '0.02em' }}>
+          <span style={{ fontSize: '18px', fontWeight: '800', color: '#ffffff' }}>
             {formatBRL(atleta.valor)}
           </span>
         </div>
 
         <div style={{ textAlign: 'center' }}>
           {!selecionado ? (
-            <span style={{ color: '#666', fontSize: '15px', fontWeight: '600' }}>—</span>
+            <span style={{ color: '#475569', fontSize: '14px', fontWeight: '500' }}>—</span>
           ) : !temCategoria ? (
             <span style={{
-              background: 'rgba(245, 158, 11, 0.1)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.3)',
-              padding: '6px 16px', borderRadius: '24px', fontSize: '13px', fontWeight: '800', letterSpacing: '0.05em'
+              background: 'rgba(255, 255, 255, 0.05)', color: '#fbbf24', border: '1px solid rgba(251, 191, 36, 0.25)',
+              padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', letterSpacing: '0.04em'
             }}>PENDENTE</span>
           ) : temCheckin ? (
             <span style={{
-              background: 'rgba(16, 185, 129, 0.1)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.3)',
-              padding: '6px 16px', borderRadius: '24px', fontSize: '13px', fontWeight: '800', letterSpacing: '0.05em'
+              background: 'rgba(255, 255, 255, 0.05)', color: '#94a3b8', border: '1px solid rgba(255, 255, 255, 0.1)',
+              padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', letterSpacing: '0.04em'
             }}>ENVIADO</span>
           ) : (
             <span style={{
-              background: 'rgba(59, 130, 246, 0.1)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.3)',
-              padding: '6px 16px', borderRadius: '24px', fontSize: '13px', fontWeight: '800', letterSpacing: '0.05em'
+              background: 'rgba(255, 255, 255, 0.1)', color: '#ffffff', border: '1px solid rgba(255, 255, 255, 0.2)',
+              padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', letterSpacing: '0.04em'
             }}>PRONTO</span>
           )}
         </div>
@@ -960,40 +959,39 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
       {/* Cabeçalho do painel */}
       {campeonatoAtivo && (
         <div style={{
-          background: 'linear-gradient(135deg, rgba(0,194,203,0.08), rgba(0,194,203,0.02))',
+          background: 'rgba(18, 20, 26, 0.65)',
           backdropFilter: 'blur(16px)',
-          border: '1px solid rgba(0,194,203,0.2)',
-          boxShadow: '0 12px 40px rgba(0,0,0,0.2)',
-          borderRadius: '24px', padding: '32px', marginBottom: '40px',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
+          borderRadius: '20px', padding: '24px 28px', marginBottom: '32px',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '24px',
         }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--brand-primary, #00c2cb)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px', fontWeight: '800' }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--brand-primary)', boxShadow: '0 0 10px var(--brand-primary)' }}></span>
+            <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px', fontWeight: '700' }}>
               Campeonato Ativo
             </div>
-            <div style={{ fontSize: '28px', fontWeight: '900', color: '#fff', letterSpacing: '-0.02em' }}>{campeonatoAtivo.nome}</div>
-            <div style={{ fontSize: '15px', color: '#999', marginTop: '8px', fontWeight: '500' }}>
-              Taxa base: <strong style={{ color: '#ccc' }}>{formatBRL(valorBase)}</strong> <span style={{ margin: '0 6px', color: '#444' }}>|</span> Absoluto: <strong style={{ color: '#ccc' }}>+{formatBRL(valorAbsoluto)}</strong>
+            <div style={{ fontSize: '24px', fontWeight: '800', color: '#ffffff', letterSpacing: '-0.01em' }}>{campeonatoAtivo.nome}</div>
+            <div style={{ fontSize: '14px', color: '#94a3b8', marginTop: '6px', fontWeight: '500' }}>
+              Taxa base: <strong style={{ color: '#ffffff' }}>{formatBRL(valorBase)}</strong> <span style={{ margin: '0 6px', color: '#444' }}>|</span> Absoluto: <strong style={{ color: '#ffffff' }}>+{formatBRL(valorAbsoluto)}</strong>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             {[
-              { label: 'Alunos', value: roster.length, color: '#aaa', bg: 'rgba(255,255,255,0.03)' },
-              { label: 'Selecionados', value: atletasSelecionados.length, color: 'var(--brand-primary,#00c2cb)', bg: 'rgba(0,194,203,0.1)' },
-              { label: 'Enviados', value: jaEnviados, color: '#f39c12', bg: 'rgba(243,156,18,0.1)' },
-              { label: 'Total', value: formatBRL(totalGeral), color: '#fff', bg: 'rgba(255,255,255,0.06)' },
+              { label: 'Alunos', value: roster.length, color: '#94a3b8', bg: 'rgba(255,255,255,0.03)' },
+              { label: 'Selecionados', value: atletasSelecionados.length, color: '#ffffff', bg: 'rgba(255,255,255,0.08)' },
+              { label: 'Enviados', value: jaEnviados, color: '#94a3b8', bg: 'rgba(255,255,255,0.03)' },
+              { label: 'Total', value: formatBRL(totalGeral), color: '#ffffff', bg: 'rgba(255,255,255,0.08)' },
             ].map(s => (
               <div key={s.label} style={{
                 textAlign: 'center',
                 background: s.bg,
-                border: '1px solid rgba(255,255,255,0.05)',
-                borderRadius: '16px',
-                padding: '16px 20px',
-                minWidth: '110px'
+                border: '1px solid rgba(255,255,255,0.06)',
+                borderRadius: '12px',
+                padding: '12px 18px',
+                minWidth: '100px'
               }}>
-                <div style={{ fontSize: '26px', fontWeight: '900', color: s.color, textShadow: '0 2px 10px rgba(0,0,0,0.3)' }}>{s.value}</div>
-                <div style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '6px', fontWeight: '700' }}>{s.label}</div>
+                <div style={{ fontSize: '22px', fontWeight: '800', color: s.color }}>{s.value}</div>
+                <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: '4px', fontWeight: '700' }}>{s.label}</div>
               </div>
             ))}
           </div>
@@ -1003,30 +1001,30 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
       {/* Alertas */}
       {isRegistrationClosed && (
         <div style={{
-          background: 'rgba(231,76,60,0.1)', border: '1px solid rgba(231,76,60,0.3)',
+          background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)',
           borderRadius: '12px', padding: '14px 20px', marginBottom: '20px',
-          display: 'flex', alignItems: 'center', gap: '12px', fontSize: '15px', color: '#e74c3c', fontWeight: '600'
+          display: 'flex', alignItems: 'center', gap: '12px', fontSize: '14px', color: '#f87171', fontWeight: '600'
         }}>
-          <AlertTriangle size={20} />
+          <AlertTriangle size={18} />
           As inscrições para este campeonato estão encerradas. Não é possível adicionar novos alunos.
         </div>
       )}
 
       {!isRegistrationClosed && semCategoria > 0 && (
         <div style={{
-          background: 'rgba(243,156,18,0.1)', border: '1px solid rgba(243,156,18,0.3)',
+          background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.2)',
           borderRadius: '12px', padding: '14px 20px', marginBottom: '20px',
-          display: 'flex', alignItems: 'center', gap: '12px', fontSize: '15px', color: '#f39c12', fontWeight: '600'
+          display: 'flex', alignItems: 'center', gap: '12px', fontSize: '14px', color: '#fbbf24', fontWeight: '600'
         }}>
-          <AlertTriangle size={20} />
+          <AlertTriangle size={18} />
           {semCategoria} aluno{semCategoria > 1 ? 's' : ''} selecionado{semCategoria > 1 ? 's' : ''} sem categoria definida. Clique no atleta para expandir e definir.
         </div>
       )}
 
       {/* Barra de Filtros e Busca */}
       <div style={{
-        background: 'rgba(15, 23, 42, 0.4)',
-        border: '1px solid rgba(255,255,255,0.07)',
+        background: 'rgba(18, 20, 26, 0.5)',
+        border: '1px solid rgba(255,255,255,0.06)',
         borderRadius: '16px',
         padding: '16px 20px',
         marginBottom: '24px',
@@ -1037,7 +1035,7 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
           {/* Busca por Nome / ID */}
           <div style={{ flex: '1 1 240px', position: 'relative', minWidth: '220px' }}>
-            <Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#888', pointerEvents: 'none' }} />
+            <Search size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', pointerEvents: 'none' }} />
             <input
               type="text"
               placeholder="Buscar atleta por nome ou ID..."
@@ -1045,17 +1043,17 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
               onChange={e => setSearchTerm(e.target.value)}
               style={{
                 width: '100%',
-                padding: '12px 14px 12px 42px',
+                padding: '11px 14px 11px 40px',
                 borderRadius: '10px',
-                background: '#111',
-                border: '1px solid #333',
+                background: '#111318',
+                border: '1px solid rgba(255,255,255,0.1)',
                 color: '#fff',
                 fontSize: '14px',
                 outline: 'none',
                 transition: 'border-color 0.2s'
               }}
-              onFocus={e => e.target.style.borderColor = 'var(--brand-primary, #00c2cb)'}
-              onBlur={e => e.target.style.borderColor = '#333'}
+              onFocus={e => e.target.style.borderColor = '#ffffff'}
+              onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
             />
             {searchTerm && (
               <button onClick={() => setSearchTerm('')} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#888', cursor: 'pointer' }}>
@@ -1070,8 +1068,8 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
               value={filterFaixa}
               onChange={e => setFilterFaixa(e.target.value)}
               style={{
-                width: '100%', padding: '12px 14px', borderRadius: '10px',
-                background: '#111', border: '1px solid #333', color: '#fff', fontSize: '14px', cursor: 'pointer'
+                width: '100%', padding: '11px 14px', borderRadius: '10px',
+                background: '#111318', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '14px', cursor: 'pointer'
               }}
             >
               <option value="">Todas as faixas</option>
@@ -1085,8 +1083,8 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
               value={filterCategoria}
               onChange={e => setFilterCategoria(e.target.value)}
               style={{
-                width: '100%', padding: '12px 14px', borderRadius: '10px',
-                background: '#111', border: '1px solid #333', color: '#fff', fontSize: '14px', cursor: 'pointer'
+                width: '100%', padding: '11px 14px', borderRadius: '10px',
+                background: '#111318', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '14px', cursor: 'pointer'
               }}
             >
               <option value="">Todas as categorias</option>
@@ -1100,8 +1098,8 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
               value={filterStatus}
               onChange={e => setFilterStatus(e.target.value)}
               style={{
-                width: '100%', padding: '12px 14px', borderRadius: '10px',
-                background: '#111', border: '1px solid #333', color: '#fff', fontSize: '14px', cursor: 'pointer'
+                width: '100%', padding: '11px 14px', borderRadius: '10px',
+                background: '#111318', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '14px', cursor: 'pointer'
               }}
             >
               <option value="">Todos os status</option>
@@ -1117,8 +1115,8 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
               value={sortBy}
               onChange={e => setSortBy(e.target.value)}
               style={{
-                width: '100%', padding: '12px 14px', borderRadius: '10px',
-                background: '#111', border: '1px solid #333', color: '#fff', fontSize: '14px', cursor: 'pointer'
+                width: '100%', padding: '11px 14px', borderRadius: '10px',
+                background: '#111318', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '14px', cursor: 'pointer'
               }}
             >
               <option value="nome_asc">Nome (A - Z)</option>
@@ -1132,17 +1130,17 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
 
         {/* Ações globais e contadores */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-          <div style={{ fontSize: '14px', color: '#aaa', fontWeight: '500' }}>
-            Exibindo <strong style={{ color: '#fff', fontWeight: '800' }}>{filteredRoster.length}</strong> de <strong style={{ color: '#fff' }}>{roster.length}</strong> alunos na academia
+          <div style={{ fontSize: '13px', color: '#94a3b8', fontWeight: '500' }}>
+            Exibindo <strong style={{ color: '#fff', fontWeight: '700' }}>{filteredRoster.length}</strong> de <strong style={{ color: '#fff' }}>{roster.length}</strong> alunos na academia
           </div>
           <div style={{ display: 'flex', gap: '10px' }}>
             <button
               onClick={toggleSelectAllFiltered}
               disabled={isRegistrationClosed || filteredRoster.length === 0}
               style={{
-                padding: '8px 16px', borderRadius: '10px', border: '1px solid rgba(0,194,203,0.3)',
-                background: 'rgba(0,194,203,0.1)', color: '#00c2cb', fontSize: '13px', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '700', transition: 'all 0.2s',
+                padding: '8px 16px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.15)',
+                background: 'rgba(255,255,255,0.06)', color: '#ffffff', fontSize: '13px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '600', transition: 'all 0.2s',
                 opacity: (isRegistrationClosed || filteredRoster.length === 0) ? 0.5 : 1
               }}
             >
@@ -1151,9 +1149,9 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
             <button
               onClick={resetarTodos}
               style={{
-                padding: '8px 16px', borderRadius: '10px', border: '1px solid #555',
-                background: 'rgba(255,255,255,0.03)', color: '#ccc', fontSize: '13px', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '700', transition: 'all 0.2s'
+                padding: '8px 16px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)',
+                background: 'transparent', color: '#94a3b8', fontSize: '13px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '600', transition: 'all 0.2s'
               }}
             >
               <RotateCcw size={14} /> Limpar seleção
@@ -1197,33 +1195,35 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
         <motion.div
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
           style={{
-            marginTop: '32px', background: 'linear-gradient(135deg, #0a1f0a, #0d2a0d)',
-            border: '1px solid rgba(46,204,113,0.3)', borderRadius: '16px', padding: '24px 30px',
+            marginTop: '32px', background: 'rgba(18, 20, 26, 0.95)',
+            backdropFilter: 'blur(16px)',
+            border: '1px solid rgba(255,255,255,0.12)', borderRadius: '18px', padding: '24px 28px',
             display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px',
-            boxShadow: '0 10px 40px rgba(46,204,113,0.1)'
+            boxShadow: '0 10px 40px rgba(0,0,0,0.5)'
           }}
         >
           <div>
-            <div style={{ fontSize: '15px', color: '#aaa', marginBottom: '6px', fontWeight: 'bold' }}>
+            <div style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '4px', fontWeight: '600' }}>
               {atletasSelecionados.length} atleta{atletasSelecionados.length > 1 ? 's' : ''} pronto{atletasSelecionados.length > 1 ? 's' : ''} para envio
             </div>
-            <div style={{ fontSize: '32px', fontWeight: '900', color: '#2ecc71' }}>{formatBRL(totalGeral)}</div>
-            <div style={{ fontSize: '13px', color: '#777', marginTop: '4px' }}>Total unificado da equipe</div>
+            <div style={{ fontSize: '28px', fontWeight: '800', color: '#ffffff' }}>{formatBRL(totalGeral)}</div>
+            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>Total unificado da equipe</div>
           </div>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             <button
               style={{
-                padding: '16px 28px', borderRadius: '12px', border: 'none',
-                background: 'linear-gradient(135deg, var(--brand-primary,#00c2cb), #009ba3)',
-                color: '#000', fontWeight: '800', fontSize: '16px',
-                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px',
+                padding: '14px 26px', borderRadius: '12px', border: 'none',
+                background: '#ffffff',
+                color: '#000000', fontWeight: '800', fontSize: '15px',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
                 opacity: semCategoria > 0 ? 0.5 : 1,
+                transition: 'all 0.2s'
               }}
               disabled={semCategoria > 0}
               title={semCategoria > 0 ? 'Defina a categoria de todos os atletas primeiro' : ''}
               onClick={() => setShowPixModal(true)}
             >
-              <CreditCard size={20}/> Gerar PIX e Anexar Comprovante
+              <CreditCard size={18} /> Pagar Inscrições da Equipe
             </button>
           </div>
         </motion.div>

@@ -133,27 +133,23 @@ const CoachManagerPage = () => {
         }} />
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px', position: 'relative', zIndex: 2 }}>
-          <div style={{
-            width: '48px', height: '48px', borderRadius: '12px',
-            background: 'linear-gradient(135deg, var(--brand-primary,#00c2cb), #009ba3)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0,
-          }}>
-            <ClipboardList size={24} color="#000" />
-          </div>
           <div>
-            <span className="section-kicker">Gestão de Inscrições</span>
-            <h1 className="profile-title" style={{ marginTop: '2px', textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>
+            <div style={{ 
+              fontSize: '0.78rem', fontWeight: '700', letterSpacing: '0.12em', 
+              textTransform: 'uppercase', color: '#94a3b8', marginBottom: '4px' 
+            }}>
+              Gestão de Inscrições
+            </div>
+            <h1 className="profile-title" style={{ marginTop: '0', fontSize: '2.1rem', fontWeight: '800', color: '#ffffff', textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>
               Gerente de Inscrições
             </h1>
             <div style={{ 
-              display: 'inline-flex', alignItems: 'center', gap: '6px', 
-              background: 'rgba(0,194,203,0.1)', border: '1px solid rgba(0,194,203,0.3)', 
-              padding: '6px 14px', borderRadius: '30px', 
-              color: '#00c2cb', fontSize: '0.85rem', fontWeight: '600', 
-              marginTop: '10px', backdropFilter: 'blur(4px)'
+              display: 'inline-flex', alignItems: 'center',
+              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', 
+              padding: '4px 12px', borderRadius: '20px', 
+              color: '#e2e8f0', fontSize: '0.82rem', fontWeight: '600', 
+              marginTop: '8px', backdropFilter: 'blur(4px)'
             }}>
-              <Shield size={14} />
               {selectedAcademy ? selectedAcademy.name : 'Gerenciamento de Equipe'}
             </div>
           </div>
@@ -169,86 +165,79 @@ const CoachManagerPage = () => {
       <div style={{ marginTop: '2rem', marginBottom: '5rem', paddingLeft: 'clamp(1.5rem, 4vw, 4rem)', paddingRight: 'clamp(1.5rem, 4vw, 4rem)' }}>
         {/* Seletor de Campeonato */}
         <motion.div 
-          initial={{ opacity: 0, y: -20 }}
+          initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
+          transition={{ duration: 0.3 }}
           style={{
-            background: 'rgba(15, 23, 42, 0.4)',
-            backdropFilter: 'blur(24px)',
-            border: '1px solid rgba(0, 194, 203, 0.15)',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05), 0 0 40px rgba(0, 194, 203, 0.05)',
-            borderRadius: '24px',
-            padding: '32px',
-            marginBottom: '40px',
+            background: 'rgba(18, 20, 26, 0.65)',
+            backdropFilter: 'blur(16px)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
+            borderRadius: '20px',
+            padding: '24px 28px',
+            marginBottom: '32px',
             display: 'flex',
             alignItems: 'center',
-            gap: '24px',
+            gap: '20px',
             flexWrap: 'wrap',
-            position: 'relative',
-            overflow: 'hidden'
+            position: 'relative'
           }}
         >
-          {/* Decorative glowing orb in background */}
-          <div style={{ position: 'absolute', top: '-50px', right: '-50px', width: '200px', height: '200px', background: 'rgba(0,194,203,0.1)', filter: 'blur(60px)', borderRadius: '50%', pointerEvents: 'none' }} />
-          
           <div style={{ flex: '1', minWidth: '250px', position: 'relative', zIndex: 1 }}>
             <label style={{
-              display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px',
-              color: '#00c2cb',
-              fontWeight: '700', fontSize: '13px',
-              textTransform: 'uppercase', letterSpacing: '0.12em',
-              textShadow: '0 0 10px rgba(0,194,203,0.3)'
+              display: 'block', marginBottom: '10px',
+              color: '#94a3b8',
+              fontWeight: '700', fontSize: '12px',
+              textTransform: 'uppercase', letterSpacing: '0.08em'
             }}>
-              <Trophy size={16} /> Selecione o Campeonato Alvo
+              Selecione o Campeonato Alvo
             </label>
 
             {activeEvents.length === 0 ? (
               <div style={{
-                padding: '30px', borderRadius: '16px',
-                background: 'rgba(15, 23, 42, 0.4)',
+                padding: '24px', borderRadius: '14px',
+                background: 'rgba(255,255,255,0.02)',
                 border: '1px dashed rgba(255,255,255,0.1)',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px',
                 textAlign: 'center'
               }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(36, 120, 255, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2478ff' }}>
-                  <CalendarX size={24} />
+                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>
+                  <CalendarX size={20} />
                 </div>
                 <div>
-                  <h3 style={{ color: '#fff', fontSize: '1.1rem', marginBottom: '4px' }}>Nenhum campeonato disponível</h3>
-                  <p style={{ color: '#888', fontSize: '0.9rem', margin: 0 }}>Aguarde a abertura oficial de novas inscrições pelos organizadores.</p>
+                  <h3 style={{ color: '#fff', fontSize: '1rem', marginBottom: '4px' }}>Nenhum campeonato disponível</h3>
+                  <p style={{ color: '#888', fontSize: '0.85rem', margin: 0 }}>Aguarde a abertura oficial de novas inscrições pelos organizadores.</p>
                 </div>
               </div>
             ) : (
               <div style={{ position: 'relative' }}>
-                <motion.select
-                  whileFocus={{ scale: 1.01 }}
-                  whileHover={{ backgroundColor: 'rgba(0,0,0,0.4)', borderColor: 'rgba(0,194,203,0.4)' }}
+                <select
                   value={selectedEventId}
                   onChange={e => setSelectedEventId(e.target.value)}
                   style={{
                     width: '100%', maxWidth: '600px',
-                    padding: '16px 24px',
-                    borderRadius: '16px',
-                    background: 'rgba(0,0,0,0.25)',
+                    padding: '14px 20px',
+                    borderRadius: '12px',
+                    background: '#111318',
                     color: '#fff',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    fontSize: '16px',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    fontSize: '15px',
                     fontWeight: '600',
                     outline: 'none',
                     cursor: 'pointer',
                     appearance: 'none',
-                    transition: 'all 0.3s ease',
-                    boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)',
+                    transition: 'all 0.2s ease',
+                    boxShadow: 'none'
                   }}
-                  onFocus={e => { e.target.style.borderColor = '#00c2cb'; e.target.style.boxShadow = '0 0 0 4px rgba(0,194,203,0.1)'; }}
-                  onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'inset 0 2px 4px rgba(0,0,0,0.2)'; }}
+                  onFocus={e => { e.target.style.borderColor = '#ffffff'; }}
+                  onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.12)'; }}
                 >
                   {activeEvents.map(ev => (
-                    <option key={ev.id} value={ev.id} style={{ background: '#0f172a' }}>{ev.name}</option>
+                    <option key={ev.id} value={ev.id} style={{ background: '#111318' }}>{ev.name}</option>
                   ))}
-                </motion.select>
-                <div style={{ position: 'absolute', right: '20px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#00c2cb' }}>
-                  <ChevronDown size={20} />
+                </select>
+                <div style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#888' }}>
+                  <ChevronDown size={18} />
                 </div>
               </div>
             )}
