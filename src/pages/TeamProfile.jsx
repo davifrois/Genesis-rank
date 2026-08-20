@@ -39,10 +39,7 @@ const TeamProfile = () => {
   const { academies, memberProfiles, events, athletes = [], brackets = [], currentUser } = useStore();
 
   const [activeTab, setActiveTab] = useState('home'); // 'home' | 'stats' | 'athletes'
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [isNotified, setIsNotified] = useState(false);
   const [athleteSearch, setAthleteSearch] = useState('');
-  const [joinedTeam, setJoinedTeam] = useState(false);
 
   const academy = useMemo(() => {
     return (academies || []).find(a => a.id === academyId);
@@ -674,94 +671,6 @@ const TeamProfile = () => {
                   {students.length}
                 </span>
               </button>
-            </div>
-
-            {/* Ações (Notificação, Favorito, Botão Junte-se) */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '10px' }}>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button
-                  onClick={() => setIsNotified(!isNotified)}
-                  style={{
-                    flex: 1, padding: '10px', borderRadius: '8px',
-                    border: '1px solid rgba(255,255,255,0.12)',
-                    background: isNotified ? 'rgba(3, 56, 110, 0.4)' : 'rgba(255,255,255,0.04)',
-                    color: isNotified ? '#93c5fd' : '#cbd5e1',
-                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    transition: 'all 0.2s'
-                  }}
-                  title="Notificações"
-                >
-                  <Bell size={18} />
-                </button>
-
-                <button
-                  onClick={() => setIsFollowing(!isFollowing)}
-                  style={{
-                    flex: 1, padding: '10px', borderRadius: '8px',
-                    border: '1px solid rgba(255,255,255,0.12)',
-                    background: isFollowing ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255,255,255,0.04)',
-                    color: isFollowing ? '#ef4444' : '#cbd5e1',
-                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    transition: 'all 0.2s'
-                  }}
-                  title="Favoritar"
-                >
-                  <Heart size={18} fill={isFollowing ? '#ef4444' : 'none'} />
-                </button>
-              </div>
-
-              <button
-                onClick={() => setJoinedTeam(!joinedTeam)}
-                style={{
-                  width: '100%',
-                  padding: '13px 18px',
-                  borderRadius: '10px',
-                  border: 'none',
-                  background: joinedTeam ? '#10b981' : '#03386e',
-                  color: '#ffffff',
-                  fontSize: '14px',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  boxShadow: '0 4px 15px rgba(3, 56, 110, 0.4)',
-                  transition: 'all 0.2s'
-                }}
-              >
-                {joinedTeam ? (
-                  <>
-                    <Check size={16} /> Filiado à Equipe
-                  </>
-                ) : (
-                  'Junte-se a equipe'
-                )}
-              </button>
-            </div>
-
-            {/* Banner Patrocinador / Parceiro (Gymdesk / Genesis) */}
-            <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{
-                background: 'linear-gradient(135deg, #1e293b, #0f172a)',
-                borderRadius: '16px',
-                border: '1px solid rgba(255,255,255,0.1)',
-                padding: '18px',
-                textAlign: 'left'
-              }}>
-                <div style={{ fontSize: '11px', color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: '800', marginBottom: '8px' }}>
-                  Plataforma Oficial
-                </div>
-                <div style={{ fontSize: '15px', fontWeight: '800', color: '#ffffff', marginBottom: '6px' }}>
-                  Gestão & Filiações Genesis
-                </div>
-                <p style={{ fontSize: '13px', color: '#94a3b8', margin: '0 0 12px 0', lineHeight: 1.4 }}>
-                  Inscrições unificadas de atletas e acompanhamento de chaves oficiais.
-                </p>
-                <Link to="/filiacao" style={{ color: '#93c5fd', fontSize: '13px', fontWeight: '700', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                  Acessar Central <ExternalLink size={13} />
-                </Link>
-              </div>
             </div>
 
           </aside>
