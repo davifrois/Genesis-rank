@@ -36,7 +36,7 @@ const getInitials = (name) => {
 
 const TeamProfile = () => {
   const { academyId } = useParams();
-  const { academies, memberProfiles, events, currentUser } = useStore();
+  const { academies, memberProfiles, events, athletes = [], brackets = [], currentUser } = useStore();
 
   const [activeTab, setActiveTab] = useState('home'); // 'home' | 'stats' | 'athletes'
   const [isFollowing, setIsFollowing] = useState(false);
@@ -60,13 +60,42 @@ const TeamProfile = () => {
     return students.find(s => (s.accountUsername || '').toLowerCase() === coachUsername);
   }, [academy, students]);
 
+  const normalize = (str = '') => 
+    str.toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+  const academyNameNorm = useMemo(() => normalize(academy?.name || ''), [academy]);
+
+  // Atletas da academia em eventos e campeonatos
+  const academyAthletes = useMemo(() => {
+    if (!academy) return [];
+    return (athletes || []).filter(a => {
+      if (a.academyId && a.academyId === academy.id) return true;
+      if (a.academia && normalize(a.academia) === academyNameNorm) return true;
+      if (a.team && normalize(a.team) === academyNameNorm) return true;
+      if (a.athleteId && students.some(s => s.id === a.athleteId)) return true;
+      return false;
+    });
+  }, [academy, athletes, academyNameNorm, students]);
+
+  // Lista unificada de todos os atletas da equipe
+  const allTeamAthletes = useMemo(() => {
+    const map = new Map();
+    [...students, ...academyAthletes].forEach(ath => {
+      const key = ath.id || ath.athleteId || ath.accountUsername || ath.fullName;
+      if (key && !map.has(key)) {
+        map.set(key, ath);
+      }
+    });
+    return Array.from(map.values());
+  }, [students, academyAthletes]);
+
   const filteredStudents = useMemo(() => {
-    return students.filter(s => 
+    return allTeamAthletes.filter(s => 
       !athleteSearch || 
-      (s.fullName || '').toLowerCase().includes(athleteSearch.toLowerCase()) ||
-      (s.belt || '').toLowerCase().includes(athleteSearch.toLowerCase())
+      (s.fullName || s.nome || '').toLowerCase().includes(athleteSearch.toLowerCase()) ||
+      (s.belt || s.graduacao || s.faixa || '').toLowerCase().includes(athleteSearch.toLowerCase())
     );
-  }, [students, athleteSearch]);
+  }, [allTeamAthletes, athleteSearch]);
 
   const activeChampionships = useMemo(() => {
     const now = new Date();
@@ -80,22 +109,120 @@ const TeamProfile = () => {
     }).slice(0, 4);
   }, [events]);
 
-  // Estatísticas calculadas
+  // Estatísticas calculadas 100% reais segundo as chaves de campeonatos e atletas
   const stats = useMemo(() => {
-    const totalGolds = students.reduce((sum, s) => sum + (Number(s.golds) || (Number(s.wins) > 0 ? 1 : 0)), 0) || 25;
-    const totalSilvers = students.reduce((sum, s) => sum + (Number(s.silvers) || 0), 0) || 38;
-    const totalBronzes = students.reduce((sum, s) => sum + (Number(s.bronzes) || 0), 0) || 14;
-    
+    let golds = 0;
+    let silvers = 0;
+    let bronzes = 0;
+    let totalWins = 0;
+    let totalFights = 0;
+    let totalPoints = 0;
+
+    const countedBracketPodiums = new Set();
+    const teamAthleteIds = new Set(allTeamAthletes.map(a => a.id).filter(Boolean));
+
+    // 1. Contabilizar pódios oficiais e lutas das chaves (brackets)
+    (brackets || []).forEach(bracket => {
+      const podium = bracket.podium || {};
+      
+      // Ouro
+      if (podium.goldId && teamAthleteIds.has(podium.goldId)) {
+        const key = `gold_${bracket.id}_${podium.goldId}`;
+        if (!countedBracketPodiums.has(key)) {
+          countedBracketPodiums.add(key);
+          golds++;
+        }
+      }
+
+      // Prata
+      if (podium.silverId && teamAthleteIds.has(podium.silverId)) {
+        const key = `silver_${bracket.id}_${podium.silverId}`;
+        if (!countedBracketPodiums.has(key)) {
+          countedBracketPodiums.add(key);
+          silvers++;
+        }
+      }
+
+      // Bronze
+      if (podium.bronzeId && teamAthleteIds.has(podium.bronzeId)) {
+        const key = `bronze_${bracket.id}_${podium.bronzeId}`;
+        if (!countedBracketPodiums.has(key)) {
+          countedBracketPodiums.add(key);
+          bronzes++;
+        }
+      }
+
+      // Lutas e vitórias dos combates
+      if (Array.isArray(bracket.matches)) {
+        bracket.matches.forEach(match => {
+          const isA = match.slotA && teamAthleteIds.has(match.slotA);
+          const isB = match.slotB && teamAthleteIds.has(match.slotB);
+          
+          if (isA || isB) {
+            totalFights++;
+            const won = (isA && match.winnerId === match.slotA) || (isB && match.winnerId === match.slotB);
+            if (won) totalWins++;
+          }
+        });
+      }
+    });
+
+    // 2. Somar histórico individual e pontos dos atletas
+    allTeamAthletes.forEach(ath => {
+      totalPoints += Number(ath.pontos || ath.points || 0);
+
+      const history = Array.isArray(ath.historico) ? ath.historico : (Array.isArray(ath.history) ? ath.history : []);
+      history.forEach(item => {
+        if (item.type === 'podium') {
+          if (Number(item.position) === 1 && !item.bracketId) golds++;
+          else if (Number(item.position) === 2 && !item.bracketId) silvers++;
+          else if (Number(item.position) === 3 && !item.bracketId) bronzes++;
+        } else if (item.type === 'match' || item.type === 'fight') {
+          if (item.result === 'win' || item.result === 'vitoria') totalWins++;
+        }
+      });
+
+      // Propriedades diretas caso registradas
+      if (ath.golds && !history.length) golds += Number(ath.golds) || 0;
+      if (ath.silvers && !history.length) silvers += Number(ath.silvers) || 0;
+      if (ath.bronzes && !history.length) bronzes += Number(ath.bronzes) || 0;
+      if (ath.wins && !history.length) totalWins += Number(ath.wins) || 0;
+    });
+
+    // 3. Distribuição real de faixas
     const beltsCount = {
-      branca: students.filter(s => (s.belt || '').toLowerCase().includes('branca')).length,
-      azul: students.filter(s => (s.belt || '').toLowerCase().includes('azul')).length,
-      roxa: students.filter(s => (s.belt || '').toLowerCase().includes('roxa')).length,
-      marrom: students.filter(s => (s.belt || '').toLowerCase().includes('marrom')).length,
-      preta: students.filter(s => (s.belt || '').toLowerCase().includes('preta')).length,
+      preta: 0,
+      marrom: 0,
+      roxa: 0,
+      azul: 0,
+      colorida: 0,
+      branca: 0,
     };
 
-    return { totalGolds, totalSilvers, totalBronzes, beltsCount };
-  }, [students]);
+    allTeamAthletes.forEach(ath => {
+      const b = (ath.belt || ath.graduacao || ath.faixa || 'branca').toLowerCase();
+      if (b.includes('preta') || b.includes('black')) beltsCount.preta++;
+      else if (b.includes('marrom') || b.includes('brown')) beltsCount.marrom++;
+      else if (b.includes('roxa') || b.includes('purple')) beltsCount.roxa++;
+      else if (b.includes('azul') || b.includes('blue')) beltsCount.azul++;
+      else if (b.includes('verde') || b.includes('laranja') || b.includes('amarela') || b.includes('cinza') || b.includes('infantil')) beltsCount.colorida++;
+      else beltsCount.branca++;
+    });
+
+    const totalAthletes = allTeamAthletes.length;
+
+    return {
+      totalGolds: golds,
+      totalSilvers: silvers,
+      totalBronzes: bronzes,
+      totalMedals: golds + silvers + bronzes,
+      totalWins,
+      totalFights,
+      totalPoints,
+      totalAthletes,
+      beltsCount,
+    };
+  }, [brackets, allTeamAthletes]);
 
   if (!academy) {
     return (
@@ -599,7 +726,7 @@ const TeamProfile = () => {
                   padding: '28px',
                   display: 'grid',
                   gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-                  gap: '20px'
+                  gap: '16px'
                 }}>
                   <div style={{ textAlign: 'center', padding: '16px', background: 'rgba(217, 119, 6, 0.1)', border: '1px solid rgba(217, 119, 6, 0.25)', borderRadius: '12px' }}>
                     <div style={{ fontSize: '32px', fontWeight: '900', color: '#f59e0b' }}>{stats.totalGolds}</div>
@@ -617,8 +744,18 @@ const TeamProfile = () => {
                   </div>
 
                   <div style={{ textAlign: 'center', padding: '16px', background: 'rgba(3, 56, 110, 0.2)', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '12px' }}>
-                    <div style={{ fontSize: '32px', fontWeight: '900', color: '#ffffff' }}>{students.length}</div>
-                    <div style={{ fontSize: '12px', color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '4px', fontWeight: '700' }}>Atletas Registrados</div>
+                    <div style={{ fontSize: '32px', fontWeight: '900', color: '#ffffff' }}>{stats.totalAthletes}</div>
+                    <div style={{ fontSize: '12px', color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '4px', fontWeight: '700' }}>Atletas da Equipe</div>
+                  </div>
+
+                  <div style={{ textAlign: 'center', padding: '16px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '12px' }}>
+                    <div style={{ fontSize: '32px', fontWeight: '900', color: '#34d399' }}>{stats.totalWins}</div>
+                    <div style={{ fontSize: '12px', color: '#6ee7b7', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '4px', fontWeight: '700' }}>Vitórias em Luta</div>
+                  </div>
+
+                  <div style={{ textAlign: 'center', padding: '16px', background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.25)', borderRadius: '12px' }}>
+                    <div style={{ fontSize: '32px', fontWeight: '900', color: '#a78bfa' }}>{stats.totalPoints}</div>
+                    <div style={{ fontSize: '12px', color: '#c4b5fd', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '4px', fontWeight: '700' }}>Pontos no Ranking</div>
                   </div>
                 </div>
 
@@ -639,9 +776,10 @@ const TeamProfile = () => {
                       { label: 'Faixa Marrom', count: stats.beltsCount.marrom, color: '#92400e', border: '#b45309' },
                       { label: 'Faixa Roxa', count: stats.beltsCount.roxa, color: '#7c3aed', border: '#8b5cf6' },
                       { label: 'Faixa Azul', count: stats.beltsCount.azul, color: '#1d4ed8', border: '#3b82f6' },
+                      { label: 'Faixas Infantis / Coloridas', count: stats.beltsCount.colorida, color: '#15803d', border: '#22c55e' },
                       { label: 'Faixa Branca', count: stats.beltsCount.branca, color: '#e2e8f0', border: '#cbd5e1' },
                     ].map(belt => {
-                      const percentage = students.length > 0 ? Math.round((belt.count / students.length) * 100) : 0;
+                      const percentage = stats.totalAthletes > 0 ? Math.round((belt.count / stats.totalAthletes) * 100) : 0;
                       return (
                         <div key={belt.label}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px', fontWeight: '600' }}>
@@ -649,7 +787,7 @@ const TeamProfile = () => {
                             <span>{belt.count} ({percentage}%)</span>
                           </div>
                           <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
-                            <div style={{ width: `${Math.max(percentage, 3)}%`, height: '100%', background: belt.color, border: `1px solid ${belt.border}`, borderRadius: '4px' }} />
+                            <div style={{ width: `${percentage}%`, height: '100%', background: belt.color, border: percentage > 0 ? `1px solid ${belt.border}` : 'none', borderRadius: '4px', transition: 'width 0.3s ease' }} />
                           </div>
                         </div>
                       );
