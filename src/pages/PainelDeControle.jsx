@@ -5795,7 +5795,12 @@ const PainelDeControle = () => {
         }
 
         try {
-            addAthlete(newAthlete);
+            addAthlete({
+                ...newAthlete,
+                status: 'APPROVED',
+                paymentStatus: 'approved',
+                checkin: true
+            });
             showFeedback('success', copy.feedback.athleteRegistered(newAthlete.nome));
             setShowAddModal(false);
             setNewAthlete({

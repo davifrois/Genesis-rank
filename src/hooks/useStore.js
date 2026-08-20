@@ -2448,6 +2448,9 @@ const useStoreState = (loadedState) => {
         validAthletes.forEach((athlete) => {
             const baseAthlete = {
                 ...athlete,
+                status: athlete.status || 'APPROVED',
+                paymentStatus: athlete.paymentStatus || 'approved',
+                checkin: athlete.checkin !== undefined ? athlete.checkin : true,
                 academia: athlete.academia || 'Sem academia',
                 eventId: resolveEventId(athlete) || fallbackEventId
             };
