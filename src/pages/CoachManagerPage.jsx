@@ -145,9 +145,9 @@ const CoachManagerPage = () => {
             </h1>
             <div style={{ 
               display: 'inline-flex', alignItems: 'center',
-              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', 
-              padding: '4px 12px', borderRadius: '20px', 
-              color: '#e2e8f0', fontSize: '0.82rem', fontWeight: '600', 
+              background: 'rgba(3, 56, 110, 0.35)', border: '1px solid rgba(3, 56, 110, 0.65)', 
+              padding: '4px 14px', borderRadius: '20px', 
+              color: '#93c5fd', fontSize: '0.82rem', fontWeight: '600', 
               marginTop: '8px', backdropFilter: 'blur(4px)'
             }}>
               {selectedAcademy ? selectedAcademy.name : 'Gerenciamento de Equipe'}
@@ -169,9 +169,9 @@ const CoachManagerPage = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
           style={{
-            background: 'rgba(18, 20, 26, 0.65)',
+            background: 'linear-gradient(135deg, rgba(3, 56, 110, 0.15), rgba(18, 20, 26, 0.7))',
             backdropFilter: 'blur(16px)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
+            border: '1px solid rgba(3, 56, 110, 0.35)',
             boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
             borderRadius: '20px',
             padding: '24px 28px',

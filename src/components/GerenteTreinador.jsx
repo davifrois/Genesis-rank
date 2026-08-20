@@ -959,15 +959,15 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
       {/* Cabeçalho do painel */}
       {campeonatoAtivo && (
         <div style={{
-          background: 'rgba(18, 20, 26, 0.65)',
+          background: 'linear-gradient(135deg, rgba(3, 56, 110, 0.22), rgba(18, 20, 26, 0.8))',
           backdropFilter: 'blur(16px)',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
-          boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
+          border: '1px solid rgba(3, 56, 110, 0.45)',
+          boxShadow: '0 8px 30px rgba(0,0,0,0.35)',
           borderRadius: '20px', padding: '24px 28px', marginBottom: '32px',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '24px',
         }}>
           <div>
-            <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px', fontWeight: '700' }}>
+            <div style={{ fontSize: '11px', color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px', fontWeight: '700' }}>
               Campeonato Ativo
             </div>
             <div style={{ fontSize: '24px', fontWeight: '800', color: '#ffffff', letterSpacing: '-0.01em' }}>{campeonatoAtivo.nome}</div>
@@ -977,21 +977,47 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
           </div>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             {[
-              { label: 'Alunos', value: roster.length, color: '#94a3b8', bg: 'rgba(255,255,255,0.03)' },
-              { label: 'Selecionados', value: atletasSelecionados.length, color: '#ffffff', bg: 'rgba(255,255,255,0.08)' },
-              { label: 'Enviados', value: jaEnviados, color: '#94a3b8', bg: 'rgba(255,255,255,0.03)' },
-              { label: 'Total', value: formatBRL(totalGeral), color: '#ffffff', bg: 'rgba(255,255,255,0.08)' },
+              { 
+                label: 'Alunos', 
+                value: roster.length, 
+                color: '#ffffff', 
+                bg: 'rgba(3, 56, 110, 0.25)', 
+                border: '1px solid rgba(3, 56, 110, 0.45)' 
+              },
+              { 
+                label: 'Selecionados', 
+                value: atletasSelecionados.length, 
+                color: '#ffffff', 
+                bg: atletasSelecionados.length > 0 ? '#03386e' : 'rgba(3, 56, 110, 0.25)', 
+                border: '1px solid rgba(3, 56, 110, 0.65)' 
+              },
+              { 
+                label: 'Enviados', 
+                value: jaEnviados, 
+                color: '#ffffff', 
+                bg: 'rgba(3, 56, 110, 0.25)', 
+                border: '1px solid rgba(3, 56, 110, 0.45)' 
+              },
+              { 
+                label: 'Total', 
+                value: formatBRL(totalGeral), 
+                color: '#ffffff', 
+                bg: '#03386e', 
+                border: '1px solid rgba(59, 130, 246, 0.5)' 
+              },
             ].map(s => (
               <div key={s.label} style={{
                 textAlign: 'center',
                 background: s.bg,
-                border: '1px solid rgba(255,255,255,0.06)',
-                borderRadius: '12px',
-                padding: '12px 18px',
-                minWidth: '100px'
+                border: s.border,
+                borderRadius: '14px',
+                padding: '14px 20px',
+                minWidth: '110px',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.25)',
+                transition: 'all 0.2s ease'
               }}>
-                <div style={{ fontSize: '22px', fontWeight: '800', color: s.color }}>{s.value}</div>
-                <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: '4px', fontWeight: '700' }}>{s.label}</div>
+                <div style={{ fontSize: '24px', fontWeight: '800', color: s.color, letterSpacing: '-0.01em' }}>{s.value}</div>
+                <div style={{ fontSize: '11px', color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '6px', fontWeight: '700' }}>{s.label}</div>
               </div>
             ))}
           </div>
@@ -1138,8 +1164,8 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
               onClick={toggleSelectAllFiltered}
               disabled={isRegistrationClosed || filteredRoster.length === 0}
               style={{
-                padding: '8px 16px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.15)',
-                background: 'rgba(255,255,255,0.06)', color: '#ffffff', fontSize: '13px', cursor: 'pointer',
+                padding: '8px 16px', borderRadius: '10px', border: '1px solid rgba(59, 130, 246, 0.4)',
+                background: '#03386e', color: '#ffffff', fontSize: '13px', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '600', transition: 'all 0.2s',
                 opacity: (isRegistrationClosed || filteredRoster.length === 0) ? 0.5 : 1
               }}
@@ -1212,11 +1238,12 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             <button
               style={{
-                padding: '14px 26px', borderRadius: '12px', border: 'none',
-                background: '#ffffff',
-                color: '#000000', fontWeight: '800', fontSize: '15px',
+                padding: '14px 26px', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.5)',
+                background: '#03386e',
+                color: '#ffffff', fontWeight: '800', fontSize: '15px',
                 cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
                 opacity: semCategoria > 0 ? 0.5 : 1,
+                boxShadow: '0 4px 20px rgba(3, 56, 110, 0.45)',
                 transition: 'all 0.2s'
               }}
               disabled={semCategoria > 0}
