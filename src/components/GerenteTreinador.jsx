@@ -818,7 +818,11 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
           console.warn('Falha ao adicionar atleta ao cache local:', e);
         }
 
-        await publicRegistrationService.register(payload);
+        try {
+          await publicRegistrationService.register(payload);
+        } catch (e) {
+          console.warn(`Sync backend falhou para lote ${payload.id} - offline mode:`, e);
+        }
       }
 
       setRoster(prev => prev.map(a => atletasSelecionados.find(s => s.id === a.id) ? { ...a, checkin: true, selecionado: false } : a));
@@ -827,9 +831,11 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
       if (totalCost > 0) {
         const registrationIds = regIds.join(',');
         const athleteName = `Equipe ${academyName || 'Academia'} (${atletasSelecionados.length} Atletas)`;
+        const athleteEmail = usuarioLogado?.email || (typeof usuarioLogado?.username === 'string' && usuarioLogado.username.includes('@') ? usuarioLogado.username : 'contato@genesisesportes.com.br');
         const data = await publicRegistrationService.createCheckoutSession({
           registrationIds,
           athleteName,
+          athleteEmail,
           amount: totalCost
         });
         
