@@ -330,8 +330,8 @@ const AtletaRow = ({ atleta, selecionado, onToggle, onCategoria, onCheckin, valo
         <div>
           <div style={{ fontWeight: '800', fontSize: '19px', color: '#ffffff', letterSpacing: '0.02em' }}>{atleta.nome}</div>
           <div style={{ fontSize: '14px', color: '#a0a0a0', marginTop: '6px', display: 'flex', gap: '12px', fontWeight: '600' }}>
-            {atleta.idade ? <span style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '4px' }}>🎂 {atleta.idade} anos</span> : null}
-            {atleta.graduacao ? <span style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '4px' }}>🥋 {atleta.graduacao}</span> : null}
+            {atleta.idade ? <span style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '4px' }}>{atleta.idade} anos</span> : null}
+            {atleta.graduacao ? <span style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '4px' }}>Faixa {atleta.graduacao}</span> : null}
           </div>
         </div>
 
@@ -366,7 +366,7 @@ const AtletaRow = ({ atleta, selecionado, onToggle, onCategoria, onCheckin, valo
             <span style={{
               background: 'rgba(16, 185, 129, 0.1)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.3)',
               padding: '6px 16px', borderRadius: '24px', fontSize: '13px', fontWeight: '800', letterSpacing: '0.05em'
-            }}>ENVIADO ✓</span>
+            }}>ENVIADO</span>
           ) : (
             <span style={{
               background: 'rgba(59, 130, 246, 0.1)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.3)',
