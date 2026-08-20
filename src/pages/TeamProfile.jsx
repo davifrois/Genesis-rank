@@ -139,7 +139,7 @@ const TeamProfile = () => {
   const websiteFormatted = academy.website || 'www.instagram.com';
   const websiteUrl = websiteFormatted.startsWith('http') ? websiteFormatted : `https://${websiteFormatted}`;
 
-  const affiliationName = academy.affiliation || academy.parentTeam || 'Nexo Jiu-Jitsu';
+  const affiliationName = academy.affiliation || academy.parentTeam || null;
 
   return (
     <div style={{ width: '100%', minHeight: '100vh', background: '#121418', color: '#ffffff', fontFamily: '"Inter", sans-serif', margin: 0, padding: 0, overflowX: 'hidden' }}>
@@ -547,40 +547,42 @@ const TeamProfile = () => {
                   </div>
                 </div>
 
-                {/* Card 3: Afiliações (Affiliations) */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <h2 style={{ fontSize: '1.4rem', fontWeight: '800', color: '#ffffff', margin: 0 }}>
-                    Affiliations
-                  </h2>
+                {/* Card 3: Afiliações (Affiliations) - Apenas se houver afiliação */}
+                {affiliationName && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <h2 style={{ fontSize: '1.4rem', fontWeight: '800', color: '#ffffff', margin: 0 }}>
+                      Affiliations
+                    </h2>
 
-                  <div style={{
-                    background: '#181b22',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    borderRadius: '14px',
-                    padding: '20px 24px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '20px'
-                  }}>
                     <div style={{
-                      width: '64px', height: '64px', borderRadius: '50%',
-                      background: '#0e1015', border: '2px solid rgba(255,255,255,0.1)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      flexShrink: 0, overflow: 'hidden'
+                      background: '#181b22',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: '14px',
+                      padding: '20px 24px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '20px'
                     }}>
-                      <Shield size={32} style={{ color: '#03386e' }} />
-                    </div>
-
-                    <div>
-                      <div style={{ fontSize: '1.1rem', fontWeight: '800', color: '#ffffff' }}>
-                        {affiliationName}
+                      <div style={{
+                        width: '64px', height: '64px', borderRadius: '50%',
+                        background: '#0e1015', border: '2px solid rgba(255,255,255,0.1)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        flexShrink: 0, overflow: 'hidden'
+                      }}>
+                        <Shield size={32} style={{ color: '#03386e' }} />
                       </div>
-                      <div style={{ fontSize: '13px', color: '#94a3b8', marginTop: '2px' }}>
-                        Associação & Matriz Oficial
+
+                      <div>
+                        <div style={{ fontSize: '1.1rem', fontWeight: '800', color: '#ffffff' }}>
+                          {affiliationName}
+                        </div>
+                        <div style={{ fontSize: '13px', color: '#94a3b8', marginTop: '2px' }}>
+                          Associação & Matriz Oficial
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
 
               </div>
             )}
