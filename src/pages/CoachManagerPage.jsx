@@ -5,7 +5,7 @@ import GerenteTreinador from '../components/GerenteTreinador';
 import LoginOverlay from '../components/LoginOverlay';
 import { Link } from 'react-router-dom';
 import { ClipboardList, ChevronLeft, Trophy, ChevronDown, CalendarX, Shield } from 'lucide-react';
-import bgHero from '../assets/jiu_jitsu_combat_bg.png';
+import bgHero from '../assets/Kuri.JPEG';
 
 const CoachManagerPage = () => {
   const { currentUser, memberProfiles, events, academies, addAthlete } = useStore();
@@ -115,18 +115,18 @@ const CoachManagerPage = () => {
             width: '100%',
             height: '100%',
             objectFit: 'cover',
-            objectPosition: 'center 30%',
-            opacity: 0.35,
+            objectPosition: 'center 25%',
+            opacity: 0.48,
             pointerEvents: 'none',
             zIndex: 0,
-            filter: 'grayscale(50%) contrast(120%)'
+            filter: 'contrast(115%) brightness(0.95)'
           }}
         />
         {/* Gradient overlay so text stays readable */}
         <div style={{
           position: 'absolute',
           inset: 0,
-          background: 'linear-gradient(90deg, rgba(10,10,14,0.95) 0%, rgba(10,10,14,0.7) 40%, rgba(10,10,14,0.2) 100%)',
+          background: 'linear-gradient(90deg, rgba(10,10,14,0.92) 0%, rgba(10,10,14,0.55) 45%, rgba(10,10,14,0.2) 100%)',
           pointerEvents: 'none',
           zIndex: 1,
         }} />
