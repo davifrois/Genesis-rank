@@ -96,7 +96,7 @@ const CoachManagerPage = () => {
   const selectedAcademy = academies.find(a => a.id === academyId);
 
   return (
-    <div className="public-page profile-page" style={{ padding: 0 }}>
+    <div className="public-page profile-page" style={{ padding: 0, margin: 0, gap: 0 }}>
       {/* Header */}
       <section className="profile-header" style={{ 
         paddingBottom: '24px', paddingTop: '28px', paddingLeft: 'clamp(1.5rem, 4vw, 4rem)', paddingRight: 'clamp(1.5rem, 4vw, 4rem)', 
