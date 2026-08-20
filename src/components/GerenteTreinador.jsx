@@ -683,13 +683,16 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
 
   const getSuggestedPrice = (cat, athlete) => {
     if (!cat || !cat.modalidade) {
-      const { base } = resolveAthleteEventPrice({ event: campeonatoAtivo, athlete });
+      const { base } = resolveAthleteEventPrice({ event: campeonatoAtivo, athlete, modalitiesCount: 1 });
       return base;
     }
+    const isCombo = cat.modalidade.includes('Combo') || (cat.modalidade.includes('Gi') && cat.modalidade.includes('No-Gi'));
+    const isAbsolute = cat.peso === 'Absoluto';
     const { total } = resolveAthleteEventPrice({
       event: campeonatoAtivo,
       athlete,
-      modalitiesCount: cat.modalidade.includes('Combo') ? 2 : 1
+      modalitiesCount: isCombo ? 2 : 1,
+      absolute: isAbsolute
     });
     return total;
   };
@@ -828,7 +831,7 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
       setRoster(prev => prev.map(a => atletasSelecionados.find(s => s.id === a.id) ? { ...a, checkin: true, selecionado: false } : a));
       
       // Chamada Checkout Pro Mercado Pago para o lote da equipe
-      if (totalCost > 0) {
+      if (totalGeral > 0) {
         const registrationIds = regIds.join(',');
         const athleteName = `Equipe ${academyName || 'Academia'} (${atletasSelecionados.length} Atletas)`;
         const athleteEmail = usuarioLogado?.email || (typeof usuarioLogado?.username === 'string' && usuarioLogado.username.includes('@') ? usuarioLogado.username : 'contato@genesisesportes.com.br');
@@ -836,7 +839,7 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
           registrationIds,
           athleteName,
           athleteEmail,
-          amount: totalCost
+          amount: totalGeral
         });
         
         if (data?.url) {

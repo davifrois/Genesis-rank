@@ -74,13 +74,14 @@ const CoachManagerPage = () => {
     const ev = activeEvents.find(e => e.id === selectedEventId) || activeEvents[0];
     if (!ev) return null;
     return {
+      ...ev,
       id: ev.id,
-      nome: ev.name,
+      nome: ev.name || ev.nome || '',
       date: ev.date || ev.eventDate,
       registrationOpen: ev.registrationOpen,
-      temCinturaoAtivo: false,
-      taxaBase: ev.feeOver15 ? parseFloat(ev.feeOver15) : 140.00,
-      taxaAbsoluto: ev.feeAbsolute ? parseFloat(ev.feeAbsolute) : 40.00,
+      batches: Array.isArray(ev.batches) ? ev.batches : [],
+      taxaBase: ev.feeOver15 ? parseFloat(ev.feeOver15) : (ev.price ? parseFloat(ev.price) : 140.00),
+      taxaAbsoluto: ev.feeAbsolute ? parseFloat(ev.feeAbsolute) : 30.00,
     };
   }, [activeEvents, selectedEventId]);
 
