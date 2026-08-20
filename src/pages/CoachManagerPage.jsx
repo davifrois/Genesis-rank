@@ -96,12 +96,13 @@ const CoachManagerPage = () => {
   const selectedAcademy = academies.find(a => a.id === academyId);
 
   return (
-    <div className="public-page profile-page" style={{ padding: 0, margin: 0, gap: 0 }}>
+    <div style={{ width: '100%', margin: 0, padding: 0 }}>
       {/* Header */}
       <section className="profile-header" style={{ 
-        paddingBottom: '24px', paddingTop: '28px', paddingLeft: 'clamp(1.5rem, 4vw, 4rem)', paddingRight: 'clamp(1.5rem, 4vw, 4rem)', 
+        paddingBottom: '24px', paddingTop: '24px', paddingLeft: 'clamp(1.5rem, 4vw, 4rem)', paddingRight: 'clamp(1.5rem, 4vw, 4rem)', 
         position: 'relative', overflow: 'hidden',
-        width: '100vw', marginLeft: 'calc(-50vw + 50%)',
+        width: '100%',
+        margin: 0,
         borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
       }}>
         {/* Jiu-jitsu background image - full cover */}
