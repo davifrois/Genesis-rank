@@ -255,7 +255,10 @@ const EventDetails = () => {
   }, [activeTab, eventId]);
 
   const eventAthletes = useMemo(() => {
-    const storeAthletes = (athletes || []).filter(a => String(a.eventId) === String(eventId));
+    const storeAthletes = (athletes || []).filter(a => String(a.eventId) === String(eventId)).map(a => ({
+      ...a,
+      status: a.status || 'PAYMENT_CONFIRMED'
+    }));
     
     const pendingAthletes = publicRegistrations.map(r => {
       const p = r.payload || r;
@@ -271,7 +274,7 @@ const EventDetails = () => {
         categoria: p.categoria,
         modalidade: p.modalidade,
         genero: p.genero,
-        status: p.status || 'pending_sync'
+        status: p.status || r.status || 'PAYMENT_CONFIRMED'
       };
     }).filter(a => String(a.eventId) === String(eventId));
 
@@ -818,7 +821,7 @@ const EventDetails = () => {
     const birthYear = fullProfile?.birthDate ? new Date(fullProfile.birthDate).getFullYear() : (age ? new Date().getFullYear() - age : '2014');
     const ageText = age ? `${age} ${copy.yearsOld}` : `11 ${copy.yearsOld}`;
 
-    const rawStatus = athlete.status || REGISTRATION_STATUS.PENDING;
+    const rawStatus = athlete.status || REGISTRATION_STATUS.PAYMENT_CONFIRMED;
     const regStatus = normalizeRegistrationStatus(rawStatus);
 
     let statusColor = '#22c55e';

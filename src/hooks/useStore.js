@@ -365,6 +365,7 @@ const normalizeAthlete = (athlete) => {
     const photoUrl = normalizeOptionalUrl(source.photoUrl || source.fotoUrl || source.avatarUrl || source.foto || '');
     const country = normalizeTextTrimmed(source.country || source.pais || source.nacionalidade || '');
     const countryCode = normalizeTextTrimmed(source.countryCode || source.paisCode || '');
+    const status = source.status || source.paymentStatus || 'PAYMENT_CONFIRMED';
 
     return {
         ...source,
@@ -378,6 +379,7 @@ const normalizeAthlete = (athlete) => {
         photoUrl,
         country,
         countryCode,
+        status,
         historico: history,
         pontos,
         isNoGi,
