@@ -1,0 +1,344 @@
+/* ==========================================================================
+   EVENTS PAGE — SMOOTHCOMP MOBILE & DESKTOP PROPORTIONS (IMAGES 3 & 4)
+   ========================================================================== */
+
+.sc-events-page {
+  min-height: 100vh;
+  background-color: #0d1017;
+  color: #e4e4e7;
+  font-family: var(--font-body, "Inter", sans-serif);
+}
+
+/* ─── Top Filter Header Banner ─── */
+.sc-events-header-wrap {
+  position: relative;
+  margin: 0;
+  overflow: hidden;
+  background-color: #090c13;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sc-events-header-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 55%;
+  filter: brightness(0.25) saturate(0.85);
+  z-index: 0;
+}
+
+.sc-events-header-inner {
+  position: relative;
+  z-index: 2;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 16px 20px 16px;
+}
+
+/* ─── 1. Pill Switcher (Próximos / Passados / Meus Eventos) ─── */
+.sc-events-pills {
+  display: flex;
+  background: #141923;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  padding: 3px;
+  max-width: 480px;
+  width: 100%;
+  margin: 0 auto 16px auto;
+}
+
+.sc-events-pill-btn {
+  flex: 1;
+  background: transparent;
+  color: #94a3b8;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.sc-events-pill-btn.active {
+  background: #ffffff;
+  color: #05070b;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* ─── 2. Top Action Buttons (Image 3) ─── */
+.sc-events-action-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.sc-events-btn-cyan {
+  background: #00c2cb;
+  color: #05070b;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.sc-events-btn-cyan:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.sc-events-btn-outline {
+  background: transparent;
+  border: 1.5px solid #00c2cb;
+  color: #00c2cb;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 6.5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.sc-events-btn-outline:hover {
+  background: rgba(0, 194, 203, 0.1);
+}
+
+/* ─── 3. Search & Filter Inputs (Image 3) ─── */
+.sc-events-filters-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sc-events-input,
+.sc-events-select {
+  background: #ffffff !important;
+  color: #18181b !important;
+  border: none !important;
+  padding: 10px 14px !important;
+  border-radius: 6px !important;
+  font-size: 0.85rem !important;
+  font-weight: 500 !important;
+  outline: none !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.sc-events-input::placeholder {
+  color: #71717a !important;
+}
+
+.sc-events-select {
+  appearance: none !important;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 12px center !important;
+  background-size: 16px !important;
+  padding-right: 32px !important;
+}
+
+.sc-events-date-row {
+  display: flex;
+  gap: 8px;
+}
+
+.sc-events-date-row > * {
+  flex: 1;
+}
+
+/* Desktop Filters Layout */
+@media (min-width: 768px) {
+  .sc-events-filters-form {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 10px;
+  }
+  .sc-events-input-search {
+    grid-column: span 4;
+  }
+  .sc-events-select-cat {
+    grid-column: span 2;
+  }
+  .sc-events-date-from {
+    grid-column: span 1;
+  }
+  .sc-events-date-to {
+    grid-column: span 1;
+  }
+  .sc-events-select-game {
+    grid-column: span 2;
+  }
+  .sc-events-select-country {
+    grid-column: span 2;
+  }
+  .sc-events-select-season {
+    grid-column: span 2;
+  }
+}
+
+/* ─── 4. Main Event List Content ─── */
+.sc-events-main-content {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 16px 60px 16px;
+}
+
+.sc-events-title-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.sc-events-section-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #ffffff;
+  margin: 0;
+  letter-spacing: -0.2px;
+}
+
+.sc-events-sort-select {
+  background: #ffffff;
+  border: none;
+  padding: 7px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #18181b;
+  outline: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2318181b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 14px;
+  padding-right: 26px;
+  cursor: pointer;
+}
+
+/* ─── 5. Event Cards Grid (2-Columns on Mobile - Image 4) ─── */
+.sc-events-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+@media (min-width: 640px) {
+  .sc-events-grid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .sc-events-grid {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 20px;
+  }
+}
+
+/* ─── 6. Event Card Item (White Background Smoothcomp Style - Image 4) ─── */
+.sc-event-card-item {
+  background: #ffffff;
+  border-radius: 8px;
+  overflow: hidden;
+  text-decoration: none;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border: none;
+  cursor: pointer;
+}
+
+.sc-event-card-item:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.sc-event-card-poster {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.sc-event-card-poster img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.sc-event-card-body {
+  padding: 10px 10px 12px 10px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  background: #ffffff;
+}
+
+.sc-event-card-title {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #111827;
+  line-height: 1.25;
+  margin: 0 0 6px 0;
+  text-transform: uppercase;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  height: 32px;
+}
+
+.sc-event-card-location {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  color: #4b5563;
+  font-weight: 600;
+  margin-bottom: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sc-event-card-footer {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.sc-event-card-date {
+  font-size: 0.74rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.sc-event-card-countdown {
+  font-size: 0.7rem;
+  color: #9ca3af;
+  margin-top: 2px;
+}
