@@ -880,16 +880,20 @@ const EventDetails = () => {
 
     let statusColor = '#22c55e';
     let StatusIcon = CheckCircle2;
+    let statusText = 'Inscrito';
 
     if (regStatus === REGISTRATION_STATUS.PAYMENT_CONFIRMED) {
       statusColor = '#22c55e';
       StatusIcon = CheckCircle2;
+      statusText = 'Inscrito';
     } else if (regStatus === REGISTRATION_STATUS.PAYMENT_ERROR) {
       statusColor = '#ef4444';
       StatusIcon = XCircle;
+      statusText = 'Inscrição rejeitada';
     } else {
       statusColor = '#f59e0b';
       StatusIcon = Clock;
+      statusText = 'Inscrição pendente';
     }
 
     return (
@@ -957,9 +961,9 @@ const EventDetails = () => {
       <td style={{ padding: '12px 16px', verticalAlign: 'middle', textAlign: 'right' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
           <StatusIcon size={16} style={{ color: statusColor, flexShrink: 0 }} />
-          <a href="#" onClick={(e) => e.preventDefault()} style={{ color: statusColor, fontSize: '0.85rem', textDecoration: 'none', fontWeight: 500 }}>
-            {copy.publicEventCard}
-          </a>
+          <span style={{ color: statusColor, fontSize: '0.85rem', fontWeight: 600 }}>
+            {statusText}
+          </span>
         </div>
       </td>
     </tr>
