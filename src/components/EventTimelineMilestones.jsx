@@ -75,10 +75,10 @@ export default function EventTimelineMilestones({ event }) {
           <h4>Linha do Tempo Oficial do Evento</h4>
         </div>
         <span className="etm-badge-active">
-          {activeStep === 1 && '🟢 Inscrições em Andamento'}
-          {activeStep === 2 && '🟡 Período de Checagem Geral'}
-          {activeStep === 3 && '🔵 Chaves & Cronograma Publicados'}
-          {activeStep === 4 && '🔴 Dia do Evento'}
+          {activeStep === 1 && <><span className="etm-dot etm-dot--green" />Inscrições em Andamento</>}
+          {activeStep === 2 && <><span className="etm-dot etm-dot--yellow" />Período de Checagem Geral</>}
+          {activeStep === 3 && <><span className="etm-dot etm-dot--blue" />Chaves &amp; Cronograma Publicados</>}
+          {activeStep === 4 && <><span className="etm-dot etm-dot--red" />Dia do Evento</>}
         </span>
       </div>
 

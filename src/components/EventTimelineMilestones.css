@@ -34,13 +34,46 @@
 }
 
 .etm-badge-active {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 700;
-  color: #00c2cb;
-  background: rgba(0, 194, 203, 0.1);
-  border: 1px solid rgba(0, 194, 203, 0.25);
-  padding: 4px 12px;
+  color: #60a5fa;
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  padding: 5px 14px;
   border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  letter-spacing: 0.02em;
+}
+
+/* Status dot indicators */
+.etm-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.etm-dot--green {
+  background: #22c55e;
+  box-shadow: 0 0 5px rgba(34, 197, 94, 0.7);
+}
+
+.etm-dot--yellow {
+  background: #eab308;
+  box-shadow: 0 0 5px rgba(234, 179, 8, 0.7);
+}
+
+.etm-dot--blue {
+  background: #3b82f6;
+  box-shadow: 0 0 5px rgba(59, 130, 246, 0.7);
+}
+
+.etm-dot--red {
+  background: #ef4444;
+  box-shadow: 0 0 5px rgba(239, 68, 68, 0.7);
 }
 
 /* Steps Grid */
