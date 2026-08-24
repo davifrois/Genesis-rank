@@ -267,76 +267,63 @@ const AtletaRow = ({ atleta, selecionado, onToggle, onCategoria, onCheckin, valo
       className={`gt-athlete-card ${selecionado ? 'selected' : ''}`}
     >
       <div className="gt-athlete-row">
-        {/* Mobile Top Row: Checkbox, Name, Info & Status */}
-        <div className="gt-athlete-mobile-top">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
-            <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-              <input
-                type="checkbox"
-                checked={selecionado}
-                onChange={onToggle}
-                style={{ display: 'none' }}
-                disabled={temCheckin || (window.isRegistrationClosed)} 
-              />
-              <div style={{
-                width: '22px', height: '22px', borderRadius: '6px',
-                border: selecionado ? '2px solid #00c2cb' : '2px solid #555',
-                background: selecionado ? '#00c2cb' : 'rgba(0,0,0,0.2)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                transition: 'all 0.2s',
-                opacity: temCheckin ? 0.5 : 1
-              }}>
-                {selecionado && <Check size={14} color="#000" strokeWidth={3} />}
-              </div>
-            </label>
-
-            <div className="gt-athlete-info">
-              <div className="gt-athlete-name">{atleta.nome}</div>
-              <div className="gt-athlete-tags">
-                {atleta.idade ? <span className="gt-athlete-tag">{atleta.idade} anos</span> : null}
-                {atleta.graduacao ? <span className="gt-athlete-tag">Faixa {atleta.graduacao}</span> : null}
-              </div>
+        {/* Coluna 1: Checkbox + Nome + Tags */}
+        <div className="gt-athlete-col-main">
+          <label className="gt-checkbox-label">
+            <input
+              type="checkbox"
+              checked={selecionado}
+              onChange={onToggle}
+              style={{ display: 'none' }}
+              disabled={temCheckin || (window.isRegistrationClosed)} 
+            />
+            <div className={`gt-custom-checkbox ${selecionado ? 'checked' : ''} ${temCheckin ? 'disabled' : ''}`}>
+              {selecionado && <Check size={14} color="#000" strokeWidth={3} />}
             </div>
-          </div>
+          </label>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-            {!selecionado ? (
-              <span style={{ color: '#475569', fontSize: '13px', fontWeight: '500' }}>—</span>
-            ) : !temCategoria ? (
-              <span className="gt-status-badge gt-status-badge--pendente">PENDENTE</span>
-            ) : temCheckin ? (
-              <span className="gt-status-badge gt-status-badge--enviado">ENVIADO</span>
-            ) : (
-              <span className="gt-status-badge gt-status-badge--pronto">PRONTO</span>
-            )}
-
-            {selecionado && !temCheckin && (
-              <button
-                onClick={() => setExpandido(!expandido)}
-                style={{
-                  background: expandido ? 'var(--brand-primary, #00c2cb)' : 'rgba(255,255,255,0.06)',
-                  border: 'none', cursor: 'pointer',
-                  color: expandido ? '#000' : '#aaa',
-                  borderRadius: '8px', padding: '6px',
-                  display: 'flex', alignItems: 'center',
-                  transition: 'all 0.2s',
-                }}
-              >
-                {expandido ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-              </button>
-            )}
+          <div className="gt-athlete-info">
+            <div className="gt-athlete-name">{atleta.nome}</div>
+            <div className="gt-athlete-tags">
+              {atleta.idade ? <span className="gt-athlete-tag">{atleta.idade} anos</span> : null}
+              {atleta.graduacao ? <span className="gt-athlete-tag">Faixa {atleta.graduacao}</span> : null}
+            </div>
           </div>
         </div>
 
-        {/* Mobile Bottom / Desktop Middle: Category & Price */}
-        <div className="gt-athlete-mobile-bottom">
-          <div className="gt-category-badge" title={categoriaStr}>
+        {/* Coluna 2: Categoria Selecionada */}
+        <div className="gt-athlete-col-category">
+          <div className={`gt-category-badge ${!temCategoria && selecionado ? 'gt-category-badge--warning' : ''}`} title={categoriaStr}>
             {categoriaStr}
           </div>
+        </div>
 
+        {/* Coluna 3: Preço + Status + Botão de Ação */}
+        <div className="gt-athlete-col-actions">
           <div className="gt-athlete-price">
             {formatBRL(atleta.valor)}
           </div>
+
+          {!selecionado ? (
+            <span className="gt-status-badge gt-status-badge--inactive">—</span>
+          ) : !temCategoria ? (
+            <span className="gt-status-badge gt-status-badge--pendente">PENDENTE</span>
+          ) : temCheckin ? (
+            <span className="gt-status-badge gt-status-badge--enviado">ENVIADO</span>
+          ) : (
+            <span className="gt-status-badge gt-status-badge--pronto">PRONTO</span>
+          )}
+
+          {selecionado && !temCheckin && (
+            <button
+              onClick={() => setExpandido(!expandido)}
+              className={`gt-expand-btn ${expandido ? 'expanded' : ''}`}
+              title={expandido ? 'Recolher categoria' : 'Editar categoria'}
+              type="button"
+            >
+              {expandido ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+          )}
         </div>
       </div>
 
