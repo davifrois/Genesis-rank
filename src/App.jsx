@@ -52,6 +52,8 @@ import ScoreboardDisplay from './pages/ScoreboardDisplay';
 import PaymentSuccess from './pages/PaymentSuccess';
 import PaymentPending from './pages/PaymentPending';
 import PaymentCancel from './pages/PaymentCancel';
+import WeightCalculatorPage from './pages/WeightCalculatorPage';
+import MyRegistrationPage from './pages/MyRegistrationPage';
 import { useStore } from './hooks/useStore';
 import { useI18n } from './hooks/useI18n';
 import LoginOverlay from './components/LoginOverlay';
@@ -821,6 +823,8 @@ const AppLayout = () => {
   ), [isEnglish, isSpanish, isFrench]);
 
   const utilityLinks = useMemo(() => ([
+    { label: 'Minha Inscrição', path: '/minha-inscricao' },
+    { label: 'Simulador de Peso', path: '/calculadora-peso' },
     { label: copy.utilityLinks.about, path: '/institucional' },
     { label: copy.utilityLinks.organizers, path: '/organizadores' }
   ]), [copy.utilityLinks.about, copy.utilityLinks.organizers]);
@@ -1675,6 +1679,8 @@ const AppLayout = () => {
                 <Route path="/minha-conta" element={<MyAccount />} />
                 <Route path="/configuracoes" element={<SettingsPage />} />
                 <Route path="/regulamento" element={<Regulations />} />
+                <Route path="/calculadora-peso" element={<WeightCalculatorPage />} />
+                <Route path="/minha-inscricao" element={<MyRegistrationPage />} />
                 <Route path="/noticias" element={<News />} />
                 <Route path="/payment/success" element={<PaymentSuccess />} />
                 <Route path="/payment/cancel" element={<PaymentCancel />} />

@@ -16,6 +16,8 @@ import BracketTree, { buildRounds } from '../components/BracketTree';
 import ChaveamentoBracket from '../components/ChaveamentoBracket';
 import { publicRegistrationService } from '../services/publicRegistrationService';
 import { translateBelt, translateCategory, translateWeight, translateCompositeLabel } from '../utils/localeLabels';
+import EventTimelineMilestones from '../components/EventTimelineMilestones';
+import WeightCategoryCalculator from '../components/WeightCategoryCalculator';
 import './EventDetails.css';
 
 const renderFormattedDescription = (text) => {
@@ -361,6 +363,7 @@ const EventDetails = () => {
   const [showFullBracket, setShowFullBracket] = useState(false);
   
   const [showSuperFightApplication, setShowSuperFightApplication] = useState(false);
+  const [showCalculator, setShowCalculator] = useState(false);
   const [superFightForm, setSuperFightForm] = useState({ name: '', belt: 'Branca', weight: '', academy: '', instagram: '', titles: '' });
 
   const toggleCategory = (catLabel) => {
@@ -634,6 +637,64 @@ const EventDetails = () => {
                 </div>
               </div>
             </div>
+
+            {/* Linha do Tempo de Prazos Críticos do Evento */}
+            <EventTimelineMilestones event={event} />
+
+            {/* Card Simulador de Categoria & Peso */}
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(0, 194, 203, 0.1), rgba(3, 56, 110, 0.25))',
+              border: '1px solid rgba(0, 194, 203, 0.3)',
+              borderRadius: '16px',
+              padding: '16px 20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '14px',
+              margin: '0 0 28px 0',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: '240px' }}>
+                <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'rgba(0, 194, 203, 0.2)', border: '1px solid rgba(0, 194, 203, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Scale size={22} color="#00c2cb" />
+                </div>
+                <div>
+                  <div style={{ fontWeight: '800', fontSize: '1rem', color: '#fff' }}>Dúvida sobre sua Categoria ou Limite de Peso?</div>
+                  <div style={{ fontSize: '0.82rem', color: '#94a3b8', marginTop: '2px' }}>Descubra sua faixa etária, divisão e limite exato na balança em segundos.</div>
+                </div>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setShowCalculator(true)}
+                style={{
+                  padding: '10px 18px',
+                  background: '#00c2cb',
+                  border: 'none',
+                  borderRadius: '10px',
+                  color: '#000',
+                  fontWeight: '800',
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.2s',
+                  boxShadow: '0 4px 15px rgba(0,194,203,0.3)'
+                }}
+              >
+                <span>Simular Categoria</span>
+                <ChevronRight size={16} />
+              </button>
+            </div>
+
+            {/* Modal da Calculadora */}
+            {showCalculator && (
+              <WeightCategoryCalculator 
+                isOpen={showCalculator} 
+                onClose={() => setShowCalculator(false)} 
+              />
+            )}
 
             {/* Wrapper: content + sidebar */}
             <div className="sc-info-body">

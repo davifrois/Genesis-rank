@@ -1,0 +1,171 @@
+/* Event Timeline Milestones - Genesis Sports */
+.etm-card {
+  background: rgba(18, 22, 31, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 20px 24px;
+  margin: 20px 0 28px 0;
+  backdrop-filter: blur(10px);
+}
+
+.etm-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.etm-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.etm-title-wrap h4 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.01em;
+}
+
+.etm-badge-active {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #00c2cb;
+  background: rgba(0, 194, 203, 0.1);
+  border: 1px solid rgba(0, 194, 203, 0.25);
+  padding: 4px 12px;
+  border-radius: 20px;
+}
+
+/* Steps Grid */
+.etm-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  position: relative;
+}
+
+@media (max-width: 768px) {
+  .etm-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
+.etm-step {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+}
+
+.etm-step-top {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.etm-step-indicator {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  color: #94a3b8;
+  font-size: 0.85rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  transition: all 0.2s;
+}
+
+.etm-step-line {
+  position: absolute;
+  left: 32px;
+  right: -8px;
+  top: 50%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateY(-50%);
+  z-index: 1;
+}
+
+@media (max-width: 768px) {
+  .etm-step-line {
+    display: none;
+  }
+}
+
+/* Current Step */
+.etm-step--current .etm-step-indicator {
+  background: #00c2cb;
+  border-color: #00c2cb;
+  color: #000;
+  box-shadow: 0 0 16px rgba(0, 194, 203, 0.6);
+}
+
+.etm-step--current .etm-step-title {
+  color: #00c2cb !important;
+  font-weight: 800 !important;
+}
+
+/* Completed Step */
+.etm-step--completed .etm-step-indicator {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: #10b981;
+}
+
+.etm-step--completed .etm-step-line {
+  background: #10b981;
+}
+
+/* Content */
+.etm-step-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.etm-step-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.etm-step-icon {
+  color: #64748b;
+}
+
+.etm-step--current .etm-step-icon {
+  color: #00c2cb;
+}
+
+.etm-step--completed .etm-step-icon {
+  color: #10b981;
+}
+
+.etm-step-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.etm-step-subtitle {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.etm-step-desc {
+  font-size: 0.75rem;
+  color: #64748b;
+  line-height: 1.3;
+}

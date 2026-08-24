@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useI18n } from '../hooks/useI18n';
 import './Regulations.css';
+import WeightCategoryCalculator from '../components/WeightCategoryCalculator';
 import scoreQueda from '../assets/score_queda.png';
 import scorePassagem from '../assets/score_passagem.png';
 import scoreMontada from '../assets/score_montada.png';
@@ -459,6 +460,10 @@ const Regulations = () => {
           <section className="regulamento-weight-section" id="tabela-peso">
             <div id="tabela-peso-infantil" className="regulations-anchor" />
             <div id="tabela-peso-juvenil-adulto" className="regulations-anchor" />
+
+            <div style={{ marginBottom: '32px' }}>
+              <WeightCategoryCalculator />
+            </div>
 
             <div className="section-heading">
               <div>
