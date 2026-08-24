@@ -1,4 +1,4 @@
-// Vercel Serverless Function: Check Payment Status
+// Vercel Serverless Function: Check Payment Status (Secure)
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -22,19 +22,22 @@ export default async function handler(req, res) {
   if (!paymentId && req.url) {
     const parts = req.url.split('?')[0].split('/');
     const lastPart = parts[parts.length - 1];
-    if (lastPart && lastPart !== 'status' && !isNaN(lastPart)) {
+    if (lastPart && lastPart !== 'status') {
       paymentId = lastPart;
     }
   }
 
-  if (!paymentId) {
-    return res.status(400).json({ error: 'paymentId é obrigatório' });
+  // Sanitização de paymentId (apenas caracteres numéricos ou UUID padrão alfanumérico)
+  const sanitizedPaymentId = (paymentId || '').toString().replace(/[^a-zA-Z0-9_\-]/g, '').trim();
+
+  if (!sanitizedPaymentId) {
+    return res.status(400).json({ error: 'paymentId válido é obrigatório' });
   }
 
   const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN || 'APP_USR-5076214841905920-081112-768e0648179ce52ceb48a90a14882388-1214160384';
 
   try {
-    const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+    const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${sanitizedPaymentId}`, {
       headers: {
         'Authorization': `Bearer ${accessToken}`
       }
