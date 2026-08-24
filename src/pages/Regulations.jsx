@@ -425,30 +425,9 @@ const Regulations = () => {
               <h1 style={{ fontSize: '2.5rem', fontWeight: '900', letterSpacing: '-0.02em', margin: '0 0 12px 0', color: '#ffffff' }}>
                 {copy.title}
               </h1>
-              <p style={{ fontSize: '1.05rem', color: '#94a3b8', margin: '0 auto 28px auto', maxWidth: '640px', lineHeight: 1.5 }}>
+              <p style={{ fontSize: '1.05rem', color: '#94a3b8', margin: '0 auto', maxWidth: '640px', lineHeight: 1.5 }}>
                 {copy.description}
               </p>
-
-              <label className="regulations-search" htmlFor="regulations-search" style={{ margin: '0 auto', maxWidth: '680px' }}>
-                <span className="regulations-search__icon" aria-hidden="true">
-                  <Search size={18} />
-                </span>
-                <input
-                  id="regulations-search"
-                  type="search"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Buscar peso, regras, penalidades..."
-                />
-              </label>
-
-              {normalizedQuery ? (
-                <div className="regulations-search__meta" style={{ marginTop: '12px', justifyContent: 'center' }}>
-                  <strong>
-                    {copy.resultsLabel}: {searchResultCount}
-                  </strong>
-                </div>
-              ) : null}
             </div>
           </section>
 
