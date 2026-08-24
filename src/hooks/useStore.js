@@ -1559,9 +1559,11 @@ const useStoreState = (loadedState) => {
             isPremium: Boolean(event?.isPremium),
             registrationCloseDate: typeof event?.registrationCloseDate === 'string' ? event.registrationCloseDate.trim() : event?.registrationCloseDate || '',
             checkinEndDate: typeof event?.checkinEndDate === 'string' ? event.checkinEndDate.trim() : event?.checkinEndDate || '',
+            organizerName: (event?.organizerName || '').toString().trim() || null,
             eventSocialWebsite: (event?.eventSocialWebsite || '').toString().trim() || null,
             eventSocialWhatsapp: (event?.eventSocialWhatsapp || '').toString().trim() || null,
             eventSocialInstagram: (event?.eventSocialInstagram || '').toString().trim() || null,
+            eventSocialEmail: (event?.eventSocialEmail || event?.supportEmail || event?.organizerEmail || '').toString().trim() || null,
             prizesDescription: (event?.prizesDescription || '').toString().trim() || null,
             liabilityWaiver: (event?.liabilityWaiver || '').toString().trim() || null,
             mapIframeUrl: (event?.mapIframeUrl || '').toString().trim() || null,
@@ -1792,9 +1794,11 @@ const useStoreState = (loadedState) => {
             checkinEndDate: typeof updates?.checkinEndDate === 'string'
                 ? updates.checkinEndDate.trim()
                 : updates?.checkinEndDate ?? current.checkinEndDate ?? '',
+            organizerName: (updates?.organizerName ?? current.organizerName ?? '').toString().trim() || null,
             eventSocialWebsite: (updates?.eventSocialWebsite ?? current.eventSocialWebsite ?? '').toString().trim() || null,
             eventSocialWhatsapp: (updates?.eventSocialWhatsapp ?? current.eventSocialWhatsapp ?? '').toString().trim() || null,
             eventSocialInstagram: (updates?.eventSocialInstagram ?? current.eventSocialInstagram ?? '').toString().trim() || null,
+            eventSocialEmail: (updates?.eventSocialEmail ?? updates?.supportEmail ?? updates?.organizerEmail ?? current.eventSocialEmail ?? current.supportEmail ?? current.organizerEmail ?? '').toString().trim() || null,
             prizesDescription: (updates?.prizesDescription ?? current.prizesDescription ?? '').toString().trim() || null,
             liabilityWaiver: (updates?.liabilityWaiver ?? current.liabilityWaiver ?? '').toString().trim() || null,
             mapIframeUrl: (updates?.mapIframeUrl ?? current.mapIframeUrl ?? '').toString().trim() || null,

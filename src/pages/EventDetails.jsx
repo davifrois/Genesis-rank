@@ -423,39 +423,63 @@ const EventDetails = () => {
         </div>
       </div>
 
-      {/* Contato */}
+      {/* Contato dos Organizadores */}
       <div className="sc-sidebar-card">
-        <div className="sc-sidebar-card__header">Contato</div>
+        <div className="sc-sidebar-card__header">Contato da Organização</div>
         <div className="sc-sidebar-card__body sc-sidebar-card__body--links">
+          {event.organizerName && (
+            <div style={{ padding: '8px 12px', background: 'rgba(255, 255, 255, 0.03)', borderRadius: '6px', fontSize: '0.85rem', color: '#e2e8f0', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+              <span style={{ color: '#94a3b8', fontSize: '0.75rem', display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Organização</span>
+              <strong style={{ color: 'var(--brand-primary, #00c2cb)' }}>{event.organizerName}</strong>
+            </div>
+          )}
           {event.eventSocialWebsite && (
-            <a href={event.eventSocialWebsite} target="_blank" rel="noreferrer" className="sc-contact-link">
+            <a 
+              href={event.eventSocialWebsite.startsWith('http') ? event.eventSocialWebsite : `https://${event.eventSocialWebsite}`} 
+              target="_blank" 
+              rel="noreferrer" 
+              className="sc-contact-link"
+            >
               <Globe size={16} />
-              <span>Event website</span>
+              <span>Site Oficial</span>
               <ChevronRight size={14} style={{ marginLeft: 'auto', color: '#71717a' }} />
             </a>
           )}
           {event.eventSocialInstagram && (
-            <a href={`https://instagram.com/${event.eventSocialInstagram.replace('@', '')}`} target="_blank" rel="noreferrer" className="sc-contact-link">
+            <a 
+              href={event.eventSocialInstagram.startsWith('http') ? event.eventSocialInstagram : `https://instagram.com/${event.eventSocialInstagram.replace('@', '').trim()}`} 
+              target="_blank" 
+              rel="noreferrer" 
+              className="sc-contact-link"
+            >
               <Instagram size={16} />
               <span>Instagram</span>
               <ChevronRight size={14} style={{ marginLeft: 'auto', color: '#71717a' }} />
             </a>
           )}
           {event.eventSocialWhatsapp && (
-            <a href={`https://wa.me/${event.eventSocialWhatsapp.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="sc-contact-link">
+            <a 
+              href={`https://wa.me/${(() => {
+                const d = (event.eventSocialWhatsapp || '').replace(/\D/g, '');
+                return d.length <= 11 && !d.startsWith('55') ? `55${d}` : d;
+              })()}`} 
+              target="_blank" 
+              rel="noreferrer" 
+              className="sc-contact-link"
+            >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/><path d="M14.05 2a9 9 0 0 1 8 7.94"/><path d="M14.05 6A5 5 0 0 1 18 10"/></svg>
-              <span>WhatsApp</span>
+              <span>WhatsApp Suporte</span>
               <ChevronRight size={14} style={{ marginLeft: 'auto', color: '#71717a' }} />
             </a>
           )}
           {(event.eventSocialEmail || event.supportEmail || event.organizerEmail) && (
             <a href={`mailto:${event.eventSocialEmail || event.supportEmail || event.organizerEmail}`} className="sc-contact-link">
               <Mail size={16} />
-              <span>Email</span>
+              <span>Email de Contato</span>
               <ChevronRight size={14} style={{ marginLeft: 'auto', color: '#71717a' }} />
             </a>
           )}
-          {!event.eventSocialWebsite && !event.eventSocialWhatsapp && !event.eventSocialInstagram && !event.eventSocialEmail && !event.supportEmail && !event.organizerEmail && (
+          {!event.organizerName && !event.eventSocialWebsite && !event.eventSocialWhatsapp && !event.eventSocialInstagram && !event.eventSocialEmail && !event.supportEmail && !event.organizerEmail && (
             <span style={{ color: '#71717a', fontSize: '0.875rem' }}>Sem contato cadastrado</span>
           )}
         </div>
@@ -646,6 +670,12 @@ const EventDetails = () => {
             <div className="sc-info-body">
               <div className="sc-info-main-col">
                 <h1 className="sc-info-main-title">{event.name}</h1>
+                {event.organizerName && (
+                  <div style={{ color: 'var(--brand-primary, #00c2cb)', fontWeight: 700, fontSize: '0.95rem', marginTop: '-8px', marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ color: '#94a3b8' }}>Organização:</span>
+                    <span>{event.organizerName}</span>
+                  </div>
+                )}
                 {event.eventDescription && (
                   <div className="sc-info-block sc-description-block">
                     {renderFormattedDescription(event.eventDescription)}

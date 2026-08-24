@@ -81,7 +81,14 @@ const createEventFormState = () => ({
   checkinEndDate: '',
   location: '',
   isPremium: false,
+  organizerName: '',
   eventDescription: '',
+  eventSocialWebsite: '',
+  eventSocialWhatsapp: '',
+  eventSocialInstagram: '',
+  eventSocialEmail: '',
+  prizesDescription: '',
+  mapIframeUrl: '',
   posterUrl: '',
   posterPositionY: 50,
   registrationUrl: '',
@@ -1863,6 +1870,89 @@ const AppLayout = () => {
                           <label className="table-meta" style={{ fontSize: '14px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>DESCRIÇÃO COMPLETA DO EVENTO</label>
                           <span style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '8px' }}>Detalhes gerais: horário de portões, regras oficiais da federação, premiações e orientações aos professores.</span>
                           <textarea className="input" rows="4" value={eventForm.eventDescription} onChange={e => setEventForm({ ...eventForm, eventDescription: e.target.value })} placeholder="Ex: Regras da IBJJF, premiações especiais em dinheiro, etc..." style={{ fontSize: '16px', padding: '16px 20px', resize: 'vertical' }}></textarea>
+                        </div>
+
+                        {/* CONTATO DOS ORGANIZADORES & REDES SOCIAIS */}
+                        <div style={{
+                          background: 'rgba(255, 255, 255, 0.02)',
+                          border: '1px solid rgba(255, 255, 255, 0.08)',
+                          borderRadius: '16px',
+                          padding: '24px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '20px'
+                        }}>
+                          <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--brand-primary, #00c2cb)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span>📞</span> CONTATOS DOS ORGANIZADORES &amp; REDES SOCIAIS
+                          </div>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                            <div>
+                              <label className="table-meta" style={{ fontSize: '13px', fontWeight: 700, marginBottom: '6px', display: 'block', color: '#94a3b8' }}>
+                                ORGANIZADOR / FEDERAÇÃO (Opcional)
+                              </label>
+                              <input
+                                className="input"
+                                type="text"
+                                value={eventForm.organizerName || ''}
+                                onChange={e => setEventForm({ ...eventForm, organizerName: e.target.value })}
+                                placeholder="Ex: Federação Genesis / Pacific BJJ"
+                                style={{ fontSize: '15px' }}
+                              />
+                            </div>
+                            <div>
+                              <label className="table-meta" style={{ fontSize: '13px', fontWeight: 700, marginBottom: '6px', display: 'block', color: '#94a3b8' }}>
+                                WHATSAPP DE SUPORTE (Opcional)
+                              </label>
+                              <input
+                                className="input"
+                                type="text"
+                                value={eventForm.eventSocialWhatsapp || ''}
+                                onChange={e => setEventForm({ ...eventForm, eventSocialWhatsapp: e.target.value })}
+                                placeholder="Ex: 31980164389"
+                                style={{ fontSize: '15px' }}
+                              />
+                            </div>
+                            <div>
+                              <label className="table-meta" style={{ fontSize: '13px', fontWeight: 700, marginBottom: '6px', display: 'block', color: '#94a3b8' }}>
+                                INSTAGRAM OFICIAL (Opcional)
+                              </label>
+                              <input
+                                className="input"
+                                type="text"
+                                value={eventForm.eventSocialInstagram || ''}
+                                onChange={e => setEventForm({ ...eventForm, eventSocialInstagram: e.target.value })}
+                                placeholder="Ex: @pacificfederationbjjbr ou link"
+                                style={{ fontSize: '15px' }}
+                              />
+                            </div>
+                            <div>
+                              <label className="table-meta" style={{ fontSize: '13px', fontWeight: 700, marginBottom: '6px', display: 'block', color: '#94a3b8' }}>
+                                E-MAIL DE SUPORTE (Opcional)
+                              </label>
+                              <input
+                                className="input"
+                                type="email"
+                                value={eventForm.eventSocialEmail || ''}
+                                onChange={e => setEventForm({ ...eventForm, eventSocialEmail: e.target.value })}
+                                placeholder="contato@organizacao.com.br"
+                                style={{ fontSize: '15px' }}
+                              />
+                            </div>
+                            <div style={{ gridColumn: '1 / -1' }}>
+                              <label className="table-meta" style={{ fontSize: '13px', fontWeight: 700, marginBottom: '6px', display: 'block', color: '#94a3b8' }}>
+                                WEBSITE OFICIAL (Opcional)
+                              </label>
+                              <input
+                                className="input"
+                                type="url"
+                                value={eventForm.eventSocialWebsite || ''}
+                                onChange={e => setEventForm({ ...eventForm, eventSocialWebsite: e.target.value })}
+                                placeholder="https://..."
+                                style={{ fontSize: '15px' }}
+                              />
+                            </div>
+                          </div>
                         </div>
                         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${eventForm.accommodationEnabled ? '#00c2cb44' : 'rgba(255,255,255,0.06)'}`, borderRadius: '14px', padding: '24px', marginTop: '10px', transition: 'all 0.2s' }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: eventForm.accommodationEnabled ? '20px' : '0', cursor: 'pointer' }} onClick={() => {

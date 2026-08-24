@@ -392,9 +392,11 @@ const createEventEditFormState = () => ({
     registrationCloseDate: '',
     checkinEndDate: '',
     eventDescription: '',
+    organizerName: '',
     eventSocialWebsite: '',
     eventSocialWhatsapp: '',
     eventSocialInstagram: '',
+    eventSocialEmail: '',
     posterUrl: '',
     posterPositionY: 50,
     registrationUrl: '',
@@ -2692,6 +2694,11 @@ const PainelDeControle = () => {
             posterUrl,
             posterPositionY: eventItem.posterPositionY ?? 50,
             isPremium: eventItem.isPremium === true,
+            organizerName: eventItem.organizerName || '',
+            eventSocialWebsite: eventItem.eventSocialWebsite || '',
+            eventSocialWhatsapp: eventItem.eventSocialWhatsapp || '',
+            eventSocialInstagram: eventItem.eventSocialInstagram || '',
+            eventSocialEmail: eventItem.eventSocialEmail || eventItem.supportEmail || eventItem.organizerEmail || '',
             registrationCloseDate: eventItem.registrationCloseDate || '',
             checkinEndDate: eventItem.checkinEndDate || '',
             pixKey: eventItem.pixKey || DEFAULT_EVENT_PIX_KEY,
@@ -2734,10 +2741,12 @@ const PainelDeControle = () => {
                 checkinEndDate: eventEditForm.checkinEndDate,
                 location: eventEditForm.location,
                 isPremium: eventEditForm.isPremium,
+                organizerName: eventEditForm.organizerName,
                 eventDescription: eventEditForm.eventDescription,
                 eventSocialWebsite: eventEditForm.eventSocialWebsite,
                 eventSocialWhatsapp: eventEditForm.eventSocialWhatsapp,
                 eventSocialInstagram: eventEditForm.eventSocialInstagram,
+                eventSocialEmail: eventEditForm.eventSocialEmail,
                 posterUrl: eventEditForm.posterUrl,
                 registrationUrl: eventEditForm.registrationUrl,
                 weightTableGiUrl: eventEditForm.weightTableGiUrl,
@@ -8659,54 +8668,86 @@ const PainelDeControle = () => {
                                                     ></textarea>
                                                 </div>
 
-                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-                                                    <div>
-                                                        <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>
-                                                            WEBSITE (Opcional)
-                                                        </label>
-                                                        <span style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '8px' }}>
-                                                            Link do site oficial da organização.
-                                                        </span>
-                                                        <input
-                                                            className="input"
-                                                            type="url"
-                                                            value={eventEditForm.eventSocialWebsite || ''}
-                                                            onChange={(event) => setEventEditForm({ ...eventEditForm, eventSocialWebsite: event.target.value })}
-                                                            placeholder="https://..."
-                                                            style={{ fontSize: '15px' }}
-                                                        />
+                                                {/* CONTATO DOS ORGANIZADORES & REDES SOCIAIS */}
+                                                <div style={{
+                                                    background: 'rgba(255, 255, 255, 0.02)',
+                                                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                                                    borderRadius: '14px',
+                                                    padding: '20px',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    gap: '16px'
+                                                }}>
+                                                    <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--brand-primary, #00c2cb)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                        <span>📞</span> CONTATOS DOS ORGANIZADORES &amp; REDES SOCIAIS
                                                     </div>
-                                                    <div>
-                                                        <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>
-                                                            WHATSAPP (Opcional)
-                                                        </label>
-                                                        <span style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '8px' }}>
-                                                            Contato de suporte aos atletas (com DDD).
-                                                        </span>
-                                                        <input
-                                                            className="input"
-                                                            type="text"
-                                                            value={eventEditForm.eventSocialWhatsapp || ''}
-                                                            onChange={(event) => setEventEditForm({ ...eventEditForm, eventSocialWhatsapp: event.target.value })}
-                                                            placeholder="Ex: 11999999999"
-                                                            style={{ fontSize: '15px' }}
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>
-                                                            INSTAGRAM (Opcional)
-                                                        </label>
-                                                        <span style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '8px' }}>
-                                                            Perfil oficial no Instagram.
-                                                        </span>
-                                                        <input
-                                                            className="input"
-                                                            type="url"
-                                                            value={eventEditForm.eventSocialInstagram || ''}
-                                                            onChange={(event) => setEventEditForm({ ...eventEditForm, eventSocialInstagram: event.target.value })}
-                                                            placeholder="https://instagram.com/..."
-                                                            style={{ fontSize: '15px' }}
-                                                        />
+
+                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                                                         <div>
+                                                             <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>
+                                                                 ORGANIZADOR / FEDERAÇÃO (Opcional)
+                                                             </label>
+                                                             <input
+                                                                 className="input"
+                                                                 type="text"
+                                                                 value={eventEditForm.organizerName || ''}
+                                                                 onChange={(event) => setEventEditForm({ ...eventEditForm, organizerName: event.target.value })}
+                                                                 placeholder="Ex: Federação Genesis / Pacific BJJ"
+                                                                 style={{ fontSize: '15px' }}
+                                                             />
+                                                         </div>
+                                                         <div>
+                                                             <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>
+                                                                 WHATSAPP (Opcional)
+                                                             </label>
+                                                             <input
+                                                                 className="input"
+                                                                 type="text"
+                                                                 value={eventEditForm.eventSocialWhatsapp || ''}
+                                                                 onChange={(event) => setEventEditForm({ ...eventEditForm, eventSocialWhatsapp: event.target.value })}
+                                                                 placeholder="Ex: 31980164389"
+                                                                 style={{ fontSize: '15px' }}
+                                                             />
+                                                         </div>
+                                                         <div>
+                                                             <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>
+                                                                 INSTAGRAM (Opcional)
+                                                             </label>
+                                                             <input
+                                                                 className="input"
+                                                                 type="text"
+                                                                 value={eventEditForm.eventSocialInstagram || ''}
+                                                                 onChange={(event) => setEventEditForm({ ...eventEditForm, eventSocialInstagram: event.target.value })}
+                                                                 placeholder="Ex: @pacificfederationbjjbr ou link"
+                                                                 style={{ fontSize: '15px' }}
+                                                             />
+                                                         </div>
+                                                         <div>
+                                                             <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>
+                                                                 E-MAIL DE SUPORTE (Opcional)
+                                                             </label>
+                                                             <input
+                                                                 className="input"
+                                                                 type="email"
+                                                                 value={eventEditForm.eventSocialEmail || ''}
+                                                                 onChange={(event) => setEventEditForm({ ...eventEditForm, eventSocialEmail: event.target.value })}
+                                                                 placeholder="contato@organizacao.com.br"
+                                                                 style={{ fontSize: '15px' }}
+                                                             />
+                                                         </div>
+                                                         <div style={{ gridColumn: '1 / -1' }}>
+                                                             <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>
+                                                                 WEBSITE OFICIAL (Opcional)
+                                                             </label>
+                                                             <input
+                                                                 className="input"
+                                                                 type="url"
+                                                                 value={eventEditForm.eventSocialWebsite || ''}
+                                                                 onChange={(event) => setEventEditForm({ ...eventEditForm, eventSocialWebsite: event.target.value })}
+                                                                 placeholder="https://..."
+                                                                 style={{ fontSize: '15px' }}
+                                                             />
+                                                         </div>
                                                     </div>
                                                 </div>
 
