@@ -16225,79 +16225,125 @@ textarea:focus-visible {
     font-size: 1rem !important;
   }
 
-  /* 3. Event Details Page Fixes */
+  /* 3. Event Details Page Smoothcomp Mobile Alignment */
   .sc-event-page {
-    zoom: 1 !important; /* Overrides desktop 1.2 zoom on mobile screens */
+    zoom: 1 !important;
   }
 
   .sc-hero {
-    flex-direction: column !important;
+    display: flex !important;
+    flex-direction: row !important;
     align-items: center !important;
-    text-align: center !important;
-    padding: 16px 12px !important;
-    gap: 14px !important;
+    justify-content: flex-start !important;
+    text-align: left !important;
+    padding: 10px 14px !important;
+    gap: 12px !important;
+    background: #000000 !important;
+    border-bottom: 1px solid #1e222d !important;
   }
 
   .sc-hero-left {
-    flex-direction: column !important;
+    display: flex !important;
+    flex-direction: row !important;
     align-items: center !important;
-    text-align: center !important;
+    text-align: left !important;
     gap: 10px !important;
+    flex: 1 !important;
+    min-width: 0 !important;
   }
 
   .sc-hero-poster {
-    width: 100% !important;
-    max-width: 220px !important;
-    height: auto !important;
-    max-height: 130px !important;
-    border-radius: 10px !important;
+    width: 52px !important;
+    max-width: 52px !important;
+    height: 30px !important;
+    max-height: 30px !important;
+    border-radius: 4px !important;
+    object-fit: cover !important;
+    flex-shrink: 0 !important;
+  }
+
+  .sc-hero-info {
+    flex: 1 !important;
+    min-width: 0 !important;
   }
 
   .sc-hero-info h1 {
-    font-size: 1.25rem !important;
-    line-height: 1.25 !important;
+    font-size: 0.95rem !important;
+    font-weight: 700 !important;
+    color: #ffffff !important;
+    margin: 0 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    line-height: 1.2 !important;
+  }
+
+  .sc-hero-info p {
+    display: none !important;
   }
 
   .sc-hero-actions {
-    width: 100% !important;
-    justify-content: center !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: auto !important;
+    flex-shrink: 0 !important;
+    justify-content: flex-end !important;
   }
 
-  .sc-btn-primary {
-    width: 100% !important;
-    padding: 14px 18px !important;
-    font-size: 0.95rem !important;
-    justify-content: center !important;
+  .sc-hero-actions .sc-btn-primary {
+    display: none !important;
   }
 
   .sc-tabs-nav {
-    gap: 14px !important;
-    padding: 0 12px !important;
+    display: flex !important;
+    gap: 20px !important;
+    padding: 0 14px !important;
+    background: #090c13 !important;
+    border-bottom: 1px solid #1e222d !important;
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
     justify-content: flex-start !important;
   }
 
   .sc-tab {
-    font-size: 0.85rem !important;
-    padding: 12px 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 4px !important;
+    font-size: 0.75rem !important;
+    padding: 10px 4px !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
   }
 
   .sc-subnav {
-    padding: 12px 8px !important;
+    display: flex !important;
+    padding: 12px 14px !important;
     gap: 8px !important;
+    background: #090c13 !important;
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
   }
 
   .sc-subtab {
-    padding: 8px 14px !important;
-    font-size: 0.8rem !important;
+    padding: 6px 14px !important;
+    border-radius: 999px !important;
+    font-size: 0.82rem !important;
+    background: #141923 !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
   }
 
   .sc-content {
-    padding: 14px 10px !important;
+    padding: 14px 12px !important;
   }
 
   .sc-info-body {
     grid-template-columns: 1fr !important;
-    gap: 20px !important;
+    gap: 16px !important;
   }
 
   /* 4. Registration Wizard (`TournamentRegistrationFlow`) Mobile Polish */

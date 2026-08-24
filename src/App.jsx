@@ -50,6 +50,7 @@ import CoachManagerPage from './pages/CoachManagerPage';
 import Scoreboard from './pages/Scoreboard';
 import ScoreboardDisplay from './pages/ScoreboardDisplay';
 import PaymentSuccess from './pages/PaymentSuccess';
+import PaymentPending from './pages/PaymentPending';
 import PaymentCancel from './pages/PaymentCancel';
 import { useStore } from './hooks/useStore';
 import { useI18n } from './hooks/useI18n';
@@ -1677,10 +1678,11 @@ const AppLayout = () => {
                 <Route path="/noticias" element={<News />} />
                 <Route path="/payment/success" element={<PaymentSuccess />} />
                 <Route path="/payment/cancel" element={<PaymentCancel />} />
-                <Route path="/payment/pending" element={<PaymentSuccess />} />
+                <Route path="/payment/error" element={<PaymentCancel />} />
+                <Route path="/payment/pending" element={<PaymentPending />} />
                 <Route path="/sucesso" element={<PaymentSuccess />} />
                 <Route path="/falha" element={<PaymentCancel />} />
-                <Route path="/pendente" element={<PaymentSuccess />} />
+                <Route path="/pendente" element={<PaymentPending />} />
               </Routes>
 
             </motion.div>

@@ -12,7 +12,20 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  const paymentId = req.query.paymentId || req.query.id;
+  // Extrair ID de pagamento de várias fontes possíveis
+  let paymentId = 
+    req.query.paymentId || 
+    req.query.id || 
+    req.query.collection_id || 
+    req.query.session_id;
+
+  if (!paymentId && req.url) {
+    const parts = req.url.split('?')[0].split('/');
+    const lastPart = parts[parts.length - 1];
+    if (lastPart && lastPart !== 'status' && !isNaN(lastPart)) {
+      paymentId = lastPart;
+    }
+  }
 
   if (!paymentId) {
     return res.status(400).json({ error: 'paymentId é obrigatório' });
@@ -28,7 +41,9 @@ export default async function handler(req, res) {
     });
 
     if (!mpRes.ok) {
-      return res.status(200).json({ approved: false, status: 'pending' });
+      const errData = await mpRes.json().catch(() => ({}));
+      console.warn(`[Payment Status API] MP retornou status ${mpRes.status}:`, errData);
+      return res.status(200).json({ approved: false, status: 'pending', notFound: mpRes.status === 404 });
     }
 
     const data = await mpRes.json();
@@ -40,10 +55,11 @@ export default async function handler(req, res) {
       approved: isApproved,
       externalReference: data.external_reference || '',
       paymentMethodId: data.payment_method_id,
-      transactionAmount: data.transaction_amount
+      transactionAmount: data.transaction_amount,
+      statusDetail: data.status_detail
     });
   } catch (error) {
     console.error('[Payment Status API] Erro ao consultar pagamento:', error);
-    return res.status(200).json({ approved: false, status: 'error', message: error.message });
+    return res.status(500).json({ approved: false, status: 'error', message: error.message });
   }
 }

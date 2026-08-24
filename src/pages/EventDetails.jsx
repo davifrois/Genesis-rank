@@ -616,6 +616,22 @@ const EventDetails = () => {
                     {eventStartDate ? eventStartDate.toLocaleDateString(locale, { day: 'numeric', month: 'short' }) : '—'}
                   </span>
                 </div>
+
+                {/* Botão de Inscrição dentro do Card (Padrão Smoothcomp Mobile) */}
+                <div className="sc-hero-card__cta-wrap">
+                  {isRegistrationOpen ? (
+                    <Link
+                      to={`/eventos/${eventId}/inscricao`}
+                      className="sc-btn-primary sc-hero-card__register-btn"
+                    >
+                      Inscrever-se
+                    </Link>
+                  ) : (
+                    <div className="sc-hero-card__closed-btn">
+                      {isCapacityFull ? `Vagas Esgotadas (${event?.maxAthletes || 0}/${event?.maxAthletes || 0})` : '🔒 Inscrições Encerradas'}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -1680,20 +1696,15 @@ const EventDetails = () => {
             className={`sc-tab ${activeTab === key ? 'active' : ''}`}
             onClick={() => setTab(key)}
           >
-            {icon} {label}
-            {count !== undefined && (
-              <span style={{ 
-                background: '#3f3f46', 
-                color: '#e4e4e7', 
-                padding: '2px 8px', 
-                borderRadius: '12px', 
-                fontSize: '0.75rem', 
-                marginLeft: '6px',
-                fontWeight: 600
-              }}>
-                {count}
-              </span>
-            )}
+            <div className="sc-tab__icon-wrap">
+              {icon}
+              {count !== undefined && (
+                <span className="sc-tab__count-badge">
+                  {count}
+                </span>
+              )}
+            </div>
+            <span className="sc-tab__label">{label}</span>
           </div>
         ))}
       </div>

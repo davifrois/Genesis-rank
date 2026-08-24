@@ -13,11 +13,10 @@ body.event-details-active .app-main > .container {
 }
 
 .sc-event-page {
-  background-color: #121212;
+  background-color: #0d1017;
   color: #e4e4e7;
   min-height: 100vh;
   font-family: var(--font-body, system-ui, sans-serif);
-  zoom: 1.2; /* Aumenta toda a página em 20% */
 }
 
 .sc-hero {
@@ -153,6 +152,27 @@ body.event-details-active .app-main > .container {
   border-bottom-color: #fff;
 }
 
+.sc-tab__icon-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sc-tab__count-badge {
+  background: #3f3f46;
+  color: #e4e4e7;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  margin-left: 4px;
+}
+
+.sc-tab__label {
+  display: inline;
+}
+
 .sc-subnav {
   display: flex;
   gap: 16px;
@@ -201,17 +221,26 @@ body.event-details-active .app-main > .container {
   }
 }
 
+
+
+@media (max-width: 900px) {
+  .sc-info-body {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ─── HERO CARD PREMIUM ─── */
 .sc-hero-card {
   display: flex;
   flex-direction: row;
-  border-radius: 12px;
+  border-radius: 14px;
   overflow: hidden;
-  background: #27272a;
-  border: none;
+  background: #181c26;
+  border: 1px solid rgba(255, 255, 255, 0.07);
   margin-bottom: 32px;
   height: 440px;
   padding: 16px 0 16px 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
 /* ─── IMAGEM GRANDE (esquerda) ─── */
@@ -220,8 +249,8 @@ body.event-details-active .app-main > .container {
   flex: 1;
   height: 100%;
   overflow: hidden;
-  background: #0f0f12;
-  border-radius: 8px;
+  background: #0f1117;
+  border-radius: 10px;
 }
 
 .sc-hero-card__img {
@@ -233,7 +262,7 @@ body.event-details-active .app-main > .container {
   transition: transform 0.5s ease;
 }
 .sc-hero-card:hover .sc-hero-card__img {
-  transform: scale(1.03);
+  transform: scale(1.02);
 }
 
 .sc-hero-card__img-fallback {
@@ -244,63 +273,156 @@ body.event-details-active .app-main > .container {
   align-items: center;
   justify-content: center;
   color: rgba(255,255,255,0.2);
-  font-size: 3rem;
+  font-size: 2rem;
 }
 
 /* ─── PAINEL DATAS (direita) ─── */
 .sc-hero-card__dates {
-  flex: 0 0 35%;
+  flex: 0 0 380px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   background: transparent;
-  padding: 16px 32px;
-  gap: 20px;
+  padding: 20px 28px;
+  gap: 16px;
 }
 
 .sc-hero-card__date-row {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .sc-hero-card__date-row--event {
-  padding-top: 16px;
-  margin-top: 8px;
+  padding-top: 12px;
+  margin-top: 4px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
 }
 
 .sc-hero-card__date-label {
-  font-size: 0.85rem;
-  color: #a1a1aa;
+  font-size: 0.84rem;
+  color: #94a3b8;
   font-weight: 500;
 }
 
 .sc-hero-card__date-value {
-  font-size: 1rem;
+  font-size: 0.98rem;
   font-weight: 700;
-  color: #fff;
+  color: #ffffff;
   line-height: 1.3;
 }
 
 .sc-hero-card__date-time {
-  font-size: 0.75rem;
-  color: #52525b;
+  font-size: 0.76rem;
+  color: #64748b;
   font-weight: 400;
 }
 
+.sc-hero-card__cta-wrap {
+  margin-top: 12px;
+  width: 100%;
+}
+
+.sc-hero-card__register-btn {
+  width: 100%;
+  height: 48px;
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.98rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+  transition: all 0.2s ease;
+}
+
+.sc-hero-card__register-btn:hover {
+  background: #1d4ed8;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.6);
+}
+
+.sc-hero-card__closed-btn {
+  width: 100%;
+  height: 46px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f87171;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ─── SMOOTHCOMP MOBILE PROPORTIONS (< 768px) ─── */
 @media (max-width: 768px) {
   .sc-hero-card {
     flex-direction: column;
     height: auto;
+    background: #181c26;
+    border-radius: 14px;
+    padding: 0;
+    margin-bottom: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
   }
+
   .sc-hero-card__banner {
     flex: none;
     width: 100%;
-    height: 260px;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    max-height: 220px;
+    border-radius: 14px 14px 0 0;
   }
+
   .sc-hero-card__dates {
+    flex: none;
+    width: 100%;
+    padding: 16px 18px;
+    gap: 12px;
     border-left: none;
-    border-top: 1px solid rgba(255,255,255,0.06);
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .sc-hero-card__date-row {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .sc-hero-card__date-row--event {
+    padding-top: 10px;
+    margin-top: 4px;
+  }
+
+  .sc-hero-card__date-label {
+    font-size: 0.82rem;
+    color: #94a3b8;
+  }
+
+  .sc-hero-card__date-value {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #ffffff;
+    text-align: right;
+  }
+
+  .sc-hero-card__date-time {
+    display: block;
+    font-size: 0.74rem;
+    color: #64748b;
+  }
+
+  .sc-hero-card__cta-wrap {
+    margin-top: 12px;
   }
 }
 
@@ -730,4 +852,348 @@ body.event-details-active .app-main > .container {
   border-radius: 10px !important;
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+/* ==========================================================================
+   SMOOTHCOMP MOBILE UI & PROPORTIONS MATCH (< 768px - IDÊNTICO À TELA 1)
+   ========================================================================== */
+@media (max-width: 768px) {
+  /* 1. Header do Evento Mobile (Compacto horizontal - Thumbnail 60x34 + Título) */
+  .sc-hero {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    padding: 10px 16px !important;
+    gap: 14px !important;
+    background: #000000 !important;
+    border-bottom: 1px solid #1e222d !important;
+    text-align: left !important;
+  }
+
+  .sc-hero-left {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 12px !important;
+    flex: 1 !important;
+    min-width: 0 !important;
+    text-align: left !important;
+  }
+
+  .sc-hero-poster {
+    width: 60px !important;
+    height: 34px !important;
+    max-width: 60px !important;
+    max-height: 34px !important;
+    object-fit: cover !important;
+    border-radius: 4px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .sc-hero-info {
+    flex: 1 !important;
+    min-width: 0 !important;
+  }
+
+  .sc-hero-info h1 {
+    font-size: 1.05rem !important;
+    font-weight: 700 !important;
+    color: #ffffff !important;
+    margin: 0 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    line-height: 1.3 !important;
+  }
+
+  .sc-hero-info p {
+    display: none !important;
+  }
+
+  .sc-hero-actions {
+    display: none !important;
+  }
+
+  /* 2. Barra de Abas Principal (Ícone em cima do texto - Screenshot 1) */
+  .sc-tabs-nav {
+    display: flex !important;
+    gap: 18px !important;
+    padding: 0 16px !important;
+    background: #000000 !important;
+    border-bottom: 1px solid #27272a !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+    justify-content: flex-start !important;
+  }
+  .sc-tabs-nav::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .sc-tab {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 4px !important;
+    padding: 10px 6px 8px 6px !important;
+    font-size: 0.76rem !important;
+    font-weight: 600 !important;
+    color: #a1a1aa !important;
+    border-bottom: 3px solid transparent !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    min-width: 58px !important;
+  }
+
+  .sc-tab.active {
+    color: #ffffff !important;
+    border-bottom-color: #ffffff !important;
+  }
+
+  .sc-tab__icon-wrap {
+    position: relative !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .sc-tab__icon-wrap svg {
+    width: 22px !important;
+    height: 22px !important;
+  }
+
+  .sc-tab__count-badge {
+    position: absolute !important;
+    top: -5px !important;
+    right: -10px !important;
+    background: #3f3f46 !important;
+    color: #e4e4e7 !important;
+    font-size: 0.65rem !important;
+    font-weight: 700 !important;
+    padding: 0 5px !important;
+    border-radius: 8px !important;
+    margin-left: 0 !important;
+  }
+
+  .sc-tab__label {
+    font-size: 0.76rem !important;
+    line-height: 1 !important;
+  }
+
+  /* 3. Sub-Navegação (Pills / Chips) */
+  .sc-subnav {
+    display: flex !important;
+    gap: 8px !important;
+    padding: 12px 16px !important;
+    background: #000000 !important;
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
+  }
+  .sc-subnav::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .sc-subtab {
+    padding: 7px 18px !important;
+    border-radius: 999px !important;
+    font-size: 0.86rem !important;
+    font-weight: 600 !important;
+    color: #a1a1aa !important;
+    background: #121212 !important;
+    border: 1px solid #27272a !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+  }
+
+  .sc-subtab.active {
+    background: #ffffff !important;
+    color: #000000 !important;
+    border-color: #ffffff !important;
+    font-weight: 700 !important;
+  }
+
+  /* 4. Conteúdo e Hero Card (Banner 16:9 + Datas 2 colunas + Botão Register interno) */
+  .sc-content {
+    padding: 14px 14px !important;
+    max-width: 100% !important;
+  }
+
+  .sc-hero-card {
+    display: flex !important;
+    flex-direction: column !important;
+    height: auto !important;
+    background: #181d28 !important;
+    border-radius: 16px !important;
+    padding: 0 !important;
+    margin-bottom: 20px !important;
+    border: 1px solid rgba(255, 255, 255, 0.07) !important;
+    overflow: hidden !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
+  }
+
+  .sc-hero-card__banner {
+    flex: none !important;
+    width: 100% !important;
+    height: auto !important;
+    aspect-ratio: 16 / 9 !important;
+    max-height: 220px !important;
+    border-radius: 16px 16px 0 0 !important;
+    overflow: hidden !important;
+  }
+
+  .sc-hero-card__dates {
+    flex: none !important;
+    width: 100% !important;
+    padding: 18px 20px 20px 20px !important;
+    gap: 14px !important;
+    border-left: none !important;
+    border-top: none !important;
+  }
+
+  .sc-hero-card__date-row {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+
+  .sc-hero-card__date-row--event {
+    padding-top: 10px !important;
+    margin-top: 4px !important;
+  }
+
+  .sc-hero-card__date-label {
+    font-size: 0.85rem !important;
+    color: #94a3b8 !important;
+    font-weight: 500 !important;
+  }
+
+  .sc-hero-card__date-value {
+    font-size: 0.95rem !important;
+    font-weight: 700 !important;
+    color: #ffffff !important;
+    text-align: right !important;
+  }
+
+  .sc-hero-card__date-time {
+    display: block !important;
+    font-size: 0.75rem !important;
+    color: #64748b !important;
+    font-weight: 400 !important;
+    margin-top: 2px !important;
+  }
+
+  .sc-hero-card__cta-wrap {
+    margin-top: 14px !important;
+    width: 100% !important;
+  }
+
+  .sc-hero-card__register-btn {
+    width: 100% !important;
+    height: 48px !important;
+    background: #2f66ee !important;
+    color: #ffffff !important;
+    border-radius: 10px !important;
+    font-size: 1rem !important;
+    font-weight: 700 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-decoration: none !important;
+    box-shadow: 0 4px 16px rgba(47, 102, 238, 0.4) !important;
+  }
+
+  /* 5. Título do Evento abaixo do Card */
+  .sc-info-main-title {
+    font-size: 1.35rem !important;
+    font-weight: 800 !important;
+    color: #ffffff !important;
+    margin: 16px 0 14px 0 !important;
+    letter-spacing: -0.3px !important;
+    line-height: 1.3 !important;
+    text-transform: none !important;
+  }
+
+  /* 6. Cards da Sidebar */
+  .sc-sidebar {
+    width: 100% !important;
+    gap: 14px !important;
+  }
+
+  .sc-sidebar-card {
+    background: #181d28 !important;
+    border-radius: 14px !important;
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+    overflow: hidden !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3) !important;
+  }
+
+  .sc-sidebar-card__header {
+    padding: 16px 18px 10px 18px !important;
+    font-size: 1rem !important;
+    font-weight: 700 !important;
+    color: #ffffff !important;
+  }
+
+  .sc-sidebar-card__body {
+    padding: 0 18px 16px 18px !important;
+  }
+
+  .sc-organizer-name {
+    font-size: 0.95rem !important;
+    font-weight: 600 !important;
+    color: #ffffff !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    margin-bottom: 10px !important;
+  }
+
+  .sc-organizer-perk {
+    font-size: 0.84rem !important;
+    color: #94a3b8 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    margin-bottom: 8px !important;
+  }
+
+  .sc-contact-link {
+    padding: 12px 18px !important;
+    font-size: 0.9rem !important;
+    color: #e2e8f0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+  }
+
+  .sc-entry-row {
+    padding: 12px 18px !important;
+    font-size: 0.9rem !important;
+    color: #ffffff !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+  }
+
+  .sc-cancel-list-item {
+    padding: 12px 18px !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+  }
+
+  .sc-cancel-title {
+    font-size: 0.9rem !important;
+    font-weight: 600 !important;
+    color: #f1f5f9 !important;
+  }
+
+  .sc-cancel-desc {
+    font-size: 0.78rem !important;
+    color: #94a3b8 !important;
+  }
 }

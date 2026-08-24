@@ -410,9 +410,12 @@ app.post('/api/webhooks/payment/pix', async (req, res) => {
 });
 
 // Direct Payment Status Polling
-app.get('/api/webhooks/payment/status/:paymentId', async (req, res) => {
+app.get(['/api/webhooks/payment/status/:paymentId', '/api/webhooks/payment/status', '/api/status'], async (req, res) => {
     try {
-        const { paymentId } = req.params;
+        const paymentId = req.params.paymentId || req.query.paymentId || req.query.id || req.query.collection_id;
+        if (!paymentId) {
+            return res.status(400).json({ error: 'paymentId é obrigatório' });
+        }
         const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN || 'APP_USR-5076214841905920-081112-768e0648179ce52ceb48a90a14882388-1214160384';
 
         const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
@@ -449,11 +452,15 @@ app.get('/api/webhooks/payment/status/:paymentId', async (req, res) => {
         }
 
         res.json({
+            paymentId: data.id,
             status: data.status,
             approved: isApproved,
-            externalReference: data.external_reference || ''
+            externalReference: data.external_reference || '',
+            paymentMethodId: data.payment_method_id,
+            transactionAmount: data.transaction_amount
         });
     } catch (e) {
+        console.error('[Payment Status API] Erro:', e);
         res.json({ approved: false, status: 'pending' });
     }
 });

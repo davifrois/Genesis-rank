@@ -640,38 +640,48 @@ export const publicRegistrationService = {
   },
 
   checkPaymentStatus: async (paymentId) => {
-    const accessToken = 'APP_USR-5076214841905920-081112-768e0648179ce52ceb48a90a14882388-1214160384';
+    const cleanId = (paymentId || '').toString().trim();
+    if (!cleanId || cleanId === 'null' || cleanId === 'undefined') {
+      return { ok: false, approved: false, status: 'unknown' };
+    }
 
-    // 1. Tentar Backend primeiro se disponível
-    try {
-      const response = await fetch(buildApiUrl(`/api/webhooks/payment/status/${paymentId}`), {
-        headers: { 'ngrok-skip-browser-warning': 'true' }
-      });
-      if (response.ok) {
-        return await response.json();
+    const endpoints = [
+      buildApiUrl(`/api/webhooks/payment/status?paymentId=${encodeURIComponent(cleanId)}`),
+      buildApiUrl(`/api/status?paymentId=${encodeURIComponent(cleanId)}`),
+      buildApiUrl(`/api/webhooks/payment/status/${encodeURIComponent(cleanId)}`),
+      `/api/webhooks/payment/status?paymentId=${encodeURIComponent(cleanId)}`,
+      `/api/status?paymentId=${encodeURIComponent(cleanId)}`,
+      `/api/webhooks/payment/status/${encodeURIComponent(cleanId)}`
+    ];
+
+    // Remover duplicatas preservando a ordem
+    const uniqueEndpoints = [...new Set(endpoints)];
+
+    for (const endpoint of uniqueEndpoints) {
+      try {
+        const response = await fetch(endpoint, {
+          headers: { 'ngrok-skip-browser-warning': 'true' }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data && typeof data === 'object') {
+            const isApproved = data.approved === true || data.status === 'approved';
+            return {
+              ok: true,
+              status: data.status || (isApproved ? 'approved' : 'pending'),
+              approved: isApproved,
+              externalReference: data.externalReference || data.external_reference || '',
+              paymentId: data.paymentId || data.id || cleanId,
+              details: data
+            };
+          }
+        }
+      } catch (err) {
+        // Tenta o próximo endpoint
       }
-    } catch {
-      // Fallback para chamada direta do Mercado Pago
     }
 
-    // 2. Chamada Direta para Mercado Pago API
-    try {
-      const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
-        headers: { 'Authorization': `Bearer ${accessToken}` }
-      });
-      if (!mpRes.ok) return { approved: false, status: 'pending' };
-
-      const data = await mpRes.json();
-      const isApproved = data.status === 'approved';
-
-      return {
-        status: data.status,
-        approved: isApproved,
-        externalReference: data.external_reference || ''
-      };
-    } catch {
-      return { approved: false, status: 'pending' };
-    }
+    return { ok: false, error: true, status: 'unknown', approved: false };
   },
 
   listRegistrations: async (eventId = '') => {
