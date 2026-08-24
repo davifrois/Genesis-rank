@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import './GerenteTreinador.css';
 import {
   CheckCircle, XCircle, Info, UserCheck, Users, ChevronDown,
   ChevronUp, Tag, ShieldCheck, AlertTriangle,
@@ -147,17 +148,7 @@ const CategoryModal = ({ atleta, onClose, onChange, valorBase, valorAbsoluto, va
       initial={{ opacity: 0, height: 0 }}
       animate={{ opacity: 1, height: 'auto' }}
       exit={{ opacity: 0, height: 0 }}
-      style={{
-        background: 'rgba(255,255,255,0.03)',
-        border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: '12px',
-        padding: '20px',
-        marginTop: '12px',
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr 1fr 1fr auto',
-        gap: '12px',
-        alignItems: 'flex-end',
-      }}
+      className="gt-category-form"
     >
       <div>
         <label style={fieldStyle}>Modalidade</label>
@@ -212,15 +203,16 @@ const CategoryModal = ({ atleta, onClose, onChange, valorBase, valorAbsoluto, va
         </select>
       </div>
 
-      <div style={{ display: 'flex', gap: '8px' }}>
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px' }}>
         <button
           onClick={handleSave}
           disabled={!isValid}
           style={{
-            padding: '12px 20px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+            flex: 1,
+            padding: '12px 18px', borderRadius: '10px', border: 'none', cursor: 'pointer',
             background: !isValid ? '#1a1a1a' : 'var(--brand-primary, #00c2cb)',
             color: !isValid ? '#555' : '#000',
-            fontWeight: '700', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px',
+            fontWeight: '700', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
             transition: 'all 0.2s', whiteSpace: 'nowrap'
           }}
         >
@@ -229,7 +221,7 @@ const CategoryModal = ({ atleta, onClose, onChange, valorBase, valorAbsoluto, va
         <button
           onClick={onClose}
           style={{
-            padding: '10px 12px', borderRadius: '8px', border: '1px solid #333', cursor: 'pointer',
+            padding: '10px 14px', borderRadius: '8px', border: '1px solid #333', cursor: 'pointer',
             background: 'transparent', color: '#888', fontSize: '14px',
           }}
         >
@@ -272,157 +264,112 @@ const AtletaRow = ({ atleta, selecionado, onToggle, onCategoria, onCheckin, valo
       layout
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      style={{
-        border: selecionado
-          ? '1px solid var(--brand-primary, #00c2cb)88'
-          : '1px solid rgba(255,255,255,0.07)',
-        borderRadius: '12px',
-        background: selecionado
-          ? 'linear-gradient(135deg, rgba(0,194,203,0.08), rgba(0,194,203,0.03))'
-          : 'rgba(255,255,255,0.02)',
-        marginBottom: '10px',
-        overflow: 'hidden',
-        transition: 'all 0.2s',
-      }}
+      className={`gt-athlete-card ${selecionado ? 'selected' : ''}`}
     >
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        whileHover={{ scale: 1.01, backgroundColor: selecionado ? 'rgba(0,194,203,0.06)' : 'rgba(255,255,255,0.04)' }}
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '50px 1.6fr 1.5fr 150px 140px 60px',
-          alignItems: 'center',
-          gap: '20px',
-          padding: '20px 24px',
-          marginBottom: '12px',
-          border: selecionado ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(255,255,255,0.06)',
-          borderRadius: '16px',
-          background: selecionado ? 'rgba(255,255,255,0.04)' : 'rgba(18, 20, 26, 0.65)',
-          backdropFilter: 'blur(10px)',
-          boxShadow: selecionado ? '0 8px 30px rgba(0,0,0,0.4)' : '0 4px 15px rgba(0,0,0,0.2)',
-          transition: 'all 0.2s ease',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-            <input
-              type="checkbox"
-              checked={selecionado}
-              onChange={onToggle}
-              style={{ display: 'none' }}
-              disabled={temCheckin || (window.isRegistrationClosed)} 
-            />
-            <div style={{
-              width: '22px', height: '22px', borderRadius: '6px',
-              border: selecionado ? '2px solid #ffffff' : '2px solid #555',
-              background: selecionado ? '#ffffff' : 'rgba(0,0,0,0.2)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all 0.2s',
-              opacity: temCheckin ? 0.5 : 1
-            }}>
-              {selecionado && <Check size={14} color="#000" strokeWidth={3} />}
-            </div>
-          </label>
-        </div>
-
-        <div>
-          <div style={{ fontWeight: '800', fontSize: '18px', color: '#ffffff', letterSpacing: '0.01em' }}>{atleta.nome}</div>
-          <div style={{ fontSize: '13px', color: '#94a3b8', marginTop: '5px', display: 'flex', gap: '10px', fontWeight: '500' }}>
-            {atleta.idade ? <span style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '4px' }}>{atleta.idade} anos</span> : null}
-            {atleta.graduacao ? <span style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '4px' }}>Faixa {atleta.graduacao}</span> : null}
-          </div>
-        </div>
-
-        <div style={{ textAlign: 'center' }}>
-          <div style={{
-            fontSize: '13px',
-            color: temCategoria ? '#f1f5f9' : '#64748b',
-            fontWeight: temCategoria ? '600' : '400',
-            background: temCategoria ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)',
-            padding: '6px 14px', borderRadius: '10px', display: 'inline-block',
-            border: temCategoria ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(255,255,255,0.04)'
-          }}>
-            {categoriaStr}
-          </div>
-        </div>
-
-        <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
-          <span style={{ fontSize: '18px', fontWeight: '800', color: '#ffffff' }}>
-            {formatBRL(atleta.valor)}
-          </span>
-        </div>
-
-        <div style={{ textAlign: 'center' }}>
-          {!selecionado ? (
-            <span style={{ color: '#475569', fontSize: '14px', fontWeight: '500' }}>—</span>
-          ) : !temCategoria ? (
-            <span style={{
-              background: 'rgba(255, 255, 255, 0.05)', color: '#fbbf24', border: '1px solid rgba(251, 191, 36, 0.25)',
-              padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', letterSpacing: '0.04em'
-            }}>PENDENTE</span>
-          ) : temCheckin ? (
-            <span style={{
-              background: 'rgba(255, 255, 255, 0.05)', color: '#94a3b8', border: '1px solid rgba(255, 255, 255, 0.1)',
-              padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', letterSpacing: '0.04em'
-            }}>ENVIADO</span>
-          ) : (
-            <span style={{
-              background: 'rgba(255, 255, 255, 0.1)', color: '#ffffff', border: '1px solid rgba(255, 255, 255, 0.2)',
-              padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', letterSpacing: '0.04em'
-            }}>PRONTO</span>
-          )}
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          {selecionado && !temCheckin && (
-            <button
-              onClick={() => setExpandido(!expandido)}
-              style={{
-                background: expandido ? 'var(--brand-primary)' : 'rgba(255,255,255,0.05)',
-                border: 'none', cursor: 'pointer',
-                color: expandido ? '#000' : '#888',
-                borderRadius: '10px', padding: '8px',
-                display: 'flex', alignItems: 'center',
+      <div className="gt-athlete-row">
+        {/* Mobile Top Row: Checkbox, Name, Info & Status */}
+        <div className="gt-athlete-mobile-top">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
+            <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+              <input
+                type="checkbox"
+                checked={selecionado}
+                onChange={onToggle}
+                style={{ display: 'none' }}
+                disabled={temCheckin || (window.isRegistrationClosed)} 
+              />
+              <div style={{
+                width: '22px', height: '22px', borderRadius: '6px',
+                border: selecionado ? '2px solid #00c2cb' : '2px solid #555',
+                background: selecionado ? '#00c2cb' : 'rgba(0,0,0,0.2)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
                 transition: 'all 0.2s',
-                boxShadow: expandido ? '0 0 15px rgba(0,194,203,0.4)' : 'none'
-              }}
-            >
-              {expandido ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-            </button>
-          )}
-        </div>
-      </motion.div>
+                opacity: temCheckin ? 0.5 : 1
+              }}>
+                {selecionado && <Check size={14} color="#000" strokeWidth={3} />}
+              </div>
+            </label>
 
-      <AnimatePresence>
-        {selecionado && expandido && !temCheckin && (
-          <div style={{ padding: '0 20px 18px' }}>
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+            <div className="gt-athlete-info">
+              <div className="gt-athlete-name">{atleta.nome}</div>
+              <div className="gt-athlete-tags">
+                {atleta.idade ? <span className="gt-athlete-tag">{atleta.idade} anos</span> : null}
+                {atleta.graduacao ? <span className="gt-athlete-tag">Faixa {atleta.graduacao}</span> : null}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+            {!selecionado ? (
+              <span style={{ color: '#475569', fontSize: '13px', fontWeight: '500' }}>—</span>
+            ) : !temCategoria ? (
+              <span className="gt-status-badge gt-status-badge--pendente">PENDENTE</span>
+            ) : temCheckin ? (
+              <span className="gt-status-badge gt-status-badge--enviado">ENVIADO</span>
+            ) : (
+              <span className="gt-status-badge gt-status-badge--pronto">PRONTO</span>
+            )}
+
+            {selecionado && !temCheckin && (
               <button
                 onClick={() => setExpandido(!expandido)}
                 style={{
-                  padding: '10px 20px', borderRadius: '10px', border: '1px solid #444',
-                background: 'rgba(255,255,255,0.05)', color: '#bbb',
-                fontSize: '15px', cursor: 'pointer', fontWeight: '600',
-                display: 'flex', alignItems: 'center', gap: '8px',
-                transition: 'all 0.15s',
+                  background: expandido ? 'var(--brand-primary, #00c2cb)' : 'rgba(255,255,255,0.06)',
+                  border: 'none', cursor: 'pointer',
+                  color: expandido ? '#000' : '#aaa',
+                  borderRadius: '8px', padding: '6px',
+                  display: 'flex', alignItems: 'center',
+                  transition: 'all 0.2s',
                 }}
               >
-                <Tag size={15} /> {temCategoria ? 'Alterar Categoria' : 'Definir Categoria'}
+                {expandido ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Mobile Bottom / Desktop Middle: Category & Price */}
+        <div className="gt-athlete-mobile-bottom">
+          <div className="gt-category-badge" title={categoriaStr}>
+            {categoriaStr}
+          </div>
+
+          <div className="gt-athlete-price">
+            {formatBRL(atleta.valor)}
+          </div>
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {selecionado && expandido && !temCheckin && (
+          <div style={{ padding: '0 16px 16px 16px' }}>
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '8px' }}>
+              <button
+                onClick={() => setExpandido(!expandido)}
+                style={{
+                  padding: '8px 16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.15)',
+                  background: 'rgba(255,255,255,0.05)', color: '#e2e8f0',
+                  fontSize: '13px', cursor: 'pointer', fontWeight: '600',
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  transition: 'all 0.15s',
+                }}
+              >
+                <Tag size={14} /> {temCategoria ? 'Alterar Categoria' : 'Definir Categoria'}
               </button>
             </div>
             {expandido && (
-            <CategoryModal
-              atleta={atleta}
-              valorBase={valorBase}
-              valorAbsoluto={valorAbsoluto}
-              valorCombo={valorCombo}
-              registeredModalities={registeredModalities}
-              getSuggestedPrice={getSuggestedPrice}
-              onChange={onCategoria}
-              onClose={() => setExpandido(false)}
-            />
-          )}</div>
+              <CategoryModal
+                atleta={atleta}
+                valorBase={valorBase}
+                valorAbsoluto={valorAbsoluto}
+                valorCombo={valorCombo}
+                registeredModalities={registeredModalities}
+                getSuggestedPrice={getSuggestedPrice}
+                onChange={onCategoria}
+                onClose={() => setExpandido(false)}
+              />
+            )}
+          </div>
         )}
       </AnimatePresence>
     </motion.div>
@@ -975,49 +922,35 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
               Taxa base: <strong style={{ color: '#ffffff' }}>{formatBRL(valorBase)}</strong> <span style={{ margin: '0 6px', color: '#444' }}>|</span> Absoluto: <strong style={{ color: '#ffffff' }}>+{formatBRL(valorAbsoluto)}</strong>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <div className="gt-stats-grid">
             {[
               { 
                 label: 'Alunos', 
                 value: roster.length, 
-                color: '#ffffff', 
-                bg: 'rgba(3, 56, 110, 0.25)', 
-                border: '1px solid rgba(3, 56, 110, 0.45)' 
+                highlight: false
               },
               { 
                 label: 'Selecionados', 
                 value: atletasSelecionados.length, 
-                color: '#ffffff', 
-                bg: atletasSelecionados.length > 0 ? '#03386e' : 'rgba(3, 56, 110, 0.25)', 
-                border: '1px solid rgba(3, 56, 110, 0.65)' 
+                highlight: atletasSelecionados.length > 0
               },
               { 
                 label: 'Enviados', 
                 value: jaEnviados, 
-                color: '#ffffff', 
-                bg: 'rgba(3, 56, 110, 0.25)', 
-                border: '1px solid rgba(3, 56, 110, 0.45)' 
+                highlight: false
               },
               { 
                 label: 'Total', 
                 value: formatBRL(totalGeral), 
-                color: '#ffffff', 
-                bg: '#03386e', 
-                border: '1px solid rgba(59, 130, 246, 0.5)' 
+                highlight: true
               },
             ].map(s => (
-              <div key={s.label} style={{
-                textAlign: 'center',
-                background: s.bg,
-                border: s.border,
-                borderRadius: '14px',
-                padding: '14px 20px',
-                minWidth: '110px',
-                boxShadow: '0 4px 15px rgba(0,0,0,0.25)',
-                transition: 'all 0.2s ease'
-              }}>
-                <div style={{ fontSize: '24px', fontWeight: '800', color: s.color, letterSpacing: '-0.01em' }}>{s.value}</div>
-                <div style={{ fontSize: '11px', color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '6px', fontWeight: '700' }}>{s.label}</div>
+              <div 
+                key={s.label} 
+                className={`gt-stat-card ${s.highlight ? 'gt-stat-card--highlight' : ''}`}
+              >
+                <div className="gt-stat-value">{s.value}</div>
+                <div className="gt-stat-label">{s.label}</div>
               </div>
             ))}
           </div>
@@ -1048,102 +981,67 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
       )}
 
       {/* Barra de Filtros e Busca */}
-      <div style={{
-        background: 'rgba(18, 20, 26, 0.5)',
-        border: '1px solid rgba(255,255,255,0.06)',
-        borderRadius: '16px',
-        padding: '16px 20px',
-        marginBottom: '24px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '14px'
-      }}>
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+      <div className="gt-filter-box">
+        <div className="gt-filters-top-row">
           {/* Busca por Nome / ID */}
-          <div style={{ flex: '1 1 240px', position: 'relative', minWidth: '220px' }}>
-            <Search size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', pointerEvents: 'none' }} />
+          <div className="gt-search-wrap">
+            <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', pointerEvents: 'none' }} />
             <input
               type="text"
               placeholder="Buscar atleta por nome ou ID..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '11px 14px 11px 40px',
-                borderRadius: '10px',
-                background: '#111318',
-                border: '1px solid rgba(255,255,255,0.1)',
-                color: '#fff',
-                fontSize: '14px',
-                outline: 'none',
-                transition: 'border-color 0.2s'
-              }}
-              onFocus={e => e.target.style.borderColor = '#ffffff'}
-              onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+              className="gt-search-input"
             />
             {searchTerm && (
-              <button onClick={() => setSearchTerm('')} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#888', cursor: 'pointer' }}>
+              <button 
+                onClick={() => setSearchTerm('')} 
+                style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#888', cursor: 'pointer' }}
+              >
                 <X size={14} />
               </button>
             )}
           </div>
 
-          {/* Filtro por Faixa */}
-          <div style={{ flex: '0 1 150px', minWidth: '140px' }}>
+          {/* Grid de Selects Responsivo */}
+          <div className="gt-select-grid">
+            {/* Filtro por Faixa */}
             <select
               value={filterFaixa}
               onChange={e => setFilterFaixa(e.target.value)}
-              style={{
-                width: '100%', padding: '11px 14px', borderRadius: '10px',
-                background: '#111318', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '14px', cursor: 'pointer'
-              }}
+              className="gt-filter-select"
             >
               <option value="">Todas as faixas</option>
               {FAIXAS.map(f => <option key={f} value={f}>{f}</option>)}
             </select>
-          </div>
 
-          {/* Filtro por Categoria */}
-          <div style={{ flex: '0 1 160px', minWidth: '150px' }}>
+            {/* Filtro por Categoria */}
             <select
               value={filterCategoria}
               onChange={e => setFilterCategoria(e.target.value)}
-              style={{
-                width: '100%', padding: '11px 14px', borderRadius: '10px',
-                background: '#111318', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '14px', cursor: 'pointer'
-              }}
+              className="gt-filter-select"
             >
               <option value="">Todas as categorias</option>
               {CATEGORIAS_ETARIAS.map(c => <option key={c.label} value={c.label}>{c.label}</option>)}
             </select>
-          </div>
 
-          {/* Filtro por Status */}
-          <div style={{ flex: '0 1 140px', minWidth: '130px' }}>
+            {/* Filtro por Status */}
             <select
               value={filterStatus}
               onChange={e => setFilterStatus(e.target.value)}
-              style={{
-                width: '100%', padding: '11px 14px', borderRadius: '10px',
-                background: '#111318', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '14px', cursor: 'pointer'
-              }}
+              className="gt-filter-select"
             >
               <option value="">Todos os status</option>
               <option value="pronto">Pronto</option>
               <option value="pendente">Pendente</option>
               <option value="enviado">Enviado</option>
             </select>
-          </div>
 
-          {/* Ordenação */}
-          <div style={{ flex: '0 1 170px', minWidth: '160px' }}>
+            {/* Ordenação */}
             <select
               value={sortBy}
               onChange={e => setSortBy(e.target.value)}
-              style={{
-                width: '100%', padding: '11px 14px', borderRadius: '10px',
-                background: '#111318', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '14px', cursor: 'pointer'
-              }}
+              className="gt-filter-select"
             >
               <option value="nome_asc">Nome (A - Z)</option>
               <option value="nome_desc">Nome (Z - A)</option>
@@ -1155,18 +1053,16 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
         </div>
 
         {/* Ações globais e contadores */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-          <div style={{ fontSize: '13px', color: '#94a3b8', fontWeight: '500' }}>
+        <div className="gt-filter-actions-row">
+          <div className="gt-count-text">
             Exibindo <strong style={{ color: '#fff', fontWeight: '700' }}>{filteredRoster.length}</strong> de <strong style={{ color: '#fff' }}>{roster.length}</strong> alunos na academia
           </div>
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div className="gt-btn-group">
             <button
               onClick={toggleSelectAllFiltered}
               disabled={isRegistrationClosed || filteredRoster.length === 0}
+              className="gt-btn-select-all"
               style={{
-                padding: '8px 16px', borderRadius: '10px', border: '1px solid rgba(59, 130, 246, 0.4)',
-                background: '#03386e', color: '#ffffff', fontSize: '13px', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '600', transition: 'all 0.2s',
                 opacity: (isRegistrationClosed || filteredRoster.length === 0) ? 0.5 : 1
               }}
             >
@@ -1174,11 +1070,7 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
             </button>
             <button
               onClick={resetarTodos}
-              style={{
-                padding: '8px 16px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)',
-                background: 'transparent', color: '#94a3b8', fontSize: '13px', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '600', transition: 'all 0.2s'
-              }}
+              className="gt-btn-clear"
             >
               <RotateCcw size={14} /> Limpar seleção
             </button>
