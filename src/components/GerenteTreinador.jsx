@@ -604,22 +604,27 @@ export default function GerenteTreinador({ usuarioLogado, campeonatoAtivo, acade
 
   useEffect(() => {
     setRoster(
-      academyAthletes.map(a => ({
-        id: a.id,
-        nome: a.fullName || [a.firstName, a.lastName].filter(Boolean).join(' ') || a.name || 'Atleta',
-        idade: a.age || '',
-        graduacao: a.belt || '',
-        categoria: {
-          modalidade: '',
-          faixa: a.belt || '',
-          categoriaEtaria: a.categoria || '',
-          peso: a.weight || '',
-        },
-        genero: a.gender || a.genero || 'Masculino',
-        valor: getSuggestedPrice(null, a),
-        checkin: false, // Usado como flag de "Já submetido"
-        selecionado: false,
-      }))
+      academyAthletes
+        .filter(a => {
+          const nome = a.fullName || [a.firstName, a.lastName].filter(Boolean).join(' ').trim() || a.name || '';
+          return nome && nome.length >= 2;
+        })
+        .map(a => ({
+          id: a.id,
+          nome: a.fullName || [a.firstName, a.lastName].filter(Boolean).join(' ') || a.name || 'Atleta',
+          idade: a.age || '',
+          graduacao: a.belt || '',
+          categoria: {
+            modalidade: '',
+            faixa: a.belt || '',
+            categoriaEtaria: a.categoria || '',
+            peso: a.weight || '',
+          },
+          genero: a.gender || a.genero || 'Masculino',
+          valor: getSuggestedPrice(null, a),
+          checkin: false, // Usado como flag de "Já submetido"
+          selecionado: false,
+        }))
     );
   }, [academyAthletes, campeonatoAtivo]);
 

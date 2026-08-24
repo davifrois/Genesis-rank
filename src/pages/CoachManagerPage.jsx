@@ -85,12 +85,20 @@ const CoachManagerPage = () => {
     };
   }, [activeEvents, selectedEventId]);
 
-  // Atletas vinculados à academia (perfis + role que não seja coach)
+  // Atletas vinculados à academia (perfis com nome válido + role que não seja coach)
   const academyAthletes = useMemo(() => {
     if (!academyId) return [];
-    return memberProfiles.filter(
-      p => p.academyId === academyId && p.role !== 'coach' && p.role !== 'professor'
-    );
+    return memberProfiles.filter(p => {
+      // Deve pertencer à academia
+      if (p.academyId !== academyId) return false;
+      // Não pode ser coach, professor ou admin
+      const r = (p.role || '').toLowerCase();
+      if (r === 'coach' || r === 'professor' || r === 'admin') return false;
+      // Deve ter um nome válido (não pode ser placeholder vazio ou "Faixa —")
+      const nome = p.fullName || [p.firstName, p.lastName].filter(Boolean).join(' ').trim() || p.name || '';
+      if (!nome || nome.length < 2) return false;
+      return true;
+    });
   }, [memberProfiles, academyId]);
 
   const selectedAcademy = academies.find(a => a.id === academyId);
