@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lock, User, ShieldCheck, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
+import { Lock, User, ShieldCheck, AlertCircle, Loader2, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 import { useStore } from '../hooks/useStore';
 import { useI18n } from '../hooks/useI18n';
 import { authService } from '../services/authService';
@@ -13,10 +13,13 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '', initialMode = 'logi
     const navigate = useNavigate();
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [registerName, setRegisterName] = useState('');
     const [registerUsername, setRegisterUsername] = useState('');
     const [registerPassword, setRegisterPassword] = useState('');
     const [registerConfirm, setRegisterConfirm] = useState('');
+    const [showRegisterPassword, setShowRegisterPassword] = useState(false);
+    const [showRegisterConfirm, setShowRegisterConfirm] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -25,6 +28,8 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '', initialMode = 'logi
     const [resetUsername, setResetUsername] = useState('');
     const [resetPassword, setResetPassword] = useState('');
     const [resetConfirm, setResetConfirm] = useState('');
+    const [showResetPassword, setShowResetPassword] = useState(false);
+    const [showResetConfirm, setShowResetConfirm] = useState(false);
     const supportsLocalReset = authService.supportsPasswordReset ? authService.supportsPasswordReset() : true;
     const supportsRegistration = true;
     const canClose = typeof onClose === 'function';
@@ -488,13 +493,22 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '', initialMode = 'logi
                             <div className="login-input">
                                 <Lock size={16} />
                                 <input
-                                    type="password"
+                                    type={showResetPassword ? 'text' : 'password'}
                                     minLength={8}
                                     value={resetPassword}
                                     onChange={(event) => setResetPassword(event.target.value)}
                                     placeholder={copy.reset.placeholder}
                                     required
                                 />
+                                <button
+                                    type="button"
+                                    className="login-eye-btn"
+                                    onClick={() => setShowResetPassword(v => !v)}
+                                    aria-label={showResetPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                                    tabIndex={-1}
+                                >
+                                    {showResetPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </button>
                             </div>
                             {resetPassword && (
                                 <small className={`password-strength password-strength--${resetPasswordStrength.level}`}>
@@ -507,13 +521,22 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '', initialMode = 'logi
                             <div className="login-input">
                                 <Lock size={16} />
                                 <input
-                                    type="password"
+                                    type={showResetConfirm ? 'text' : 'password'}
                                     minLength={8}
                                     value={resetConfirm}
                                     onChange={(event) => setResetConfirm(event.target.value)}
                                     placeholder={copy.reset.confirmPlaceholder}
                                     required
                                 />
+                                <button
+                                    type="button"
+                                    className="login-eye-btn"
+                                    onClick={() => setShowResetConfirm(v => !v)}
+                                    aria-label={showResetConfirm ? 'Ocultar senha' : 'Mostrar senha'}
+                                    tabIndex={-1}
+                                >
+                                    {showResetConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </button>
                             </div>
                         </label>
 
@@ -563,13 +586,22 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '', initialMode = 'logi
                             <div className="login-input">
                                 <Lock size={16} />
                                 <input
-                                    type="password"
+                                    type={showRegisterPassword ? 'text' : 'password'}
                                     minLength={8}
                                     value={registerPassword}
                                     onChange={(event) => setRegisterPassword(event.target.value)}
                                     placeholder={copy.register.passwordPlaceholder}
                                     required
                                 />
+                                <button
+                                    type="button"
+                                    className="login-eye-btn"
+                                    onClick={() => setShowRegisterPassword(v => !v)}
+                                    aria-label={showRegisterPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                                    tabIndex={-1}
+                                >
+                                    {showRegisterPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </button>
                             </div>
                             {registerPassword && (
                                 <small className={`password-strength password-strength--${registerPasswordStrength.level}`}>
@@ -582,13 +614,22 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '', initialMode = 'logi
                             <div className="login-input">
                                 <Lock size={16} />
                                 <input
-                                    type="password"
+                                    type={showRegisterConfirm ? 'text' : 'password'}
                                     minLength={8}
                                     value={registerConfirm}
                                     onChange={(event) => setRegisterConfirm(event.target.value)}
                                     placeholder={copy.register.confirmPlaceholder}
                                     required
                                 />
+                                <button
+                                    type="button"
+                                    className="login-eye-btn"
+                                    onClick={() => setShowRegisterConfirm(v => !v)}
+                                    aria-label={showRegisterConfirm ? 'Ocultar senha' : 'Mostrar senha'}
+                                    tabIndex={-1}
+                                >
+                                    {showRegisterConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </button>
                             </div>
                         </label>
 
@@ -625,12 +666,21 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '', initialMode = 'logi
                             <div className="login-input">
                                 <Lock size={16} />
                                 <input
-                                    type="password"
+                                    type={showPassword ? 'text' : 'password'}
                                     value={password}
                                     onChange={(event) => setPassword(event.target.value)}
                                     placeholder={copy.form.passwordPlaceholder}
                                     required
                                 />
+                                <button
+                                    type="button"
+                                    className="login-eye-btn"
+                                    onClick={() => setShowPassword(v => !v)}
+                                    aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                                    tabIndex={-1}
+                                >
+                                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </button>
                             </div>
                         </label>
 

@@ -208,10 +208,28 @@ const getWeightLimitString = (peso, categoria, genero, idade) => {
     return pesoStr;
 };
 
+// Faixas conhecidas que podem vir erroneamente concatenadas no campo peso
+const KNOWN_BELTS = ['BRANCA', 'CINZA', 'AMARELA', 'LARANJA', 'VERDE', 'AZUL', 'ROXA', 'MARROM', 'PRETA', 'VERMELHA', 'CORAL'];
+
+/**
+ * Remove a faixa que veio concatenada no campo peso.
+ * Ex: "AZUL / PESADISSIMO ACIMA DE 100,50" → "PESADISSIMO ACIMA DE 100,50"
+ */
+const sanitizePesoField = (rawPeso) => {
+    if (!rawPeso) return rawPeso;
+    const parts = String(rawPeso).split('/').map(p => p.trim());
+    // Se a primeira parte for uma faixa conhecida, descartá-la
+    if (parts.length >= 2 && KNOWN_BELTS.some(b => parts[0].toUpperCase() === b)) {
+        return parts.slice(1).join(' / ');
+    }
+    return rawPeso;
+};
+
 export const resolvePesoLabel = (athlete) => {
     if (athlete.isAbsolute) return 'Absoluto';
     const rawPeso = athlete.peso || (athlete.isAbsolute ? 'Absoluto' : 'Peso');
-    return getWeightLimitString(rawPeso, athlete.categoria, athlete.genero || athlete.sexo, athlete.idade);
+    const cleanedPeso = sanitizePesoField(rawPeso);
+    return getWeightLimitString(cleanedPeso, athlete.categoria, athlete.genero || athlete.sexo, athlete.idade);
 };
 
 export const buildCategoryDescriptor = (athlete) => {
