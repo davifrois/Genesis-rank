@@ -829,7 +829,6 @@ const AppLayout = () => {
   ), [isEnglish, isSpanish, isFrench]);
 
   const utilityLinks = useMemo(() => ([
-    { label: 'Minha Inscrição', path: '/minha-inscricao' },
     { label: copy.utilityLinks.about, path: '/institucional' },
     { label: copy.utilityLinks.organizers, path: '/organizadores' }
   ]), [copy.utilityLinks.about, copy.utilityLinks.organizers]);
