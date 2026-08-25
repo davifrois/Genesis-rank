@@ -458,18 +458,14 @@ const Home = () => {
           isOpen
         };
       })
+      .filter((event) => event.isOpen)
       .sort((a, b) => {
-        // 1. Inscrições abertas entram primeiro
-        if (a.isOpen !== b.isOpen) {
-          return a.isOpen ? -1 : 1;
-        }
-
-        // 2. Favoritados
+        // 1. Favoritados
         const aFav = favoriteEvents.includes(a.id) ? 1 : 0;
         const bFav = favoriteEvents.includes(b.id) ? 1 : 0;
         if (aFav !== bFav) return bFav - aFav;
 
-        // 3. Data do evento
+        // 2. Data do evento
         const aTime = a.parsedDate ? a.parsedDate.getTime() : 0;
         const bTime = b.parsedDate ? b.parsedDate.getTime() : 0;
         if (aTime && bTime) return aTime - bTime;
