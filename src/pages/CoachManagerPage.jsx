@@ -8,7 +8,7 @@ import { ClipboardList, ChevronLeft, Trophy, ChevronDown, CalendarX, Shield } fr
 import bgHero from '../assets/Kuri.JPEG';
 
 const CoachManagerPage = () => {
-  const { currentUser, memberProfiles, events, academies, addAthlete } = useStore();
+  const { currentUser, memberProfiles, events, academies, addAthlete, athletes = [] } = useStore();
 
   const activeEvents = useMemo(
     () => events.filter(e => {
@@ -103,6 +103,30 @@ const CoachManagerPage = () => {
 
   const selectedAcademy = academies.find(a => a.id === academyId);
 
+  // Métricas de desempenho da academia
+  const teamPerformance = useMemo(() => {
+    const academyName = selectedAcademy?.name || '';
+    const academyMap = {};
+    athletes.forEach(a => {
+      const name = a.academia || 'Independente';
+      academyMap[name] = (academyMap[name] || 0) + (a.pontos || 0);
+    });
+
+    const sortedAcademies = Object.entries(academyMap).sort((a, b) => b[1] - a[1]);
+    const targetIndex = sortedAcademies.findIndex(([name]) => 
+      name.toLowerCase().trim() === academyName.toLowerCase().trim()
+    );
+
+    const totalPts = academyMap[academyName] || 0;
+    const rankPos = targetIndex !== -1 ? `#${targetIndex + 1}` : '#1';
+
+    return {
+      points: totalPts,
+      position: rankPos,
+      athletesCount: academyAthletes?.length || 0
+    };
+  }, [selectedAcademy, athletes, academyAthletes]);
+
   return (
     <div style={{ width: '100%', margin: 0, padding: 0 }}>
       {/* Header */}
@@ -171,6 +195,71 @@ const CoachManagerPage = () => {
       </section>
 
       <div style={{ marginTop: '2rem', marginBottom: '5rem', paddingLeft: 'clamp(1.5rem, 4vw, 4rem)', paddingRight: 'clamp(1.5rem, 4vw, 4rem)' }}>
+        {/* Painel de Desempenho da Equipe */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gap: '16px',
+          marginBottom: '24px'
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.8) 0%, rgba(30, 41, 59, 0.6) 100%)',
+            border: '1px solid rgba(56, 189, 248, 0.25)',
+            borderRadius: '16px',
+            padding: '18px 22px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '14px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.25)'
+          }}>
+            <div style={{ width: '46px', height: '46px', borderRadius: '12px', background: 'rgba(56, 189, 248, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8' }}>
+              <Trophy size={24} />
+            </div>
+            <div>
+              <div style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ranking Geral</div>
+              <div style={{ fontSize: '24px', fontWeight: 900, color: '#ffffff' }}>{teamPerformance.position} <span style={{ fontSize: '13px', fontWeight: 600, color: '#38bdf8' }}>Temporada</span></div>
+            </div>
+          </div>
+
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.8) 0%, rgba(30, 41, 59, 0.6) 100%)',
+            border: '1px solid rgba(234, 179, 8, 0.25)',
+            borderRadius: '16px',
+            padding: '18px 22px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '14px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.25)'
+          }}>
+            <div style={{ width: '46px', height: '46px', borderRadius: '12px', background: 'rgba(234, 179, 8, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#eab308' }}>
+              <Shield size={24} />
+            </div>
+            <div>
+              <div style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pontos Somados</div>
+              <div style={{ fontSize: '24px', fontWeight: 900, color: '#ffffff' }}>{teamPerformance.points} <span style={{ fontSize: '13px', fontWeight: 600, color: '#fef08a' }}>pts</span></div>
+            </div>
+          </div>
+
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.8) 0%, rgba(30, 41, 59, 0.6) 100%)',
+            border: '1px solid rgba(34, 197, 94, 0.25)',
+            borderRadius: '16px',
+            padding: '18px 22px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '14px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.25)'
+          }}>
+            <div style={{ width: '46px', height: '46px', borderRadius: '12px', background: 'rgba(34, 197, 94, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#22c55e' }}>
+              <ClipboardList size={24} />
+            </div>
+            <div>
+              <div style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Alunos Cadastrados</div>
+              <div style={{ fontSize: '24px', fontWeight: 900, color: '#ffffff' }}>{teamPerformance.athletesCount} <span style={{ fontSize: '13px', fontWeight: 600, color: '#86efac' }}>atletas</span></div>
+            </div>
+          </div>
+        </div>
+
         {/* Seletor de Campeonato */}
         <motion.div 
           initial={{ opacity: 0, y: -10 }}

@@ -1,0 +1,418 @@
+/* ─── PAINEL DE CHAMADA DE TATAMES (ARENA & TELÃO) ─── */
+
+.callboard-container {
+  min-height: 100vh;
+  background: radial-gradient(circle at 50% 10%, #0d1b2a 0%, #070d18 100%);
+  color: #f8fafc;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.callboard-fullscreen {
+  padding: 14px;
+}
+
+/* Header */
+.callboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.callboard-brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.callboard-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #f87171;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  background: #ef4444;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #ef4444;
+  animation: pulseLive 1.5s infinite;
+}
+
+@keyframes pulseLive {
+  0% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(1.2); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.callboard-title {
+  font-size: 22px;
+  font-weight: 800;
+  margin: 0;
+  background: linear-gradient(135deg, #ffffff 0%, #38bdf8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Controles */
+.callboard-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.callboard-select {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: #ffffff;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+}
+
+.callboard-tatame-tabs {
+  display: flex;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.callboard-tab-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.callboard-tab-btn.active {
+  background: #0284c7;
+  color: #ffffff;
+}
+
+.callboard-icon-btn {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #cbd5e1;
+  padding: 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.callboard-icon-btn.active {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: #38bdf8;
+  color: #38bdf8;
+}
+
+/* Banner de Alerta */
+.callboard-alert-banner {
+  background: linear-gradient(90deg, rgba(234, 179, 8, 0.2) 0%, rgba(245, 158, 11, 0.1) 100%);
+  border: 1px solid rgba(234, 179, 8, 0.4);
+  border-radius: 12px;
+  padding: 12px 18px;
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #fef08a;
+  animation: slideDown 0.3s ease-out;
+}
+
+.bell-ring {
+  animation: ring 1s ease-in-out infinite;
+  color: #eab308;
+}
+
+@keyframes ring {
+  0% { transform: rotate(0); }
+  10% { transform: rotate(14deg); }
+  20% { transform: rotate(-14deg); }
+  30% { transform: rotate(14deg); }
+  40% { transform: rotate(-14deg); }
+  50% { transform: rotate(0); }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.alert-text {
+  font-size: 14px;
+}
+
+.alert-text span {
+  color: #ffffff;
+  font-weight: 800;
+  text-decoration: underline;
+}
+
+/* Grid de Tatames */
+.callboard-grid {
+  display: grid;
+  gap: 18px;
+  margin-top: 18px;
+  flex: 1;
+}
+
+/* Card do Tatame */
+.tatame-card {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+}
+
+.tatame-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.tatame-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 900;
+  color: #38bdf8;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.call-btn {
+  background: rgba(234, 179, 8, 0.15);
+  border: 1px solid rgba(234, 179, 8, 0.35);
+  color: #fef08a;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.call-btn:hover {
+  background: #eab308;
+  color: #000;
+}
+
+/* Seções de Luta */
+.fight-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.section-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
+  text-transform: uppercase;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.dot-red { background: #ef4444; box-shadow: 0 0 6px #ef4444; }
+.dot-yellow { background: #eab308; box-shadow: 0 0 6px #eab308; }
+.dot-green { background: #22c55e; box-shadow: 0 0 6px #22c55e; }
+
+.fight-box {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 12px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.active-fight-box {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(15, 23, 42, 0.8) 100%);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.warm-fight-box {
+  background: linear-gradient(135deg, rgba(234, 179, 8, 0.08) 0%, rgba(15, 23, 42, 0.8) 100%);
+  border-color: rgba(234, 179, 8, 0.25);
+}
+
+.fight-category {
+  font-size: 11px;
+  font-weight: 700;
+  color: #38bdf8;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+/* Atletas da Luta Atual */
+.athletes-matchup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.athlete-card {
+  flex: 1;
+  padding: 10px;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.athlete-blue {
+  background: rgba(37, 99, 235, 0.15);
+  border: 1px solid rgba(37, 99, 235, 0.4);
+}
+
+.athlete-white {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.athlete-tag {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+}
+
+.athlete-name {
+  font-size: 13px;
+  font-weight: 800;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.athlete-team {
+  font-size: 11px;
+  color: #cbd5e1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vs-divider {
+  font-size: 11px;
+  font-weight: 900;
+  color: #64748b;
+}
+
+/* Próximos Atletas */
+.next-athletes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #f8fafc;
+}
+
+.vs-mini {
+  align-self: center;
+  font-size: 10px;
+  font-weight: 800;
+  color: #64748b;
+}
+
+/* Fila */
+.queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.queue-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.queue-pos {
+  font-size: 10px;
+  font-weight: 800;
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.15);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.queue-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.queue-cat {
+  font-size: 10px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.queue-names {
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.empty-fight, .empty-fight-mini {
+  color: #64748b;
+  font-size: 12px;
+  font-style: italic;
+  padding: 8px;
+  text-align: center;
+}

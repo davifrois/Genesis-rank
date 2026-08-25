@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { CheckCircle, ShieldCheck, ArrowRight, Calendar, User, Trophy, CreditCard, Printer, Sparkles, ExternalLink, ArrowLeft, Loader2 } from 'lucide-react';
+import { CheckCircle, ShieldCheck, ArrowRight, Calendar, User, Trophy, CreditCard, Printer, Sparkles, ExternalLink, ArrowLeft, Loader2, MessageCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import localforage from 'localforage';
 import { publicRegistrationService } from '../services/publicRegistrationService';
+import { whatsappNotificationService } from '../utils/whatsappNotificationService';
 
 const PaymentSuccess = () => {
   const navigate = useNavigate();
@@ -370,6 +371,43 @@ const PaymentSuccess = () => {
             <ArrowRight size={20} />
           </button>
           
+          {/* BOTÃO WHATSAPP: COMPROVANTE & QR CODE */}
+          <button 
+            type="button"
+            onClick={() => {
+              whatsappNotificationService.sendRegistrationReceipt({
+                athleteName: registration?.athleteName || registration?.fullName || registration?.nome || 'Atleta',
+                eventName: registration?.eventName || registration?.eventTitle || 'Circuito Genesis Sports',
+                category: registration?.category || registration?.categoria || registration?.modality,
+                belt: registration?.belt || registration?.faixa,
+                weight: registration?.weight,
+                team: registration?.team || registration?.academy || registration?.academia,
+                amount: registration?.amount || registration?.price || registration?.totalPrice,
+                registrationId: sessionId || registration?.id
+              });
+            }}
+            style={{ 
+              width: '100%', 
+              padding: '0.9rem', 
+              background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)', 
+              color: '#ffffff', 
+              border: 'none', 
+              borderRadius: '12px', 
+              fontWeight: 800, 
+              fontSize: '0.95rem', 
+              cursor: 'pointer', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              gap: '8px', 
+              boxShadow: '0 4px 16px rgba(37, 211, 102, 0.35)',
+              transition: 'transform 0.2s, box-shadow 0.2s' 
+            }}
+          >
+            <MessageCircle size={19} />
+            Enviar Comprovante e QR Code no WhatsApp
+          </button>
+
           <div style={{ display: 'flex', gap: '10px' }}>
             <button 
               onClick={handlePrintReceipt}

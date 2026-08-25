@@ -49,6 +49,7 @@ import AcademyRegistration from './pages/AcademyRegistration';
 import CoachManagerPage from './pages/CoachManagerPage';
 import Scoreboard from './pages/Scoreboard';
 import ScoreboardDisplay from './pages/ScoreboardDisplay';
+import TatameCallBoard from './pages/TatameCallBoard';
 import PaymentSuccess from './pages/PaymentSuccess';
 import PaymentPending from './pages/PaymentPending';
 import PaymentCancel from './pages/PaymentCancel';
@@ -1629,6 +1630,8 @@ const AppLayout = () => {
                 <Route path="/" element={<Home />} />
                 <Route path="/placar" element={<Scoreboard />} />
                 <Route path="/placar/display" element={<ScoreboardDisplay />} />
+                <Route path="/tatames" element={<TatameCallBoard />} />
+                <Route path="/chamada-tatame" element={<TatameCallBoard />} />
                 
                 <Route
                   path="/admin/*"
