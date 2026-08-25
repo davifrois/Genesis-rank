@@ -8493,44 +8493,47 @@ const PainelDeControle = () => {
 
             <AnimatePresence>
                 {showEventEditModal && (
-                    <>
+                    <div className="modal-backdrop" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', inset: 0, background: 'rgba(5, 10, 20, 0.85)', backdropFilter: 'blur(12px)', zIndex: 9999, padding: '16px' }} onClick={handleCloseEditEvent}>
                         <motion.div
-                            className="modal-backdrop"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            onClick={handleCloseEditEvent}
-                        />
-                        <motion.div
-                            className="modal-card"
-                            initial={{ opacity: 0, y: 12 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: 12 }}
-                            style={{ padding: 0 }}
-                        >
-                            <div className="modal-panel" style={{ padding: 0, overflow: 'hidden', width: '100vw', height: '100vh', maxWidth: '100vw', maxHeight: '100vh', borderRadius: 0, display: 'flex', flexDirection: 'column', background: '#0b1120' }}>
+                                initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                                transition={{ duration: 0.2 }}
+                                onClick={e => e.stopPropagation()}
+                                style={{
+                                    width: 'min(960px, 96vw)',
+                                    maxHeight: 'min(92vh, 840px)',
+                                    background: '#0d1527',
+                                    border: '1px solid rgba(56, 189, 248, 0.25)',
+                                    borderRadius: '20px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    overflow: 'hidden',
+                                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.85), 0 0 35px rgba(56, 189, 248, 0.15)'
+                                }}
+                            >
                                 {/* ── Header ─────────────────────────────────── */}
                                 <div style={{
                                     flexShrink: 0,
-                                    background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+                                    background: 'linear-gradient(135deg, #0f172a 0%, #17233f 100%)',
                                     borderBottom: '1px solid rgba(255,255,255,0.08)',
-                                    padding: '16px 20px 0 20px',
+                                    padding: '18px 24px 0 24px',
                                 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                                         <div>
                                             <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.12em', color: 'var(--brand-primary,#00c2cb)', textTransform: 'uppercase', marginBottom: '4px' }}>
                                                 Genesis Sports · Painel Admin
                                             </div>
-                                            <div className="modal-title" style={{ fontSize: '1.5rem', margin: 0 }}>
+                                            <div className="modal-title" style={{ fontSize: '20px', margin: 0, color: '#ffffff', fontWeight: 800 }}>
                                                 {copy.modalEventEdit.title}
                                             </div>
                                             {eventEditForm.name && (
-                                                <div style={{ fontSize: '13px', color: '#94a3b8', marginTop: '2px' }}>
+                                                <div style={{ fontSize: '13px', color: '#cbd5e1', marginTop: '2px' }}>
                                                     {eventEditForm.name}
                                                 </div>
                                             )}
                                         </div>
-                                        <button type="button" className="btn btn-ghost" onClick={handleCloseEditEvent} style={{ alignSelf: 'flex-start' }}>
+                                        <button type="button" className="btn btn-ghost" onClick={handleCloseEditEvent} style={{ color: '#94a3b8', fontSize: '13px', padding: '6px 12px' }}>
                                             {copy.common.close}
                                         </button>
                                     </div>
@@ -8547,10 +8550,10 @@ const PainelDeControle = () => {
                                                 type="button"
                                                 onClick={() => setEventModalTab(tab.id)}
                                                 style={{
-                                                    padding: '10px 16px',
-                                                    fontSize: '14px',
+                                                    padding: '8px 16px',
+                                                    fontSize: '13px',
                                                     fontWeight: eventModalTab === tab.id ? 700 : 500,
-                                                    color: eventModalTab === tab.id ? 'var(--brand-primary,#00c2cb)' : '#64748b',
+                                                    color: eventModalTab === tab.id ? 'var(--brand-primary,#00c2cb)' : '#94a3b8',
                                                     background: 'transparent',
                                                     border: 'none',
                                                     borderBottom: eventModalTab === tab.id ? '3px solid var(--brand-primary,#00c2cb)' : '3px solid transparent',
@@ -8569,23 +8572,23 @@ const PainelDeControle = () => {
 
                                 {/* ── Body ─────────────────────────────────── */}
                                 {eventEditError && (
-                                    <div className="login-error" role="alert" style={{ margin: '16px 20px 0 20px', borderRadius: '10px' }}>
-                                        <AlertCircle size={18} />
-                                        <p>{eventEditError}</p>
+                                    <div className="login-error" role="alert" style={{ margin: '14px 24px 0 24px', borderRadius: '10px' }}>
+                                        <AlertCircle size={16} />
+                                        <p style={{ fontSize: '13px' }}>{eventEditError}</p>
                                     </div>
                                 )}
 
                                 <form onSubmit={handleUpdateEvent} style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
-                                    <div style={{ flex: 1, padding: '20px 20px', overflowY: 'auto' }}>
+                                    <div style={{ flex: 1, padding: '20px 24px', overflowY: 'auto' }}>
 
                                         {/* ── TAB 1: Informações Básicas ──────── */}
                                         {eventModalTab === 'info' && (
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
                                                 <div>
-                                                    <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>
+                                                    <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#ffffff' }}>
                                                         NOME DO EVENTO *
                                                     </label>
-                                                    <span style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '8px' }}>
+                                                    <span style={{ fontSize: '12px', color: '#cbd5e1', display: 'block', marginBottom: '6px' }}>
                                                         Nome oficial do campeonato exibido aos atletas, inscrições e certificados.
                                                     </span>
                                                     <input
@@ -8595,16 +8598,16 @@ const PainelDeControle = () => {
                                                         onChange={(event) => setEventEditForm({ ...eventEditForm, name: event.target.value })}
                                                         placeholder={copy.modalEventEdit.eventNamePlaceholder}
                                                         required
-                                                        style={{ fontSize: '16px', padding: '14px 16px', fontWeight: 600 }}
+                                                        style={{ fontSize: '14px', padding: '10px 14px', fontWeight: 600, color: '#ffffff' }}
                                                     />
                                                 </div>
 
                                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                                                     <div>
-                                                        <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>
+                                                        <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#ffffff' }}>
                                                             DATA DO EVENTO
                                                         </label>
-                                                        <span style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '8px' }}>
+                                                        <span style={{ fontSize: '12px', color: '#cbd5e1', display: 'block', marginBottom: '6px' }}>
                                                             Data oficial de realização das lutas.
                                                         </span>
                                                         <input
@@ -8612,14 +8615,14 @@ const PainelDeControle = () => {
                                                             type="date"
                                                             value={eventEditForm.date}
                                                             onChange={(event) => setEventEditForm({ ...eventEditForm, date: event.target.value })}
-                                                            style={{ fontSize: '15px' }}
+                                                            style={{ fontSize: '14px', padding: '10px 14px', color: '#ffffff' }}
                                                         />
                                                     </div>
                                                     <div>
-                                                        <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>
+                                                        <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#ffffff' }}>
                                                             LOCAL / ARENA
                                                         </label>
-                                                        <span style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '8px' }}>
+                                                        <span style={{ fontSize: '12px', color: '#cbd5e1', display: 'block', marginBottom: '6px' }}>
                                                             Nome do ginásio, centro esportivo ou endereço completo.
                                                         </span>
                                                         <input
@@ -8628,63 +8631,63 @@ const PainelDeControle = () => {
                                                             value={eventEditForm.location}
                                                             onChange={(event) => setEventEditForm({ ...eventEditForm, location: event.target.value })}
                                                             placeholder={copy.modalEventEdit.locationPlaceholder}
-                                                            style={{ fontSize: '15px' }}
+                                                            style={{ fontSize: '14px', padding: '10px 14px', color: '#ffffff' }}
                                                         />
                                                     </div>
                                                 </div>
 
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px', padding: '16px', background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.2)', borderRadius: '10px' }}>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '12px 16px', background: 'rgba(234, 179, 8, 0.12)', border: '1px solid rgba(234, 179, 8, 0.3)', borderRadius: '10px' }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                                         <input
                                                             type="checkbox"
                                                             id="isPremiumCheckbox"
                                                             checked={eventEditForm.isPremium || false}
                                                             onChange={(e) => setEventEditForm({ ...eventEditForm, isPremium: e.target.checked })}
-                                                            style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#eab308' }}
+                                                            style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#eab308' }}
                                                         />
-                                                        <label htmlFor="isPremiumCheckbox" style={{ fontSize: '14px', fontWeight: 700, color: '#fef08a', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                        <label htmlFor="isPremiumCheckbox" style={{ fontSize: '13px', fontWeight: 700, color: '#fef08a', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                             <span>Evento Premium / Destaque Especial na Página Inicial</span>
                                                         </label>
                                                     </div>
-                                                    <span style={{ fontSize: '12px', color: '#fef08acc', marginLeft: '28px' }}>
+                                                    <span style={{ fontSize: '12px', color: '#fef08a', opacity: 0.9, marginLeft: '26px' }}>
                                                         Ao ativar, este evento fica em destaque principal no topo da página inicial do site para atração máxima de inscritos.
                                                     </span>
                                                 </div>
 
                                                 <div>
-                                                    <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>
+                                                    <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#ffffff' }}>
                                                         DESCRIÇÃO DO EVENTO (Informações Gerais)
                                                     </label>
-                                                    <span style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '8px' }}>
+                                                    <span style={{ fontSize: '12px', color: '#cbd5e1', display: 'block', marginBottom: '6px' }}>
                                                         Detalhes do evento: horários de abertura de portões, regras oficiais da federação, premiações e orientações gerais.
                                                     </span>
                                                     <textarea
                                                         className="input"
-                                                        rows="4"
+                                                        rows="3"
                                                         value={eventEditForm.eventDescription || ''}
                                                         onChange={(event) => setEventEditForm({ ...eventEditForm, eventDescription: event.target.value })}
                                                         placeholder="Ex: Regras da IBJJF, premiações especiais em dinheiro, etc..."
-                                                        style={{ fontSize: '15px', resize: 'vertical' }}
+                                                        style={{ fontSize: '14px', padding: '10px 14px', resize: 'vertical', color: '#ffffff' }}
                                                     ></textarea>
                                                 </div>
 
                                                 {/* CONTATO DOS ORGANIZADORES & REDES SOCIAIS */}
                                                 <div style={{
-                                                    background: 'rgba(255, 255, 255, 0.02)',
-                                                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                                                    background: 'rgba(255, 255, 255, 0.03)',
+                                                    border: '1px solid rgba(255, 255, 255, 0.1)',
                                                     borderRadius: '14px',
-                                                    padding: '20px',
+                                                    padding: '16px',
                                                     display: 'flex',
                                                     flexDirection: 'column',
-                                                    gap: '16px'
+                                                    gap: '14px'
                                                 }}>
-                                                    <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--brand-primary, #00c2cb)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                         <span>📞</span> CONTATOS DOS ORGANIZADORES &amp; REDES SOCIAIS
                                                     </div>
 
-                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
                                                          <div>
-                                                             <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>
+                                                             <label className="table-meta" style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#ffffff' }}>
                                                                  ORGANIZADOR / FEDERAÇÃO (Opcional)
                                                              </label>
                                                              <input
@@ -8693,11 +8696,11 @@ const PainelDeControle = () => {
                                                                  value={eventEditForm.organizerName || ''}
                                                                  onChange={(event) => setEventEditForm({ ...eventEditForm, organizerName: event.target.value })}
                                                                  placeholder="Ex: Federação Genesis / Pacific BJJ"
-                                                                 style={{ fontSize: '15px' }}
+                                                                 style={{ fontSize: '13px', padding: '8px 12px', color: '#ffffff' }}
                                                              />
                                                          </div>
                                                          <div>
-                                                             <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>
+                                                             <label className="table-meta" style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#ffffff' }}>
                                                                  WHATSAPP (Opcional)
                                                              </label>
                                                              <input
@@ -8706,11 +8709,11 @@ const PainelDeControle = () => {
                                                                  value={eventEditForm.eventSocialWhatsapp || ''}
                                                                  onChange={(event) => setEventEditForm({ ...eventEditForm, eventSocialWhatsapp: event.target.value })}
                                                                  placeholder="Ex: 31980164389"
-                                                                 style={{ fontSize: '15px' }}
+                                                                 style={{ fontSize: '13px', padding: '8px 12px', color: '#ffffff' }}
                                                              />
                                                          </div>
                                                          <div>
-                                                             <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>
+                                                             <label className="table-meta" style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#ffffff' }}>
                                                                  INSTAGRAM (Opcional)
                                                              </label>
                                                              <input
@@ -8719,11 +8722,11 @@ const PainelDeControle = () => {
                                                                  value={eventEditForm.eventSocialInstagram || ''}
                                                                  onChange={(event) => setEventEditForm({ ...eventEditForm, eventSocialInstagram: event.target.value })}
                                                                  placeholder="Ex: @pacificfederationbjjbr ou link"
-                                                                 style={{ fontSize: '15px' }}
+                                                                 style={{ fontSize: '13px', padding: '8px 12px', color: '#ffffff' }}
                                                              />
                                                          </div>
                                                          <div>
-                                                             <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>
+                                                             <label className="table-meta" style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#ffffff' }}>
                                                                  E-MAIL DE SUPORTE (Opcional)
                                                              </label>
                                                              <input
@@ -8732,11 +8735,11 @@ const PainelDeControle = () => {
                                                                  value={eventEditForm.eventSocialEmail || ''}
                                                                  onChange={(event) => setEventEditForm({ ...eventEditForm, eventSocialEmail: event.target.value })}
                                                                  placeholder="contato@organizacao.com.br"
-                                                                 style={{ fontSize: '15px' }}
+                                                                 style={{ fontSize: '13px', padding: '8px 12px', color: '#ffffff' }}
                                                              />
                                                          </div>
                                                          <div style={{ gridColumn: '1 / -1' }}>
-                                                             <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>
+                                                             <label className="table-meta" style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#ffffff' }}>
                                                                  WEBSITE OFICIAL (Opcional)
                                                              </label>
                                                              <input
@@ -8745,17 +8748,17 @@ const PainelDeControle = () => {
                                                                  value={eventEditForm.eventSocialWebsite || ''}
                                                                  onChange={(event) => setEventEditForm({ ...eventEditForm, eventSocialWebsite: event.target.value })}
                                                                  placeholder="https://..."
-                                                                 style={{ fontSize: '15px' }}
+                                                                 style={{ fontSize: '13px', padding: '8px 12px', color: '#ffffff' }}
                                                              />
                                                          </div>
                                                     </div>
                                                 </div>
 
                                                 <div>
-                                                    <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#94a3b8' }}>
+                                                    <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#ffffff' }}>
                                                         LOCAL NO MAPA (URL Iframe do Google Maps - opcional)
                                                     </label>
-                                                    <span style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '8px' }}>
+                                                    <span style={{ fontSize: '12px', color: '#cbd5e1', display: 'block', marginBottom: '6px' }}>
                                                         Link de incorporação (embed iframe) gerado no Google Maps para exibir o mapa interativo na página do evento.
                                                     </span>
                                                     <input
@@ -8764,11 +8767,12 @@ const PainelDeControle = () => {
                                                         value={eventEditForm.mapIframeUrl || ''}
                                                         onChange={(event) => setEventEditForm({ ...eventEditForm, mapIframeUrl: event.target.value })}
                                                         placeholder="Ex: https://www.google.com/maps/embed?pb=..."
+                                                        style={{ fontSize: '13px', padding: '8px 12px', color: '#ffffff' }}
                                                     />
                                                 </div>
 
                                                 <div>
-                                                    <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px', display: 'block', color: '#94a3b8' }}>
+                                                    <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '6px', display: 'block', color: '#ffffff' }}>
                                                         URL DA IMAGEM DO CARTAZ (opcional)
                                                     </label>
                                                     <input
@@ -8777,14 +8781,15 @@ const PainelDeControle = () => {
                                                         value={eventEditForm.posterUrl}
                                                         onChange={handleEventEditPosterUrlChange}
                                                         placeholder={copy.modalEventEdit.posterUrlPlaceholder}
+                                                        style={{ fontSize: '13px', padding: '8px 12px', color: '#ffffff' }}
                                                     />
                                                 </div>
 
                                                 <div>
-                                                    <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '2px', display: 'block', color: '#94a3b8' }}>
+                                                    <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '2px', display: 'block', color: '#ffffff' }}>
                                                         ENVIAR ARQUIVO DO CARTAZ
                                                     </label>
-                                                    <span style={{ fontSize: '12px', color: '#38bdf8', display: 'block', marginBottom: '8px', fontWeight: 500 }}>
+                                                    <span style={{ fontSize: '12px', color: '#38bdf8', display: 'block', marginBottom: '6px', fontWeight: 500 }}>
                                                         💡 Dica: A proporção recomendada é 3:1 (ex: 1200x400px) para o cartaz horizontal.
                                                     </span>
                                                     <input
@@ -8792,10 +8797,11 @@ const PainelDeControle = () => {
                                                         type="file"
                                                         accept="image/*"
                                                         onChange={handleEventEditPosterFile}
+                                                        style={{ fontSize: '13px', padding: '6px 10px', color: '#ffffff' }}
                                                     />
-                                                    <div className="table-meta table-meta--tight">{copy.modalEventEdit.posterCompressionHint}</div>
+                                                    <div className="table-meta table-meta--tight" style={{ marginTop: '4px', fontSize: '12px', color: '#cbd5e1' }}>{copy.modalEventEdit.posterCompressionHint}</div>
                                                     {eventPosterStoredSizeBytes > 0 && (
-                                                        <div className="table-meta table-meta--tight">
+                                                        <div className="table-meta table-meta--tight" style={{ fontSize: '12px', color: '#38bdf8' }}>
                                                             {copy.modalEventEdit.posterCompressedSize}: {formatBytes(eventPosterStoredSizeBytes)}
                                                         </div>
                                                     )}
@@ -9374,16 +9380,16 @@ const PainelDeControle = () => {
                                                     Próxima Aba →
                                                 </button>
                                             )}
-                                            <button type="submit" className="btn btn-primary" style={{ minWidth: '160px', fontSize: '15px', padding: '10px 24px', fontWeight: 800 }}>
+                                            <button type="submit" className="btn btn-primary" style={{ minWidth: '140px', fontSize: '13px', padding: '8px 20px', fontWeight: 700 }}>
                                                 {copy.modalEventEdit.saveChanges || 'Salvar alterações'}
                                             </button>
                                         </div>
                                     </div>
                                 </form>
-                            </div>
-                        </motion.div>
-                    </>
-                )}
+                            </motion.div>
+                        </div>
+                    )
+                }
             </AnimatePresence>
 
 
