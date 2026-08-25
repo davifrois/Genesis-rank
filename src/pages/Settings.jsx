@@ -824,6 +824,81 @@ const Settings = () => {
           </article>
 
           <article className="profile-card profile-card--dark">
+            <div className="profile-card__header profile-card__header--dark"><h2>Imagem de perfil e capa</h2></div>
+            <div className="profile-card__body">
+              <div className="profile-upload-grid">
+                <div className="profile-upload-panel">
+                  <label>URL da foto de perfil</label>
+                  <input className="profile-input profile-input--dark" value={form.photoUrl} onChange={(event) => setForm((previous) => ({ ...previous, photoUrl: event.target.value }))} placeholder="https://..." />
+                  <div className="profile-upload-row">
+                    <label className="profile-file-btn">
+                      <Image size={14} />
+                      Selecionar foto
+                      <input type="file" accept="image/*" onChange={handleImageFile('photoUrl')} />
+                    </label>
+                    {form.photoUrl && (
+                      <div className="profile-image-preview profile-image-preview--athlete">
+                        <img src={form.photoUrl} alt={buildFullName(form.firstName, form.middleName, form.lastName) || 'Atleta'} />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="profile-upload-panel">
+                  <label>URL da imagem de capa</label>
+                  <input className="profile-input profile-input--dark" value={form.coverUrl} onChange={(event) => setForm((previous) => ({ ...previous, coverUrl: event.target.value }))} placeholder="https://..." />
+                  <div className="profile-upload-row">
+                    <label className="profile-file-btn">
+                      <Image size={14} />
+                      Selecionar capa
+                      <input type="file" accept="image/*" onChange={handleImageFile('coverUrl')} />
+                    </label>
+                  </div>
+                  {form.coverUrl && (
+                    <>
+                      <div className="profile-note profile-note--dark" style={{ marginTop: '10px', fontSize: '11px' }}>
+                        Clique e arraste a imagem para cima ou para baixo para ajustar a posi&#231;&#227;o.
+                      </div>
+                      <div
+                        className="profile-cover-preview"
+                        style={{
+                          height: '150px',
+                          overflow: 'hidden',
+                          cursor: 'ns-resize',
+                          position: 'relative',
+                          backgroundImage: `url(${form.coverUrl})`,
+                          backgroundSize: 'cover',
+                          backgroundPosition: `center ${form.coverPositionY}%`,
+                          borderRadius: '8px',
+                          border: '1px solid #1f2937'
+                        }}
+                        onPointerDown={(e) => {
+                          e.currentTarget.setPointerCapture(e.pointerId);
+                          e.currentTarget.dataset.startY = e.clientY;
+                          e.currentTarget.dataset.startPosY = form.coverPositionY;
+                        }}
+                        onPointerMove={(e) => {
+                          if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+                            const startY = parseFloat(e.currentTarget.dataset.startY);
+                            const startPosY = parseFloat(e.currentTarget.dataset.startPosY);
+                            const deltaY = e.clientY - startY;
+                            let newPos = startPosY - (deltaY * 0.5);
+                            newPos = Math.max(0, Math.min(100, newPos));
+                            setForm(prev => ({ ...prev, coverPositionY: newPos }));
+                          }
+                        }}
+                        onPointerUp={(e) => {
+                          e.currentTarget.releasePointerCapture(e.pointerId);
+                        }}
+                      />
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article className="profile-card profile-card--dark">
             <div className="profile-card__header profile-card__header--dark"><h2>Seguranca da conta</h2></div>
             <div className="profile-card__body">
               <p className="profile-note profile-note--dark">
@@ -974,80 +1049,6 @@ const Settings = () => {
             </div>
           </article>
 
-          <article className="profile-card profile-card--dark">
-            <div className="profile-card__header profile-card__header--dark"><h2>Imagem de perfil e capa</h2></div>
-            <div className="profile-card__body">
-              <div className="profile-upload-grid">
-                <div className="profile-upload-panel">
-                  <label>URL da foto de perfil</label>
-                  <input className="profile-input profile-input--dark" value={form.photoUrl} onChange={(event) => setForm((previous) => ({ ...previous, photoUrl: event.target.value }))} placeholder="https://..." />
-                  <div className="profile-upload-row">
-                    <label className="profile-file-btn">
-                      <Image size={14} />
-                      Selecionar foto
-                      <input type="file" accept="image/*" onChange={handleImageFile('photoUrl')} />
-                    </label>
-                    {form.photoUrl && (
-                      <div className="profile-image-preview profile-image-preview--athlete">
-                        <img src={form.photoUrl} alt={buildFullName(form.firstName, form.middleName, form.lastName) || 'Atleta'} />
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="profile-upload-panel">
-                  <label>URL da imagem de capa</label>
-                  <input className="profile-input profile-input--dark" value={form.coverUrl} onChange={(event) => setForm((previous) => ({ ...previous, coverUrl: event.target.value }))} placeholder="https://..." />
-                  <div className="profile-upload-row">
-                    <label className="profile-file-btn">
-                      <Image size={14} />
-                      Selecionar capa
-                      <input type="file" accept="image/*" onChange={handleImageFile('coverUrl')} />
-                    </label>
-                  </div>
-                  {form.coverUrl && (
-                    <>
-                      <div className="profile-note profile-note--dark" style={{ marginTop: '10px', fontSize: '11px' }}>
-                        Clique e arraste a imagem para cima ou para baixo para ajustar a posição.
-                      </div>
-                      <div 
-                        className="profile-cover-preview"
-                        style={{ 
-                          height: '150px', 
-                          overflow: 'hidden', 
-                          cursor: 'ns-resize', 
-                          position: 'relative',
-                          backgroundImage: `url(${form.coverUrl})`,
-                          backgroundSize: 'cover',
-                          backgroundPosition: `center ${form.coverPositionY}%`,
-                          borderRadius: '8px',
-                          border: '1px solid #1f2937'
-                        }}
-                        onPointerDown={(e) => {
-                          e.currentTarget.setPointerCapture(e.pointerId);
-                          e.currentTarget.dataset.startY = e.clientY;
-                          e.currentTarget.dataset.startPosY = form.coverPositionY;
-                        }}
-                        onPointerMove={(e) => {
-                          if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-                            const startY = parseFloat(e.currentTarget.dataset.startY);
-                            const startPosY = parseFloat(e.currentTarget.dataset.startPosY);
-                            const deltaY = e.clientY - startY;
-                            let newPos = startPosY - (deltaY * 0.5);
-                            newPos = Math.max(0, Math.min(100, newPos));
-                            setForm(prev => ({ ...prev, coverPositionY: newPos }));
-                          }
-                        }}
-                        onPointerUp={(e) => {
-                          e.currentTarget.releasePointerCapture(e.pointerId);
-                        }}
-                      />
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          </article>
 
           <article className="profile-card profile-card--dark">
             <div className="profile-card__header profile-card__header--dark"><h2>Faixa e historico tecnico</h2></div>
