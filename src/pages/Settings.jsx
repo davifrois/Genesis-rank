@@ -824,6 +824,102 @@ const Settings = () => {
           </article>
 
           <article className="profile-card profile-card--dark">
+            <div className="profile-card__header profile-card__header--dark"><h2>Faixa e historico tecnico</h2></div>
+            <div className="profile-card__body">
+              <div className="profile-fields">
+                <div className="profile-field">
+                  <label>Faixa atual</label>
+                  <select className="profile-input profile-input--dark" value={form.belt} onChange={(event) => setForm((previous) => ({ ...previous, belt: event.target.value }))}>
+                    <option value="">Selecione a faixa</option>
+                    {getAvailableBeltsForAge(age).map((belt) => (
+                      <option key={belt} value={belt}>{belt}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="profile-field">
+                  <label>Peso / divisao</label>
+                  <select className="profile-input profile-input--dark" value={form.weight} onChange={(event) => setForm((previous) => ({ ...previous, weight: event.target.value }))}>
+                    <option value="">Selecione o peso</option>
+                    {getAvailableWeightsForProfile(age, form.gender).map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="profile-field profile-field--full">
+                  <label>Historico de faixa</label>
+                  <textarea className="profile-input profile-input--dark profile-textarea" value={form.beltHistory} onChange={(event) => setForm((previous) => ({ ...previous, beltHistory: event.target.value }))} placeholder="Ex: Azul (2023), Roxa (2025)." rows={3} />
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article className="profile-card profile-card--dark">
+            <div className="profile-card__header profile-card__header--dark" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h2>Academia e Equipe</h2>
+              <button
+                type="button"
+                onClick={() => navigate('/registro-academia')}
+                style={{
+                  background: 'rgba(0, 194, 203, 0.12)',
+                  border: '1px solid rgba(0, 194, 203, 0.35)',
+                  borderRadius: '8px',
+                  padding: '6px 12px',
+                  color: '#00c2cb',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <PlusCircle size={15} />
+                Cadastrar Nova Academia
+              </button>
+            </div>
+            <div className="profile-card__body">
+              <div className="profile-fields">
+                <div className="profile-field profile-field--full">
+                  <label>Academia</label>
+                  <AcademySelect 
+                    academies={academies} 
+                    value={form.academyId} 
+                    onChange={(value) => setForm((previous) => ({ ...previous, academyId: value }))} 
+                    onRegisterNew={(typedName) => navigate('/registro-academia', { state: { initialName: typedName || '' } })} 
+                    theme="light"
+                  />
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px' }}>
+                    <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+                      Não encontrou sua equipe na lista?
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/registro-academia')}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#00c2cb',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        textDecoration: 'underline'
+                      }}
+                    >
+                      + Cadastrar Nova Academia
+                    </button>
+                  </div>
+                </div>
+                <div className="profile-field profile-field--full" style={{ marginTop: '10px' }}>
+                  <label>Afiliação/Equipe Selecionada</label>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', fontWeight: 500, margin: 0 }}>
+                    {selectedAcademy ? selectedAcademy.name : 'Sem equipe/afiliação'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article className="profile-card profile-card--dark">
             <div className="profile-card__header profile-card__header--dark"><h2>Imagem de perfil e capa</h2></div>
             <div className="profile-card__body">
               <div className="profile-upload-grid">
@@ -1046,103 +1142,6 @@ const Settings = () => {
                 <input type="checkbox" checked={!form.publicProfile} onChange={(event) => setForm((previous) => ({ ...previous, publicProfile: !event.target.checked }))} />
                 <span>{form.publicProfile ? 'Exibir perfil publico' : 'Ocultar perfil publico'}</span>
               </label>
-            </div>
-          </article>
-
-
-          <article className="profile-card profile-card--dark">
-            <div className="profile-card__header profile-card__header--dark"><h2>Faixa e historico tecnico</h2></div>
-            <div className="profile-card__body">
-              <div className="profile-fields">
-                <div className="profile-field">
-                  <label>Faixa atual</label>
-                  <select className="profile-input profile-input--dark" value={form.belt} onChange={(event) => setForm((previous) => ({ ...previous, belt: event.target.value }))}>
-                    <option value="">Selecione a faixa</option>
-                    {getAvailableBeltsForAge(age).map((belt) => (
-                      <option key={belt} value={belt}>{belt}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="profile-field">
-                  <label>Peso / divisao</label>
-                  <select className="profile-input profile-input--dark" value={form.weight} onChange={(event) => setForm((previous) => ({ ...previous, weight: event.target.value }))}>
-                    <option value="">Selecione o peso</option>
-                    {getAvailableWeightsForProfile(age, form.gender).map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="profile-field profile-field--full">
-                  <label>Historico de faixa</label>
-                  <textarea className="profile-input profile-input--dark profile-textarea" value={form.beltHistory} onChange={(event) => setForm((previous) => ({ ...previous, beltHistory: event.target.value }))} placeholder="Ex: Azul (2023), Roxa (2025)." rows={3} />
-                </div>
-              </div>
-            </div>
-          </article>
-
-          <article className="profile-card profile-card--dark">
-            <div className="profile-card__header profile-card__header--dark" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h2>Academia e Equipe</h2>
-              <button
-                type="button"
-                onClick={() => navigate('/registro-academia')}
-                style={{
-                  background: 'rgba(0, 194, 203, 0.12)',
-                  border: '1px solid rgba(0, 194, 203, 0.35)',
-                  borderRadius: '8px',
-                  padding: '6px 12px',
-                  color: '#00c2cb',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                <PlusCircle size={15} />
-                Cadastrar Nova Academia
-              </button>
-            </div>
-            <div className="profile-card__body">
-              <div className="profile-fields">
-                <div className="profile-field profile-field--full">
-                  <label>Academia</label>
-                  <AcademySelect 
-                    academies={academies} 
-                    value={form.academyId} 
-                    onChange={(value) => setForm((previous) => ({ ...previous, academyId: value }))} 
-                    onRegisterNew={(typedName) => navigate('/registro-academia', { state: { initialName: typedName || '' } })} 
-                    theme="light"
-                  />
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px' }}>
-                    <span style={{ fontSize: '12px', color: '#94a3b8' }}>
-                      Não encontrou sua equipe na lista?
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => navigate('/registro-academia')}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#00c2cb',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        textDecoration: 'underline'
-                      }}
-                    >
-                      + Cadastrar Nova Academia
-                    </button>
-                  </div>
-                </div>
-                <div className="profile-field profile-field--full" style={{ marginTop: '10px' }}>
-                  <label>Afiliação/Equipe Selecionada</label>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', fontWeight: 500, margin: 0 }}>
-                    {selectedAcademy ? selectedAcademy.name : 'Sem equipe/afiliação'}
-                  </p>
-                </div>
-              </div>
             </div>
           </article>
 
