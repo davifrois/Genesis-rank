@@ -1,5 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { nextPowerOfTwo, seedSlotsWithRankingAwareByes } from '../services/bracketService';
 import { Users, CheckCircle2 } from 'lucide-react';
 
@@ -399,10 +400,32 @@ const BracketTree = ({
                     )}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {!isByeA && <span style={{ fontSize: '12px', marginRight: '4px' }}>🇧🇷</span>}
-                      {match.slotALabel}
-                    </span>
+                    {!isByeA && match.slotAId && !match.slotAId.startsWith('__') ? (
+                      <Link 
+                        to={`/perfil-publico/${match.slotAId}`}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ 
+                          fontSize: '0.85rem', 
+                          fontWeight: 700, 
+                          color: '#fff', 
+                          whiteSpace: 'nowrap', 
+                          overflow: 'hidden', 
+                          textOverflow: 'ellipsis',
+                          textDecoration: 'none',
+                          cursor: 'pointer'
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.color = '#38bdf8'; e.currentTarget.style.textDecoration = 'underline'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.textDecoration = 'none'; }}
+                      >
+                        <span style={{ fontSize: '12px', marginRight: '4px' }}>🇧🇷</span>
+                        {match.slotALabel}
+                      </Link>
+                    ) : (
+                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {!isByeA && <span style={{ fontSize: '12px', marginRight: '4px' }}>🇧🇷</span>}
+                        {match.slotALabel}
+                      </span>
+                    )}
                     {!isByeA && <span style={{ fontSize: '0.7rem', color: '#999', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {match.slotAAcademy || '-'}
                     </span>}
@@ -424,10 +447,32 @@ const BracketTree = ({
                     )}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {!isByeB && <span style={{ fontSize: '12px', marginRight: '4px' }}>🇧🇷</span>}
-                      {match.slotBLabel}
-                    </span>
+                    {!isByeB && match.slotBId && !match.slotBId.startsWith('__') ? (
+                      <Link 
+                        to={`/perfil-publico/${match.slotBId}`}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ 
+                          fontSize: '0.85rem', 
+                          fontWeight: 700, 
+                          color: '#fff', 
+                          whiteSpace: 'nowrap', 
+                          overflow: 'hidden', 
+                          textOverflow: 'ellipsis',
+                          textDecoration: 'none',
+                          cursor: 'pointer'
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.color = '#38bdf8'; e.currentTarget.style.textDecoration = 'underline'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.textDecoration = 'none'; }}
+                      >
+                        <span style={{ fontSize: '12px', marginRight: '4px' }}>🇧🇷</span>
+                        {match.slotBLabel}
+                      </Link>
+                    ) : (
+                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {!isByeB && <span style={{ fontSize: '12px', marginRight: '4px' }}>🇧🇷</span>}
+                        {match.slotBLabel}
+                      </span>
+                    )}
                     {!isByeB && <span style={{ fontSize: '0.7rem', color: '#999', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {match.slotBAcademy || '-'}
                     </span>}

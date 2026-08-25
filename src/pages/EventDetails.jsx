@@ -1546,6 +1546,12 @@ const EventDetails = () => {
                                 const isByeA = aName === 'BYE' || aName === 'Aguardando';
                                 const isByeB = bName === 'BYE' || bName === 'Aguardando';
 
+                                const athObjA = (aId && !isByeA) ? (athleteMap.get(aId) || athletes.find(a => a.id === aId || (a.nome && a.nome.toLowerCase() === aName.toLowerCase()))) : null;
+                                const athObjB = (bId && !isByeB) ? (athleteMap.get(bId) || athletes.find(a => a.id === bId || (a.nome && a.nome.toLowerCase() === bName.toLowerCase()))) : null;
+
+                                const profileLinkA = athObjA?.id ? `/perfil-publico/${athObjA.id}` : (aId && !isByeA && !aId.startsWith('__') ? `/perfil-publico/${aId}` : null);
+                                const profileLinkB = athObjB?.id ? `/perfil-publico/${athObjB.id}` : (bId && !isByeB && !bId.startsWith('__') ? `/perfil-publico/${bId}` : null);
+
                                 const result = selectedBracket.matchResults?.[match.matchId || match.id];
                                 const isFinished = !!result;
                                 const winnerA = isFinished && result.winnerId === aId;
@@ -1577,9 +1583,27 @@ const EventDetails = () => {
                                         <div style={{ display: 'flex', flexDirection: 'column' }}>
                                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                             {!isByeA && <span style={{ fontSize: '10px' }}>🇧🇷</span>}
-                                            <span style={{ color: winnerA ? '#22c55e' : (isByeA ? '#71717a' : '#fff'), fontWeight: winnerA ? 700 : 600, fontSize: '0.9rem' }}>{aName}</span>
+                                            {profileLinkA ? (
+                                              <Link
+                                                to={profileLinkA}
+                                                style={{ 
+                                                  color: winnerA ? '#22c55e' : '#fff', 
+                                                  fontWeight: winnerA ? 700 : 600, 
+                                                  fontSize: '0.9rem',
+                                                  textDecoration: 'none',
+                                                  cursor: 'pointer',
+                                                  transition: 'color 0.15s'
+                                                }}
+                                                onMouseEnter={(e) => { e.currentTarget.style.color = '#38bdf8'; e.currentTarget.style.textDecoration = 'underline'; }}
+                                                onMouseLeave={(e) => { e.currentTarget.style.color = winnerA ? '#22c55e' : '#fff'; e.currentTarget.style.textDecoration = 'none'; }}
+                                              >
+                                                {aName}
+                                              </Link>
+                                            ) : (
+                                              <span style={{ color: winnerA ? '#22c55e' : (isByeA ? '#71717a' : '#fff'), fontWeight: winnerA ? 700 : 600, fontSize: '0.9rem' }}>{aName}</span>
+                                            )}
                                           </div>
-                                          {!isByeA && <span style={{ color: '#71717a', fontSize: '0.75rem' }}>Equipe / Academy</span>}
+                                          {!isByeA && <span style={{ color: '#71717a', fontSize: '0.75rem' }}>{athObjA?.academia || 'Equipe / Academy'}</span>}
                                         </div>
                                       </div>
                                       
@@ -1598,9 +1622,27 @@ const EventDetails = () => {
                                         <div style={{ display: 'flex', flexDirection: 'column' }}>
                                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                             {!isByeB && <span style={{ fontSize: '10px' }}>🇧🇷</span>}
-                                            <span style={{ color: winnerB ? '#22c55e' : (isByeB ? '#71717a' : '#fff'), fontWeight: winnerB ? 700 : 600, fontSize: '0.9rem' }}>{bName}</span>
+                                            {profileLinkB ? (
+                                              <Link
+                                                to={profileLinkB}
+                                                style={{ 
+                                                  color: winnerB ? '#22c55e' : '#fff', 
+                                                  fontWeight: winnerB ? 700 : 600, 
+                                                  fontSize: '0.9rem',
+                                                  textDecoration: 'none',
+                                                  cursor: 'pointer',
+                                                  transition: 'color 0.15s'
+                                                }}
+                                                onMouseEnter={(e) => { e.currentTarget.style.color = '#38bdf8'; e.currentTarget.style.textDecoration = 'underline'; }}
+                                                onMouseLeave={(e) => { e.currentTarget.style.color = winnerB ? '#22c55e' : '#fff'; e.currentTarget.style.textDecoration = 'none'; }}
+                                              >
+                                                {bName}
+                                              </Link>
+                                            ) : (
+                                              <span style={{ color: winnerB ? '#22c55e' : (isByeB ? '#71717a' : '#fff'), fontWeight: winnerB ? 700 : 600, fontSize: '0.9rem' }}>{bName}</span>
+                                            )}
                                           </div>
-                                          {!isByeB && <span style={{ color: '#71717a', fontSize: '0.75rem' }}>Equipe / Academy</span>}
+                                          {!isByeB && <span style={{ color: '#71717a', fontSize: '0.75rem' }}>{athObjB?.academia || 'Equipe / Academy'}</span>}
                                         </div>
                                       </div>
                                     </div>
