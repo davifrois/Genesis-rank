@@ -225,29 +225,77 @@ const sanitizePesoField = (rawPeso) => {
     return rawPeso;
 };
 
-export const resolvePesoLabel = (athlete) => {
-    if (athlete.isAbsolute) return 'Absoluto';
-    const rawPeso = athlete.peso || (athlete.isAbsolute ? 'Absoluto' : 'Peso');
-    const cleanedPeso = sanitizePesoField(rawPeso);
-    return getWeightLimitString(cleanedPeso, athlete.categoria, athlete.genero || athlete.sexo, athlete.idade);
+const AGE_DIVISIONS = [
+    'PRÉ-MIRIM', 'PRE-MIRIM', 'MIRIM', 'INFANTIL', 'INFANTO-JUVENIL', 'INFANTO JUVENIL',
+    'JUVENIL', 'ADULTO', 'MASTER 1', 'MASTER 2', 'MASTER 3', 'MASTER 4', 'MASTER 5', 'MASTER 6', 'MASTER 7'
+];
+
+/**
+ * Normaliza os componentes da categoria evitando repetições duplicadas
+ */
+export const normalizeCategoryComponents = (athlete) => {
+    const rawCat = (athlete.categoria || athlete.category || '').toUpperCase().trim();
+    const rawFaixa = (athlete.faixa || athlete.belt || '').toUpperCase().trim();
+    const rawPeso = (athlete.peso || athlete.weight || '').toUpperCase().trim();
+    const rawGenero = (athlete.genero || athlete.sexo || athlete.gender || '').toUpperCase().trim();
+
+    const segments = rawCat.split(/[\/\-]/).map(s => s.trim()).filter(Boolean);
+
+    let ageDivision = '';
+    let foundGender = '';
+    let foundBelt = '';
+    let foundWeight = '';
+
+    segments.forEach(seg => {
+        if (!ageDivision && AGE_DIVISIONS.some(ad => seg.includes(ad))) {
+            ageDivision = seg;
+        } else if (!foundGender && (seg === 'MASCULINO' || seg === 'FEMININO' || seg === 'MASC' || seg === 'FEM')) {
+            foundGender = seg.startsWith('FEM') ? 'FEMININO' : 'MASCULINO';
+        } else if (!foundBelt && KNOWN_BELTS.some(b => seg === b)) {
+            foundBelt = seg;
+        } else if (!foundWeight && (seg.includes('KG') || seg.includes('PES') || seg.includes('LEVE') || seg.includes('GALO') || seg.includes('PLUMA') || seg.includes('PENA') || seg.includes('MÉDIO') || seg.includes('MEDIO') || seg.includes('ABSOLUTO'))) {
+            foundWeight = seg;
+        }
+    });
+
+    if (!ageDivision) {
+        ageDivision = segments[0] || rawCat || 'ADULTO';
+    }
+
+    const finalGender = (rawGenero.startsWith('FEM') || foundGender === 'FEMININO') ? 'MASCULINO' : (rawGenero.startsWith('FEM') ? 'FEMININO' : 'MASCULINO');
+    const finalBelt = rawFaixa || foundBelt || 'BRANCA';
+    const finalWeight = sanitizePesoField(rawPeso) || foundWeight || 'PESO';
+
+    return {
+        ageDivision: ageDivision.toUpperCase(),
+        gender: finalGender.toUpperCase(),
+        belt: finalBelt.toUpperCase(),
+        weight: finalWeight.toUpperCase(),
+        isAbsolute: athlete.isAbsolute || rawCat.includes('ABSOLUTO') || rawPeso.includes('ABSOLUTO')
+    };
 };
 
 export const buildCategoryDescriptor = (athlete) => {
-    const categoria = athlete.categoria || 'Categoria';
-    const faixa = athlete.faixa || 'Faixa';
-    const peso = resolvePesoLabel(athlete);
-    const genero = resolveGenderLabel(athlete);
-    const baseParts = [categoria, faixa, peso, genero];
-    const labelParts = athlete.isAbsolute ? ['ABS', ...baseParts] : baseParts;
-    const keyParts = [
-        ...baseParts,
-        athlete.isAbsolute ? 'ABS' : 'STD',
-        athlete.isNoGi ? 'NO-GI' : 'GI'
-    ];
+    const comp = normalizeCategoryComponents(athlete);
+
+    const parts = [
+        comp.ageDivision,
+        comp.gender,
+        comp.belt,
+        comp.weight
+    ].filter(Boolean);
+
+    // Remove duplicatas consecutivas ou repetidas
+    const uniqueParts = [];
+    parts.forEach(p => {
+        if (!uniqueParts.includes(p)) {
+            uniqueParts.push(p);
+        }
+    });
 
     return {
-        key: keyParts.map(normalizeGroupPart).join('::'),
-        label: labelParts.join(' - ')
+        key: uniqueParts.map(normalizeGroupPart).join('::'),
+        label: uniqueParts.join(' / ')
     };
 };
 

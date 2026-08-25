@@ -102,10 +102,21 @@ export const translateSegment = (value, language) => {
 };
 
 export const translateCompositeLabel = (label, language) => {
+  if (!label) return '';
+  const rawSegments = label.split(/[\/\-]/).map(s => s.trim()).filter(Boolean);
+  
+  // Desduplica segmentos repetidos
+  const uniqueSegments = [];
+  rawSegments.forEach(seg => {
+    if (!uniqueSegments.some(u => u.toUpperCase() === seg.toUpperCase())) {
+      uniqueSegments.push(seg);
+    }
+  });
+
   const localeKey = resolveLocaleKey(language);
-  if (localeKey === 'pt' || !label) return label;
-  return label
-    .split(' - ')
+  if (localeKey === 'pt') return uniqueSegments.join(' / ');
+
+  return uniqueSegments
     .map((segment) => translateSegment(segment, language))
-    .join(' - ');
+    .join(' / ');
 };
