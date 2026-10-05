@@ -1355,7 +1355,7 @@ const AppLayout = () => {
 
                 </div>
               </div>
-              <ConnectionSyncIndicator />
+              {canAccessDashboard && <ConnectionSyncIndicator />}
               <div className="utility-dropdown utility-dropdown--language">
                 <button className="utility-link utility-link--language" type="button" aria-label={copy.utility.language}>
                   {currentLanguage?.flagImages?.[0] && (
