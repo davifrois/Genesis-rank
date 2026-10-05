@@ -106,11 +106,34 @@ export const resolveProfileAthleteRows = ({
   });
 };
 
-const resolvePodiumPlace = (athlete) => {
+const resolvePodiumPlace = (athlete, eventBrackets = [], matchedIds = new Set()) => {
   const history = Array.isArray(athlete?.historico) ? athlete.historico : [];
   const podiumPositions = history
     .filter((item) => item?.type === 'podium' && [1, 2, 3].includes(Number(item?.position)))
     .map((item) => Number(item.position));
+
+  if ([1, 2, 3].includes(Number(athlete?.podium))) {
+    podiumPositions.push(Number(athlete.podium));
+  }
+  if ([1, 2, 3].includes(Number(athlete?.colocacao))) {
+    podiumPositions.push(Number(athlete.colocacao));
+  }
+  if ([1, 2, 3].includes(Number(athlete?.posicao))) {
+    podiumPositions.push(Number(athlete.posicao));
+  }
+
+  const athId = String(athlete?.id || '');
+  eventBrackets.forEach((b) => {
+    const pod = b?.podium || {};
+    const gold = String(pod.goldId || '');
+    const silver = String(pod.silverId || '');
+    const bronze = String(pod.bronzeId || '');
+
+    if (gold && (gold === athId || matchedIds.has(gold))) podiumPositions.push(1);
+    if (silver && (silver === athId || matchedIds.has(silver))) podiumPositions.push(2);
+    if (bronze && (bronze === athId || matchedIds.has(bronze))) podiumPositions.push(3);
+  });
+
   if (!podiumPositions.length) return 0;
   return Math.min(...podiumPositions);
 };
@@ -119,7 +142,8 @@ export const buildPublicProfileSnapshot = ({
   profile = {},
   shareCode = '',
   athletes = [],
-  events = []
+  events = [],
+  brackets = []
 } = {}) => {
   const profileName = (profile?.fullName || '').toString().trim();
   const academyName = (profile?.academyName || '').toString().trim();
@@ -130,6 +154,15 @@ export const buildPublicProfileSnapshot = ({
     profileId: profile?.id || '',
     athleteRecordId: profile?.athleteRecordId || ''
   });
+
+  const matchedAthleteIds = new Set(
+    matchedAthletes
+      .flatMap(a => [a.id, a.profileId, a.memberProfileId])
+      .map(id => (id || '').toString().trim())
+      .filter(Boolean)
+  );
+  if (profile?.id) matchedAthleteIds.add(String(profile.id));
+  if (profile?.athleteRecordId) matchedAthleteIds.add(String(profile.athleteRecordId));
 
   const eventMap = new Map(
     (Array.isArray(events) ? events : [])
@@ -150,12 +183,31 @@ export const buildPublicProfileSnapshot = ({
       const event = eventMap.get(eventId);
       if (!event) return acc;
 
-      const podiumPlace = resolvePodiumPlace(athlete);
+      const eventBrackets = (Array.isArray(brackets) ? brackets : []).filter(
+        (b) => String(b?.eventId) === String(eventId)
+      );
+
+      const podiumPlace = resolvePodiumPlace(athlete, eventBrackets, matchedAthleteIds);
       const existing = acc.get(eventId);
       const modality = athlete?.isNoGi ? 'NO-GI' : 'GI';
       const category = (athlete?.categoria || '').toString().trim();
       const belt = (athlete?.faixa || '').toString().trim();
       const weight = (athlete?.peso || '').toString().trim();
+
+      let athletePoints = Number(athlete?.pontos || 0);
+      if (athletePoints === 0) {
+        const histPoints = (athlete?.historico || []).reduce(
+          (sum, h) => sum + (Number(h.points || h.pontos) || 0), 0
+        );
+        if (histPoints > 0) athletePoints = histPoints;
+      }
+      if (athletePoints === 0 && podiumPlace > 0) {
+        if (podiumPlace === 1) athletePoints = 9;
+        else if (podiumPlace === 2) athletePoints = 3;
+        else if (podiumPlace === 3) athletePoints = 1;
+      }
+
+      const isCheckedIn = Boolean(athlete?.checkedIn);
 
       if (!existing) {
         acc.set(eventId, {
@@ -169,9 +221,11 @@ export const buildPublicProfileSnapshot = ({
           weightSet: new Set(weight ? [weight] : []),
           modalitySet: new Set(modality ? [modality] : []),
           isAbsolute: athlete?.isAbsolute === true,
-          points: Number(athlete?.pontos || 0),
+          points: athletePoints,
           podiumPlace: podiumPlace || 0,
-          status: athlete?.status || 'PAYMENT_CONFIRMED'
+          status: athlete?.status || 'PAYMENT_CONFIRMED',
+          checkedIn: isCheckedIn,
+          checkedInAt: athlete?.checkedInAt || ''
         });
         return acc;
       }
@@ -181,7 +235,11 @@ export const buildPublicProfileSnapshot = ({
       if (weight) existing.weightSet.add(weight);
       if (modality) existing.modalitySet.add(modality);
       existing.isAbsolute = existing.isAbsolute || athlete?.isAbsolute === true;
-      existing.points = Math.max(existing.points, Number(athlete?.pontos || 0));
+      existing.points = Math.max(existing.points, athletePoints);
+      if (isCheckedIn) {
+        existing.checkedIn = true;
+        existing.checkedInAt = athlete?.checkedInAt || existing.checkedInAt || '';
+      }
       if (podiumPlace > 0) {
         existing.podiumPlace = existing.podiumPlace > 0
           ? Math.min(existing.podiumPlace, podiumPlace)
@@ -219,7 +277,9 @@ export const buildPublicProfileSnapshot = ({
         isAbsolute: row.isAbsolute,
         points: row.points,
         podiumPlace: row.podiumPlace,
-        status: row.status
+        status: row.status,
+        checkedIn: Boolean(row.checkedIn),
+        checkedInAt: row.checkedInAt || ''
       };
     })
     .sort((a, b) => {

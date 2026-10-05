@@ -342,3 +342,95 @@
   color: #9ca3af;
   margin-top: 2px;
 }
+
+/* ─── Badges de Status de Inscrição ─── */
+.sc-event-card-reg-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+  backdrop-filter: blur(6px);
+  z-index: 2;
+}
+
+.sc-event-card-reg-badge.open {
+  background: rgba(16, 185, 129, 0.92);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.5);
+}
+
+.sc-event-card-reg-badge.closed {
+  background: rgba(0,0,0,0.65);
+  color: #d1d5db;
+}
+
+/* ─── Badge de Modalidade (Gi / No-Gi) ─── */
+.sc-event-card-mode-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 0.6rem;
+  font-weight: 800;
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: rgba(0, 194, 203, 0.9);
+  color: #05070b;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  z-index: 2;
+  backdrop-filter: blur(4px);
+}
+
+/* ─── CTA de inscrição no card ─── */
+.sc-event-card-cta {
+  margin-top: 8px;
+  background: #10b981;
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-align: center;
+  padding: 6px 10px;
+  border-radius: 6px;
+  letter-spacing: 0.02em;
+}
+
+/* ─── Estado vazio ─── */
+.sc-events-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px 60px 20px;
+  text-align: center;
+}
+
+.sc-events-empty-icon {
+  font-size: 3rem;
+  margin-bottom: 16px;
+  opacity: 0.6;
+}
+
+.sc-events-empty-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #e4e4e7;
+  margin: 0 0 8px 0;
+}
+
+.sc-events-empty-desc {
+  font-size: 0.9rem;
+  color: #71717a;
+  margin: 0;
+  max-width: 360px;
+  line-height: 1.6;
+}
+
+/* ─── Skeleton pulse animation ─── */
+@keyframes sc-skeleton-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}

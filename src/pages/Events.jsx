@@ -449,6 +449,11 @@ const Events = () => {
       ? { href: event.registrationUrl, target: '_blank', rel: 'noreferrer' }
       : { to: `/eventos/${event.id}` };
 
+    const modeLabel = event.modes?.gi && event.modes?.noGi ? 'Gi + No-Gi'
+      : event.modes?.gi ? 'Gi'
+      : event.modes?.noGi ? 'No-Gi'
+      : null;
+
     return (
       <CardTag
         key={event.id}
@@ -463,6 +468,16 @@ const Events = () => {
               objectPosition: `center ${event.posterPositionY ?? 50}%` 
             }} 
           />
+          {/* Badge de status de inscrição */}
+          <div className={`sc-event-card-reg-badge ${event.registrationAvailable ? 'open' : 'closed'}`}>
+            {event.isPastEvent ? '✓ Finalizado' : event.registrationAvailable ? '🟢 Inscrições Abertas' : '🔴 Inscrições Fechadas'}
+          </div>
+          {/* Modo (Gi / No-Gi) */}
+          {modeLabel && (
+            <div className="sc-event-card-mode-badge">
+              {modeLabel}
+            </div>
+          )}
         </div>
         <div className="sc-event-card-body">
           <h3 className="sc-event-card-title">
@@ -480,6 +495,11 @@ const Events = () => {
               {remainingLabel}
             </span>
           </div>
+          {event.registrationAvailable && event.displayPrice > 0 && (
+            <div className="sc-event-card-cta">
+              Inscrever-se · {copy.from} R$ {event.displayPrice.toFixed(2).replace('.', ',')}
+            </div>
+          )}
         </div>
       </CardTag>
     );
@@ -547,9 +567,9 @@ const Events = () => {
               onChange={e => setModeFilter(e.target.value)} 
               className="sc-events-select sc-events-select-cat"
             >
-              <option value="all">Type of game</option>
-              <option value="gi">{copy.gi || 'Com Kimono (Gi)'}</option>
-              <option value="nogi">{copy.noGi || 'Sem Kimono (No-Gi)'}</option>
+              <option value="all">Modalidade</option>
+              <option value="gi">{copy.gi || 'Gi (Com Kimono)'}</option>
+              <option value="nogi">{copy.noGi || 'No-Gi (Sem Kimono)'}</option>
             </select>
             
             <div className="sc-events-date-row">
@@ -574,7 +594,7 @@ const Events = () => {
               onChange={e => setCountryFilter(e.target.value)} 
               className="sc-events-select sc-events-select-country"
             >
-              <option value="all">Countries</option>
+              <option value="all">País / Região</option>
               {countryOptions.map(code => (
                 <option value={code} key={code}>
                   {countryLabelFromCode(code, uiLanguage)}
@@ -608,7 +628,7 @@ const Events = () => {
             {isLoading ? (
               <div className="sc-events-grid">
                 {[1,2,3,4,5,6].map(i => (
-                  <div key={i} style={{ aspectRatio: '4/5', background: '#1e222d', borderRadius: '8px' }} />
+                  <div key={i} style={{ aspectRatio: '4/5', background: '#1e222d', borderRadius: '8px', animation: 'sc-skeleton-pulse 1.4s ease-in-out infinite' }} />
                 ))}
               </div>
             ) : (
@@ -617,8 +637,25 @@ const Events = () => {
                   {filteredEvents.map(event => renderEventCard(event))}
                 </div>
               ) : (
-                <div style={{ padding: '60px 20px', textAlign: 'center', color: '#a1a1aa', fontSize: '1rem' }}>
-                  {copy.noEvents}
+                <div className="sc-events-empty-state">
+                  <div className="sc-events-empty-icon">🔍</div>
+                  <p className="sc-events-empty-title">Nenhum evento encontrado</p>
+                  <p className="sc-events-empty-desc">
+                    Tente ajustar os filtros de modalidade, data ou localização para encontrar mais eventos.
+                  </p>
+                  <button
+                    className="sc-events-btn-cyan"
+                    onClick={() => {
+                      setQuery('');
+                      setModeFilter('all');
+                      setCountryFilter('all');
+                      setDateFrom('');
+                      setDateTo('');
+                    }}
+                    style={{ marginTop: '16px' }}
+                  >
+                    Limpar filtros
+                  </button>
                 </div>
               )
             )}

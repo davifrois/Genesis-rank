@@ -978,7 +978,7 @@ const ProfileConfirmationStep = ({ profile, event, onProfileUpdate, onConfirm, o
           {!requiredProfileOk && (
             <p className="photo-warning">
               <AlertCircle size={14} />
-              Complete nacionalidade, nascimento, genero e telefone antes de continuar.
+              Complete nacionalidade, nascimento e genero antes de continuar.
             </p>
           )}
         </div>
@@ -1004,7 +1004,6 @@ const ProfileConfirmationStep = ({ profile, event, onProfileUpdate, onConfirm, o
     getFieldValue('country')
     && getFieldValue('birthDate')
     && getFieldValue('gender')
-    && getFieldValue('phone')
   );
   const canContinue = Boolean(draftProfile.photoUrl && requiredProfileOk && !editingField);
 
@@ -1085,18 +1084,6 @@ const ProfileConfirmationStep = ({ profile, event, onProfileUpdate, onConfirm, o
             <div className="cell label">Genero</div>
             <div className="cell value">{editingField === 'gender' ? <select className="registration-inline-input" value={getFieldValue('gender')} onChange={(event) => setFieldValue('gender', event.target.value)} autoFocus><option value="Masculino">Masculino</option><option value="Feminino">Feminino</option></select> : getFieldValue('gender')}</div>
             <div className="cell action">{editingField === 'gender' ? <span className="registration-inline-actions"><button type="button" onClick={() => saveField('gender')}>Salvar</button><button type="button" onClick={cancelField}>Cancelar</button></span> : <button type="button" onClick={() => setEditingField('gender')}>Editar</button>}</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Contact Section */}
-      <div className="details-section contact-table">
-        <div className="section-header">Contato e residencia</div>
-        <div className="section-content table-style">
-          <div className="table-row">
-            <div className="cell label">Telefone</div>
-            <div className="cell value">{editingField === 'phone' ? <input className="registration-inline-input" type="tel" value={getFieldValue('phone')} onChange={(event) => setFieldValue('phone', event.target.value)} autoFocus /> : (getFieldValue('phone') || '-')}</div>
-            <div className="cell action">{editingField === 'phone' ? <span className="registration-inline-actions"><button type="button" onClick={() => saveField('phone')}>Salvar</button><button type="button" onClick={cancelField}>Cancelar</button></span> : <button type="button" onClick={() => setEditingField('phone')}>Editar</button>}</div>
           </div>
         </div>
       </div>

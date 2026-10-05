@@ -3,6 +3,8 @@ import { Maximize, Minimize, Settings, Play, Pause, RefreshCw, Users, Plus, Minu
 import './Scoreboard.css';
 import { useStore } from '../hooks/useStore';
 import { buildBracketMatches } from '../services/bracketService';
+import ConnectionSyncIndicator from '../components/ConnectionSyncIndicator';
+import { offlineSyncService } from '../services/offlineSyncService';
 
 const DEFAULT_TIME = 300; // 5 minutes
 
@@ -369,6 +371,19 @@ const Scoreboard = () => {
        
        finalizeMatch(selectedBracketId, selectedMatchId, winnerObj.id, scoreA, scoreB, loserObj.id, selectedOutcome.reason, matchDuration);
        
+       // Enfileira a luta no sistema offline-first garantindo que nada se perca sem internet
+       offlineSyncService.queueAction('MATCH_FINALIZED', {
+         bracketId: selectedBracketId,
+         matchId: selectedMatchId,
+         winnerId: winnerObj.id,
+         loserId: loserObj.id,
+         scoreA: { ...scoreA },
+         scoreB: { ...scoreB },
+         winReason: selectedOutcome.reason,
+         matchDuration,
+         timestamp: new Date().toISOString()
+       });
+       
        // Broadcast the result so EventDetails can update the bracket tree in real time
        broadcastRef.current?.postMessage({
          type: 'BRACKET_MATCH_RESULT',
@@ -399,12 +414,8 @@ const Scoreboard = () => {
            setBracketPodium(selectedBracketId, newPodium);
        }
 
-       const seeds = bracket?.seedIds?.filter(Boolean) || [];
-       const isComplete = seeds.length >= 3 
-           ? (newPodium.goldId && newPodium.silverId && newPodium.bronzeId)
-           : (newPodium.goldId && newPodium.silverId);
-
-       if (isComplete) {
+       const hasPodium = Boolean(newPodium.goldId);
+       if (hasPodium) {
            if (applyBracketPodium) applyBracketPodium(selectedBracketId, newPodium);
            if (applyBracketToRanking) applyBracketToRanking(selectedBracketId, selectedEventId, new Date().getFullYear());
        }
@@ -564,6 +575,7 @@ const Scoreboard = () => {
   return (
   <div className="scoreboard-container">
       <div className="top-right-controls">
+        <ConnectionSyncIndicator />
         <button className="top-btn" onClick={() => window.open('/placar/display', '_blank', 'width=1280,height=720')}><Users size={16}/> Telão</button>
         <button className="top-btn" onClick={toggleFullscreen}>{isFullscreen ? <Minimize size={16}/> : <Maximize size={16}/>} Tela Cheia</button>
       </div>

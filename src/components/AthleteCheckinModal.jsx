@@ -35,12 +35,17 @@ const AthleteCheckinModal = ({ isOpen, onClose, athlete, athleteAge, onSave }) =
     const handleSubmit = (e) => {
         e.preventDefault();
         if (athlete && athlete.id) {
-            updateAthlete(athlete.id, formData);
+            const updatedPayload = {
+                ...formData,
+                checkedIn: true,
+                checkedInAt: new Date().toISOString()
+            };
+            updateAthlete(athlete.id, updatedPayload);
             if (onSave) {
-                onSave(formData);
+                onSave(updatedPayload);
             }
             onClose();
-            if (athlete.eventId) {
+            if (!onSave && athlete.eventId) {
                 navigate(`/eventos/${athlete.eventId}?tab=athletes`);
             }
         }

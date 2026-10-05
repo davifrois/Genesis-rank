@@ -2,7 +2,8 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import {
   Trophy, ShieldCheck, Medal, Target, MapPin, Calendar,
-  Star, TrendingUp, Award, ChevronLeft, Swords, Users, Info, CreditCard
+  Star, TrendingUp, Award, ChevronLeft, Swords, Users, Info, CreditCard,
+  CheckCircle2, Edit3
 } from 'lucide-react';
 import { useStore } from '../hooks/useStore';
 import { countryCodeFromValue, flagFromCountryCode } from '../utils/countryFlags';
@@ -15,6 +16,7 @@ import { normalizeRegistrationStatus, REGISTRATION_STATUS } from '../utils/regis
 import AthleteCheckinModal from '../components/AthleteCheckinModal';
 import { publicRegistrationService } from '../services/publicRegistrationService';
 import { resolveAgeNumber } from '../utils/eventPricing';
+import { translateCompositeLabel } from '../utils/localeLabels';
 import './PublicProfile.css';
 
 /* ── helpers ─────────────────────────────────────────────── */
@@ -223,10 +225,10 @@ const PublicProfile = ({ profileOverride, isPreview = false }) => {
   const snapshot = useMemo(() => {
     if (!profile) return null;
     if (profile.fullName) {
-      return buildPublicProfileSnapshot({ profile, athletes, events });
+      return buildPublicProfileSnapshot({ profile, athletes, events, brackets });
     }
     return null;
-  }, [profile, athletes, events]);
+  }, [profile, athletes, events, brackets]);
 
   const matchedProfileAthletes = useMemo(() => {
     if (!profile) return [];
@@ -278,7 +280,9 @@ const PublicProfile = ({ profileOverride, isPreview = false }) => {
       }
       return true;
     });
-    return openAthletes.length > 0 ? openAthletes[0] : null;
+    if (openAthletes.length === 0) return null;
+    const pending = openAthletes.find(a => !a.checkedIn);
+    return pending || openAthletes[0];
   }, [matchedProfileAthletes, events]);
 
   const fightHistoryByEvent = useMemo(() => {
@@ -302,52 +306,107 @@ const PublicProfile = ({ profileOverride, isPreview = false }) => {
     const pushFight = (eventId, fight) => {
       if (!eventId) return;
       if (!result.has(eventId)) result.set(eventId, []);
-      result.get(eventId).push(fight);
+      const existingList = result.get(eventId);
+      if (!existingList.some(f => f.id === fight.id)) {
+        existingList.push(fight);
+      }
     };
     const nameFromId = (id) => resolveAthleteName(athleteById.get((id || '').toString())) || (id ? 'Atleta a confirmar' : 'BYE');
 
-    (Array.isArray(brackets) ? brackets : [])
-      .filter((bracket) => bracket?.isPublished === true || bracket?.published === true || bracket?.is_published === true)
-      .forEach((bracket) => {
-        const eventId = (bracket.eventId || '').toString();
-        (Array.isArray(bracket.liveMatches) ? bracket.liveMatches : []).forEach((match, index) => {
-          const leftId = (match.slotAId || match.slotA || match.athleteAId || match.athleteA || '').toString();
-          const rightId = (match.slotBId || match.slotB || match.athleteBId || match.athleteB || '').toString();
-          const leftName = normalizeProfileLookup(nameFromId(leftId));
-          const rightName = normalizeProfileLookup(nameFromId(rightId));
-          const isLeft = athleteIds.has(leftId) || (!!athleteName && leftName === athleteName);
-          const isRight = athleteIds.has(rightId) || (!!athleteName && rightName === athleteName);
-          if (!isLeft && !isRight) return;
+    (Array.isArray(brackets) ? brackets : []).forEach((bracket) => {
+      const eventId = (bracket.eventId || '').toString();
+      
+      // 1. Process liveMatches if present
+      (Array.isArray(bracket.liveMatches) ? bracket.liveMatches : []).forEach((match, index) => {
+        const leftId = (match.slotAId || match.slotA || match.athleteAId || match.athleteA || '').toString();
+        const rightId = (match.slotBId || match.slotB || match.athleteBId || match.athleteB || '').toString();
+        const leftName = normalizeProfileLookup(nameFromId(leftId));
+        const rightName = normalizeProfileLookup(nameFromId(rightId));
+        const isLeft = athleteIds.has(leftId) || (!!athleteName && leftName === athleteName);
+        const isRight = athleteIds.has(rightId) || (!!athleteName && rightName === athleteName);
+        if (!isLeft && !isRight) return;
 
-          const winnerId = (match.winnerId || '').toString();
-          const hasWinner = Boolean(winnerId);
-          const won = hasWinner && ((isLeft && winnerId === leftId) || (isRight && winnerId === rightId));
-          const opponentId = isLeft ? rightId : leftId;
-          const scoreA = Number.isFinite(Number(match.scoreA)) ? Number(match.scoreA) : null;
-          const scoreB = Number.isFinite(Number(match.scoreB)) ? Number(match.scoreB) : null;
-          const method = match.method || match.victoryMethod || match.finishType || (
-            !opponentId ? 'BYE' : scoreA !== null || scoreB !== null ? 'points' : 'decision'
-          );
+        const winnerId = (match.winnerId || '').toString();
+        const hasWinner = Boolean(winnerId);
+        const won = hasWinner && ((isLeft && winnerId === leftId) || (isRight && winnerId === rightId));
+        const opponentId = isLeft ? rightId : leftId;
+        const scoreA = Number.isFinite(Number(match.scoreA)) ? Number(match.scoreA) : null;
+        const scoreB = Number.isFinite(Number(match.scoreB)) ? Number(match.scoreB) : null;
+        const method = match.method || match.victoryMethod || match.finishType || (
+          !opponentId ? 'BYE' : scoreA !== null || scoreB !== null ? 'points' : 'decision'
+        );
 
-          pushFight(eventId, {
-            id: match.id || `${bracket.id || eventId}-match-${index + 1}`,
-            result: won ? 'WIN' : hasWinner ? 'LOSS' : 'PENDING',
-            opponentName: opponentId ? nameFromId(opponentId) : 'BYE',
-            method,
-            score: scoreA !== null && scoreB !== null ? `${scoreA}-${scoreB}` : '',
-            bracketLabel: bracket.label || bracket.categoryLabel || bracket.category || ''
-          });
+        pushFight(eventId, {
+          id: match.id || `${bracket.id || eventId}-match-${index + 1}`,
+          result: won ? 'WIN' : hasWinner ? 'LOSS' : 'PENDING',
+          opponentName: opponentId ? nameFromId(opponentId) : 'BYE',
+          method,
+          score: scoreA !== null && scoreB !== null ? `${scoreA}-${scoreB}` : '',
+          bracketLabel: bracket.label || bracket.categoryLabel || bracket.category || ''
         });
       });
+
+      // 2. Process matchResults from bracket if present
+      if (bracket.matchResults && typeof bracket.matchResults === 'object') {
+        Object.entries(bracket.matchResults).forEach(([mId, mData]) => {
+          if (!mData) return;
+          const wId = (mData.winnerId || '').toString();
+          const lId = (mData.loserId || '').toString();
+          const wName = normalizeProfileLookup(nameFromId(wId));
+          const lName = normalizeProfileLookup(nameFromId(lId));
+          const isW = athleteIds.has(wId) || (athleteName && wName === athleteName);
+          const isL = athleteIds.has(lId) || (athleteName && lName === athleteName);
+          if (!isW && !isL) return;
+
+          const oppId = isW ? lId : wId;
+
+          // Parse score from scoreboard object { points, advantages, penalties } or numbers
+          const getPts = (s) => (typeof s === 'object' && s !== null ? (s.points ?? 0) : Number(s) || 0);
+          const getAdv = (s) => (typeof s === 'object' && s !== null ? (s.advantages ?? 0) : 0);
+
+          const ptsA = mData.scoreA !== undefined ? getPts(mData.scoreA) : null;
+          const ptsB = mData.scoreB !== undefined ? getPts(mData.scoreB) : null;
+          const advA = mData.scoreA !== undefined ? getAdv(mData.scoreA) : 0;
+          const advB = mData.scoreB !== undefined ? getAdv(mData.scoreB) : 0;
+
+          let scoreFormatted = '';
+          if (ptsA !== null && ptsB !== null) {
+            scoreFormatted = `${ptsA}-${ptsB}`;
+            if (advA > 0 || advB > 0) {
+              scoreFormatted += ` (V: ${advA}-${advB})`;
+            }
+          }
+
+          const rawReason = (mData.winReason || mData.method || '').toString();
+          let method = rawReason;
+          if (/finaliza|submis/i.test(rawReason)) method = 'Finalização';
+          else if (/ponto/i.test(rawReason)) method = 'Pontos';
+          else if (/desclass|dq/i.test(rawReason)) method = 'Desclassificação';
+          else if (/decis/i.test(rawReason)) method = 'Decisão';
+          else if (/wo|comparece/i.test(rawReason)) method = 'W.O.';
+          else if (!method) method = scoreFormatted ? 'Pontos' : 'Decisão';
+
+          pushFight(eventId, {
+            id: `${bracket.id || eventId}-res-${mId}`,
+            result: isW ? 'WIN' : 'LOSS',
+            opponentName: oppId ? nameFromId(oppId) : 'BYE',
+            method,
+            score: scoreFormatted,
+            bracketLabel: bracket.label || bracket.categoryKey || ''
+          });
+        });
+      }
+    });
 
     matchedProfileAthletes.forEach((athlete) => {
       const eventId = (athlete.eventId || '').toString();
       (Array.isArray(athlete.historico) ? athlete.historico : []).forEach((item, index) => {
         if (!['win', 'loss'].includes(item?.type)) return;
-        pushFight(eventId, {
-          id: `${athlete.id || eventId}-history-${index}`,
+        const targetEventId = (item.eventId || eventId).toString();
+        pushFight(targetEventId, {
+          id: `${athlete.id || targetEventId}-history-${item.matchId || index}`,
           result: item.type === 'win' ? 'WIN' : 'LOSS',
-          opponentName: item.opponent || item.opponentName || 'Adversario registrado',
+          opponentName: item.opponent || item.opponentName || 'Adversário',
           method: item.method || item.description || 'resultado',
           score: item.score || '',
           bracketLabel: athlete.categoria || ''
@@ -378,8 +437,10 @@ const PublicProfile = ({ profileOverride, isPreview = false }) => {
         return n && (n === needle || n.includes(needle) || needle.includes(n));
       })
       .forEach((a) => (a.historico || []).forEach((h) => {
-        if (h.type === 'win') w++;
-        if (h.type === 'loss') l++;
+        if (h.source !== 'bracket') {
+          if (h.type === 'win') w++;
+          if (h.type === 'loss') l++;
+        }
       }));
 
     // Contar em quantos eventos diferentes o atleta está inscrito
@@ -455,8 +516,10 @@ const PublicProfile = ({ profileOverride, isPreview = false }) => {
   const beltColor    = getBeltColor(profile.belt);
   const countryCode = countryCodeFromValue(profile.country || 'Brasil', 'BR');
   const countryFlag = flagFromCountryCode(countryCode);
-  const totalGold    = summary.podium1   || 0;
-  const totalPodiums = summary.totalPodiums || 0;
+  const totalGold    = summary.podium1   || rows.filter(r => r.podiumPlace === 1).length;
+  const totalSilver  = summary.podium2   || rows.filter(r => r.podiumPlace === 2).length;
+  const totalBronze  = summary.podium3   || rows.filter(r => r.podiumPlace === 3).length;
+  const totalPodiums = summary.totalPodiums || (totalGold + totalSilver + totalBronze);
   const totalEvents  = totalRegisteredEvents > 0 ? totalRegisteredEvents : (summary.eventsFought || rows.length);
   const fights       = totalWins + totalLosses;
   const winRate      = fights > 0 ? Math.round((totalWins / fights) * 100) : 0;
@@ -551,20 +614,29 @@ const PublicProfile = ({ profileOverride, isPreview = false }) => {
               )}
               {isOwner && (
                 topCheckinAthlete ? (
-                  <button 
-                    onClick={() => {
-                      setSelectedAthleteForCheckin(topCheckinAthlete);
-                      setIsCheckinModalOpen(true);
-                    }}
-                    className="pp-owner-btn pp-owner-btn--primary"
-                    style={{ marginLeft: '8px' }}
-                  >
-                    <Target size={12} /> CHECK-IN
-                  </button>
+                  topCheckinAthlete.checkedIn ? (
+                    <span 
+                      className="pp-owner-btn"
+                      style={{ marginLeft: '8px', color: '#22c55e', borderColor: 'rgba(34, 197, 94, 0.4)', background: 'rgba(34, 197, 94, 0.12)', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      <CheckCircle2 size={13} /> CHECK-IN OK
+                    </span>
+                  ) : (
+                    <button 
+                      onClick={() => {
+                        setSelectedAthleteForCheckin(topCheckinAthlete);
+                        setIsCheckinModalOpen(true);
+                      }}
+                      className="pp-owner-btn pp-checkin-highlight"
+                      style={{ marginLeft: '8px' }}
+                    >
+                      <Target size={14} /> FAZER CHECK-IN
+                    </button>
+                  )
                 ) : (
                   <button 
                     className="pp-owner-btn pp-owner-btn--primary"
-                    style={{ marginLeft: '8px', opacity: 0.5, cursor: 'not-allowed', backgroundColor: '#3f3f46', borderColor: '#3f3f46', color: '#a1a1aa' }}
+                    style={{ marginLeft: '8px', opacity: 0.45, cursor: 'not-allowed', backgroundColor: '#3f3f46', borderColor: '#3f3f46', color: '#a1a1aa' }}
                     disabled
                   >
                     <Target size={12} /> CHECK-IN ENCERRADO
@@ -837,147 +909,200 @@ const PublicProfile = ({ profileOverride, isPreview = false }) => {
 
                   <div className="pp-champ__flex">
                     {/* main content (left) */}
-                    <div className="pp-champ__body">
-                      
-                      <div className="pp-champ__category-title">
-                        {[row.modality, profile.belt, row.category, row.weight, row.isAbsolute ? 'Absolute' : ''].filter(Boolean).join(' / ')}
-                      </div>
+                    {(() => {
+                      const categoryDisplay = translateCompositeLabel(
+                        [row.modality, profile.belt, row.category, row.weight, row.isAbsolute ? 'Absolute' : ''].filter(Boolean).join(' / '),
+                        'pt'
+                      );
 
-                      {/* Tags/Check-in action if owner */}
-                      <div className="pp-champ__owner-actions">
-                        {isOwner && (
-                          <div style={{ marginTop: '14px', marginBottom: '14px' }}>
-                            {(() => {
-                              const eventObj = events.find(e => e.id === row.eventId);
-                              let isRegistrationClosed = false;
-                              if (eventObj) {
-                                if (eventObj.checkinEndDate) {
-                                  const checkinEndObj = new Date(eventObj.checkinEndDate);
-                                  if (new Date() > checkinEndObj) {
-                                    isRegistrationClosed = true;
-                                  }
-                                } else {
-                                  const batches = eventObj.batches || [];
-                                  let lastDate = eventObj.date;
-                                  if (batches.length > 0 && batches[batches.length - 1].endDate) {
-                                    lastDate = batches[batches.length - 1].endDate;
-                                  }
-                                  if (lastDate) {
-                                    const lastDateObj = new Date(lastDate);
-                                    lastDateObj.setHours(23, 59, 59, 999);
-                                    if (new Date() > lastDateObj) {
-                                      isRegistrationClosed = true;
+                      return (
+                        <div className="pp-champ__body">
+                          <div className="pp-champ__category-title">
+                            {categoryDisplay}
+                          </div>
+
+                          {/* Tags/Check-in action if owner */}
+                          <div className="pp-champ__owner-actions">
+                            {isOwner && (
+                              <div style={{ marginTop: '14px', marginBottom: '14px' }}>
+                                {(() => {
+                                  const eventObj = events.find(e => e.id === row.eventId);
+                                  let isRegistrationClosed = false;
+                                  if (eventObj) {
+                                    if (eventObj.checkinEndDate) {
+                                      const checkinEndObj = new Date(eventObj.checkinEndDate);
+                                      if (new Date() > checkinEndObj) {
+                                        isRegistrationClosed = true;
+                                      }
+                                    } else {
+                                      const batches = eventObj.batches || [];
+                                      let lastDate = eventObj.date;
+                                      if (batches.length > 0 && batches[batches.length - 1].endDate) {
+                                        lastDate = batches[batches.length - 1].endDate;
+                                      }
+                                      if (lastDate) {
+                                        const lastDateObj = new Date(lastDate);
+                                        lastDateObj.setHours(23, 59, 59, 999);
+                                        if (new Date() > lastDateObj) {
+                                          isRegistrationClosed = true;
+                                        }
+                                      }
                                     }
                                   }
-                                }
-                              }
 
-                              const athleteRecord = matchedProfileAthletes.find(a => String(a.eventId) === String(row.eventId)) || row;
-                              const regStatus = normalizeRegistrationStatus(athleteRecord?.status || row?.status);
-                              const isPaid = regStatus === REGISTRATION_STATUS.PAYMENT_CONFIRMED;
+                                  const athleteRecord = matchedProfileAthletes.find(a => String(a.eventId) === String(row.eventId)) || row;
+                                  const regStatus = normalizeRegistrationStatus(athleteRecord?.status || row?.status);
+                                  const isPaid = regStatus === REGISTRATION_STATUS.PAYMENT_CONFIRMED;
 
-                              if (isRegistrationClosed) {
-                                return (
-                                  <button 
-                                    className="btn btn-primary"
-                                    style={{ padding: '8px 16px', fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', opacity: 0.5, cursor: 'not-allowed', backgroundColor: '#3f3f46', borderColor: '#3f3f46', color: '#a1a1aa' }}
-                                    disabled
-                                  >
-                                    <Target size={14} /> Edição Encerrada (Data Limite)
-                                  </button>
-                                );
-                              }
+                                  if (isRegistrationClosed) {
+                                    return (
+                                      <button 
+                                        className="btn btn-primary"
+                                        style={{ padding: '8px 16px', fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', opacity: 0.5, cursor: 'not-allowed', backgroundColor: '#3f3f46', borderColor: '#3f3f46', color: '#a1a1aa' }}
+                                        disabled
+                                      >
+                                        <Target size={14} /> Edição Encerrada (Data Limite)
+                                      </button>
+                                    );
+                                  }
 
-                              if (!isPaid) {
-                                return (
-                                  <button 
-                                    className="btn"
-                                    style={{ 
-                                      padding: '8px 16px', 
-                                      fontSize: '13px', 
-                                      display: 'inline-flex', 
-                                      alignItems: 'center', 
-                                      gap: '8px', 
-                                      fontWeight: 'bold',
-                                      backgroundColor: '#f59e0b',
-                                      borderColor: '#f59e0b',
-                                      color: '#09090b',
-                                      cursor: 'pointer',
-                                      borderRadius: '6px'
-                                    }}
-                                    onClick={async () => {
-                                      try {
-                                        const checkoutRes = await publicRegistrationService.createCheckoutSession({
-                                          registrationIds: athleteRecord.id || row.id,
-                                          athleteName: profile.fullName || athleteRecord.nome || 'Atleta',
-                                          athleteEmail: profile.email || '',
-                                          amount: Number(athleteRecord.price || row.price || 0)
-                                        });
-                                        if (checkoutRes && checkoutRes.url) {
-                                          window.location.href = checkoutRes.url;
-                                        } else {
-                                          alert('Não foi possível iniciar o checkout. Tente novamente.');
-                                        }
-                                      } catch (err) {
-                                        alert(`Erro ao conectar com Mercado Pago: ${err.message}`);
-                                      }
-                                    }}
-                                  >
-                                    <CreditCard size={14} /> Pagar Inscrição
-                                  </button>
-                                );
-                              }
+                                  if (!isPaid) {
+                                    return (
+                                      <button 
+                                        className="btn"
+                                        style={{ 
+                                          padding: '8px 16px', 
+                                          fontSize: '13px', 
+                                          display: 'inline-flex', 
+                                          alignItems: 'center', 
+                                          gap: '8px', 
+                                          fontWeight: 'bold',
+                                          backgroundColor: '#f59e0b',
+                                          borderColor: '#f59e0b',
+                                          color: '#09090b',
+                                          cursor: 'pointer',
+                                          borderRadius: '6px'
+                                        }}
+                                        onClick={async () => {
+                                          try {
+                                            const checkoutRes = await publicRegistrationService.createCheckoutSession({
+                                              registrationIds: athleteRecord.id || row.id,
+                                              athleteName: profile.fullName || athleteRecord.nome || 'Atleta',
+                                              athleteEmail: profile.email || '',
+                                              amount: Number(athleteRecord.price || row.price || 0)
+                                            });
+                                            if (checkoutRes && checkoutRes.url) {
+                                              window.location.href = checkoutRes.url;
+                                            } else {
+                                              alert('Não foi possível iniciar o checkout. Tente novamente.');
+                                            }
+                                          } catch (err) {
+                                            alert(`Erro ao conectar com Mercado Pago: ${err.message}`);
+                                          }
+                                        }}
+                                      >
+                                        <CreditCard size={14} /> Pagar Inscrição
+                                      </button>
+                                    );
+                                  }
 
-                              return (
-                                <button 
-                                  className="btn btn-primary"
-                                  style={{ padding: '8px 16px', fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}
-                                  onClick={() => {
-                                    const athleteRecordToUse = matchedProfileAthletes.find(a => String(a.eventId) === String(row.eventId)) || { id: row.id, eventId: row.eventId, nome: profile.fullName, academia: profile.academyName };
-                                    setSelectedAthleteForCheckin(athleteRecordToUse);
-                                    setIsCheckinModalOpen(true);
-                                  }}
-                                >
-                                  <Target size={14} /> Fazer Check-in da Inscrição
-                                </button>
-                              );
-                            })()}
-                          </div>
-                        )}
-                      </div>
+                                  const isCheckedIn = Boolean(athleteRecord?.checkedIn || row?.checkedIn);
 
-                      {/* Matches */}
-                      {row.fights?.length > 0 && (
-                        <div className="pp-fight-results">
-                          {row.fights.map((fight) => (
-                            <div className="pp-fight-result" key={fight.id}>
-                              <span className={`pp-fight-result__tag is-${fight.result.toLowerCase()}`}>
-                                {fight.result}
-                              </span>
-                              <div className="pp-fight-result__text">
-                                <strong>{fight.opponentName}</strong> 
-                                <span>
-                                  {fight.result === 'WIN' ? 'Won by' : fight.result === 'LOSS' ? 'Lost by' : ''} {fight.method || 'Decision'}
-                                  {fight.score ? ` (${fight.score})` : ''}
-                                </span>
+                                  if (isCheckedIn) {
+                                    return (
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                        <span style={{ 
+                                          display: 'inline-flex', 
+                                          alignItems: 'center', 
+                                          gap: '6px', 
+                                          background: 'rgba(34, 197, 94, 0.15)', 
+                                          color: '#22c55e', 
+                                          border: '1px solid rgba(34, 197, 94, 0.4)', 
+                                          padding: '7px 14px', 
+                                          borderRadius: '6px', 
+                                          fontWeight: '700', 
+                                          fontSize: '12px' 
+                                        }}>
+                                          <CheckCircle2 size={14} /> Check-in Confirmado
+                                        </span>
+                                        <button 
+                                          className="btn"
+                                          style={{ 
+                                            padding: '7px 12px', 
+                                            fontSize: '12px', 
+                                            display: 'inline-flex', 
+                                            alignItems: 'center', 
+                                            gap: '6px', 
+                                            background: 'rgba(255, 255, 255, 0.08)', 
+                                            border: '1px solid rgba(255, 255, 255, 0.15)', 
+                                            color: '#cbd5e1', 
+                                            borderRadius: '6px', 
+                                            cursor: 'pointer' 
+                                          }}
+                                          onClick={() => {
+                                            const athleteRecordToUse = matchedProfileAthletes.find(a => String(a.eventId) === String(row.eventId)) || { id: row.id, eventId: row.eventId, nome: profile.fullName, academia: profile.academyName };
+                                            setSelectedAthleteForCheckin(athleteRecordToUse);
+                                            setIsCheckinModalOpen(true);
+                                          }}
+                                        >
+                                          <Edit3 size={13} /> Editar Inscrição
+                                        </button>
+                                      </div>
+                                    );
+                                  }
+
+                                  return (
+                                    <button 
+                                      className="btn btn-primary pp-checkin-highlight"
+                                      style={{ padding: '8px 16px', fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}
+                                      onClick={() => {
+                                        const athleteRecordToUse = matchedProfileAthletes.find(a => String(a.eventId) === String(row.eventId)) || { id: row.id, eventId: row.eventId, nome: profile.fullName, academia: profile.academyName };
+                                        setSelectedAthleteForCheckin(athleteRecordToUse);
+                                        setIsCheckinModalOpen(true);
+                                      }}
+                                    >
+                                      <Target size={14} /> Fazer Check-in da Inscrição
+                                    </button>
+                                  );
+                                })()}
                               </div>
+                            )}
+                          </div>
+
+                          {/* Matches */}
+                          {row.fights?.length > 0 && (
+                            <div className="pp-fight-results">
+                              {row.fights.map((fight) => (
+                                <div className="pp-fight-result" key={fight.id}>
+                                  <span className={`pp-fight-result__tag is-${fight.result.toLowerCase()}`}>
+                                    {fight.result === 'WIN' ? 'VITÓRIA' : fight.result === 'LOSS' ? 'DERROTA' : fight.result}
+                                  </span>
+                                  <div className="pp-fight-result__text">
+                                    <strong>vs {fight.opponentName}</strong> 
+                                    <span>
+                                      • {fight.result === 'WIN' ? 'Por' : 'Para'} {fight.method || 'Decisão'}
+                                      {fight.score ? ` (${fight.score})` : ''}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
-                      )}
+                          )}
 
-                      {/* Medal */}
-                      {pod && (
-                        <div className={`pp-podium-badge ${pod.cls}`}>
-                          {podiumPublicLabel(row.podiumPlace)}
-                        </div>
-                      )}
+                          {/* Medal */}
+                          {pod && (
+                            <div className={`pp-podium-badge ${pod.cls}`}>
+                              {podiumPublicLabel(row.podiumPlace)}
+                            </div>
+                          )}
 
-                      {/* Points */}
-                      <div className="pp-champ__pts-line">
-                        Earned <span className="pp-champ__pts-val">{(row.points || 0).toFixed(2)} pts</span> to ranking {[row.modality, profile.belt, row.category].filter(Boolean).join(' / ')} – {new Date(row.eventDate).getFullYear()}
-                      </div>
-                    </div>
+                          {/* Points */}
+                          <div className="pp-champ__pts-line">
+                            Conquistou <span className="pp-champ__pts-val">{(row.points || 0).toFixed(2)} pts</span> no ranking {categoryDisplay} – {new Date(row.eventDate).getFullYear()}
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* poster (right) */}
                     <div className="pp-champ__poster-wrap">
@@ -1004,7 +1129,7 @@ const PublicProfile = ({ profileOverride, isPreview = false }) => {
         onSave={(formData) => {
           if (selectedAthleteForCheckin?.eventId) {
             try { 
-              generateBrackets({ eventId: selectedAthleteForCheckin.eventId, replaceExisting: true }); 
+              generateBrackets({ eventId: selectedAthleteForCheckin.eventId, replaceExisting: false }); 
             } catch (err) {
               console.error('Erro ao gerar chaves:', err);
             }

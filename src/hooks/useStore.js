@@ -8,6 +8,7 @@ import { buildCategoryDescriptor, matchesBracketMode } from "/src/services/categ
 import { nextPowerOfTwo, shuffleList } from "/src/services/bracketService.js";
 import { normalizeEventFees, resolveEventPixKey } from "/src/utils/eventPricing.js";
 import { formatBrazilPhone } from "/src/utils/phone.js";
+import { offlineSyncService } from "/src/services/offlineSyncService.js";
 
 // ========================================== //
 //  GERENCIAMENTO GLOBAL DE ESTADO (CACHE)    //
@@ -1106,7 +1107,15 @@ const useStoreState = (loadedState) => {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: serialized
-                }).catch(() => {});
+                }).then((res) => {
+                    if (res.ok) {
+                        offlineSyncService.setStoredLastSync(new Date().toISOString());
+                        offlineSyncService.notifyListeners();
+                    }
+                }).catch(() => {
+                    // Sem internet ou falha de conexão: garante que o estado será enviado quando reconectar
+                    offlineSyncService.queueAction('STORE_UPDATE', { timestamp: new Date().toISOString() });
+                });
             }
         }, 150);
 
@@ -1559,6 +1568,9 @@ const useStoreState = (loadedState) => {
             isPremium: Boolean(event?.isPremium),
             registrationCloseDate: typeof event?.registrationCloseDate === 'string' ? event.registrationCloseDate.trim() : event?.registrationCloseDate || '',
             checkinEndDate: typeof event?.checkinEndDate === 'string' ? event.checkinEndDate.trim() : event?.checkinEndDate || '',
+            cancelDeadline: typeof event?.cancelDeadline === 'string' ? event.cancelDeadline.trim() : event?.cancelDeadline || '',
+            refundPolicy: (event?.refundPolicy || '').toString().trim() || 'Sujeito a analise do organizador',
+            editDeadline: typeof event?.editDeadline === 'string' ? event.editDeadline.trim() : event?.editDeadline || '',
             organizerName: (event?.organizerName || '').toString().trim() || null,
             eventSocialWebsite: (event?.eventSocialWebsite || '').toString().trim() || null,
             eventSocialWhatsapp: (event?.eventSocialWhatsapp || '').toString().trim() || null,
@@ -1794,6 +1806,13 @@ const useStoreState = (loadedState) => {
             checkinEndDate: typeof updates?.checkinEndDate === 'string'
                 ? updates.checkinEndDate.trim()
                 : updates?.checkinEndDate ?? current.checkinEndDate ?? '',
+            cancelDeadline: typeof updates?.cancelDeadline === 'string'
+                ? updates.cancelDeadline.trim()
+                : updates?.cancelDeadline ?? current.cancelDeadline ?? '',
+            refundPolicy: (updates?.refundPolicy ?? current.refundPolicy ?? '').toString().trim() || 'Sujeito a analise do organizador',
+            editDeadline: typeof updates?.editDeadline === 'string'
+                ? updates.editDeadline.trim()
+                : updates?.editDeadline ?? current.editDeadline ?? '',
             organizerName: (updates?.organizerName ?? current.organizerName ?? '').toString().trim() || null,
             eventSocialWebsite: (updates?.eventSocialWebsite ?? current.eventSocialWebsite ?? '').toString().trim() || null,
             eventSocialWhatsapp: (updates?.eventSocialWhatsapp ?? current.eventSocialWhatsapp ?? '').toString().trim() || null,
@@ -2324,20 +2343,69 @@ const useStoreState = (loadedState) => {
     };
 
     const finalizeMatch = (bracketId, matchId, winnerId, scoreA, scoreB, loserId, winReason, matchDuration) => {
-        setData(prev => ({
-            ...prev,
-            brackets: prev.brackets.map(b => {
-                if (b.id !== bracketId) return b;
-                return {
-                    ...b,
-                    matchResults: {
-                        ...(b.matchResults || {}),
-                        [matchId]: { winnerId, loserId, scoreA, scoreB, winReason, matchDuration, timestamp: new Date().toISOString() }
-                    }
+        const nowIso = new Date().toISOString();
+        const ptsA = typeof scoreA === 'object' && scoreA !== null ? (scoreA.points || 0) : Number(scoreA) || 0;
+        const ptsB = typeof scoreB === 'object' && scoreB !== null ? (scoreB.points || 0) : Number(scoreB) || 0;
+        const advA = typeof scoreA === 'object' && scoreA !== null ? (scoreA.advantages || 0) : 0;
+        const advB = typeof scoreB === 'object' && scoreB !== null ? (scoreB.advantages || 0) : 0;
+        const formattedScore = `${ptsA}x${ptsB}${advA > 0 || advB > 0 ? ` (V: ${advA}x${advB})` : ''}`;
+
+        setData(prev => {
+            const targetBracket = prev.brackets.find(b => b.id === bracketId);
+            const eventId = targetBracket?.eventId || '';
+            const winnerAth = prev.athletes.find(a => a.id === winnerId);
+            const loserAth = prev.athletes.find(a => a.id === loserId);
+
+            const updatedAthletes = prev.athletes.map(athlete => {
+                if (athlete.id !== winnerId && athlete.id !== loserId) return athlete;
+
+                const isWinner = athlete.id === winnerId;
+                const opponentName = isWinner ? (loserAth?.nome || 'Adversário') : (winnerAth?.nome || 'Adversário');
+                const opponentId = isWinner ? loserId : winnerId;
+
+                const filteredHistory = (athlete.historico || []).filter(item => !(
+                    item.source === 'scoreboard' && item.bracketId === bracketId && item.matchId === matchId
+                ));
+
+                const newHistoryItem = {
+                    type: isWinner ? 'win' : 'loss',
+                    source: 'scoreboard',
+                    bracketId,
+                    matchId,
+                    eventId,
+                    opponent: opponentName,
+                    opponentId,
+                    method: winReason || 'PONTOS',
+                    score: formattedScore,
+                    timestamp: nowIso
                 };
-            })
-        }));
-        addLog({ type: 'INFO', action: 'FINALIZE_MATCH', details: `Luta finalizada na chave.` });
+
+                const nextHistory = [...filteredHistory, newHistoryItem];
+                const pontos = calculateTotalPoints(nextHistory);
+
+                return {
+                    ...athlete,
+                    historico: nextHistory,
+                    pontos: Math.max(Number(athlete.pontos || 0), pontos)
+                };
+            });
+
+            return {
+                ...prev,
+                athletes: updatedAthletes,
+                brackets: prev.brackets.map(b => {
+                    if (b.id !== bracketId) return b;
+                    return {
+                        ...b,
+                        matchResults: {
+                            ...(b.matchResults || {}),
+                            [matchId]: { winnerId, loserId, scoreA, scoreB, winReason, matchDuration, timestamp: nowIso }
+                        }
+                    };
+                })
+            };
+        });
+        addLog({ type: 'INFO', action: 'FINALIZE_MATCH', details: `Luta finalizada no placar e sincronizada com os atletas.` });
     };
 
     const applyBracketPodium = (bracketId, podiumOverride = null) => {
@@ -2359,18 +2427,11 @@ const useStoreState = (loadedState) => {
             bronzeId: podium.bronzeId || ''
         };
 
-        const required = participantIds.size >= 3
-            ? ['goldId', 'silverId', 'bronzeId']
-            : participantIds.size === 2
-                ? ['goldId', 'silverId']
-                : ['goldId'];
-
-        const missing = required.filter((key) => !positions[key]);
-        if (missing.length) {
-            return { ok: false, message: 'Selecione o pódio completo para aplicar.' };
+        const chosen = Object.values(positions).filter(Boolean);
+        if (chosen.length === 0) {
+            return { ok: false, message: 'Selecione ao menos um atleta do pódio.' };
         }
 
-        const chosen = Object.values(positions).filter(Boolean);
         const unique = new Set(chosen);
         if (unique.size !== chosen.length) {
             return { ok: false, message: 'Os atletas do pódio devem ser diferentes.' };
@@ -2428,6 +2489,12 @@ const useStoreState = (loadedState) => {
             type: 'INFO',
             action: 'APPLY_BRACKET',
             details: `Pódio aplicado para a chave ${bracket.number || bracketId}.`
+        });
+
+        offlineSyncService.queueAction('PODIUM_APPLIED', {
+            bracketId,
+            podium,
+            eventId: bracket.eventId || ''
         });
 
         return { ok: true };

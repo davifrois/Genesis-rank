@@ -188,6 +188,39 @@
   background: rgba(var(--primary-color-rgb, 59,130,246), 0.1);
 }
 
+/* ─── Check-in Highlight Button ─── */
+.pp-checkin-highlight {
+  border-color: #10b981 !important;
+  color: #ffffff !important;
+  background: linear-gradient(135deg, #10b981, #059669) !important;
+  font-size: 0.78rem !important;
+  font-weight: 800 !important;
+  padding: 6px 14px !important;
+  border-radius: 6px !important;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  animation: pp-checkin-pulse 2s ease-in-out infinite;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.pp-checkin-highlight:hover {
+  background: linear-gradient(135deg, #059669, #047857) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.5) !important;
+}
+
+@keyframes pp-checkin-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  60% {
+    box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
 .pp-belt-card {
   display: flex;
   align-items: center;

@@ -134,6 +134,7 @@ const MyAccount = () => {
     academies,
     athletes,
     events,
+    brackets,
     memberProfiles,
     addMemberProfile,
     deleteMemberProfile
@@ -322,11 +323,13 @@ const MyAccount = () => {
       profile: profilePayload,
       shareCode,
       athletes,
-      events
+      events,
+      brackets
     });
   }, [
     age,
     athletes,
+    brackets,
     currentProfile?.academyName,
     currentProfile?.age,
     currentProfile?.belt,

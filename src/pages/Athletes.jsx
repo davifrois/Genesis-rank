@@ -592,28 +592,34 @@ const Athletes = () => {
           </h1>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <input
-              type="search"
-              style={{ width: '100%', padding: '14px 16px', borderRadius: '4px', border: 'none', fontSize: '0.9rem', color: '#000', backgroundColor: '#fff', outline: 'none' }}
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder={isEnglish ? 'Search...' : 'Pesquisar...'}
-            />
+            <div style={{ position: 'relative' }}>
+              <Search size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#71717a', pointerEvents: 'none' }} />
+              <input
+                type="search"
+                style={{ width: '100%', padding: '14px 16px 14px 42px', borderRadius: '4px', border: 'none', fontSize: '0.9rem', color: '#000', backgroundColor: '#fff', outline: 'none', boxSizing: 'border-box' }}
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder={isEnglish ? 'Search by name, academy or belt...' : 'Buscar por nome, academia ou faixa...'}
+              />
+            </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
               <select style={{ width: '100%', padding: '12px', borderRadius: '4px', border: 'none', fontSize: '0.8rem', color: '#333', backgroundColor: '#fff', cursor: 'pointer', outline: 'none' }} value={countryFilter} onChange={(event) => setCountryFilter(event.target.value)}>
-                <option value="all">{isEnglish ? 'Select country' : 'Selecione o país'}</option>
+                <option value="all">{isEnglish ? 'País' : 'País'}</option>
                 {Array.from(new Set(memberProfiles.map(p => p.country).filter(Boolean))).sort().map(c => (
                   <option key={c} value={c}>{c}</option>
                 ))}
               </select>
               <select style={{ width: '100%', padding: '12px', borderRadius: '4px', border: 'none', fontSize: '0.8rem', color: '#333', backgroundColor: '#fff', cursor: 'pointer', outline: 'none' }} value={beltFilter} onChange={(event) => setBeltFilter(event.target.value)}>
-                <option value="all">{isEnglish ? '- Continent -' : '- Continente -'}</option>
+                <option value="all">{isEnglish ? '- Belt -' : '- Faixa -'}</option>
+                {BELT_OPTIONS.map(belt => (
+                  <option key={belt} value={belt}>{belt}</option>
+                ))}
               </select>
               <select style={{ width: '100%', padding: '12px', borderRadius: '4px', border: 'none', fontSize: '0.8rem', color: '#333', backgroundColor: '#fff', cursor: 'pointer', outline: 'none' }} value={academyFilter} onChange={(event) => setAcademyFilter(event.target.value)}>
                 <option value="all">{isEnglish ? 'Academy' : 'Academia'}</option>
                 {availableAcademies.map(a => (
-                  <option key={a.id} value={a.id}>{a.name}</option>
+                  <option key={a.id} value={a.name}>{a.name}</option>
                 ))}
               </select>
               <select style={{ width: '100%', padding: '12px', borderRadius: '4px', border: 'none', fontSize: '0.8rem', color: '#333', backgroundColor: '#fff', cursor: 'pointer', outline: 'none' }} value={genderFilter} onChange={(event) => setGenderFilter(event.target.value)}>

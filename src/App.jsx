@@ -58,6 +58,7 @@ import { useStore } from './hooks/useStore';
 import { useI18n } from './hooks/useI18n';
 import LoginOverlay from './components/LoginOverlay';
 import PwaInstallBanner from './components/PwaInstallBanner';
+import ConnectionSyncIndicator from './components/ConnectionSyncIndicator';
 import { DEFAULT_EVENT_FEES, DEFAULT_EVENT_PIX_KEY } from './utils/eventPricing';
 import { compressImage } from './utils/imageUtils';
 import './index.css';
@@ -80,6 +81,9 @@ const createEventFormState = () => ({
   endDate: '',
   registrationCloseDate: '',
   checkinEndDate: '',
+  cancelDeadline: '',
+  refundPolicy: 'Sujeito a analise do organizador',
+  editDeadline: '',
   location: '',
   isPremium: false,
   organizerName: '',
@@ -1351,6 +1355,7 @@ const AppLayout = () => {
 
                 </div>
               </div>
+              <ConnectionSyncIndicator />
               <div className="utility-dropdown utility-dropdown--language">
                 <button className="utility-link utility-link--language" type="button" aria-label={copy.utility.language}>
                   {currentLanguage?.flagImages?.[0] && (
@@ -1775,96 +1780,96 @@ const AppLayout = () => {
               transition={{ duration: 0.2 }}
               onClick={e => e.stopPropagation()}
               style={{
-                width: 'min(960px, 96vw)',
-                maxHeight: 'min(92vh, 840px)',
+                width: 'min(1120px, 96vw)',
+                maxHeight: 'min(93vh, 880px)',
                 background: '#0d1527',
                 border: '1px solid rgba(56, 189, 248, 0.25)',
-                borderRadius: '20px',
+                borderRadius: '24px',
                 display: 'flex',
                 flexDirection: 'column',
                 overflow: 'hidden',
-                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.85), 0 0 35px rgba(56, 189, 248, 0.15)'
+                boxShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.9), 0 0 45px rgba(56, 189, 248, 0.18)'
               }}
             >
               {/* ── Header com abas ──────────────────────── */}
-              <div style={{ flexShrink: 0, background: 'linear-gradient(135deg, #0f172a 0%, #17233f 100%)', borderBottom: '1px solid rgba(255,255,255,0.08)', padding: '18px 24px 0 24px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <div style={{ flexShrink: 0, background: 'linear-gradient(135deg, #0f172a 0%, #17233f 100%)', borderBottom: '1px solid rgba(255,255,255,0.08)', padding: '20px 28px 0 28px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
                   <div>
-                    <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.12em', color: 'var(--brand-primary,#00c2cb)', textTransform: 'uppercase', marginBottom: '4px' }}>Genesis Sports · Admin</div>
-                    <div className="modal-title" style={{ fontSize: '20px', margin: 0, color: '#ffffff', fontWeight: 800 }}>{copy.eventModal.title}</div>
-                    {eventForm.name && <div style={{ fontSize: '13px', color: '#cbd5e1', marginTop: '2px' }}>{eventForm.name}</div>}
+                    <div style={{ fontSize: '12px', fontWeight: 800, letterSpacing: '0.14em', color: 'var(--brand-primary,#00c2cb)', textTransform: 'uppercase', marginBottom: '5px' }}>Genesis Sports · Admin</div>
+                    <div className="modal-title" style={{ fontSize: '26px', margin: 0, color: '#ffffff', fontWeight: 900, letterSpacing: '-0.02em' }}>{copy.eventModal.title}</div>
+                    {eventForm.name && <div style={{ fontSize: '14px', color: '#cbd5e1', marginTop: '3px', fontWeight: 500 }}>{eventForm.name}</div>}
                   </div>
-                  <button type="button" className="btn btn-ghost" onClick={handleCloseEventModal} style={{ color: '#94a3b8', fontSize: '13px', padding: '6px 12px' }}>{copy.eventModal.close}</button>
+                  <button type="button" className="btn btn-ghost" onClick={handleCloseEventModal} style={{ color: '#cbd5e1', fontSize: '14px', fontWeight: 600, padding: '8px 18px', background: 'rgba(255,255,255,0.06)', borderRadius: '10px' }}>{copy.eventModal.close}</button>
                 </div>
-                <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }}>
+                <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '2px' }}>
                   {[{ id: 'info', label: '📋 Informações Básicas' }, { id: 'registration', label: '💰 Inscrições e Valores' }, { id: 'documents', label: '⚖️ Tabelas e Documentos' }].map(tab => (
-                    <button key={tab.id} type="button" onClick={() => setEventModalTab(tab.id)} style={{ padding: '8px 16px', fontSize: '13px', fontWeight: eventModalTab === tab.id ? 700 : 500, color: eventModalTab === tab.id ? 'var(--brand-primary,#00c2cb)' : '#94a3b8', background: 'transparent', border: 'none', borderBottom: eventModalTab === tab.id ? '3px solid var(--brand-primary,#00c2cb)' : '3px solid transparent', borderRadius: 0, cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap' }}>{tab.label}</button>
+                    <button key={tab.id} type="button" onClick={() => setEventModalTab(tab.id)} style={{ padding: '12px 22px', fontSize: '15px', fontWeight: eventModalTab === tab.id ? 800 : 600, color: eventModalTab === tab.id ? 'var(--brand-primary,#00c2cb)' : '#94a3b8', background: eventModalTab === tab.id ? 'rgba(0,194,203,0.08)' : 'transparent', border: 'none', borderBottom: eventModalTab === tab.id ? '3px solid var(--brand-primary,#00c2cb)' : '3px solid transparent', borderRadius: '8px 8px 0 0', cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap' }}>{tab.label}</button>
                   ))}
                 </div>
               </div>
 
               {/* ── Erros / Sucesso ──────────────────────── */}
-              {eventError && (<div className="login-error" role="alert" style={{ margin: '14px 24px 0 24px', borderRadius: '10px' }}><AlertCircle size={16} /><p style={{ fontSize: '13px' }}>{eventError}</p></div>)}
-              {eventSuccess && (<div className="profile-success" role="status" style={{ margin: '14px 24px 0 24px', borderRadius: '10px' }}><p style={{ fontSize: '13px' }}>{eventSuccess}</p></div>)}
+              {eventError && (<div className="login-error" role="alert" style={{ margin: '14px 28px 0 28px', borderRadius: '10px', fontSize: '14px' }}><AlertCircle size={18} /><p style={{ fontSize: '14px' }}>{eventError}</p></div>)}
+              {eventSuccess && (<div className="profile-success" role="status" style={{ margin: '14px 28px 0 28px', borderRadius: '10px', fontSize: '14px' }}><p style={{ fontSize: '14px' }}>{eventSuccess}</p></div>)}
 
               <form onSubmit={handleCreateEvent} style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
-                <div style={{ flex: 1, padding: '20px 24px', overflowY: 'auto' }}>
+                <div style={{ flex: 1, padding: '26px 30px', overflowY: 'auto' }}>
 
                   {/* ── TAB 1 ──────────────────────────────── */}
                   {eventModalTab === 'info' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
                       <div>
-                        <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#ffffff' }}>NOME DO EVENTO *</label>
-                        <span style={{ fontSize: '12px', color: '#cbd5e1', display: 'block', marginBottom: '6px' }}>Nome oficial do campeonato exibido aos atletas, inscrições e certificados.</span>
-                        <input className="input" type="text" value={eventForm.name} onChange={e => setEventForm({ ...eventForm, name: e.target.value })} placeholder={copy.eventModal.namePlaceholder} required style={{ fontSize: '14px', padding: '10px 14px', fontWeight: 600, color: '#ffffff' }} />
+                        <label className="table-meta" style={{ fontSize: '14px', fontWeight: 800, marginBottom: '6px', display: 'block', color: '#f8fafc', letterSpacing: '0.03em' }}>NOME DO EVENTO *</label>
+                        <span style={{ fontSize: '13px', color: '#94a3b8', display: 'block', marginBottom: '8px', lineHeight: 1.5 }}>Nome oficial do campeonato exibido aos atletas, inscrições e certificados.</span>
+                        <input className="input" type="text" value={eventForm.name} onChange={e => setEventForm({ ...eventForm, name: e.target.value })} placeholder={copy.eventModal.namePlaceholder} required style={{ fontSize: '15.5px', padding: '12px 16px', fontWeight: 600, color: '#ffffff' }} />
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '18px' }}>
                         <div>
-                          <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#ffffff' }}>DATA DO EVENTO (DIA 1) *</label>
-                          <span style={{ fontSize: '12px', color: '#cbd5e1', display: 'block', marginBottom: '6px' }}>Data principal de realização das lutas.</span>
-                          <input className="input" type="date" value={eventForm.date} onChange={e => setEventForm({ ...eventForm, date: e.target.value })} required style={{ fontSize: '14px', padding: '10px 14px', color: '#ffffff' }} />
+                          <label className="table-meta" style={{ fontSize: '14px', fontWeight: 800, marginBottom: '6px', display: 'block', color: '#f8fafc', letterSpacing: '0.03em' }}>DATA DO EVENTO (DIA 1) *</label>
+                          <span style={{ fontSize: '13px', color: '#94a3b8', display: 'block', marginBottom: '8px', lineHeight: 1.5 }}>Data principal de realização das lutas.</span>
+                          <input className="input" type="date" value={eventForm.date} onChange={e => setEventForm({ ...eventForm, date: e.target.value })} required style={{ fontSize: '15px', padding: '12px 16px', color: '#ffffff' }} />
                         </div>
                         <div>
-                          <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#ffffff' }}>DATA DO EVENTO (DIA 2 - opcional)</label>
-                          <span style={{ fontSize: '12px', color: '#cbd5e1', display: 'block', marginBottom: '6px' }}>Preencha apenas se o campeonato ocorrer em dois dias seguidos.</span>
-                          <input className="input" type="date" value={eventForm.endDate} onChange={e => setEventForm({ ...eventForm, endDate: e.target.value })} style={{ fontSize: '14px', padding: '10px 14px', color: '#ffffff' }} />
+                          <label className="table-meta" style={{ fontSize: '14px', fontWeight: 800, marginBottom: '6px', display: 'block', color: '#f8fafc', letterSpacing: '0.03em' }}>DATA DO EVENTO (DIA 2 - opcional)</label>
+                          <span style={{ fontSize: '13px', color: '#94a3b8', display: 'block', marginBottom: '8px', lineHeight: 1.5 }}>Preencha apenas se o campeonato ocorrer em dois dias seguidos.</span>
+                          <input className="input" type="date" value={eventForm.endDate} onChange={e => setEventForm({ ...eventForm, endDate: e.target.value })} style={{ fontSize: '15px', padding: '12px 16px', color: '#ffffff' }} />
                         </div>
                       </div>
                       <div>
-                        <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#ffffff' }}>LOCAL / ARENA</label>
-                        <span style={{ fontSize: '12px', color: '#cbd5e1', display: 'block', marginBottom: '6px' }}>Nome do ginásio, centro esportivo ou endereço completo da competição.</span>
-                        <input className="input" type="text" value={eventForm.location} onChange={e => setEventForm({ ...eventForm, location: e.target.value })} placeholder={copy.eventModal.locationPlaceholder} style={{ fontSize: '14px', padding: '10px 14px', color: '#ffffff' }} />
+                        <label className="table-meta" style={{ fontSize: '14px', fontWeight: 800, marginBottom: '6px', display: 'block', color: '#f8fafc', letterSpacing: '0.03em' }}>LOCAL / ARENA</label>
+                        <span style={{ fontSize: '13px', color: '#94a3b8', display: 'block', marginBottom: '8px', lineHeight: 1.5 }}>Nome do ginásio, centro esportivo ou endereço completo da competição.</span>
+                        <input className="input" type="text" value={eventForm.location} onChange={e => setEventForm({ ...eventForm, location: e.target.value })} placeholder={copy.eventModal.locationPlaceholder} style={{ fontSize: '15.5px', padding: '12px 16px', color: '#ffffff' }} />
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '12px 16px', background: 'rgba(234, 179, 8, 0.12)', border: '1px solid rgba(234, 179, 8, 0.3)', borderRadius: '10px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <input type="checkbox" id="isPremiumCheckboxNew" checked={eventForm.isPremium} onChange={e => setEventForm({ ...eventForm, isPremium: e.target.checked })} style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#eab308' }} />
-                          <label htmlFor="isPremiumCheckboxNew" style={{ fontSize: '13px', fontWeight: 700, color: '#fef08a', cursor: 'pointer' }}>Evento Premium / Destaque Especial na Página Inicial</label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '16px 20px', background: 'rgba(234, 179, 8, 0.12)', border: '1px solid rgba(234, 179, 8, 0.35)', borderRadius: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <input type="checkbox" id="isPremiumCheckboxNew" checked={eventForm.isPremium} onChange={e => setEventForm({ ...eventForm, isPremium: e.target.checked })} style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#eab308' }} />
+                          <label htmlFor="isPremiumCheckboxNew" style={{ fontSize: '15px', fontWeight: 800, color: '#fef08a', cursor: 'pointer' }}>Evento Premium / Destaque Especial na Página Inicial</label>
                         </div>
-                        <span style={{ fontSize: '12px', color: '#fef08a', opacity: 0.9, marginLeft: '26px' }}>Ao ativar, o evento é colocado em destaque no topo da página inicial do site para atração máxima de inscritos.</span>
+                        <span style={{ fontSize: '13px', color: '#fef08a', opacity: 0.95, marginLeft: '30px', lineHeight: 1.5 }}>Ao ativar, o evento é colocado em destaque no topo da página inicial do site para atração máxima de inscritos.</span>
                       </div>
                       <div>
-                        <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#ffffff' }}>DESCRIÇÃO COMPLETA DO EVENTO</label>
-                        <span style={{ fontSize: '12px', color: '#cbd5e1', display: 'block', marginBottom: '6px' }}>Detalhes gerais: horário de portões, regras oficiais da federação, premiações e orientações aos professores.</span>
-                        <textarea className="input" rows="3" value={eventForm.eventDescription} onChange={e => setEventForm({ ...eventForm, eventDescription: e.target.value })} placeholder="Ex: Regras da IBJJF, premiações especiais em dinheiro, etc..." style={{ fontSize: '14px', padding: '10px 14px', resize: 'vertical', color: '#ffffff' }}></textarea>
+                        <label className="table-meta" style={{ fontSize: '14px', fontWeight: 800, marginBottom: '6px', display: 'block', color: '#f8fafc', letterSpacing: '0.03em' }}>DESCRIÇÃO COMPLETA DO EVENTO</label>
+                        <span style={{ fontSize: '13px', color: '#94a3b8', display: 'block', marginBottom: '8px', lineHeight: 1.5 }}>Detalhes gerais: horário de portões, regras oficiais da federação, premiações e orientações aos professores.</span>
+                        <textarea className="input" rows="3" value={eventForm.eventDescription} onChange={e => setEventForm({ ...eventForm, eventDescription: e.target.value })} placeholder="Ex: Regras da IBJJF, premiações especiais em dinheiro, etc..." style={{ fontSize: '15px', padding: '12px 16px', resize: 'vertical', lineHeight: 1.6, color: '#ffffff' }}></textarea>
                       </div>
 
                       {/* CONTATO DOS ORGANIZADORES & REDES SOCIAIS */}
                       <div style={{
                         background: 'rgba(255, 255, 255, 0.03)',
                         border: '1px solid rgba(255, 255, 255, 0.1)',
-                        borderRadius: '14px',
-                        padding: '16px',
+                        borderRadius: '16px',
+                        padding: '20px 24px',
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '14px'
+                        gap: '16px'
                       }}>
-                        <div style={{ fontSize: '13px', fontWeight: 700, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ fontSize: '15px', fontWeight: 800, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '0.04em' }}>
                           <span>📞</span> CONTATOS DOS ORGANIZADORES &amp; REDES SOCIAIS
                         </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                           <div>
-                            <label className="table-meta" style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#ffffff' }}>
+                            <label className="table-meta" style={{ fontSize: '13px', fontWeight: 700, marginBottom: '6px', display: 'block', color: '#f1f5f9' }}>
                               ORGANIZADOR / FEDERAÇÃO (Opcional)
                             </label>
                             <input
@@ -1873,11 +1878,11 @@ const AppLayout = () => {
                               value={eventForm.organizerName || ''}
                               onChange={e => setEventForm({ ...eventForm, organizerName: e.target.value })}
                               placeholder="Ex: Federação Genesis / Pacific BJJ"
-                              style={{ fontSize: '13px', padding: '8px 12px', color: '#ffffff' }}
+                              style={{ fontSize: '14.5px', padding: '11px 14px', color: '#ffffff' }}
                             />
                           </div>
                           <div>
-                            <label className="table-meta" style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#ffffff' }}>
+                            <label className="table-meta" style={{ fontSize: '13px', fontWeight: 700, marginBottom: '6px', display: 'block', color: '#f1f5f9' }}>
                               WHATSAPP DE SUPORTE (Opcional)
                             </label>
                             <input
@@ -1886,11 +1891,11 @@ const AppLayout = () => {
                               value={eventForm.eventSocialWhatsapp || ''}
                               onChange={e => setEventForm({ ...eventForm, eventSocialWhatsapp: e.target.value })}
                               placeholder="Ex: 31980164389"
-                              style={{ fontSize: '13px', padding: '8px 12px', color: '#ffffff' }}
+                              style={{ fontSize: '14.5px', padding: '11px 14px', color: '#ffffff' }}
                             />
                           </div>
                           <div>
-                            <label className="table-meta" style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#ffffff' }}>
+                            <label className="table-meta" style={{ fontSize: '13px', fontWeight: 700, marginBottom: '6px', display: 'block', color: '#f1f5f9' }}>
                               INSTAGRAM OFICIAL (Opcional)
                             </label>
                             <input
@@ -1899,11 +1904,11 @@ const AppLayout = () => {
                               value={eventForm.eventSocialInstagram || ''}
                               onChange={e => setEventForm({ ...eventForm, eventSocialInstagram: e.target.value })}
                               placeholder="Ex: @pacificfederationbjjbr ou link"
-                              style={{ fontSize: '13px', padding: '8px 12px', color: '#ffffff' }}
+                              style={{ fontSize: '14.5px', padding: '11px 14px', color: '#ffffff' }}
                             />
                           </div>
                           <div>
-                            <label className="table-meta" style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#ffffff' }}>
+                            <label className="table-meta" style={{ fontSize: '13px', fontWeight: 700, marginBottom: '6px', display: 'block', color: '#f1f5f9' }}>
                               E-MAIL DE SUPORTE (Opcional)
                             </label>
                             <input
@@ -1912,11 +1917,11 @@ const AppLayout = () => {
                               value={eventForm.eventSocialEmail || ''}
                               onChange={e => setEventForm({ ...eventForm, eventSocialEmail: e.target.value })}
                               placeholder="contato@organizacao.com.br"
-                              style={{ fontSize: '13px', padding: '8px 12px', color: '#ffffff' }}
+                              style={{ fontSize: '14.5px', padding: '11px 14px', color: '#ffffff' }}
                             />
                           </div>
                           <div style={{ gridColumn: '1 / -1' }}>
-                            <label className="table-meta" style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#ffffff' }}>
+                            <label className="table-meta" style={{ fontSize: '13px', fontWeight: 700, marginBottom: '6px', display: 'block', color: '#f1f5f9' }}>
                               WEBSITE OFICIAL (Opcional)
                             </label>
                             <input
@@ -1925,12 +1930,12 @@ const AppLayout = () => {
                               value={eventForm.eventSocialWebsite || ''}
                               onChange={e => setEventForm({ ...eventForm, eventSocialWebsite: e.target.value })}
                               placeholder="https://..."
-                              style={{ fontSize: '13px', padding: '8px 12px', color: '#ffffff' }}
+                              style={{ fontSize: '14.5px', padding: '11px 14px', color: '#ffffff' }}
                             />
                           </div>
                         </div>
                       </div>
-                      <div style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${eventForm.accommodationEnabled ? '#00c2cb66' : 'rgba(255,255,255,0.08)'}`, borderRadius: '14px', padding: '16px', transition: 'all 0.2s' }}>
+                      <div style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${eventForm.accommodationEnabled ? '#00c2cb66' : 'rgba(255,255,255,0.08)'}`, borderRadius: '16px', padding: '20px 24px', transition: 'all 0.2s' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: eventForm.accommodationEnabled ? '16px' : '0', cursor: 'pointer' }} onClick={() => {
                           const isChecked = !eventForm.accommodationEnabled;
                           const updates = { accommodationEnabled: isChecked };
@@ -1943,43 +1948,43 @@ const AppLayout = () => {
                           setEventForm({ ...eventForm, ...updates });
                         }}>
                           <div>
-                            <div style={{ fontSize: '14px', fontWeight: 700, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>🛌 Opções de Hospedagem</div>
-                            <div style={{ fontSize: '12px', color: '#cbd5e1', marginTop: '2px' }}>Habilita informações de hotel/alojamento na página do evento</div>
+                            <div style={{ fontSize: '15px', fontWeight: 800, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>🛌 Opções de Hospedagem</div>
+                            <div style={{ fontSize: '13px', color: '#94a3b8', marginTop: '3px' }}>Habilita informações de hotel/alojamento na página do evento</div>
                           </div>
-                          <div style={{ flexShrink: 0, width: '46px', height: '26px', borderRadius: '13px', background: eventForm.accommodationEnabled ? '#00c2cb' : '#334155', position: 'relative', transition: 'background 0.2s' }}>
-                            <div style={{ position: 'absolute', top: '3px', left: eventForm.accommodationEnabled ? '23px' : '3px', width: '20px', height: '20px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
+                          <div style={{ flexShrink: 0, width: '48px', height: '28px', borderRadius: '14px', background: eventForm.accommodationEnabled ? '#00c2cb' : '#334155', position: 'relative', transition: 'background 0.2s' }}>
+                            <div style={{ position: 'absolute', top: '3px', left: eventForm.accommodationEnabled ? '23px' : '3px', width: '22px', height: '22px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
                           </div>
                         </div>
                         {eventForm.accommodationEnabled && (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                             <div>
-                              <label className="table-meta" style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#ffffff' }}>Título (Ex: Hotel Oficial)</label>
-                              <input className="input" type="text" value={eventForm.accommodationTitle} onChange={e => setEventForm({ ...eventForm, accommodationTitle: e.target.value })} placeholder="Hotel Parceiro" style={{ fontSize: '13px', padding: '8px 12px', color: '#ffffff' }} />
+                              <label className="table-meta" style={{ fontSize: '13px', fontWeight: 700, marginBottom: '6px', display: 'block', color: '#ffffff' }}>Título (Ex: Hotel Oficial)</label>
+                              <input className="input" type="text" value={eventForm.accommodationTitle} onChange={e => setEventForm({ ...eventForm, accommodationTitle: e.target.value })} placeholder="Hotel Parceiro" style={{ fontSize: '14.5px', padding: '11px 14px', color: '#ffffff' }} />
                             </div>
                             <div>
-                              <label className="table-meta" style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#ffffff' }}>Descrição / Preço / Contato</label>
-                              <textarea className="input" rows="4" value={eventForm.accommodationDescription} onChange={e => setEventForm({ ...eventForm, accommodationDescription: e.target.value })} placeholder="Diárias a partir de R$ 100. Fale com (11) 9999-9999" style={{ fontSize: '13px', resize: 'vertical', lineHeight: '1.5', padding: '8px 12px', color: '#ffffff' }}></textarea>
+                              <label className="table-meta" style={{ fontSize: '13px', fontWeight: 700, marginBottom: '6px', display: 'block', color: '#ffffff' }}>Descrição / Preço / Contato</label>
+                              <textarea className="input" rows="4" value={eventForm.accommodationDescription} onChange={e => setEventForm({ ...eventForm, accommodationDescription: e.target.value })} placeholder="Diárias a partir de R$ 100. Fale com (11) 9999-9999" style={{ fontSize: '14px', resize: 'vertical', lineHeight: '1.6', padding: '11px 14px', color: '#ffffff' }}></textarea>
                             </div>
                           </div>
                         )}
                       </div>
                       <div>
-                        <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '6px', display: 'block', color: '#ffffff' }}>URL DO CARTAZ (opcional)</label>
-                        <input className="input" type="text" value={eventForm.posterUrl} onChange={handleEventPosterUrlChange} placeholder={copy.eventModal.posterUrlPlaceholder} style={{ fontSize: '13px', padding: '8px 12px', color: '#ffffff' }} />
+                        <label className="table-meta" style={{ fontSize: '14px', fontWeight: 800, marginBottom: '6px', display: 'block', color: '#f8fafc', letterSpacing: '0.03em' }}>URL DO CARTAZ (opcional)</label>
+                        <input className="input" type="text" value={eventForm.posterUrl} onChange={handleEventPosterUrlChange} placeholder={copy.eventModal.posterUrlPlaceholder} style={{ fontSize: '14.5px', padding: '11px 14px', color: '#ffffff' }} />
                       </div>
                       <div>
-                        <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '2px', display: 'block', color: '#ffffff' }}>ENVIAR ARQUIVO DO CARTAZ</label>
-                        <span style={{ fontSize: '12px', color: '#38bdf8', display: 'block', marginBottom: '6px', fontWeight: 500 }}>
+                        <label className="table-meta" style={{ fontSize: '14px', fontWeight: 800, marginBottom: '4px', display: 'block', color: '#f8fafc', letterSpacing: '0.03em' }}>ENVIAR ARQUIVO DO CARTAZ</label>
+                        <span style={{ fontSize: '13px', color: '#38bdf8', display: 'block', marginBottom: '8px', fontWeight: 500 }}>
                             💡 Dica: A proporção recomendada é 3:1 (ex: 1200x400px) para o cartaz horizontal.
                         </span>
-                        <input className="input" type="file" accept="image/*" onChange={handleEventPosterFileChange} style={{ fontSize: '13px', padding: '6px 10px', color: '#ffffff' }} />
-                        <div className="table-meta table-meta--tight" style={{ marginTop: '4px', fontSize: '12px', color: '#cbd5e1' }}>{copy.eventModal.posterCompressionHint}</div>
-                        {eventPosterStoredSizeBytes > 0 && <div className="table-meta table-meta--tight" style={{ fontSize: '12px', color: '#38bdf8' }}>{copy.eventModal.posterCompressedSize}: {formatBytes(eventPosterStoredSizeBytes)}</div>}
+                        <input className="input" type="file" accept="image/*" onChange={handleEventPosterFileChange} style={{ fontSize: '14px', padding: '8px 12px', color: '#ffffff' }} />
+                        <div className="table-meta table-meta--tight" style={{ marginTop: '5px', fontSize: '13px', color: '#94a3b8' }}>{copy.eventModal.posterCompressionHint}</div>
+                        {eventPosterStoredSizeBytes > 0 && <div className="table-meta table-meta--tight" style={{ fontSize: '13px', color: '#38bdf8' }}>{copy.eventModal.posterCompressedSize}: {formatBytes(eventPosterStoredSizeBytes)}</div>}
                       </div>
                       {eventForm.posterUrl && (
-                        <div style={{ marginTop: '8px', background: 'rgba(15,23,42,0.6)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                            <span style={{ fontSize: '12px', color: '#00c2cb', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ marginTop: '8px', background: 'rgba(15,23,42,0.6)', padding: '16px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                            <span style={{ fontSize: '13px', color: '#00c2cb', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
                               <span>↕️</span> Arraste com o mouse para enquadrar a imagem ({Math.round(eventForm.posterPositionY ?? 50)}%)
                             </span>
                             <button
@@ -1988,10 +1993,10 @@ const AppLayout = () => {
                               style={{
                                 background: 'rgba(255,255,255,0.06)',
                                 border: '1px solid rgba(255,255,255,0.15)',
-                                borderRadius: '6px',
-                                padding: '3px 8px',
+                                borderRadius: '8px',
+                                padding: '5px 12px',
                                 color: '#cbd5e1',
-                                fontSize: '11px',
+                                fontSize: '12px',
                                 fontWeight: 600,
                                 cursor: 'pointer'
                               }}
@@ -2001,14 +2006,14 @@ const AppLayout = () => {
                           </div>
                           <div
                             style={{
-                              height: '180px',
+                              height: '200px',
                               overflow: 'hidden',
                               cursor: 'ns-resize',
                               position: 'relative',
                               backgroundImage: `url(${eventForm.posterUrl})`,
                               backgroundSize: 'cover',
                               backgroundPosition: `center ${eventForm.posterPositionY ?? 50}%`,
-                              borderRadius: '10px',
+                              borderRadius: '12px',
                               border: '2px solid rgba(0, 194, 203, 0.4)',
                               boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
                               userSelect: 'none',
@@ -2044,9 +2049,9 @@ const AppLayout = () => {
                               backdropFilter: 'blur(8px)',
                               color: '#00c2cb',
                               border: '1px solid rgba(0,194,203,0.3)',
-                              fontSize: '10px',
+                              fontSize: '11px',
                               fontWeight: 700,
-                              padding: '4px 10px',
+                              padding: '5px 12px',
                               borderRadius: '20px',
                               pointerEvents: 'none',
                               display: 'flex',
@@ -2056,17 +2061,17 @@ const AppLayout = () => {
                               ↕️ Clique e arraste para posicionar
                             </div>
                           </div>
-                          <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 600 }}>Topo (0%)</span>
+                          <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <span style={{ fontSize: '12px', color: '#cbd5e1', fontWeight: 600 }}>Topo (0%)</span>
                             <input
                               type="range"
                               min="0"
                               max="100"
                               value={eventForm.posterPositionY ?? 50}
                               onChange={(e) => setEventForm(prev => ({ ...prev, posterPositionY: Number(e.target.value) }))}
-                              style={{ flex: 1, accentColor: '#00c2cb', cursor: 'pointer', height: '5px' }}
+                              style={{ flex: 1, accentColor: '#00c2cb', cursor: 'pointer', height: '6px' }}
                             />
-                            <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 600 }}>Base (100%)</span>
+                            <span style={{ fontSize: '12px', color: '#cbd5e1', fontWeight: 600 }}>Base (100%)</span>
                           </div>
                         </div>
                       )}
@@ -2075,21 +2080,21 @@ const AppLayout = () => {
 
                   {/* ── TAB 2 ──────────────────────────────── */}
                   {eventModalTab === 'registration' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                       {/* Toggle switches */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                         {[
                           { label: 'Inscrições Abertas', desc: 'Permite que atletas se inscrevam neste evento.', key: 'registrationOpen', icon: '🟢', activeColor: '#22c55e' },
                           { label: 'Inscrição pelo Sistema Genesis', desc: 'Usa o fluxo interno de pagamento. Desative para usar link externo.', key: 'internalRegistration', icon: '🔗', activeColor: 'var(--brand-primary,#00c2cb)' },
                         ].map(toggle => (
-                          <div key={toggle.key} onClick={() => setEventForm(f => ({ ...f, [toggle.key]: !f[toggle.key] }))} style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${eventForm[toggle.key] ? toggle.activeColor + '55' : 'rgba(255,255,255,0.08)'}`, borderRadius: '12px', padding: '16px', cursor: 'pointer', transition: 'all 0.2s' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                          <div key={toggle.key} onClick={() => setEventForm(f => ({ ...f, [toggle.key]: !f[toggle.key] }))} style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${eventForm[toggle.key] ? toggle.activeColor + '55' : 'rgba(255,255,255,0.08)'}`, borderRadius: '14px', padding: '18px 20px', cursor: 'pointer', transition: 'all 0.2s' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '14px' }}>
                               <div>
-                                <div style={{ fontSize: '14px', fontWeight: 700, color: '#ffffff', marginBottom: '4px' }}>{toggle.icon} {toggle.label}</div>
-                                <div style={{ fontSize: '12px', color: '#cbd5e1', lineHeight: 1.4 }}>{toggle.desc}</div>
+                                <div style={{ fontSize: '15px', fontWeight: 800, color: '#ffffff', marginBottom: '5px' }}>{toggle.icon} {toggle.label}</div>
+                                <div style={{ fontSize: '13px', color: '#94a3b8', lineHeight: 1.5 }}>{toggle.desc}</div>
                               </div>
-                              <div style={{ flexShrink: 0, width: '46px', height: '26px', borderRadius: '13px', background: eventForm[toggle.key] ? toggle.activeColor : '#334155', position: 'relative', transition: 'background 0.2s' }}>
-                                <div style={{ position: 'absolute', top: '3px', left: eventForm[toggle.key] ? '23px' : '3px', width: '20px', height: '20px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
+                              <div style={{ flexShrink: 0, width: '48px', height: '28px', borderRadius: '14px', background: eventForm[toggle.key] ? toggle.activeColor : '#334155', position: 'relative', transition: 'background 0.2s' }}>
+                                <div style={{ position: 'absolute', top: '3px', left: eventForm[toggle.key] ? '23px' : '3px', width: '22px', height: '22px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
                               </div>
                             </div>
                           </div>
@@ -2097,37 +2102,125 @@ const AppLayout = () => {
                       </div>
                       {!eventForm.internalRegistration && (
                         <div>
-                          <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#ffffff' }}>URL DE INSCRIÇÃO EXTERNA</label>
-                          <span style={{ fontSize: '12px', color: '#cbd5e1', display: 'block', marginBottom: '6px' }}>Link do sistema externo para onde os atletas serão redirecionados.</span>
-                          <input className="input" type="text" value={eventForm.registrationUrl} onChange={e => setEventForm({ ...eventForm, registrationUrl: e.target.value })} placeholder={copy.eventModal.registrationUrlPlaceholder} style={{ fontSize: '14px', padding: '10px 14px', color: '#ffffff' }} />
+                          <label className="table-meta" style={{ fontSize: '14px', fontWeight: 800, marginBottom: '6px', display: 'block', color: '#f8fafc', letterSpacing: '0.03em' }}>URL DE INSCRIÇÃO EXTERNA</label>
+                          <span style={{ fontSize: '13px', color: '#94a3b8', display: 'block', marginBottom: '8px', lineHeight: 1.5 }}>Link do sistema externo para onde os atletas serão redirecionados.</span>
+                          <input className="input" type="text" value={eventForm.registrationUrl} onChange={e => setEventForm({ ...eventForm, registrationUrl: e.target.value })} placeholder={copy.eventModal.registrationUrlPlaceholder} style={{ fontSize: '15px', padding: '12px 16px', color: '#ffffff' }} />
                         </div>
                       )}
                       
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '18px' }}>
                         <div>
-                          <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#ffffff' }}>DATA LIMITE P/ INSCRIÇÃO</label>
-                          <span style={{ fontSize: '12px', color: '#cbd5e1', display: 'block', marginBottom: '6px' }}>Data final limite em que o sistema aceitará novas inscrições.</span>
-                          <input className="input" type="date" value={eventForm.registrationCloseDate || ''} onChange={e => setEventForm({ ...eventForm, registrationCloseDate: e.target.value })} style={{ fontSize: '14px', padding: '10px 14px', color: '#ffffff' }} />
+                          <label className="table-meta" style={{ fontSize: '14px', fontWeight: 800, marginBottom: '6px', display: 'block', color: '#f8fafc', letterSpacing: '0.03em' }}>DATA LIMITE P/ INSCRIÇÃO</label>
+                          <span style={{ fontSize: '13px', color: '#94a3b8', display: 'block', marginBottom: '8px', lineHeight: 1.5 }}>Data final limite em que o sistema aceitará novas inscrições.</span>
+                          <input className="input" type="date" value={eventForm.registrationCloseDate || ''} onChange={e => setEventForm({ ...eventForm, registrationCloseDate: e.target.value })} style={{ fontSize: '15px', padding: '12px 16px', color: '#ffffff' }} />
                         </div>
                         <div>
-                          <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#ffffff' }}>DATA LIMITE P/ CHECK-IN</label>
-                          <span style={{ fontSize: '12px', color: '#cbd5e1', display: 'block', marginBottom: '6px' }}>Após esta data, os atletas não conseguirão mais fazer check-in ou trocar de categoria pelo perfil.</span>
-                          <input className="input" type="date" value={eventForm.checkinEndDate || ''} onChange={e => setEventForm({ ...eventForm, checkinEndDate: e.target.value })} style={{ fontSize: '14px', padding: '10px 14px', color: '#ffffff' }} />
+                          <label className="table-meta" style={{ fontSize: '14px', fontWeight: 800, marginBottom: '6px', display: 'block', color: '#f8fafc', letterSpacing: '0.03em' }}>DATA LIMITE P/ CHECK-IN</label>
+                          <span style={{ fontSize: '13px', color: '#94a3b8', display: 'block', marginBottom: '8px', lineHeight: 1.5 }}>Após esta data, os atletas não conseguirão mais fazer check-in ou trocar de categoria pelo perfil.</span>
+                          <input className="input" type="date" value={eventForm.checkinEndDate || ''} onChange={e => setEventForm({ ...eventForm, checkinEndDate: e.target.value })} style={{ fontSize: '15px', padding: '12px 16px', color: '#ffffff' }} />
+                        </div>
+                      </div>
+
+                      {/* POLÍTICA DE CANCELAMENTO / REEMBOLSO */}
+                      <div style={{
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '16px',
+                        padding: '20px 24px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '16px'
+                      }}>
+                        <div>
+                          <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--brand-primary,#00c2cb)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>
+                            📋 Política de Cancelamento / Reembolso
+                          </div>
+                          <span style={{ fontSize: '13px', color: '#94a3b8' }}>
+                            Essas informações serão exibidas para os atletas no momento da inscrição.
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '18px' }}>
+                          <div>
+                            <label className="table-meta" style={{ fontSize: '13.5px', fontWeight: 800, marginBottom: '6px', display: 'block', color: '#ffffff' }}>
+                              ÚLTIMO DIA PARA CANCELAR
+                            </label>
+                            <span style={{ fontSize: '13px', color: '#94a3b8', display: 'block', marginBottom: '8px' }}>
+                              Prazo final para o atleta solicitar cancelamento.
+                            </span>
+                            <input
+                              className="input"
+                              type="date"
+                              value={eventForm.cancelDeadline || ''}
+                              onChange={e => setEventForm({ ...eventForm, cancelDeadline: e.target.value })}
+                              style={{ fontSize: '15px', padding: '12px 16px', color: '#ffffff' }}
+                            />
+                          </div>
+
+                          <div>
+                            <label className="table-meta" style={{ fontSize: '13.5px', fontWeight: 800, marginBottom: '6px', display: 'block', color: '#ffffff' }}>
+                              ÚLTIMO DIA PARA EDITAR
+                            </label>
+                            <span style={{ fontSize: '13px', color: '#94a3b8', display: 'block', marginBottom: '8px' }}>
+                              Prazo final para alterações de categoria e dados da inscrição.
+                            </span>
+                            <input
+                              className="input"
+                              type="date"
+                              value={eventForm.editDeadline || ''}
+                              onChange={e => setEventForm({ ...eventForm, editDeadline: e.target.value })}
+                              style={{ fontSize: '15px', padding: '12px 16px', color: '#ffffff' }}
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="table-meta" style={{ fontSize: '13.5px', fontWeight: 800, marginBottom: '6px', display: 'block', color: '#ffffff' }}>
+                            POLÍTICA DE REEMBOLSO
+                          </label>
+                          <span style={{ fontSize: '13px', color: '#94a3b8', display: 'block', marginBottom: '8px' }}>
+                            Descrição da política (ex: "Sujeito a análise do organizador", "Reembolso integral até X dias", etc).
+                          </span>
+                          <input
+                            className="input"
+                            type="text"
+                            value={eventForm.refundPolicy || ''}
+                            onChange={e => setEventForm({ ...eventForm, refundPolicy: e.target.value })}
+                            placeholder="Sujeito a análise do organizador"
+                            style={{ fontSize: '15px', padding: '12px 16px', color: '#ffffff' }}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="table-meta" style={{ fontSize: '13.5px', fontWeight: 800, marginBottom: '6px', display: 'block', color: '#ffffff' }}>
+                            TERMO DE RESPONSABILIDADE / POLÍTICA DO SITE (opcional)
+                          </label>
+                          <span style={{ fontSize: '13px', color: '#94a3b8', display: 'block', marginBottom: '8px' }}>
+                            Texto das regras do evento ou termo que o atleta precisa aceitar para concluir a inscrição.
+                          </span>
+                          <textarea
+                            className="input"
+                            rows="3"
+                            value={eventForm.liabilityWaiver || ''}
+                            onChange={e => setEventForm({ ...eventForm, liabilityWaiver: e.target.value })}
+                            placeholder="Ex: Declaro estar apto fisicamente para participar do campeonato e isento a organização de responsabilidades..."
+                            style={{ fontSize: '14.5px', padding: '12px 16px', color: '#ffffff', resize: 'vertical', lineHeight: 1.5 }}
+                          />
                         </div>
                       </div>
 
                       <div>
-                        <label className="table-meta" style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#ffffff' }}>CHAVE PIX (responsável pelo campeonato) *</label>
-                        <span style={{ fontSize: '12px', color: '#cbd5e1', display: 'block', marginBottom: '6px' }}>Chave PIX bancária da organização que receberá os pagamentos dos inscritos.</span>
-                        <input className="input" type="text" value={eventForm.pixKey} onChange={e => setEventForm({ ...eventForm, pixKey: e.target.value })} placeholder={copy.eventModal.pixKeyPlaceholder} required style={{ fontSize: '14px', padding: '10px 14px', color: '#ffffff' }} />
+                        <label className="table-meta" style={{ fontSize: '14px', fontWeight: 800, marginBottom: '6px', display: 'block', color: '#ffffff', letterSpacing: '0.03em' }}>CHAVE PIX (responsável pelo campeonato) *</label>
+                        <span style={{ fontSize: '13px', color: '#94a3b8', display: 'block', marginBottom: '8px', lineHeight: 1.5 }}>Chave PIX bancária da organização que receberá os pagamentos dos inscritos.</span>
+                        <input className="input" type="text" value={eventForm.pixKey} onChange={e => setEventForm({ ...eventForm, pixKey: e.target.value })} placeholder={copy.eventModal.pixKeyPlaceholder} required style={{ fontSize: '16px', padding: '13px 18px', fontWeight: 700, color: '#ffffff' }} />
                       </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '16px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '18px 20px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: eventForm.closeOnCapacity ? '12px' : '0' }}>
                             <div>
-                              <div style={{ fontSize: '13px', fontWeight: 700, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>🚫 Fechar inscrições automaticamente</div>
-                              <div style={{ fontSize: '11px', color: '#cbd5e1', marginTop: '2px' }}>Encerra as inscrições ao atingir o limite.</div>
+                              <div style={{ fontSize: '14.5px', fontWeight: 800, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>🚫 Fechar inscrições automaticamente</div>
+                              <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '3px' }}>Encerra as inscrições ao atingir o limite.</div>
                             </div>
                             <div className="ios-toggle-wrapper">
                               <input type="checkbox" id="capacity-toggle" checked={eventForm.closeOnCapacity} onChange={e => setEventForm({ ...eventForm, closeOnCapacity: e.target.checked })} />
@@ -2136,8 +2229,8 @@ const AppLayout = () => {
                           </div>
                           {eventForm.closeOnCapacity && (
                             <div>
-                              <label className="table-meta" style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#ffffff' }}>Quantidade Máxima de Atletas</label>
-                              <input className="input" type="number" value={eventForm.maxAthletes} onChange={e => setEventForm({ ...eventForm, maxAthletes: e.target.value })} placeholder="Ex: 500" style={{ fontSize: '13px', padding: '8px 12px', color: '#ffffff' }} />
+                              <label className="table-meta" style={{ fontSize: '13px', fontWeight: 700, marginBottom: '6px', display: 'block', color: '#ffffff' }}>Quantidade Máxima de Atletas</label>
+                              <input className="input" type="number" value={eventForm.maxAthletes} onChange={e => setEventForm({ ...eventForm, maxAthletes: e.target.value })} placeholder="Ex: 500" style={{ fontSize: '14.5px', padding: '10px 14px', color: '#ffffff' }} />
                             </div>
                           )}
                         </div>
@@ -2164,50 +2257,50 @@ const AppLayout = () => {
                         </div>
                       </div>
 
-                      <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '18px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                          <div style={{ fontSize: '15px', fontWeight: 700, color: '#ffffff', letterSpacing: '0.02em' }}>Lotes de Inscrição</div>
-                          <button type="button" className="btn btn-secondary" onClick={handleAddBatch} style={{ padding: '6px 12px', fontSize: '13px' }}>+ Adicionar Lote</button>
+                      <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '20px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                          <div style={{ fontSize: '17px', fontWeight: 800, color: '#ffffff', letterSpacing: '0.02em' }}>🏷️ Lotes de Inscrição</div>
+                          <button type="button" className="btn btn-secondary" onClick={handleAddBatch} style={{ padding: '8px 16px', fontSize: '13.5px', fontWeight: 700 }}>+ Adicionar Lote</button>
                         </div>
                         
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
                           {(eventForm.batches || []).map((batch, index) => (
-                            <div key={batch.id} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '16px' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                                <div style={{ fontSize: '14px', fontWeight: 700, color: '#00c2cb' }}>Lote {index + 1}</div>
+                            <div key={batch.id} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', padding: '18px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                <div style={{ fontSize: '16px', fontWeight: 800, color: '#00c2cb' }}>Lote {index + 1}</div>
                                 {index > 0 && (
-                                  <button type="button" className="btn btn-ghost" onClick={() => handleRemoveBatch(index)} style={{ color: '#ef4444', padding: '4px 8px', fontSize: '12px' }}>Remover</button>
+                                  <button type="button" className="btn btn-ghost" onClick={() => handleRemoveBatch(index)} style={{ color: '#ef4444', padding: '6px 12px', fontSize: '13px', fontWeight: 700 }}>Remover</button>
                                 )}
                               </div>
                               
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginBottom: '18px' }}>
                                 <div>
-                                  <label className="table-meta" style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#ffffff' }}>Nome do Lote</label>
-                                  <input className="input" type="text" value={batch.name} onChange={e => handleBatchChange(index, 'name', e.target.value)} required style={{ fontSize: '13px', padding: '8px 12px', color: '#ffffff' }} />
+                                  <label className="table-meta" style={{ fontSize: '13px', fontWeight: 800, marginBottom: '6px', display: 'block', color: '#f8fafc' }}>Nome do Lote</label>
+                                  <input className="input" type="text" value={batch.name} onChange={e => handleBatchChange(index, 'name', e.target.value)} required style={{ fontSize: '15px', padding: '10px 14px', color: '#ffffff' }} />
                                 </div>
                                 <div>
-                                  <label className="table-meta" style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#ffffff' }}>Data/Hora de Início</label>
-                                  <input className="input" type="datetime-local" value={batch.startDate} onChange={e => handleBatchChange(index, 'startDate', e.target.value)} style={{ fontSize: '13px', padding: '8px 12px', color: '#ffffff' }} />
+                                  <label className="table-meta" style={{ fontSize: '13px', fontWeight: 800, marginBottom: '6px', display: 'block', color: '#f8fafc' }}>Data/Hora de Início</label>
+                                  <input className="input" type="datetime-local" value={batch.startDate} onChange={e => handleBatchChange(index, 'startDate', e.target.value)} style={{ fontSize: '14px', padding: '10px 14px', color: '#ffffff' }} />
                                 </div>
                                 <div>
-                                  <label className="table-meta" style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', display: 'block', color: '#ffffff' }}>Data/Hora de Fim</label>
-                                  <input className="input" type="datetime-local" value={batch.endDate} onChange={e => handleBatchChange(index, 'endDate', e.target.value)} style={{ fontSize: '13px', padding: '8px 12px', color: '#ffffff' }} />
+                                  <label className="table-meta" style={{ fontSize: '13px', fontWeight: 800, marginBottom: '6px', display: 'block', color: '#f8fafc' }}>Data/Hora de Fim</label>
+                                  <input className="input" type="datetime-local" value={batch.endDate} onChange={e => handleBatchChange(index, 'endDate', e.target.value)} style={{ fontSize: '14px', padding: '10px 14px', color: '#ffffff' }} />
                                 </div>
                               </div>
 
-                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
                                 {[
                                   { label: 'Sub-15 (até 14a)', key: 'feeUnder15', emoji: '🧒', color: '#38bdf8' },
                                   { label: 'Adulto (15+)', key: 'feeOver15', emoji: '🥋', color: '#00c2cb' },
                                   { label: 'Combo (Gi+No-Gi)', key: 'feeCombo', emoji: '🎯', color: '#f59e0b' },
                                   { label: 'Absoluto', key: 'feeAbsolute', emoji: '🏆', color: '#a78bfa' },
                                 ].map(fee => (
-                                  <div key={fee.key} style={{ background: `${fee.color}15`, border: `1px solid ${fee.color}44`, borderRadius: '10px', padding: '12px' }}>
-                                    <div style={{ fontSize: '18px', marginBottom: '4px' }}>{fee.emoji}</div>
-                                    <div style={{ fontSize: '11px', color: '#ffffff', marginBottom: '8px', fontWeight: 700 }}>{fee.label}</div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                      <span style={{ color: '#cbd5e1', fontSize: '13px', fontWeight: 700 }}>R$</span>
-                                      <input className="input" type="number" min="0" step="0.01" value={batch[fee.key]} onChange={e => handleBatchChange(index, fee.key, e.target.value)} required style={{ fontSize: '16px', fontWeight: 800, color: fee.color, background: 'transparent', border: 'none', borderBottom: `2px solid ${fee.color}66`, borderRadius: 0, padding: '2px 0', width: '100%' }} />
+                                  <div key={fee.key} style={{ background: `${fee.color}15`, border: `1px solid ${fee.color}44`, borderRadius: '12px', padding: '14px' }}>
+                                    <div style={{ fontSize: '20px', marginBottom: '6px' }}>{fee.emoji}</div>
+                                    <div style={{ fontSize: '12.5px', color: '#ffffff', marginBottom: '8px', fontWeight: 800 }}>{fee.label}</div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <span style={{ color: '#cbd5e1', fontSize: '14px', fontWeight: 800 }}>R$</span>
+                                      <input className="input" type="number" min="0" step="0.01" value={batch[fee.key]} onChange={e => handleBatchChange(index, fee.key, e.target.value)} required style={{ fontSize: '18px', fontWeight: 900, color: fee.color, background: 'transparent', border: 'none', borderBottom: `2px solid ${fee.color}66`, borderRadius: 0, padding: '4px 0', width: '100%' }} />
                                     </div>
                                   </div>
                                 ))}
@@ -2221,37 +2314,37 @@ const AppLayout = () => {
 
                   {/* ── TAB 3 ──────────────────────────────── */}
                   {eventModalTab === 'documents' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
 
                       {/* ── Info Banner ─── */}
-                      <div style={{ background: 'rgba(0,194,203,0.08)', border: '1px solid rgba(0,194,203,0.25)', borderRadius: '12px', padding: '14px 16px', display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                        <span style={{ fontSize: '18px', flexShrink: 0 }}>ℹ️</span>
+                      <div style={{ background: 'rgba(0,194,203,0.08)', border: '1px solid rgba(0,194,203,0.3)', borderRadius: '14px', padding: '16px 20px', display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+                        <span style={{ fontSize: '22px', flexShrink: 0 }}>ℹ️</span>
                         <div>
-                          <div style={{ fontSize: '13px', fontWeight: 700, color: '#00c2cb', marginBottom: '2px' }}>Tabelas Predefinidas Ativas</div>
-                          <div style={{ fontSize: '12px', color: '#cbd5e1', lineHeight: 1.5 }}>
+                          <div style={{ fontSize: '14.5px', fontWeight: 800, color: '#00c2cb', marginBottom: '4px' }}>Tabelas Predefinidas Ativas</div>
+                          <div style={{ fontSize: '13px', color: '#e2e8f0', lineHeight: 1.6 }}>
                             Por padrão, o sistema usa as <strong style={{ color: '#ffffff' }}>tabelas oficiais Genesis Sports</strong> com todas as categorias de peso. Se quiser usar uma tabela própria do seu evento, ative a opção abaixo e carregue o arquivo.
                           </div>
                         </div>
                       </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
 
                         {/* ── GI ─── */}
-                        <div style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${eventForm.useCustomWeightTableGi ? '#00c2cb55' : 'rgba(255,255,255,0.08)'}`, borderRadius: '14px', padding: '16px', transition: 'border-color 0.2s' }}>
-                          <div style={{ fontSize: '15px', fontWeight: 700, color: '#ffffff', marginBottom: '12px' }}>🥋 Tabela de Peso — GI</div>
+                        <div style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${eventForm.useCustomWeightTableGi ? '#00c2cb55' : 'rgba(255,255,255,0.09)'}`, borderRadius: '16px', padding: '18px', transition: 'border-color 0.2s' }}>
+                          <div style={{ fontSize: '16px', fontWeight: 800, color: '#ffffff', marginBottom: '14px' }}>🥋 Tabela de Peso — GI</div>
 
                           {/* Predefined Preview */}
                           {!eventForm.useCustomWeightTableGi && (
-                            <div style={{ background: 'rgba(0,194,203,0.06)', border: '1px dashed rgba(0,194,203,0.3)', borderRadius: '8px', padding: '12px', marginBottom: '14px' }}>
-                              <div style={{ fontSize: '11px', fontWeight: 700, color: '#00c2cb', marginBottom: '8px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>✅ Tabela Padrão Genesis (em uso)</div>
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+                            <div style={{ background: 'rgba(0,194,203,0.06)', border: '1px dashed rgba(0,194,203,0.35)', borderRadius: '10px', padding: '14px', marginBottom: '16px' }}>
+                              <div style={{ fontSize: '12px', fontWeight: 800, color: '#00c2cb', marginBottom: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>✅ Tabela Padrão Genesis (em uso)</div>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
                                 {[
                                   ['Galo', 'até 57,5 kg'], ['Pluma', 'até 64 kg'], ['Pena', 'até 70 kg'],
                                   ['Leve', 'até 76 kg'], ['Médio', 'até 82,3 kg'], ['Meio-Pesado', 'até 88,3 kg'],
                                   ['Pesado', 'até 94,3 kg'], ['Super-Pesado', 'até 100,5 kg'], ['Pesadíssimo', 'acima de 100,5 kg'],
                                 ].map(([cat, weight]) => (
-                                  <div key={cat} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#cbd5e1', padding: '3px 6px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px' }}>
-                                    <span style={{ color: '#ffffff', fontWeight: 600 }}>{cat}</span>
+                                  <div key={cat} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#cbd5e1', padding: '4px 8px', background: 'rgba(255,255,255,0.04)', borderRadius: '6px' }}>
+                                    <span style={{ color: '#ffffff', fontWeight: 700 }}>{cat}</span>
                                     <span style={{ color: '#94a3b8' }}>{weight}</span>
                                   </div>
                                 ))}
@@ -2260,51 +2353,51 @@ const AppLayout = () => {
                           )}
 
                           {/* Custom Toggle */}
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', padding: '8px 0', borderTop: '1px solid rgba(255,255,255,0.06)' }} onClick={() => setEventForm(f => ({ ...f, useCustomWeightTableGi: !f.useCustomWeightTableGi }))}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', padding: '10px 0', borderTop: '1px solid rgba(255,255,255,0.08)' }} onClick={() => setEventForm(f => ({ ...f, useCustomWeightTableGi: !f.useCustomWeightTableGi }))}>
                             <div>
-                              <div style={{ fontSize: '13px', fontWeight: 700, color: eventForm.useCustomWeightTableGi ? '#00c2cb' : '#ffffff' }}>Usar tabela personalizada (GI)</div>
-                              <div style={{ fontSize: '11px', color: '#cbd5e1', marginTop: '2px' }}>Substitui a tabela padrão pela sua imagem/PDF</div>
+                              <div style={{ fontSize: '14px', fontWeight: 800, color: eventForm.useCustomWeightTableGi ? '#00c2cb' : '#ffffff' }}>Usar tabela personalizada (GI)</div>
+                              <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>Substitui a tabela padrão pela sua imagem/PDF</div>
                             </div>
-                            <div style={{ flexShrink: 0, width: '42px', height: '24px', borderRadius: '12px', background: eventForm.useCustomWeightTableGi ? '#00c2cb' : '#334155', position: 'relative', transition: 'background 0.2s' }}>
-                              <div style={{ position: 'absolute', top: '2px', left: eventForm.useCustomWeightTableGi ? '20px' : '2px', width: '20px', height: '20px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
+                            <div style={{ flexShrink: 0, width: '46px', height: '26px', borderRadius: '13px', background: eventForm.useCustomWeightTableGi ? '#00c2cb' : '#334155', position: 'relative', transition: 'background 0.2s' }}>
+                              <div style={{ position: 'absolute', top: '3px', left: eventForm.useCustomWeightTableGi ? '23px' : '3px', width: '20px', height: '20px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
                             </div>
                           </div>
 
                           {eventForm.useCustomWeightTableGi && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '14px' }}>
                               <div>
-                                <label className="table-meta" style={{ fontSize: '11px', marginBottom: '4px', display: 'block', color: '#ffffff', fontWeight: 700 }}>URL da Tabela (imagem/PDF)</label>
-                                <input className="input" type="text" value={eventForm.weightTableGiUrl} onChange={handleWeightTableGiUrlChange} placeholder={copy.eventModal.weightTableGiUrlPlaceholder} style={{ fontSize: '13px', padding: '8px 12px', color: '#ffffff' }} />
+                                <label className="table-meta" style={{ fontSize: '13px', marginBottom: '6px', display: 'block', color: '#f8fafc', fontWeight: 800 }}>URL da Tabela (imagem/PDF)</label>
+                                <input className="input" type="text" value={eventForm.weightTableGiUrl} onChange={handleWeightTableGiUrlChange} placeholder={copy.eventModal.weightTableGiUrlPlaceholder} style={{ fontSize: '14.5px', padding: '10px 14px', color: '#ffffff' }} />
                               </div>
                               <div>
-                                <label className="table-meta" style={{ fontSize: '11px', marginBottom: '4px', display: 'block', color: '#ffffff', fontWeight: 700 }}>Enviar arquivo da tabela GI</label>
-                                <input className="input" type="file" accept="image/*,application/pdf" onChange={handleWeightTableGiFileChange} style={{ fontSize: '13px', padding: '6px 10px', color: '#ffffff' }} />
-                                {eventWeightTableGiStoredSizeBytes > 0 && <div className="table-meta table-meta--tight" style={{ fontSize: '11px', marginTop: '4px', color: '#38bdf8' }}>{copy.eventModal.assetStoredSize}: {formatBytes(eventWeightTableGiStoredSizeBytes)}</div>}
+                                <label className="table-meta" style={{ fontSize: '13px', marginBottom: '6px', display: 'block', color: '#f8fafc', fontWeight: 800 }}>Enviar arquivo da tabela GI</label>
+                                <input className="input" type="file" accept="image/*,application/pdf" onChange={handleWeightTableGiFileChange} style={{ fontSize: '13px', padding: '8px 12px', color: '#ffffff' }} />
+                                {eventWeightTableGiStoredSizeBytes > 0 && <div className="table-meta table-meta--tight" style={{ fontSize: '12px', marginTop: '4px', color: '#38bdf8' }}>{copy.eventModal.assetStoredSize}: {formatBytes(eventWeightTableGiStoredSizeBytes)}</div>}
                               </div>
                               <div>
-                                <label className="table-meta" style={{ fontSize: '11px', marginBottom: '4px', display: 'block', color: '#ffffff', fontWeight: 700 }}>{copy.eventModal.weightTableGiOptions}</label>
-                                <textarea className="input" value={eventForm.weightTableGiOptions} onChange={e => setEventForm({ ...eventForm, weightTableGiOptions: e.target.value })} placeholder={copy.eventModal.weightTableGiOptionsPlaceholder} rows={4} style={{ fontSize: '13px', padding: '8px 12px', color: '#ffffff' }} />
+                                <label className="table-meta" style={{ fontSize: '13px', marginBottom: '6px', display: 'block', color: '#f8fafc', fontWeight: 800 }}>{copy.eventModal.weightTableGiOptions}</label>
+                                <textarea className="input" value={eventForm.weightTableGiOptions} onChange={e => setEventForm({ ...eventForm, weightTableGiOptions: e.target.value })} placeholder={copy.eventModal.weightTableGiOptionsPlaceholder} rows={4} style={{ fontSize: '14px', padding: '10px 14px', color: '#ffffff' }} />
                               </div>
                             </div>
                           )}
                         </div>
 
                         {/* ── NO-GI ─── */}
-                        <div style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${eventForm.useCustomWeightTableNoGi ? '#f59e0b55' : 'rgba(255,255,255,0.08)'}`, borderRadius: '14px', padding: '16px', transition: 'border-color 0.2s' }}>
-                          <div style={{ fontSize: '15px', fontWeight: 700, color: '#ffffff', marginBottom: '12px' }}>🤼 Tabela de Peso — NO-GI</div>
+                        <div style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${eventForm.useCustomWeightTableNoGi ? '#f59e0b55' : 'rgba(255,255,255,0.09)'}`, borderRadius: '16px', padding: '18px', transition: 'border-color 0.2s' }}>
+                          <div style={{ fontSize: '16px', fontWeight: 800, color: '#ffffff', marginBottom: '14px' }}>🤼 Tabela de Peso — NO-GI</div>
 
                           {/* Predefined Preview */}
                           {!eventForm.useCustomWeightTableNoGi && (
-                            <div style={{ background: 'rgba(245,158,11,0.06)', border: '1px dashed rgba(245,158,11,0.3)', borderRadius: '8px', padding: '12px', marginBottom: '14px' }}>
-                              <div style={{ fontSize: '11px', fontWeight: 700, color: '#f59e0b', marginBottom: '8px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>✅ Tabela Padrão Genesis (em uso)</div>
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+                            <div style={{ background: 'rgba(245,158,11,0.06)', border: '1px dashed rgba(245,158,11,0.35)', borderRadius: '10px', padding: '14px', marginBottom: '16px' }}>
+                              <div style={{ fontSize: '12px', fontWeight: 800, color: '#f59e0b', marginBottom: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>✅ Tabela Padrão Genesis (em uso)</div>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
                                 {[
                                   ['Galo', 'até 55,5 kg'], ['Pluma', 'até 61,5 kg'], ['Pena', 'até 67,5 kg'],
                                   ['Leve', 'até 73,5 kg'], ['Médio', 'até 79,5 kg'], ['Meio-Pesado', 'até 85,5 kg'],
                                   ['Pesado', 'até 91,5 kg'], ['Super-Pesado', 'até 97,5 kg'], ['Pesadíssimo', 'acima de 97,5 kg'],
                                 ].map(([cat, weight]) => (
-                                  <div key={cat} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#cbd5e1', padding: '3px 6px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px' }}>
-                                    <span style={{ color: '#ffffff', fontWeight: 600 }}>{cat}</span>
+                                  <div key={cat} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#cbd5e1', padding: '4px 8px', background: 'rgba(255,255,255,0.04)', borderRadius: '6px' }}>
+                                    <span style={{ color: '#ffffff', fontWeight: 700 }}>{cat}</span>
                                     <span style={{ color: '#94a3b8' }}>{weight}</span>
                                   </div>
                                 ))}
@@ -2313,30 +2406,30 @@ const AppLayout = () => {
                           )}
 
                           {/* Custom Toggle */}
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', padding: '8px 0', borderTop: '1px solid rgba(255,255,255,0.06)' }} onClick={() => setEventForm(f => ({ ...f, useCustomWeightTableNoGi: !f.useCustomWeightTableNoGi }))}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', padding: '10px 0', borderTop: '1px solid rgba(255,255,255,0.08)' }} onClick={() => setEventForm(f => ({ ...f, useCustomWeightTableNoGi: !f.useCustomWeightTableNoGi }))}>
                             <div>
-                              <div style={{ fontSize: '13px', fontWeight: 700, color: eventForm.useCustomWeightTableNoGi ? '#f59e0b' : '#ffffff' }}>Usar tabela personalizada (NO-GI)</div>
-                              <div style={{ fontSize: '11px', color: '#cbd5e1', marginTop: '2px' }}>Substitui a tabela padrão pela sua imagem/PDF</div>
+                              <div style={{ fontSize: '14px', fontWeight: 800, color: eventForm.useCustomWeightTableNoGi ? '#f59e0b' : '#ffffff' }}>Usar tabela personalizada (NO-GI)</div>
+                              <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>Substitui a tabela padrão pela sua imagem/PDF</div>
                             </div>
-                            <div style={{ flexShrink: 0, width: '42px', height: '24px', borderRadius: '12px', background: eventForm.useCustomWeightTableNoGi ? '#f59e0b' : '#334155', position: 'relative', transition: 'background 0.2s' }}>
-                              <div style={{ position: 'absolute', top: '2px', left: eventForm.useCustomWeightTableNoGi ? '20px' : '2px', width: '20px', height: '20px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
+                            <div style={{ flexShrink: 0, width: '46px', height: '26px', borderRadius: '13px', background: eventForm.useCustomWeightTableNoGi ? '#f59e0b' : '#334155', position: 'relative', transition: 'background 0.2s' }}>
+                              <div style={{ position: 'absolute', top: '3px', left: eventForm.useCustomWeightTableNoGi ? '23px' : '3px', width: '20px', height: '20px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
                             </div>
                           </div>
 
                           {eventForm.useCustomWeightTableNoGi && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '14px' }}>
                               <div>
-                                <label className="table-meta" style={{ fontSize: '11px', marginBottom: '4px', display: 'block', color: '#ffffff', fontWeight: 700 }}>URL da Tabela (imagem/PDF)</label>
-                                <input className="input" type="text" value={eventForm.weightTableNoGiUrl} onChange={handleWeightTableNoGiUrlChange} placeholder={copy.eventModal.weightTableNoGiUrlPlaceholder} style={{ fontSize: '13px', padding: '8px 12px', color: '#ffffff' }} />
+                                <label className="table-meta" style={{ fontSize: '13px', marginBottom: '6px', display: 'block', color: '#f8fafc', fontWeight: 800 }}>URL da Tabela (imagem/PDF)</label>
+                                <input className="input" type="text" value={eventForm.weightTableNoGiUrl} onChange={handleWeightTableNoGiUrlChange} placeholder={copy.eventModal.weightTableNoGiUrlPlaceholder} style={{ fontSize: '14.5px', padding: '10px 14px', color: '#ffffff' }} />
                               </div>
                               <div>
-                                <label className="table-meta" style={{ fontSize: '11px', marginBottom: '4px', display: 'block', color: '#ffffff', fontWeight: 700 }}>Enviar arquivo da tabela NO-GI</label>
-                                <input className="input" type="file" accept="image/*,application/pdf" onChange={handleWeightTableNoGiFileChange} style={{ fontSize: '13px', padding: '6px 10px', color: '#ffffff' }} />
-                                {eventWeightTableNoGiStoredSizeBytes > 0 && <div className="table-meta table-meta--tight" style={{ fontSize: '11px', marginTop: '4px', color: '#38bdf8' }}>{copy.eventModal.assetStoredSize}: {formatBytes(eventWeightTableNoGiStoredSizeBytes)}</div>}
+                                <label className="table-meta" style={{ fontSize: '13px', marginBottom: '6px', display: 'block', color: '#f8fafc', fontWeight: 800 }}>Enviar arquivo da tabela NO-GI</label>
+                                <input className="input" type="file" accept="image/*,application/pdf" onChange={handleWeightTableNoGiFileChange} style={{ fontSize: '13px', padding: '8px 12px', color: '#ffffff' }} />
+                                {eventWeightTableNoGiStoredSizeBytes > 0 && <div className="table-meta table-meta--tight" style={{ fontSize: '12px', marginTop: '4px', color: '#38bdf8' }}>{copy.eventModal.assetStoredSize}: {formatBytes(eventWeightTableNoGiStoredSizeBytes)}</div>}
                               </div>
                               <div>
-                                <label className="table-meta" style={{ fontSize: '11px', marginBottom: '4px', display: 'block', color: '#ffffff', fontWeight: 700 }}>{copy.eventModal.weightTableNoGiOptions}</label>
-                                <textarea className="input" value={eventForm.weightTableNoGiOptions} onChange={e => setEventForm({ ...eventForm, weightTableNoGiOptions: e.target.value })} placeholder={copy.eventModal.weightTableNoGiOptionsPlaceholder} rows={4} style={{ fontSize: '13px', padding: '8px 12px', color: '#ffffff' }} />
+                                <label className="table-meta" style={{ fontSize: '13px', marginBottom: '6px', display: 'block', color: '#f8fafc', fontWeight: 800 }}>{copy.eventModal.weightTableNoGiOptions}</label>
+                                <textarea className="input" value={eventForm.weightTableNoGiOptions} onChange={e => setEventForm({ ...eventForm, weightTableNoGiOptions: e.target.value })} placeholder={copy.eventModal.weightTableNoGiOptionsPlaceholder} rows={4} style={{ fontSize: '14px', padding: '10px 14px', color: '#ffffff' }} />
                               </div>
                             </div>
                           )}
@@ -2344,17 +2437,17 @@ const AppLayout = () => {
 
                       </div>
 
-                      <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '16px' }}>
-                        <div style={{ fontSize: '15px', fontWeight: 700, color: '#ffffff', marginBottom: '12px' }}>📄 Circular / Regulamento</div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                      <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: '16px', padding: '18px' }}>
+                        <div style={{ fontSize: '16px', fontWeight: 800, color: '#ffffff', marginBottom: '14px' }}>📄 Circular / Regulamento</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
                           <div>
-                            <label className="table-meta" style={{ fontSize: '11px', marginBottom: '4px', display: 'block', color: '#ffffff', fontWeight: 700 }}>URL da Circular (PDF)</label>
-                            <input className="input" type="text" value={eventForm.circularUrl} onChange={handleCircularUrlChange} placeholder={copy.eventModal.circularUrlPlaceholder} style={{ fontSize: '13px', padding: '8px 12px', color: '#ffffff' }} />
+                            <label className="table-meta" style={{ fontSize: '13px', marginBottom: '6px', display: 'block', color: '#f8fafc', fontWeight: 800 }}>URL da Circular (PDF)</label>
+                            <input className="input" type="text" value={eventForm.circularUrl} onChange={handleCircularUrlChange} placeholder={copy.eventModal.circularUrlPlaceholder} style={{ fontSize: '14.5px', padding: '10px 14px', color: '#ffffff' }} />
                           </div>
                           <div>
-                            <label className="table-meta" style={{ fontSize: '11px', marginBottom: '4px', display: 'block', color: '#ffffff', fontWeight: 700 }}>Enviar arquivo da circular</label>
-                            <input className="input" type="file" accept="image/*,application/pdf" onChange={handleCircularFileChange} style={{ fontSize: '13px', padding: '6px 10px', color: '#ffffff' }} />
-                            {eventCircularStoredSizeBytes > 0 && <div className="table-meta table-meta--tight" style={{ fontSize: '11px', marginTop: '4px', color: '#38bdf8' }}>{copy.eventModal.assetStoredSize}: {formatBytes(eventCircularStoredSizeBytes)}</div>}
+                            <label className="table-meta" style={{ fontSize: '13px', marginBottom: '6px', display: 'block', color: '#f8fafc', fontWeight: 800 }}>Enviar arquivo da circular</label>
+                            <input className="input" type="file" accept="image/*,application/pdf" onChange={handleCircularFileChange} style={{ fontSize: '13px', padding: '8px 12px', color: '#ffffff' }} />
+                            {eventCircularStoredSizeBytes > 0 && <div className="table-meta table-meta--tight" style={{ fontSize: '12px', marginTop: '4px', color: '#38bdf8' }}>{copy.eventModal.assetStoredSize}: {formatBytes(eventCircularStoredSizeBytes)}</div>}
                           </div>
                         </div>
                       </div>
@@ -2364,39 +2457,39 @@ const AppLayout = () => {
                 </div>
 
                 {/* ── Rodapé Fixo ────────────────────────────── */}
-                <div style={{ flexShrink: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 24px', borderTop: '1px solid rgba(255,255,255,0.08)', background: '#0b1120', boxShadow: '0 -4px 20px rgba(0,0,0,0.4)', zIndex: 10 }}>
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <div style={{ flexShrink: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 28px', borderTop: '1px solid rgba(255,255,255,0.08)', background: '#0b1120', boxShadow: '0 -4px 20px rgba(0,0,0,0.4)', zIndex: 10 }}>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                     {Boolean(eventForm.id) ? (
                       <button
                         type="button"
                         className="btn btn-danger"
                         onClick={handleDeleteEventInModal}
                         style={{
-                          fontSize: '13px', padding: '8px 16px', borderRadius: '20px',
+                          fontSize: '14px', padding: '10px 20px', borderRadius: '12px',
                           background: '#ef4444', color: '#fff',
-                          border: 'none', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer'
+                          border: 'none', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer'
                         }}
                       >
-                        <Trash2 size={14} /> Apagar evento
+                        <Trash2 size={16} /> Apagar evento
                       </button>
                     ) : (
-                      <button type="button" className="btn btn-ghost" onClick={handleCloseEventModal} style={{ fontSize: '13px', padding: '8px 16px', color: '#cbd5e1' }}>
+                      <button type="button" className="btn btn-ghost" onClick={handleCloseEventModal} style={{ fontSize: '14px', padding: '10px 20px', color: '#cbd5e1', fontWeight: 600 }}>
                         {copy.eventModal.cancel}
                       </button>
                     )}
                   </div>
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                     {eventModalTab !== 'info' && (
-                      <button type="button" className="btn btn-ghost" onClick={() => setEventModalTab(eventModalTab === 'documents' ? 'registration' : 'info')} style={{ fontSize: '13px', padding: '8px 14px', color: '#cbd5e1' }}>
+                      <button type="button" className="btn btn-ghost" onClick={() => setEventModalTab(eventModalTab === 'documents' ? 'registration' : 'info')} style={{ fontSize: '14px', padding: '10px 18px', color: '#cbd5e1', fontWeight: 600 }}>
                         ← Anterior
                       </button>
                     )}
                     {eventModalTab !== 'documents' && (
-                      <button type="button" className="btn btn-secondary" onClick={() => setEventModalTab(eventModalTab === 'info' ? 'registration' : 'documents')} style={{ fontSize: '13px', padding: '8px 16px' }}>
+                      <button type="button" className="btn btn-secondary" onClick={() => setEventModalTab(eventModalTab === 'info' ? 'registration' : 'documents')} style={{ fontSize: '14px', padding: '10px 20px', fontWeight: 700 }}>
                         Próxima Aba →
                       </button>
                     )}
-                    <button type="submit" className="btn btn-primary" style={{ minWidth: '140px', fontSize: '13px', padding: '8px 20px', fontWeight: 700 }}>
+                    <button type="submit" className="btn btn-primary" style={{ minWidth: '160px', fontSize: '15px', padding: '11px 26px', fontWeight: 800, borderRadius: '12px' }}>
                       {eventForm.id ? 'Salvar alterações' : copy.eventModal.save}
                     </button>
                   </div>
