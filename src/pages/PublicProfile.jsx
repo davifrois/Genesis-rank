@@ -691,6 +691,27 @@ const PublicProfile = ({ profileOverride, isPreview = false }) => {
             <span>Estatísticas do Atleta</span>
           </div>
 
+          {/* Dica amigável quando o atleta ainda não tem lutas registradas */}
+          {fights === 0 && (
+            <div style={{
+              background: 'rgba(59, 130, 246, 0.08)',
+              border: '1px solid rgba(59, 130, 246, 0.25)',
+              borderRadius: '8px',
+              padding: '10px 16px',
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              color: '#93c5fd',
+              fontSize: '13px'
+            }}>
+              <Info size={16} style={{ flexShrink: 0, color: '#60a5fa' }} />
+              <span>
+                <strong>Painel de Desempenho Inicial:</strong> Suas métricas de Win Rate, taxa de finalização e lutas serão consolidadas automaticamente assim que suas primeiras lutas forem concluídas no placar oficial.
+              </span>
+            </div>
+          )}
+
           {/* ROW 1: Gauge + Donut + Stat Cards */}
           <div className="pp-stats-row">
 
@@ -914,11 +935,29 @@ const PublicProfile = ({ profileOverride, isPreview = false }) => {
                         [row.modality, profile.belt, row.category, row.weight, row.isAbsolute ? 'Absolute' : ''].filter(Boolean).join(' / '),
                         'pt'
                       );
+                      const catSegments = (categoryDisplay || '').split(' / ').map(s => s.trim()).filter(Boolean);
 
                       return (
                         <div className="pp-champ__body">
-                          <div className="pp-champ__category-title">
-                            {categoryDisplay}
+                          <div className="pp-champ__category-title" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center', margin: '4px 0 10px 0' }}>
+                            {catSegments.length > 0 ? (
+                              catSegments.map((segment, sIdx) => (
+                                <span key={sIdx} style={{
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  border: '1px solid rgba(255, 255, 255, 0.16)',
+                                  borderRadius: '6px',
+                                  padding: '3px 10px',
+                                  fontSize: '13px',
+                                  fontWeight: 600,
+                                  color: '#f4f4f5',
+                                  letterSpacing: '0.2px'
+                                }}>
+                                  {segment}
+                                </span>
+                              ))
+                            ) : (
+                              <span>{categoryDisplay}</span>
+                            )}
                           </div>
 
                           {/* Tags/Check-in action if owner */}

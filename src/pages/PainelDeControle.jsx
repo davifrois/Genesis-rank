@@ -432,6 +432,13 @@ const createEventEditFormState = () => ({
     batches: [],
     superFights: [],
     superFightsPublished: false,
+    superFightsTitle: '',
+    superFightsDescription: '',
+    superFightsMaxCount: 0,
+    superFightsOrder: 'scheduled',
+    superFightsShowTimer: false,
+    superFightsShowBelt: false,
+    superFightsAllowVoting: false,
     registrationOpen: true,
     internalRegistration: true
 });
@@ -2715,7 +2722,14 @@ const PainelDeControle = () => {
             noGiEnabled: eventItem.noGiEnabled !== false,
             absoluteEnabled: eventItem.absoluteEnabled !== false,
             registrationOpen: eventItem.registrationOpen !== false,
-            internalRegistration: eventItem.internalRegistration !== false
+            internalRegistration: eventItem.internalRegistration !== false,
+            superFightsTitle: eventItem.superFightsTitle || '',
+            superFightsDescription: eventItem.superFightsDescription || '',
+            superFightsMaxCount: eventItem.superFightsMaxCount ?? 0,
+            superFightsOrder: eventItem.superFightsOrder || 'scheduled',
+            superFightsShowTimer: eventItem.superFightsShowTimer ?? false,
+            superFightsShowBelt: eventItem.superFightsShowBelt ?? false,
+            superFightsAllowVoting: eventItem.superFightsAllowVoting ?? false,
         });
         setEventPosterStoredSizeBytes(isDataImageUrl(posterUrl) ? estimateDataUrlBytes(posterUrl) : 0);
         setShowEventEditModal(true);
@@ -2787,6 +2801,13 @@ const PainelDeControle = () => {
                 batches: eventEditForm.batches,
                 superFights: eventEditForm.superFights,
                 superFightsPublished: eventEditForm.superFightsPublished,
+                superFightsTitle: eventEditForm.superFightsTitle,
+                superFightsDescription: eventEditForm.superFightsDescription,
+                superFightsMaxCount: eventEditForm.superFightsMaxCount ?? 0,
+                superFightsOrder: eventEditForm.superFightsOrder || 'scheduled',
+                superFightsShowTimer: eventEditForm.superFightsShowTimer ?? false,
+                superFightsShowBelt: eventEditForm.superFightsShowBelt ?? false,
+                superFightsAllowVoting: eventEditForm.superFightsAllowVoting ?? false,
                 registrationOpen: eventEditForm.registrationOpen,
                 internalRegistration: eventEditForm.internalRegistration
             });
@@ -8983,6 +9004,175 @@ const PainelDeControle = () => {
                                                         </div>
                                                     ))}
                                                 </div>
+
+                                                {/* ── LUTAS CASADAS CONFIG (visível só quando ativado) ─── */}
+                                                {eventEditForm.superFightsPublished && (
+                                                    <div style={{
+                                                        background: 'linear-gradient(135deg, rgba(239,68,68,0.08) 0%, rgba(239,68,68,0.03) 100%)',
+                                                        border: '1px solid rgba(239,68,68,0.35)',
+                                                        borderRadius: '16px',
+                                                        padding: '22px',
+                                                        display: 'flex',
+                                                        flexDirection: 'column',
+                                                        gap: '18px',
+                                                        animation: 'fadeIn 0.35s ease',
+                                                    }}>
+                                                        {/* Header */}
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+                                                            <span style={{ fontSize: '20px' }}>🗡️</span>
+                                                            <div>
+                                                                <div style={{ fontSize: '15px', fontWeight: 800, color: '#ef4444', letterSpacing: '0.04em' }}>
+                                                                    CONFIGURAÇÕES DE LUTAS CASADAS
+                                                                </div>
+                                                                <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>
+                                                                    Personalize como as lutas casadas serão exibidas neste evento.
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Título da seção */}
+                                                        <div>
+                                                            <label className="table-meta" style={{ fontSize: '13px', fontWeight: 800, color: '#f8fafc', display: 'block', marginBottom: '6px' }}>
+                                                                TÍTULO DA SEÇÃO DE LUTAS CASADAS
+                                                            </label>
+                                                            <span style={{ fontSize: '12px', color: '#94a3b8', display: 'block', marginBottom: '8px' }}>
+                                                                Nome que aparecerá na página pública do evento (ex: "Super Lutas", "Cinturão").
+                                                            </span>
+                                                            <input
+                                                                className="input"
+                                                                type="text"
+                                                                value={eventEditForm.superFightsTitle || ''}
+                                                                onChange={(e) => setEventEditForm({ ...eventEditForm, superFightsTitle: e.target.value })}
+                                                                placeholder="Ex: Super Lutas · Cinturão Genesis"
+                                                                style={{ fontSize: '15px', padding: '11px 15px', color: '#ffffff' }}
+                                                            />
+                                                        </div>
+
+                                                        {/* Descrição / chamada */}
+                                                        <div>
+                                                            <label className="table-meta" style={{ fontSize: '13px', fontWeight: 800, color: '#f8fafc', display: 'block', marginBottom: '6px' }}>
+                                                                DESCRIÇÃO / CHAMADA (opcional)
+                                                            </label>
+                                                            <span style={{ fontSize: '12px', color: '#94a3b8', display: 'block', marginBottom: '8px' }}>
+                                                                Breve descrição exibida abaixo do título na página pública.
+                                                            </span>
+                                                            <textarea
+                                                                className="input"
+                                                                rows="2"
+                                                                value={eventEditForm.superFightsDescription || ''}
+                                                                onChange={(e) => setEventEditForm({ ...eventEditForm, superFightsDescription: e.target.value })}
+                                                                placeholder="Ex: As lutas mais esperadas do campeonato. Não perca!"
+                                                                style={{ fontSize: '14px', padding: '11px 15px', color: '#ffffff', resize: 'vertical', lineHeight: 1.5 }}
+                                                            />
+                                                        </div>
+
+                                                        {/* Número máximo de lutas + Exibir timer */}
+                                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                                                            <div>
+                                                                <label className="table-meta" style={{ fontSize: '13px', fontWeight: 800, color: '#f8fafc', display: 'block', marginBottom: '6px' }}>
+                                                                    MÁXIMO DE LUTAS CASADAS
+                                                                </label>
+                                                                <span style={{ fontSize: '12px', color: '#94a3b8', display: 'block', marginBottom: '8px' }}>
+                                                                    Limite de lutas permitidas neste evento (0 = sem limite).
+                                                                </span>
+                                                                <input
+                                                                    className="input"
+                                                                    type="number"
+                                                                    min="0"
+                                                                    max="99"
+                                                                    value={eventEditForm.superFightsMaxCount ?? 0}
+                                                                    onChange={(e) => setEventEditForm({ ...eventEditForm, superFightsMaxCount: Number(e.target.value) })}
+                                                                    style={{ fontSize: '15px', padding: '11px 15px', color: '#ffffff' }}
+                                                                />
+                                                            </div>
+
+                                                            <div>
+                                                                <label className="table-meta" style={{ fontSize: '13px', fontWeight: 800, color: '#f8fafc', display: 'block', marginBottom: '6px' }}>
+                                                                    ORDEM DE EXIBIÇÃO
+                                                                </label>
+                                                                <span style={{ fontSize: '12px', color: '#94a3b8', display: 'block', marginBottom: '8px' }}>
+                                                                    Como as lutas serão ordenadas ao exibir para o público.
+                                                                </span>
+                                                                <select
+                                                                    className="input"
+                                                                    value={eventEditForm.superFightsOrder || 'scheduled'}
+                                                                    onChange={(e) => setEventEditForm({ ...eventEditForm, superFightsOrder: e.target.value })}
+                                                                    style={{ fontSize: '14px', padding: '11px 15px', color: '#ffffff', background: '#0f172a' }}
+                                                                >
+                                                                    <option value="scheduled">Por horário agendado</option>
+                                                                    <option value="manual">Ordem manual (arrastar)</option>
+                                                                    <option value="alphabetical">Ordem alfabética</option>
+                                                                </select>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Toggles internos de luta casada */}
+                                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+                                                            {[
+                                                                {
+                                                                    key: 'superFightsShowTimer',
+                                                                    label: 'Exibir Countdown (Contagem Regressiva)',
+                                                                    desc: 'Mostra um timer ao vivo na página pública até o horário da luta.',
+                                                                    icon: '⏱️',
+                                                                },
+                                                                {
+                                                                    key: 'superFightsShowBelt',
+                                                                    label: 'Exibir Ícone de Cinturão',
+                                                                    desc: 'Adiciona ícone de cinturão nas lutas de disputa de título.',
+                                                                    icon: '🏆',
+                                                                },
+                                                                {
+                                                                    key: 'superFightsAllowVoting',
+                                                                    label: 'Votação do Público',
+                                                                    desc: 'Permite que o público vote no favorito antes da luta.',
+                                                                    icon: '🗳️',
+                                                                },
+                                                            ].map(opt => (
+                                                                <div
+                                                                    key={opt.key}
+                                                                    onClick={() => setEventEditForm(f => ({ ...f, [opt.key]: !f[opt.key] }))}
+                                                                    style={{
+                                                                        background: eventEditForm[opt.key] ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.03)',
+                                                                        border: `1px solid ${eventEditForm[opt.key] ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                                                                        borderRadius: '12px',
+                                                                        padding: '14px 16px',
+                                                                        cursor: 'pointer',
+                                                                        transition: 'all 0.2s',
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '12px',
+                                                                    }}
+                                                                >
+                                                                    <span style={{ fontSize: '22px', flexShrink: 0 }}>{opt.icon}</span>
+                                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                                        <div style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc', marginBottom: '3px' }}>{opt.label}</div>
+                                                                        <div style={{ fontSize: '11.5px', color: '#94a3b8', lineHeight: 1.4 }}>{opt.desc}</div>
+                                                                    </div>
+                                                                    {/* mini toggle */}
+                                                                    <div style={{
+                                                                        flexShrink: 0,
+                                                                        width: '36px', height: '20px',
+                                                                        borderRadius: '10px',
+                                                                        background: eventEditForm[opt.key] ? '#ef4444' : '#334155',
+                                                                        position: 'relative',
+                                                                        transition: 'background 0.2s',
+                                                                    }}>
+                                                                        <div style={{
+                                                                            position: 'absolute',
+                                                                            top: '2px',
+                                                                            left: eventEditForm[opt.key] ? '18px' : '2px',
+                                                                            width: '16px', height: '16px',
+                                                                            borderRadius: '50%',
+                                                                            background: '#fff',
+                                                                            transition: 'left 0.2s',
+                                                                            boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                                                                        }} />
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
 
                                                 {/* External registration URL (only when not internal) */}
                                                 {!eventEditForm.internalRegistration && (

@@ -1005,6 +1005,66 @@ const Settings = () => {
             </div>
           </article>
 
+          <article className="profile-card profile-card--dark">
+            <div className="profile-card__header profile-card__header--dark">
+              <h2>Segurança da conta</h2>
+            </div>
+            <div className="profile-card__body">
+              <p className="profile-note profile-note--dark">
+                Defina uma senha forte com no mínimo 8 caracteres, letra maiúscula, minúscula, número e símbolo.
+              </p>
+              <div className="profile-fields">
+                <div className="profile-field">
+                  <label>Nova Senha</label>
+                  <input
+                    type="password"
+                    className="profile-input profile-input--dark"
+                    placeholder="••••••••"
+                    value={accountPassword}
+                    onChange={(event) => setAccountPassword(event.target.value)}
+                  />
+                  {accountPassword && (
+                    <div style={{ marginTop: '6px', fontSize: '12px', color: accountPasswordStrength.isStrong ? '#22c55e' : '#f59e0b' }}>
+                      {accountPasswordStrength.message}
+                    </div>
+                  )}
+                </div>
+                <div className="profile-field">
+                  <label>Confirmar Nova Senha</label>
+                  <input
+                    type="password"
+                    className="profile-input profile-input--dark"
+                    placeholder="••••••••"
+                    value={accountPasswordConfirm}
+                    onChange={(event) => setAccountPasswordConfirm(event.target.value)}
+                  />
+                </div>
+              </div>
+              {passwordError && (
+                <div className="login-error" style={{ marginTop: '10px' }}>
+                  <p>{passwordError}</p>
+                </div>
+              )}
+              {passwordSuccess && (
+                <div className="profile-success" style={{ marginTop: '10px', padding: '10px', fontSize: '13px' }}>
+                  <p>{passwordSuccess}</p>
+                </div>
+              )}
+              <div style={{ marginTop: '14px' }}>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleUpdatePassword}
+                  disabled={passwordLoading || !accountPassword}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                >
+                  <Lock size={15} />
+                  {passwordLoading ? 'Atualizando...' : 'Atualizar senha'}
+                </button>
+              </div>
+            </div>
+          </article>
+
           {error && <div className="login-error" style={{ marginTop: '12px' }}><p>{error}</p></div>}
           {success && (
             <div className="profile-success" style={{

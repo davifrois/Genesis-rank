@@ -89,16 +89,16 @@ const resolveCategoryByProfile = (profile = {}) => {
   if (age >= 4 && age <= 7) { ageCategory = 'Infantil'; ageCategoryLabel = 'Infantil (4 a 7 anos)'; ageCategoryColor = '#22c55e'; }
   else if (age >= 8 && age <= 9) { ageCategory = 'Infantil A'; ageCategoryLabel = 'Infantil A (8 a 9 anos)'; ageCategoryColor = '#22c55e'; }
   else if (age >= 10 && age <= 11) { ageCategory = 'Infantil B'; ageCategoryLabel = 'Infantil B (10 a 11 anos)'; ageCategoryColor = '#22c55e'; }
-  else if (age >= 12 && age <= 13) { ageCategory = 'Infanto-Juvenil'; ageCategoryLabel = 'Infanto-Juvenil (12 a 13 anos)'; ageCategoryColor = '#f59e0b'; }
-  else if (age >= 14 && age <= 15) { ageCategory = 'Juvenil'; ageCategoryLabel = 'Juvenil (14 a 15 anos)'; ageCategoryColor = '#f59e0b'; }
-  else if (age >= 16 && age <= 29) { ageCategory = 'Adulto'; ageCategoryLabel = 'Adulto (16 a 29 anos)'; ageCategoryColor = '#3b82f6'; }
+  else if (age >= 12 && age <= 14) { ageCategory = 'Infanto-Juvenil'; ageCategoryLabel = 'Infanto-Juvenil (12 a 14 anos)'; ageCategoryColor = '#f59e0b'; }
+  else if (age >= 15 && age <= 17) { ageCategory = 'Juvenil'; ageCategoryLabel = 'Juvenil (15 a 17 anos)'; ageCategoryColor = '#f59e0b'; }
+  else if (age >= 18 && age <= 29) { ageCategory = 'Adulto'; ageCategoryLabel = 'Adulto (18 a 29 anos)'; ageCategoryColor = '#3b82f6'; }
   else if (age >= 30 && age <= 35) { ageCategory = 'Master 1'; ageCategoryLabel = 'Master 1 (30 a 35 anos)'; ageCategoryColor = '#8b5cf6'; }
   else if (age >= 36 && age <= 40) { ageCategory = 'Master 2'; ageCategoryLabel = 'Master 2 (36 a 40 anos)'; ageCategoryColor = '#8b5cf6'; }
   else if (age >= 41 && age <= 45) { ageCategory = 'Master 3'; ageCategoryLabel = 'Master 3 (41 a 45 anos)'; ageCategoryColor = '#8b5cf6'; }
   else if (age >= 46 && age <= 50) { ageCategory = 'Master 4'; ageCategoryLabel = 'Master 4 (46 a 50 anos)'; ageCategoryColor = '#8b5cf6'; }
   else if (age >= 51 && age <= 55) { ageCategory = 'Master 5'; ageCategoryLabel = 'Master 5 (51 a 55 anos)'; ageCategoryColor = '#8b5cf6'; }
   else if (age >= 56) { ageCategory = 'Master 6'; ageCategoryLabel = 'Master 6 (56+ anos)'; ageCategoryColor = '#8b5cf6'; }
-  else { ageCategory = 'Adulto'; ageCategoryLabel = 'Adulto'; ageCategoryColor = '#3b82f6'; }
+  else { ageCategory = 'Adulto'; ageCategoryLabel = 'Adulto (18 a 29 anos)'; ageCategoryColor = '#3b82f6'; }
 
   return { ageCategory, ageCategoryLabel, ageCategoryColor, genderLabel, isFemale, age };
 };
@@ -111,8 +111,8 @@ const resolveWeightOptions = (profile = {}, isNoGi, eventOptions) => {
 
   let defaultOptions = [];
 
-  // Kids (4 to 15 years old)
-  if (age <= 15) {
+  // Kids (4 to 14 years old)
+  if (age <= 14) {
     let youthIndex = 5;
     if (age <= 5) youthIndex = 0;
     else if (age <= 7) youthIndex = 1;
@@ -149,8 +149,8 @@ const resolveWeightOptions = (profile = {}, isNoGi, eventOptions) => {
       { value: 'Pesadssimo', label: `Pesadíssimo (${getW('Pesadssimo')})` }
     ];
   }
-  // Juvenil (16 and 17 years old)
-  else if (age === 16 || age === 17) {
+  // Juvenil (15 a 17 anos)
+  else if (age >= 15 && age <= 17) {
     if (isFemale) {
       defaultOptions = [
         { value: 'Galo', label: 'Galo (até 44.3 kg)' },
@@ -1252,7 +1252,7 @@ const CategorySelectionStep = ({ profile, event, registeredModalities = [], onCo
     modalitiesCount: modalities.length,
     absolute
   }), [absolute, event, modalities.length, profile]);
-  const basePrice = serverClockPrice.base || ((profile?.age || 0) <= 15 ? eventFees.under15 : eventFees.over15);
+  const basePrice = serverClockPrice.base || ((profile?.age || 0) <= 14 ? eventFees.under15 : eventFees.over15);
   const absoluteFee = serverClockPrice.absoluteFee || eventFees.absolute;
   const comboPrice = serverClockPrice.combo || eventFees.combo;
   const activeBatchName = serverClockPrice.batchName || 'Lote atual';
@@ -1435,17 +1435,6 @@ const CategorySelectionStep = ({ profile, event, registeredModalities = [], onCo
               ))}
             </select>
           </div>
-        </div>
-        <div className="form-group-pro">
-          <label>Voucher de Desconto (Opcional)</label>
-          <input
-            type="text"
-            className="registration-inline-input"
-            placeholder="Possui um cupom 100% OFF?"
-            value={voucher}
-            onChange={(e) => setVoucher(e.target.value)}
-            style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #333', background: '#111', color: '#fff', fontSize: '1rem' }}
-          />
         </div>
 
         {Number(event?.feeAbsolute || event?.priceAbsolute || 0) > 0 && (

@@ -1495,7 +1495,7 @@
       "eventDescription": "Open Sarzedo III Edição – Kids, Juvenil, Adulto e Master. Premiação em dinheiro. Sarzedo/MG. Contato: 31 9 7207-7729.",
       "registrationUrl": "https://genesisesportes.com.br",
       "id": "1785951925044",
-      "posterUrl": "",
+      "posterUrl": null,
       "weightTableGiUrl": "",
       "weightTableNoGiUrl": "",
       "circularUrl": "",
@@ -1507,8 +1507,8 @@
       "feeCombo": 0.01,
       "feeAbsolute": 30,
       "endDate": null,
-      "registrationCloseDate": "",
-      "checkinEndDate": "",
+      "registrationCloseDate": null,
+      "checkinEndDate": null,
       "eventSocialWebsite": null,
       "eventSocialWhatsapp": null,
       "eventSocialInstagram": null,
@@ -1528,7 +1528,14 @@
       "accommodationSearchLocation": null,
       "batches": [],
       "superFights": [],
-      "superFightsPublished": false
+      "superFightsPublished": true,
+      "cancelDeadline": null,
+      "refundPolicy": "Sujeito a analise do organizador",
+      "editDeadline": null,
+      "organizerName": null,
+      "eventSocialEmail": null,
+      "eventPhase": null,
+      "publishedAt": null
     }
   ],
   "news": [

@@ -990,14 +990,14 @@ const EventDetails = () => {
                   {approvedAthletes.length > 0 && (
                     <>
                       <thead>
-                        <tr style={{ borderBottom: '1px solid #27272a', textAlign: 'left', color: '#71717a', fontSize: '0.8rem', textTransform: 'capitalize' }}>
-                          <th style={{ padding: '12px 16px', fontWeight: 'normal' }}>{copy.thAthlete}</th>
-                          <th style={{ padding: '12px 16px', fontWeight: 'normal' }}>{copy.thBirth}</th>
-                          <th style={{ padding: '12px 16px', fontWeight: 'normal' }}>{copy.thAcademy}</th>
-                          <th style={{ padding: '12px 16px', fontWeight: 'normal' }}>{copy.thRegistration}</th>
+                        <tr style={{ borderBottom: '1px solid #27272a', textAlign: 'left', color: '#a1a1aa', fontSize: '0.85rem', textTransform: 'capitalize' }}>
+                          <th style={{ padding: '12px 16px', fontWeight: '600' }}>{copy.thAthlete}</th>
+                          <th style={{ padding: '12px 16px', fontWeight: '600' }}>{copy.thBirth}</th>
+                          <th style={{ padding: '12px 16px', fontWeight: '600' }}>{copy.thAcademy}</th>
+                          <th style={{ padding: '12px 16px', fontWeight: '600' }}>{copy.thRegistration}</th>
                           <th></th>
                           <th></th>
-                          <th style={{ padding: '12px 16px', fontWeight: 'normal', textAlign: 'right' }}>{copy.thStatus}</th>
+                          <th style={{ padding: '12px 16px', fontWeight: '600', textAlign: 'right' }}>{copy.thStatus}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1008,8 +1008,8 @@ const EventDetails = () => {
                 </table>
               </div>
 
-              <div style={{ fontSize: '0.85rem', color: '#71717a', marginBottom: '8px' }}>
-                {copy.approvedRegistrations}: {approvedAthletes.length}
+              <div style={{ fontSize: '0.9rem', color: '#a1a1aa', marginBottom: '8px', fontWeight: 500 }}>
+                {copy.approvedRegistrations}: <strong style={{ color: '#f4f4f5' }}>{approvedAthletes.length}</strong>
               </div>
 
               {unapprovedAthletes.length > 0 && (
@@ -1025,14 +1025,14 @@ const EventDetails = () => {
                     <div style={{ marginTop: '16px', overflowX: 'auto', borderRadius: '8px', border: '1px solid #27272a' }}>
                       <table style={{ width: '100%', borderCollapse: 'collapse', color: '#e4e4e7', fontSize: '0.95rem', background: 'transparent' }}>
                         <thead>
-                          <tr style={{ borderBottom: '1px solid #27272a', textAlign: 'left', color: '#71717a', fontSize: '0.8rem', textTransform: 'capitalize' }}>
-                            <th style={{ padding: '12px 16px', fontWeight: 'normal' }}>{copy.thAthlete}</th>
-                            <th style={{ padding: '12px 16px', fontWeight: 'normal' }}>{copy.thBirth}</th>
-                            <th style={{ padding: '12px 16px', fontWeight: 'normal' }}>{copy.thAcademy}</th>
-                            <th style={{ padding: '12px 16px', fontWeight: 'normal' }}>{copy.thRegistration}</th>
+                          <tr style={{ borderBottom: '1px solid #27272a', textAlign: 'left', color: '#a1a1aa', fontSize: '0.85rem', textTransform: 'capitalize' }}>
+                            <th style={{ padding: '12px 16px', fontWeight: '600' }}>{copy.thAthlete}</th>
+                            <th style={{ padding: '12px 16px', fontWeight: '600' }}>{copy.thBirth}</th>
+                            <th style={{ padding: '12px 16px', fontWeight: '600' }}>{copy.thAcademy}</th>
+                            <th style={{ padding: '12px 16px', fontWeight: '600' }}>{copy.thRegistration}</th>
                             <th></th>
                             <th></th>
-                            <th style={{ padding: '12px 16px', fontWeight: 'normal', textAlign: 'right' }}>{copy.thStatus}</th>
+                            <th style={{ padding: '12px 16px', fontWeight: '600', textAlign: 'right' }}>{copy.thStatus}</th>
                           </tr>
                         </thead>
                         <tbody>

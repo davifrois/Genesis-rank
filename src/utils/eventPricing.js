@@ -216,7 +216,7 @@ export const resolveAthleteEventPrice = ({
   const eventDate = event?.date ? new Date(event.date) : null;
   const ageReferenceDate = eventDate && !Number.isNaN(eventDate.getTime()) ? eventDate : now;
   const age = resolveAgeNumber(athlete, ageReferenceDate);
-  const isUnder15 = age !== null && age <= 15;
+  const isUnder15 = age !== null && age <= 14;
   const baseSinglePrice = isUnder15
     ? resolveBatchFee(activeBatch, 'under15', eventFees.under15)
     : resolveBatchFee(activeBatch, 'over15', eventFees.over15);
