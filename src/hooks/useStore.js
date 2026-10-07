@@ -1001,29 +1001,10 @@ const useStoreState = (loadedState) => {
         const activeEventId = normalizedActiveEventId && eventIds.has(normalizedActiveEventId)
             ? normalizedActiveEventId
             : null;
-        let currentUser = normalizeUser(parsed.currentUser);
-        if (currentUser && authService.getRoleForUsername && (!authService.isLocalAuth || authService.isLocalAuth())) {
-            const freshRole = authService.getRoleForUsername(currentUser.username);
-            const freshName = authService.getNameForUsername
-                ? authService.getNameForUsername(currentUser.username)
-                : null;
-            let needsUpdate = false;
-            const updates = {};
-            if (freshRole && freshRole !== currentUser.role) {
-                updates.role = freshRole;
-                needsUpdate = true;
-            } else if (!currentUser.role && freshRole) {
-                updates.role = freshRole;
-                needsUpdate = true;
-            }
-            if (freshName && freshName !== currentUser.name) {
-                updates.name = freshName;
-                needsUpdate = true;
-            }
-            if (needsUpdate) {
-                currentUser = { ...currentUser, ...updates };
-            }
-        }
+        // SEGURANÇA: currentUser nunca é lido do localStorage.
+        // A sessão sempre parte de null; o usuário deve fazer login explicitamente.
+        // Isso previne que dados de uma sessão anterior apareçam para um novo usuário.
+        const currentUser = null;
         const rankHistory = parsed.rankHistory && typeof parsed.rankHistory === 'object' && !Array.isArray(parsed.rankHistory)
             ? parsed.rankHistory
             : {};
@@ -1090,7 +1071,11 @@ const useStoreState = (loadedState) => {
     // Sincronização e persistência contínua e segura dos dados locais
     useEffect(() => {
         const timeout = setTimeout(() => {
-            const payload = { ...data, schemaVersion: STORAGE_VERSION };
+            // SEGURANÇA: currentUser NUNCA é persistido no localStorage para evitar
+            // contaminação de sessão entre usuários diferentes no mesmo navegador.
+            // A sessão é sempre reiniciada como null e preenchida apenas via login explícito.
+            const { currentUser: _omitCurrentUser, ...dataWithoutUser } = data;
+            const payload = { ...dataWithoutUser, schemaVersion: STORAGE_VERSION };
             const serialized = JSON.stringify(payload);
             
             // Persistir de forma imediata e síncrona no localStorage
@@ -1173,8 +1158,12 @@ const useStoreState = (loadedState) => {
     };
 
     const login = (user) => {
-        setData(prev => ({ ...prev, currentUser: user }));
-        addLog({ type: 'AUTH', action: 'LOGIN', details: `Usuário ${user.name} acessou o sistema.` });
+        // Substitui completamente o currentUser sem mesclar dados de sessão anterior
+        const normalized = user && typeof user === 'object' ? normalizeUser(user) : null;
+        setData(prev => ({ ...prev, currentUser: normalized }));
+        if (normalized) {
+            addLog({ type: 'AUTH', action: 'LOGIN', details: `Usuário ${normalized.name} acessou o sistema.` });
+        }
     };
 
     const logout = () => {

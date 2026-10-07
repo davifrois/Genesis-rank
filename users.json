@@ -28,5 +28,17 @@
     "password": "12345678",
     "name": "Tarciso",
     "role": "admin"
+  },
+  {
+    "username": "luizinhooliveira",
+    "password": "Davifrois324@",
+    "name": "Luiz",
+    "role": "mesario"
+  },
+  {
+    "username": "luizin",
+    "password": "Davifrois324@",
+    "name": "Luiz",
+    "role": "mesario"
   }
 ]

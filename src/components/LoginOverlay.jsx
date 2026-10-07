@@ -329,7 +329,8 @@ const LoginOverlay = ({ onClose, onSuccess, redirectTo = '', initialMode = 'logi
                 onClose();
             }
             const targetRoute = (redirectTo || '').toString().trim();
-            navigate(targetRoute || '/minha-conta', { replace: true });
+            // Novos usuários são redirecionados para configurações de perfil (foto)
+            navigate(targetRoute || '/configuracoes', { replace: true });
             setUsername(user.username);
             setPassword('');
             setRegisterMode(false);

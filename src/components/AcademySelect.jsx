@@ -70,7 +70,8 @@ const getCustomStyles = (theme = 'dark') => {
     }),
     placeholder: (provided) => ({
       ...provided,
-      color: isLight ? '#9ca3af' : '#64748b'
+      color: isLight ? '#475569' : '#cbd5e1',
+      fontWeight: 500
     })
   };
 };
@@ -96,7 +97,7 @@ const Menu = (props) => {
             borderBottomRightRadius: '10px'
           }}
         >
-          <div style={{ fontSize: '12px', color: isLight ? '#64748b' : '#94a3b8', textAlign: 'center', fontWeight: 500 }}>
+          <div style={{ fontSize: '13px', color: isLight ? '#1e293b' : '#f1f5f9', textAlign: 'center', fontWeight: 600 }}>
             {inputValue ? `Não encontrou "${inputValue}"?` : 'Não encontrou a sua academia?'}
           </div>
           <button 

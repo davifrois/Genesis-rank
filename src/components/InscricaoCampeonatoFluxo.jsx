@@ -22,11 +22,13 @@ import {
   Globe,
   Calendar,
   Phone,
+  Building2,
   X
 } from 'lucide-react';
 import { useStore } from '../hooks/useStore';
 import { useI18n } from '../hooks/useI18n';
 import LoginOverlay from './LoginOverlay';
+import AcademySelect from './AcademySelect';
 import {
   formatBrlCurrency,
   normalizeEventBeltRegistration,
@@ -381,7 +383,7 @@ const ProgressBar = ({ currentStep }) => {
 // Fluxo de Inscrição para Campeonatos
 // Este componente gerencia todo o processo de inscrição do atleta em um evento.
 const InscricaoCampeonatoFluxo = ({ event, onComplete }) => {
-  const { currentUser, memberProfiles = [], academies = [], addMemberProfile, addAthlete, athletes = [], deleteMemberProfile } = useStore() || {};
+  const { currentUser, memberProfiles = [], academies = [], addMemberProfile, addAthlete, athletes = [], deleteMemberProfile, addAcademy } = useStore() || {};
   const [step, setStep] = useState(1); // 1: Profile Select, 1.5: Profile Confirm, 2: Category, 3: Payment
   const [showLogin, setShowLogin] = useState(!currentUser);
   const [showPixModal, setShowPixModal] = useState(false);
@@ -756,7 +758,10 @@ const InscricaoCampeonatoFluxo = ({ event, onComplete }) => {
               key="step1.5"
               profile={selectedProfile}
               event={event}
+              academies={academies}
+              currentUser={currentUser}
               onProfileUpdate={handleProfileUpdate}
+              onAddAcademy={addAcademy}
               onConfirm={handleProfileConfirm}
               onBack={() => setStep(1)}
             />
@@ -865,9 +870,35 @@ const ProfileSelectionStep = ({ profiles, onSelect, onRemoveProfile }) => {
   );
 };
 
-const ProfileConfirmationStep = ({ profile, event, onProfileUpdate, onConfirm, onBack }) => {
+const ProfileConfirmationStep = ({ 
+  profile, 
+  event, 
+  academies = [], 
+  currentUser, 
+  onProfileUpdate, 
+  onAddAcademy, 
+  onConfirm, 
+  onBack 
+}) => {
   const [draftProfile, setDraftProfile] = useState(profile || {});
   const [editingField, setEditingField] = useState('');
+  const [showCreateAcademyModal, setShowCreateAcademyModal] = useState(false);
+  const [newAcademyName, setNewAcademyName] = useState('');
+  const [createAcademyError, setCreateAcademyError] = useState('');
+  const [isSubmittingAcademy, setIsSubmittingAcademy] = useState(false);
+  const [successToast, setSuccessToast] = useState('');
+
+  const BELT_OPTIONS = [
+    'Branca',
+    'Cinza',
+    'Amarela',
+    'Laranja',
+    'Verde',
+    'Azul',
+    'Roxa',
+    'Marrom',
+    'Preta'
+  ];
 
   useEffect(() => {
     setDraftProfile(profile || {});
@@ -892,6 +923,7 @@ const ProfileConfirmationStep = ({ profile, event, onProfileUpdate, onConfirm, o
     if (field === 'birthDate') return draftProfile.birthDate || draftProfile.dataNascimento || '';
     if (field === 'gender') return draftProfile.gender || draftProfile.genero || 'Masculino';
     if (field === 'phone') return draftProfile.phone || draftProfile.telefone || '';
+    if (field === 'belt') return draftProfile.belt || draftProfile.faixa || '';
     return draftProfile[field] || '';
   };
 
@@ -919,6 +951,11 @@ const ProfileConfirmationStep = ({ profile, event, onProfileUpdate, onConfirm, o
         next.telefone = value;
         return next;
       }
+      if (field === 'belt') {
+        next.belt = value;
+        next.faixa = value;
+        return next;
+      }
       next[field] = value;
       return next;
     });
@@ -936,56 +973,6 @@ const ProfileConfirmationStep = ({ profile, event, onProfileUpdate, onConfirm, o
     setEditingField('');
   };
 
-  const renderEditableField = (field, label, displayValue, inputType = 'text') => {
-    const isEditing = editingField === field;
-    return (
-      <div className={`table-row ${isEditing ? 'is-editing' : ''}`}>
-        <div className="cell label">{label}</div>
-        <div className="cell value">
-          {isEditing ? (
-            field === 'gender' ? (
-              <select
-                className="registration-inline-input"
-                value={getFieldValue(field)}
-                onChange={(event) => setFieldValue(field, event.target.value)}
-                autoFocus
-              >
-                <option value="Masculino">Masculino</option>
-                <option value="Feminino">Feminino</option>
-              </select>
-            ) : (
-              <input
-                className="registration-inline-input"
-                type={inputType}
-                value={getFieldValue(field)}
-                onChange={(event) => setFieldValue(field, event.target.value)}
-                autoFocus
-              />
-            )
-          ) : (
-            displayValue || '-'
-          )}
-        </div>
-        <div className="cell action">
-          {isEditing ? (
-            <span className="registration-inline-actions">
-              <button type="button" onClick={() => saveField(field)}>Salvar</button>
-              <button type="button" onClick={cancelField}>Cancelar</button>
-            </span>
-          ) : (
-            <button type="button" onClick={() => setEditingField(field)}>Editar</button>
-          )}
-          {!requiredProfileOk && (
-            <p className="photo-warning">
-              <AlertCircle size={14} />
-              Complete nacionalidade, nascimento e genero antes de continuar.
-            </p>
-          )}
-        </div>
-      </div>
-    );
-  };
-
   const handlePhotoFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1000,12 +987,91 @@ const ProfileConfirmationStep = ({ profile, event, onProfileUpdate, onConfirm, o
     }
   };
 
+  const handleCreateAcademySubmit = async () => {
+    const trimmedName = (newAcademyName || '').trim();
+    if (!trimmedName || trimmedName.length < 2) {
+      setCreateAcademyError('O nome da academia deve ter pelo menos 2 caracteres.');
+      return;
+    }
+
+    setIsSubmittingAcademy(true);
+    setCreateAcademyError('');
+
+    try {
+      const lookup = trimmedName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const duplicate = (academies || []).find(a => 
+        (a.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') === lookup
+      );
+
+      if (duplicate) {
+        setCreateAcademyError(`Já existe uma academia com este nome: "${duplicate.name}". Selecione-a na lista de busca.`);
+        setIsSubmittingAcademy(false);
+        return;
+      }
+
+      let savedAcademy = null;
+      if (typeof onAddAcademy === 'function') {
+        savedAcademy = onAddAcademy({
+          name: trimmedName,
+          ownerUsername: currentUser?.username || '',
+          ownerName: currentUser?.name || currentUser?.fullName || '',
+          createdAt: new Date().toISOString()
+        });
+      }
+
+      const newAcademyId = savedAcademy?.id || `academy-${Date.now()}`;
+      const newAcademyFinalName = savedAcademy?.name || trimmedName;
+
+      // Concessão de acesso de professor/responsável e vínculo da nova academia
+      const updatedProfile = {
+        ...draftProfile,
+        academyId: newAcademyId,
+        academyName: newAcademyFinalName,
+        academy: newAcademyFinalName,
+        academia: newAcademyFinalName,
+        isProfessor: true,
+        role: 'coach'
+      };
+
+      setDraftProfile(updatedProfile);
+      if (typeof onProfileUpdate === 'function') {
+        onProfileUpdate(updatedProfile);
+      }
+
+      setShowCreateAcademyModal(false);
+      setNewAcademyName('');
+      setSuccessToast(`Academia "${newAcademyFinalName}" cadastrada com sucesso! Vínculo e acesso de professor concedidos.`);
+      setTimeout(() => setSuccessToast(''), 4500);
+    } catch (err) {
+      setCreateAcademyError(err?.message || 'Erro ao cadastrar academia. Tente novamente.');
+    } finally {
+      setIsSubmittingAcademy(false);
+    }
+  };
+
+  const selectedBelt = getFieldValue('belt');
+  const selectedAcademyId = draftProfile.academyId || '';
+  const selectedAcademyName = draftProfile.academyName || draftProfile.academy || draftProfile.academia || '';
+
   const requiredProfileOk = Boolean(
-    getFieldValue('country')
-    && getFieldValue('birthDate')
-    && getFieldValue('gender')
+    getFieldValue('country') &&
+    getFieldValue('birthDate') &&
+    getFieldValue('gender') &&
+    selectedBelt &&
+    (selectedAcademyId || selectedAcademyName)
   );
+
   const canContinue = Boolean(draftProfile.photoUrl && requiredProfileOk && !editingField);
+
+  const getContinueButtonMessage = () => {
+    if (!draftProfile.photoUrl) return 'Adicione uma foto para continuar';
+    if (!getFieldValue('country') || !getFieldValue('birthDate') || !getFieldValue('gender')) {
+      return 'Complete seus dados cadastrais';
+    }
+    if (!selectedBelt) return 'Selecione sua faixa para continuar';
+    if (!selectedAcademyId && !selectedAcademyName) return 'Selecione sua academia para continuar';
+    return 'Salve e continue';
+  };
 
   return (
     <motion.div
@@ -1014,6 +1080,81 @@ const ProfileConfirmationStep = ({ profile, event, onProfileUpdate, onConfirm, o
       exit={{ opacity: 0 }}
       className="registration-details-v2"
     >
+      {/* Toast de Sucesso */}
+      {successToast && (
+        <div className="registration-toast-success">
+          <Check size={18} />
+          <span>{successToast}</span>
+        </div>
+      )}
+
+      {/* Modal Criar Nova Academia (Design Idêntico à Imagem 3) */}
+      {showCreateAcademyModal && (
+        <div 
+          className="academy-creation-modal-backdrop" 
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowCreateAcademyModal(false);
+          }}
+        >
+          <div className="academy-creation-modal-card">
+            <button
+              type="button"
+              className="academy-creation-modal-close"
+              onClick={() => setShowCreateAcademyModal(false)}
+              title="Fechar"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="academy-creation-modal-icon">
+              <Building2 size={36} color="#2563eb" strokeWidth={1.5} />
+            </div>
+
+            <h2 className="academy-creation-modal-title">CRIAR NOVA ACADEMIA</h2>
+            
+            <p className="academy-creation-modal-advice">
+              Recomendamos que você peça ao gerente/professor da sua academia para realizar o cadastro.
+            </p>
+
+            <div className="academy-creation-modal-body">
+              <input
+                type="text"
+                className="academy-creation-modal-input"
+                placeholder="Nome da academia"
+                value={newAcademyName}
+                onChange={(e) => {
+                  setNewAcademyName(e.target.value);
+                  if (createAcademyError) setCreateAcademyError('');
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && newAcademyName.trim().length >= 2) {
+                    e.preventDefault();
+                    handleCreateAcademySubmit();
+                  }
+                }}
+                autoFocus
+              />
+
+              {createAcademyError && (
+                <p className="academy-creation-modal-error">
+                  <AlertCircle size={14} />
+                  {createAcademyError}
+                </p>
+              )}
+
+              <button
+                type="button"
+                className="academy-creation-modal-submit"
+                disabled={!newAcademyName.trim() || newAcademyName.trim().length < 2 || isSubmittingAcademy}
+                onClick={handleCreateAcademySubmit}
+              >
+                {isSubmittingAcademy ? 'Cadastrando...' : 'Continuar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Organizer Info Section */}
       <div className="details-section organizer">
         <div className="section-header">Evento selecionado</div>
@@ -1054,7 +1195,7 @@ const ProfileConfirmationStep = ({ profile, event, onProfileUpdate, onConfirm, o
         <span>PAGAMENTO</span>
       </div>
 
-      {/* User Details Table */}
+      {/* User Details Table (Design Idêntico à Imagem 1) */}
       <div className="details-section user-table">
         <div className="section-header">DETALHES DO USUARIO</div>
         <div className="section-content table-style">
@@ -1072,27 +1213,179 @@ const ProfileConfirmationStep = ({ profile, event, onProfileUpdate, onConfirm, o
           </div>
           <div className="table-row">
             <div className="cell label">Nacionalidade</div>
-            <div className="cell value">{editingField === 'country' ? <input className="registration-inline-input" value={getFieldValue('country')} onChange={(event) => setFieldValue('country', event.target.value)} autoFocus /> : getFieldValue('country')}</div>
-            <div className="cell action">{editingField === 'country' ? <span className="registration-inline-actions"><button type="button" onClick={() => saveField('country')}>Salvar</button><button type="button" onClick={cancelField}>Cancelar</button></span> : <button type="button" onClick={() => setEditingField('country')}>Editar</button>}</div>
+            <div className="cell value">
+              {editingField === 'country' ? (
+                <input 
+                  className="registration-inline-input" 
+                  value={getFieldValue('country')} 
+                  onChange={(event) => setFieldValue('country', event.target.value)} 
+                  autoFocus 
+                />
+              ) : (
+                getFieldValue('country')
+              )}
+            </div>
+            <div className="cell action">
+              {editingField === 'country' ? (
+                <span className="registration-inline-actions">
+                  <button type="button" onClick={() => saveField('country')}>Salvar</button>
+                  <button type="button" onClick={cancelField}>Cancelar</button>
+                </span>
+              ) : (
+                <button type="button" onClick={() => setEditingField('country')}>Editar</button>
+              )}
+            </div>
           </div>
           <div className="table-row">
             <div className="cell label">Data de nascimento</div>
-            <div className="cell value">{editingField === 'birthDate' ? <input className="registration-inline-input" type="date" value={getFieldValue('birthDate')} onChange={(event) => setFieldValue('birthDate', event.target.value)} autoFocus /> : formatDate(getFieldValue('birthDate'))}</div>
-            <div className="cell action">{editingField === 'birthDate' ? <span className="registration-inline-actions"><button type="button" onClick={() => saveField('birthDate')}>Salvar</button><button type="button" onClick={cancelField}>Cancelar</button></span> : <button type="button" onClick={() => setEditingField('birthDate')}>Editar</button>}</div>
+            <div className="cell value">
+              {editingField === 'birthDate' ? (
+                <input 
+                  className="registration-inline-input" 
+                  type="date" 
+                  value={getFieldValue('birthDate')} 
+                  onChange={(event) => setFieldValue('birthDate', event.target.value)} 
+                  autoFocus 
+                />
+              ) : (
+                formatDate(getFieldValue('birthDate'))
+              )}
+            </div>
+            <div className="cell action">
+              {editingField === 'birthDate' ? (
+                <span className="registration-inline-actions">
+                  <button type="button" onClick={() => saveField('birthDate')}>Salvar</button>
+                  <button type="button" onClick={cancelField}>Cancelar</button>
+                </span>
+              ) : (
+                <button type="button" onClick={() => setEditingField('birthDate')}>Editar</button>
+              )}
+            </div>
           </div>
           <div className="table-row">
             <div className="cell label">Genero</div>
-            <div className="cell value">{editingField === 'gender' ? <select className="registration-inline-input" value={getFieldValue('gender')} onChange={(event) => setFieldValue('gender', event.target.value)} autoFocus><option value="Masculino">Masculino</option><option value="Feminino">Feminino</option></select> : getFieldValue('gender')}</div>
-            <div className="cell action">{editingField === 'gender' ? <span className="registration-inline-actions"><button type="button" onClick={() => saveField('gender')}>Salvar</button><button type="button" onClick={cancelField}>Cancelar</button></span> : <button type="button" onClick={() => setEditingField('gender')}>Editar</button>}</div>
+            <div className="cell value">
+              {editingField === 'gender' ? (
+                <select 
+                  className="registration-inline-input" 
+                  value={getFieldValue('gender')} 
+                  onChange={(event) => setFieldValue('gender', event.target.value)} 
+                  autoFocus
+                >
+                  <option value="Masculino">Masculino</option>
+                  <option value="Feminino">Feminino</option>
+                </select>
+              ) : (
+                getFieldValue('gender')
+              )}
+            </div>
+            <div className="cell action">
+              {editingField === 'gender' ? (
+                <span className="registration-inline-actions">
+                  <button type="button" onClick={() => saveField('gender')}>Salvar</button>
+                  <button type="button" onClick={cancelField}>Cancelar</button>
+                </span>
+              ) : (
+                <button type="button" onClick={() => setEditingField('gender')}>Editar</button>
+              )}
+            </div>
+          </div>
+
+          {/* Campo Faixa (Graduação Oficial BJJ) */}
+          <div className="table-row">
+            <div className="cell label">Faixa</div>
+            <div className="cell value">
+              {editingField === 'belt' ? (
+                <select 
+                  className="registration-inline-input" 
+                  value={selectedBelt} 
+                  onChange={(event) => setFieldValue('belt', event.target.value)} 
+                  autoFocus
+                >
+                  <option value="">Selecione sua faixa...</option>
+                  {BELT_OPTIONS.map((belt) => (
+                    <option key={belt} value={belt}>{belt}</option>
+                  ))}
+                </select>
+              ) : (
+                selectedBelt ? (
+                  <span className="belt-badge-display">
+                    {selectedBelt}
+                  </span>
+                ) : (
+                  <span style={{ color: '#ef4444', fontSize: '0.88rem', fontWeight: 500 }}>
+                    <AlertCircle size={14} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
+                    Faixa não informada (Obrigatória)
+                  </span>
+                )
+              )}
+            </div>
+            <div className="cell action">
+              {editingField === 'belt' ? (
+                <span className="registration-inline-actions">
+                  <button type="button" onClick={() => saveField('belt')}>Salvar</button>
+                  <button type="button" onClick={cancelField}>Cancelar</button>
+                </span>
+              ) : (
+                <button type="button" onClick={() => setEditingField('belt')}>
+                  {selectedBelt ? 'Editar' : 'Selecionar'}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Profile Image Section */}
+      {/* Seção ACADEMIA com Autocomplete e Modal (Design Idêntico à Imagem 2) */}
+      <div className="details-section academy-section">
+        <div className="section-header">ACADEMIA</div>
+        <div className="section-content" style={{ padding: '20px' }}>
+          <AcademySelect 
+            academies={academies} 
+            value={selectedAcademyId} 
+            onChange={(selectedId) => {
+              const found = academies.find(a => a.id === selectedId);
+              const nextName = found ? found.name : '';
+              const updated = {
+                ...draftProfile,
+                academyId: selectedId,
+                academyName: nextName,
+                academy: nextName,
+                academia: nextName
+              };
+              setDraftProfile(updated);
+              if (typeof onProfileUpdate === 'function') {
+                onProfileUpdate(updated);
+              }
+            }} 
+            onRegisterNew={(typedName) => {
+              setNewAcademyName(typedName || '');
+              setCreateAcademyError('');
+              setShowCreateAcademyModal(true);
+            }} 
+            placeholder="Buscar ou selecionar academia..."
+            theme="light"
+          />
+
+          {selectedAcademyName ? (
+            <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', color: '#059669', fontWeight: 600 }}>
+              <Check size={16} />
+              Equipe vinculada: {selectedAcademyName}
+            </div>
+          ) : (
+            <p className="photo-warning" style={{ marginTop: '10px', fontSize: '0.85rem' }}>
+              <AlertCircle size={14} />
+              Selecione ou cadastre uma academia para pontuar no ranking oficial e prosseguir.
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Profile Image Section (Design Idêntico à Imagem 1) */}
       <div className="details-section profile-image">
         <div className="section-header">
           Imagem de perfil
-          <span className="btn-edit-small" style={{ cursor: 'pointer' }}>Clique abaixo para enviar</span>
+          <span className="btn-edit-small" style={{ cursor: 'pointer' }}>CLIQUE ABAIXO PARA ENVIAR</span>
         </div>
         <div className="section-content centered">
           <label style={{ cursor: 'pointer', display: 'inline-block' }}>
@@ -1117,6 +1410,7 @@ const ProfileConfirmationStep = ({ profile, event, onProfileUpdate, onConfirm, o
         </div>
       </div>
 
+      {/* Footer / Salvar e Continuar com Validações Rigorosas */}
       <div className="footer-actions-v2">
         <button
           className="btn-save-continue"
@@ -1126,9 +1420,9 @@ const ProfileConfirmationStep = ({ profile, event, onProfileUpdate, onConfirm, o
             onConfirm();
           }}
           disabled={!canContinue}
-          title={!draftProfile.photoUrl ? "Adicione uma foto ao seu perfil primeiro" : ""}
+          title={!canContinue ? getContinueButtonMessage() : "Clique para avançar para a etapa Entradas"}
         >
-          {draftProfile.photoUrl ? 'Salve e continue' : 'Adicione uma foto para continuar'}
+          {getContinueButtonMessage()}
           <ChevronRight size={20} />
         </button>
       </div>
@@ -1237,30 +1531,6 @@ const CategorySelectionStep = ({ profile, event, registeredModalities = [], onCo
       <div className="registration-header-pro">
         <div className="event-tag">Inscricao de Atleta</div>
         <h2>Escolha suas categorias</h2>
-
-        {/* AUTO-DETECTED CATEGORY BADGE */}
-        <div className="auto-category-badge" style={{ marginBottom: '12px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: '6px',
-            background: categoryInfo.ageCategoryColor + '22',
-            border: `1.5px solid ${categoryInfo.ageCategoryColor}`,
-            color: categoryInfo.ageCategoryColor,
-            borderRadius: '20px', padding: '4px 14px', fontWeight: 700,
-            fontSize: '13px', letterSpacing: '0.5px'
-          }}>
-            {categoryInfo.ageCategoryLabel}
-          </span>
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: '6px',
-            background: categoryInfo.isFemale ? '#ec489920' : '#3b82f620',
-            border: `1.5px solid ${categoryInfo.isFemale ? '#ec4899' : '#3b82f6'}`,
-            color: categoryInfo.isFemale ? '#ec4899' : '#3b82f6',
-            borderRadius: '20px', padding: '4px 14px', fontWeight: 700,
-            fontSize: '13px', letterSpacing: '0.5px'
-          }}>
-            {categoryInfo.isFemale ? ' Feminino' : ' Masculino'}
-          </span>
-        </div>
 
         <div className="athlete-summary-bar">
           <div className="summary-item">

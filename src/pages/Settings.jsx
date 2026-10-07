@@ -1010,9 +1010,24 @@ const Settings = () => {
               <h2>Segurança da conta</h2>
             </div>
             <div className="profile-card__body">
-              <p className="profile-note profile-note--dark">
-                Defina uma senha forte com no mínimo 8 caracteres, letra maiúscula, minúscula, número e símbolo.
-              </p>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'flex-start', 
+                gap: '12px', 
+                background: '#eef2ff', 
+                border: '1px solid #c7d2fe', 
+                borderRadius: '12px', 
+                padding: '14px 16px', 
+                marginBottom: '20px' 
+              }}>
+                <span style={{ fontSize: '20px', lineHeight: 1.2 }}>🔑</span>
+                <p style={{ margin: 0, fontSize: '14px', color: '#334155', lineHeight: '1.6' }}>
+                  <strong style={{ color: '#1e1b4b', fontWeight: 700, fontSize: '14.5px', display: 'block', marginBottom: '3px' }}>
+                    Precisa alterar sua senha?
+                  </strong>
+                  Use os campos abaixo para definir uma nova senha. Recomendamos usar no mínimo 8 caracteres com letra maiúscula, minúscula, número e símbolo.
+                </p>
+              </div>
               <div className="profile-fields">
                 <div className="profile-field">
                   <label>Nova Senha</label>

@@ -1318,30 +1318,6 @@ const CategorySelectionStep = ({ profile, event, registeredModalities = [], onCo
         <div className="event-tag">Inscricao de Atleta</div>
         <h2>Escolha suas categorias</h2>
 
-        {/* AUTO-DETECTED CATEGORY BADGE */}
-        <div className="auto-category-badge" style={{ marginBottom: '12px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: '6px',
-            background: categoryInfo.ageCategoryColor + '22',
-            border: `1.5px solid ${categoryInfo.ageCategoryColor}`,
-            color: categoryInfo.ageCategoryColor,
-            borderRadius: '20px', padding: '4px 14px', fontWeight: 700,
-            fontSize: '13px', letterSpacing: '0.5px'
-          }}>
-            {categoryInfo.ageCategoryLabel}
-          </span>
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: '6px',
-            background: categoryInfo.isFemale ? '#ec489920' : '#3b82f620',
-            border: `1.5px solid ${categoryInfo.isFemale ? '#ec4899' : '#3b82f6'}`,
-            color: categoryInfo.isFemale ? '#ec4899' : '#3b82f6',
-            borderRadius: '20px', padding: '4px 14px', fontWeight: 700,
-            fontSize: '13px', letterSpacing: '0.5px'
-          }}>
-            {categoryInfo.isFemale ? ' Feminino' : ' Masculino'}
-          </span>
-        </div>
-
         <div className="athlete-summary-bar">
           <div className="summary-item">
             <span className="label">Atleta:</span>

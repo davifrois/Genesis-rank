@@ -229,6 +229,8 @@ const EventDetails = () => {
     thBirth: isEnglish ? 'Birth' : isSpanish ? 'Nacimiento' : 'Nascimento',
     thAcademy: isEnglish ? 'Academy & Affiliation' : isSpanish ? 'Academia & Afiliación' : 'Academia & Afiliação',
     thRegistration: isEnglish ? 'Registration' : isSpanish ? 'Inscripción' : 'Inscrição',
+    thCategory: isEnglish ? 'Category' : isSpanish ? 'Categoría' : 'Categoria',
+    thWeight: isEnglish ? 'Weight' : isSpanish ? 'Peso' : 'Peso',
     thDownload: isEnglish ? 'Download' : isSpanish ? 'Descargar' : 'Download',
     thStatus: isEnglish ? 'Status' : isSpanish ? 'Estado' : 'Status',
     approvedRegistrations: isEnglish ? 'Approved registrations' : isSpanish ? 'Inscripciones aprobadas' : 'Inscrições aprovadas',
@@ -921,7 +923,7 @@ const EventDetails = () => {
         <span style={{ color: '#f4f4f5', fontSize: '0.85rem' }}>{translateBelt(athlete.faixa, uiLanguage)}</span>
       </td>
       <td style={{ padding: '12px 16px', verticalAlign: 'middle' }}>
-        <span style={{ color: '#a1a1aa', fontSize: '0.85rem' }}>{translateCategory(athlete.categoria, uiLanguage)}</span>
+        <span style={{ color: '#f4f4f5', fontSize: '0.85rem', fontWeight: 500 }}>{translateCategory(athlete.categoria, uiLanguage)}</span>
       </td>
       <td style={{ padding: '12px 16px', verticalAlign: 'middle' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -995,8 +997,8 @@ const EventDetails = () => {
                           <th style={{ padding: '12px 16px', fontWeight: '600' }}>{copy.thBirth}</th>
                           <th style={{ padding: '12px 16px', fontWeight: '600' }}>{copy.thAcademy}</th>
                           <th style={{ padding: '12px 16px', fontWeight: '600' }}>{copy.thRegistration}</th>
-                          <th></th>
-                          <th></th>
+                          <th style={{ padding: '12px 16px', fontWeight: '600' }}>{copy.thCategory}</th>
+                          <th style={{ padding: '12px 16px', fontWeight: '600' }}>{copy.thWeight}</th>
                           <th style={{ padding: '12px 16px', fontWeight: '600', textAlign: 'right' }}>{copy.thStatus}</th>
                         </tr>
                       </thead>
@@ -1030,8 +1032,8 @@ const EventDetails = () => {
                             <th style={{ padding: '12px 16px', fontWeight: '600' }}>{copy.thBirth}</th>
                             <th style={{ padding: '12px 16px', fontWeight: '600' }}>{copy.thAcademy}</th>
                             <th style={{ padding: '12px 16px', fontWeight: '600' }}>{copy.thRegistration}</th>
-                            <th></th>
-                            <th></th>
+                            <th style={{ padding: '12px 16px', fontWeight: '600' }}>{copy.thCategory}</th>
+                            <th style={{ padding: '12px 16px', fontWeight: '600' }}>{copy.thWeight}</th>
                             <th style={{ padding: '12px 16px', fontWeight: '600', textAlign: 'right' }}>{copy.thStatus}</th>
                           </tr>
                         </thead>
